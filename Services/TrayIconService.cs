@@ -27,6 +27,8 @@ internal sealed class TrayIconService : IDisposable
     private readonly Action _onExit;
     private readonly Func<bool>? _isDndEnabled;
     private readonly Action<bool>? _setDndEnabled;
+    private readonly Func<bool>? _isReplaceBannersEnabled;
+    private readonly Action<bool>? _setReplaceBannersEnabled;
     private IntPtr _hIcon;
     private bool _added;
 
@@ -42,7 +44,9 @@ internal sealed class TrayIconService : IDisposable
         Action onToggleStopwatch,
         Action onExit,
         Func<bool>? isDndEnabled = null,
-        Action<bool>? setDndEnabled = null)
+        Action<bool>? setDndEnabled = null,
+        Func<bool>? isReplaceBannersEnabled = null,
+        Action<bool>? setReplaceBannersEnabled = null)
     {
         _hwnd = hwnd;
         _onExpand = onExpand;
@@ -56,6 +60,8 @@ internal sealed class TrayIconService : IDisposable
         _onExit = onExit;
         _isDndEnabled = isDndEnabled;
         _setDndEnabled = setDndEnabled;
+        _isReplaceBannersEnabled = isReplaceBannersEnabled;
+        _setReplaceBannersEnabled = setReplaceBannersEnabled;
 
         string? exe = Environment.ProcessPath;
         if (!string.IsNullOrEmpty(exe) && File.Exists(exe))
@@ -148,6 +154,18 @@ internal sealed class TrayIconService : IDisposable
             };
             itemDnd.Click += (_, _) => _setDndEnabled(itemDnd.IsChecked);
             menu.Items.Add(itemDnd);
+        }
+
+        if (_isReplaceBannersEnabled != null && _setReplaceBannersEnabled != null)
+        {
+            var itemReplace = new MenuItem
+            {
+                Header = "Show Notifications in Island Only (Hide Windows Banners)",
+                IsCheckable = true,
+                IsChecked = _isReplaceBannersEnabled()
+            };
+            itemReplace.Click += (_, _) => _setReplaceBannersEnabled(itemReplace.IsChecked);
+            menu.Items.Add(itemReplace);
         }
 
         var itemStartup = new MenuItem

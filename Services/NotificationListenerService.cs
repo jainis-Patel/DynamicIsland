@@ -13,13 +13,24 @@ namespace DynamicIsland.Services;
 /// using Windows 10/11 UserNotificationListener and converts them into Dynamic Island toasts.
 /// Respects Do Not Disturb, Windows Focus Assist / Quiet Time, self-notification filtering, and per-app mute lists.
 /// </summary>
+/// <remarks>
+/// <see cref="UserNotificationListener.NotificationChanged"/> is only raised for packaged (MSIX) apps with
+/// package identity. For this unpackaged Win32 app subscribing either throws ("Element not found") or the
+/// event silently never fires, so new notifications are detected by polling
+/// <see cref="UserNotificationListener.GetNotificationsAsync"/> and diffing notification IDs.
+/// </remarks>
 internal sealed class NotificationListenerService : IDisposable
 {
+    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(750);
+
     private readonly Dispatcher _ui;
     private readonly Func<AppSettings>? _getSettings;
+    private readonly HashSet<uint> _seenIds = new();
     private UserNotificationListener? _listener;
-    private bool _initialized;
-    private bool _accessGranted;
+    private DispatcherTimer? _pollTimer;
+    private bool _eventSubscribed;
+    private bool _polling;
+    private bool _disposed;
 
     public event Action<ToastContent>? NotificationReceived;
 
@@ -28,6 +39,8 @@ internal sealed class NotificationListenerService : IDisposable
         _ui = ui;
         _getSettings = getSettings;
     }
+
+    public bool IsListening => _pollTimer?.IsEnabled ?? false;
 
     public async Task InitializeAsync()
     {
@@ -40,19 +53,74 @@ internal sealed class NotificationListenerService : IDisposable
             }
 
             _listener = UserNotificationListener.Current;
-            var access = await _listener.RequestAccessAsync();
-            _accessGranted = access == UserNotificationListenerAccessStatus.Allowed;
+
+            var access = _listener.GetAccessStatus();
+            if (access != UserNotificationListenerAccessStatus.Allowed)
+            {
+                // RequestAccessAsync must be invoked on the UI thread.
+                access = await _listener.RequestAccessAsync();
+            }
             App.Log($"[NotificationListener] Access status: {access}");
 
-            if (_accessGranted)
+            if (access != UserNotificationListenerAccessStatus.Allowed)
+            {
+                App.Log("[NotificationListener] Access denied. Enable 'Settings > Privacy & security > Notifications > Let apps access your notifications'.");
+                return;
+            }
+
+            // Snapshot existing notifications so Action Center history isn't replayed on startup.
+            var existing = await _listener.GetNotificationsAsync(NotificationKinds.Toast);
+            foreach (var n in existing) _seenIds.Add(n.Id);
+
+            // Best-effort event subscription (works only when running with package identity).
+            try
             {
                 _listener.NotificationChanged += OnNotificationChanged;
-                _initialized = true;
+                _eventSubscribed = true;
             }
+            catch (Exception ex)
+            {
+                App.Log($"[NotificationListener] NotificationChanged unavailable (unpackaged app), using polling: {ex.Message}");
+            }
+
+            _pollTimer = new DispatcherTimer(DispatcherPriority.Background, _ui) { Interval = PollInterval };
+            _pollTimer.Tick += async (_, _) => await PollAsync();
+            _pollTimer.Start();
+            App.Log($"[NotificationListener] Listening ({_seenIds.Count} existing notifications ignored).");
         }
         catch (Exception ex)
         {
             App.Log($"[NotificationListener] Init failed: {ex.Message}");
+        }
+    }
+
+    private async Task PollAsync()
+    {
+        if (_polling || _disposed || _listener == null) return;
+        _polling = true;
+        try
+        {
+            var current = await _listener.GetNotificationsAsync(NotificationKinds.Toast);
+            var currentIds = new HashSet<uint>();
+            foreach (var notif in current)
+            {
+                currentIds.Add(notif.Id);
+                if (_seenIds.Add(notif.Id))
+                {
+                    ProcessNotification(notif);
+                }
+            }
+
+            // Forget IDs that have left Action Center so the set doesn't grow unbounded.
+            _seenIds.IntersectWith(currentIds);
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[NotificationListener] Poll failed: {ex.Message}");
+        }
+        finally
+        {
+            _polling = false;
         }
     }
 
@@ -111,54 +179,95 @@ internal sealed class NotificationListenerService : IDisposable
     {
         if (args.ChangeKind != UserNotificationChangedKind.Added) return;
 
+        // Event can fire on a background thread; marshal to UI so _seenIds stays single-threaded.
+        _ui.InvokeAsync(() =>
+        {
+            try
+            {
+                if (!_seenIds.Add(args.UserNotificationId)) return;
+                var notif = sender.GetNotification(args.UserNotificationId);
+                if (notif != null) ProcessNotification(notif);
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[NotificationListener] Error reading notification: {ex.Message}");
+            }
+        });
+    }
+
+    private void ProcessNotification(UserNotification notif)
+    {
         try
         {
-            var notif = sender.GetNotification(args.UserNotificationId);
-            if (notif == null) return;
-
-            string appName = notif.AppInfo?.DisplayInfo?.DisplayName ?? "Notification";
-            if (ShouldSuppressNotification(appName, _getSettings?.Invoke(), IsWindowsFocusAssistActive()))
+            string appName = SafeAppName(notif);
+            var settings = _getSettings?.Invoke();
+            if (ShouldSuppressNotification(appName, settings, IsWindowsFocusAssistActive()))
             {
                 return;
             }
 
-            string title = "";
-            string body = "";
-
-            var binding = notif.Notification?.Visual?.GetBinding(KnownNotificationBindings.ToastGeneric);
-            if (binding != null)
-            {
-                var textElements = binding.GetTextElements();
-                var list = textElements?.ToList();
-                if (list != null && list.Count > 0)
-                {
-                    title = list[0].Text;
-                    if (list.Count > 1) body = list[1].Text;
-                }
-            }
-
+            var (title, body) = ExtractText(notif);
             if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
                 return;
 
             string glyph = GlyphForAppName(appName);
             Color accent = AccentForAppName(appName);
 
-            _ui.InvokeAsync(() =>
+            App.Log($"[NotificationListener] Showing notification from '{appName}'.");
+            NotificationReceived?.Invoke(new ToastContent(
+                glyph,
+                string.IsNullOrWhiteSpace(title) ? appName : $"{appName} · {title}",
+                body,
+                accent,
+                TimeSpan.FromSeconds(4),
+                TargetView: null,
+                Priority: ToastPriority.Notification));
+
+            // Show it in the island *instead of* the Windows banner: removing the notification
+            // dismisses the native toast popup (it is also removed from Action Center).
+            if (settings?.ReplaceWindowsBanners ?? false)
             {
-                NotificationReceived?.Invoke(new ToastContent(
-                    glyph,
-                    string.IsNullOrWhiteSpace(title) ? appName : $"{appName} · {title}",
-                    body,
-                    accent,
-                    TimeSpan.FromSeconds(3.5),
-                    TargetView: null,
-                    Priority: ToastPriority.Notification));
-            });
+                try { _listener?.RemoveNotification(notif.Id); }
+                catch (Exception ex) { App.Log($"[NotificationListener] Could not dismiss Windows banner: {ex.Message}"); }
+            }
         }
         catch (Exception ex)
         {
             App.Log($"[NotificationListener] Error reading notification: {ex.Message}");
         }
+    }
+
+    private static string SafeAppName(UserNotification notif)
+    {
+        try
+        {
+            string? name = notif.AppInfo?.DisplayInfo?.DisplayName;
+            if (!string.IsNullOrWhiteSpace(name)) return name;
+        }
+        catch
+        {
+            // AppInfo.DisplayInfo throws for some unpackaged (AUMID-only) senders.
+        }
+        return "Notification";
+    }
+
+    private static (string Title, string Body) ExtractText(UserNotification notif)
+    {
+        var visual = notif.Notification?.Visual;
+        if (visual == null) return ("", "");
+
+        // Prefer ToastGeneric, but fall back to the first binding for legacy templates (ToastText02, etc.).
+        var binding = visual.GetBinding(KnownNotificationBindings.ToastGeneric) ?? visual.Bindings.FirstOrDefault();
+        if (binding == null) return ("", "");
+
+        var texts = binding.GetTextElements()
+            .Select(t => t.Text?.Trim() ?? "")
+            .Where(t => t.Length > 0)
+            .ToList();
+
+        string title = texts.Count > 0 ? texts[0] : "";
+        string body = texts.Count > 1 ? string.Join(" ", texts.Skip(1)) : "";
+        return (title, body);
     }
 
     private static string GlyphForAppName(string name)
@@ -186,7 +295,9 @@ internal sealed class NotificationListenerService : IDisposable
 
     public void Dispose()
     {
-        if (_listener != null && _initialized)
+        _disposed = true;
+        _pollTimer?.Stop();
+        if (_listener != null && _eventSubscribed)
         {
             try { _listener.NotificationChanged -= OnNotificationChanged; } catch { }
         }

@@ -14,6 +14,8 @@ public sealed class AppSettings
     public int MonitorIndex { get; set; } = 0;
     public string? MonitorDeviceName { get; set; }
     public bool DoNotDisturb { get; set; } = false;
+    /// <summary>When true, Windows notification banners are dismissed after being shown in the island.</summary>
+    public bool ReplaceWindowsBanners { get; set; } = true;
     public bool ReduceMotion { get; set; } = false;
     public bool EnableDeveloperHotkeys { get; set; } = false;
     public List<string> MutedNotificationApps { get; set; } = new();

@@ -102,7 +102,10 @@ public partial class IslandWindow
                 onToggleStopwatch: () => Dispatcher.InvokeAsync(ToggleStopwatch),
                 onExit: () => Dispatcher.InvokeAsync(() => Application.Current.Shutdown()),
                 isDndEnabled: () => _settingsService.Current.DoNotDisturb,
-                setDndEnabled: enabled => Dispatcher.InvokeAsync(() => SetDoNotDisturb(enabled)));
+                setDndEnabled: enabled => Dispatcher.InvokeAsync(() => SetDoNotDisturb(enabled)),
+                isReplaceBannersEnabled: () => _settingsService.Current.ReplaceWindowsBanners,
+                setReplaceBannersEnabled: enabled => Dispatcher.InvokeAsync(() =>
+                    _settingsService.Update(s => s.ReplaceWindowsBanners = enabled, nameof(AppSettings.ReplaceWindowsBanners))));
 
             await _mediaService.InitializeAsync();
             UpdateSpectrumActivity();

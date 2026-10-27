@@ -13,6 +13,8 @@ An interactive, Apple-inspired **Dynamic Island** desktop overlay for Windows 10
   - Click the media source badge in the expanded view to cycle between multiple active media players, or `Shift + Scroll` / tilt-scroll on the pill to skip tracks.
 - **Priority-Aware Toast Queue & Action Center Notifications**:
   - Converts incoming Windows notifications into Dynamic Island banners (`Services/NotificationListenerService.cs`).
+  - Polls `UserNotificationListener.GetNotificationsAsync` (the `NotificationChanged` event only fires for packaged MSIX apps). Requires **Settings › Privacy & security › Notifications › Let apps access your notifications**.
+  - **Show Notifications in Island Only** (tray menu, on by default) dismisses the native Windows banner after it appears in the island. Note that this also removes it from Action Center.
   - Priority queue (`Critical > Notification > System > Feedback > Low`) with in-place category coalescing so volume scroll steps never overwrite incoming messages or low-battery warnings.
   - Built-in **Do Not Disturb (DND)** toggle and automatic Windows Focus Assist (`QUNS_QUIET_TIME`) suppression.
 - **Privacy-First Clipboard Manager**:
