@@ -5,12 +5,14 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using DynamicIsland.Services;
+using static DynamicIsland.Interop.NativeMethods;
 
 namespace DynamicIsland.Core;
 
 /// <summary>
-/// Built-in deterministic verification suite for core physics, state machine priority,
-/// calculator/unit conversion, and color extraction algorithms.
+/// Built-in deterministic verification suite for core physics, state machine priority &amp; toast queueing,
+/// fullscreen detection, clipboard privacy exclusion, atomic JSON persistence, activity resolution,
+/// countdown/Pomodoro timer, calculator/unit conversion, and color extraction algorithms.
 /// Run via: DynamicIsland.exe --self-test
 /// </summary>
 internal static class SelfTestRunner
@@ -39,11 +41,19 @@ internal static class SelfTestRunner
         Run("Spring: Stalled frame clamp prevents numerical explosion", TestSpringStalledFrame);
         Run("IslandStateMachine: State priority hierarchy (Hidden > Expanded > Toast > Compact > Idle)", TestStateMachinePriorities);
         Run("IslandStateMachine: Toast replacement & TargetView routing", TestStateMachineToastReplacement);
-        Run("QuickCalcService: Arithmetic, exponentiation, percentages, and unit conversions", TestQuickCalc);
-        Run("ColorExtractor: Vibrant hue extraction vs monochrome fallback", TestColorExtractor);
+        Run("IslandStateMachine: Toast priority queue & category coalescing", TestStateMachineToastPriorityQueue);
+        Run("FullscreenWatcher: Borderless-fullscreen detection with standard & auto-hidden taskbar", TestFullscreenBorderlessDetection);
         Run("ClipboardHistoryService: 4K screenshot bounding & detached freeze", TestClipboardImageBounding);
+        Run("ClipboardHistoryService: Password-manager privacy exclusion markers", TestClipboardPrivacyExclusion);
+        Run("AtomicJsonStore & SettingsService: Atomic save, schema migration & granular PropertyChanged", TestAtomicJsonAndSettings);
+        Run("NotificationListenerService: DND, Focus Assist Quiet Time, self-filter & per-app mute", TestNotificationSuppression);
+        Run("ActivityResolver & ExpandedView: Compact priority hierarchy & strongly-typed view routing", TestActivityResolverAndViews);
+        Run("CountdownTimerService: Pomodoro 25m countdown, pause/resume & deterministic completion", TestCountdownTimer);
+        Run("ServiceContainer: Deterministic reverse-order IDisposable lifecycle management", TestServiceContainerLifecycle);
+        Run("QuickCalcService: Arithmetic, exponentiation, percentages, sqrt & unit conversions", TestQuickCalc);
+        Run("ColorExtractor: Vibrant hue extraction vs monochrome fallback", TestColorExtractor);
         Run("ObservableCollection: Incremental sync avoids destructive Clear/Reset", TestIncrementalObservableSync);
-        Run("AppPaths: Writable data directory resolution", TestAppPaths);
+        Run("AppPaths: Writable data directory resolution & XAML dictionary validation", TestAppPaths);
         Run("ThemeBrushes: Pre-allocated brushes are frozen for render-thread safety", TestThemeBrushesFrozen);
         Run("AudioSpectrum: Lock-free band read & idle zeroing", TestAudioSpectrumLockFree);
 
@@ -104,7 +114,6 @@ internal static class SelfTestRunner
         Assert(sm.State == IslandState.Hidden, "Hidden (Suppressed) should override Expanded");
 
         sm.SetSuppressed(false);
-        // After suppression ends, hover was cleared so Toast is next highest priority
         Assert(sm.State == IslandState.Toast, $"Expected Toast after unsuppress, got {sm.State}");
 
         sm.ExpandNow();
@@ -123,6 +132,211 @@ internal static class SelfTestRunner
 
         sm.PushToast(new ToastContent("B", "Second", "2", Colors.Green, TimeSpan.FromSeconds(3)));
         Assert(lastReplacing, "Second consecutive toast in Toast state should have replacing=true");
+    }
+
+    private static void TestStateMachineToastPriorityQueue()
+    {
+        var sm = new IslandStateMachine();
+
+        // 1. Show a Notification toast (priority = Notification)
+        var notifToast = new ToastContent("N", "Discord · Alice", "Hey there!", Colors.CornflowerBlue, TimeSpan.FromSeconds(3.5), null, ToastPriority.Notification);
+        sm.PushToast(notifToast);
+        Assert(sm.ActiveToast?.Title == "Discord · Alice", "Notification toast should be active");
+
+        // 2. Push a low-priority Volume Feedback toast while Notification is showing -> should NOT clobber Notification!
+        var volToast = new ToastContent("V", "Volume", "60%", Colors.DodgerBlue, TimeSpan.FromSeconds(1.8), "audio", ToastPriority.Feedback, "volume");
+        sm.PushToast(volToast);
+        Assert(sm.ActiveToast?.Title == "Discord · Alice", "Feedback toast must not clobber active Notification toast");
+
+        // 3. Push a System toast (e.g. Track changed) while Notification is showing -> should queue behind Notification
+        var trackToast = new ToastContent("M", "Strobe", "deadmau5", Colors.Orange, TimeSpan.FromSeconds(2.8), "media", ToastPriority.System, "track");
+        sm.PushToast(trackToast);
+        Assert(sm.ActiveToast?.Title == "Discord · Alice", "System toast must not clobber active Notification toast");
+        Assert(sm.QueuedToastCount == 1, $"Expected 1 queued toast, got {sm.QueuedToastCount}");
+
+        // 4. Push a Critical toast (Battery Low) -> preempts Notification AND re-queues the Notification at the front!
+        var critToast = new ToastContent("C", "Battery Low", "15% remaining", Colors.Red, TimeSpan.FromSeconds(4.0), "battery", ToastPriority.Critical);
+        sm.PushToast(critToast);
+        Assert(sm.ActiveToast?.Title == "Battery Low", "Critical toast must immediately preempt Notification");
+        Assert(sm.QueuedToastCount == 2, $"Expected 2 queued toasts (Notification + System), got {sm.QueuedToastCount}");
+
+        // 5. Advance toast queue: Notification resumes first, then Track toast, then Idle
+        sm.AdvanceToast();
+        Assert(sm.ActiveToast?.Title == "Discord · Alice", $"Expected re-queued Notification next, got {sm.ActiveToast?.Title}");
+
+        sm.AdvanceToast();
+        Assert(sm.ActiveToast?.Title == "Strobe", $"Expected queued System toast next, got {sm.ActiveToast?.Title}");
+
+        // 6. Test same-category coalescing in-place
+        sm.PushToast(new ToastContent("M", "Harder Better Faster", "Daft Punk", Colors.Gold, TimeSpan.FromSeconds(2.8), "media", ToastPriority.System, "track"));
+        Assert(sm.ActiveToast?.Title == "Harder Better Faster", "Same-category toast should update in-place");
+        Assert(sm.QueuedToastCount == 0, "In-place category coalescing should not grow queue");
+
+        sm.AdvanceToast();
+        Assert(sm.ActiveToast is null && sm.State == IslandState.Idle, "State machine should return to Idle when queue drains");
+    }
+
+    private static void TestFullscreenBorderlessDetection()
+    {
+        var fullRect = new RECT { Left = 0, Top = 0, Right = 2560, Bottom = 1440 };
+
+        // Case 1: Standard visible taskbar (rcWork < rcMonitor) -> borderless window covering rcMonitor is fullscreen
+        var standardMon = new MONITORINFO
+        {
+            rcMonitor = fullRect,
+            rcWork = new RECT { Left = 0, Top = 0, Right = 2560, Bottom = 1392 }
+        };
+        Assert(FullscreenWatcher.IsWindowBorderlessFullscreen(fullRect, standardMon, WS_CAPTION | WS_THICKFRAME),
+            "Window covering full monitor when taskbar is visible should be detected as fullscreen");
+
+        // Case 2: Auto-hidden taskbar (rcWork == rcMonitor) + normal maximized window (has WS_CAPTION) -> NOT fullscreen
+        var autoHideMon = new MONITORINFO
+        {
+            rcMonitor = fullRect,
+            rcWork = fullRect
+        };
+        Assert(!FullscreenWatcher.IsWindowBorderlessFullscreen(fullRect, autoHideMon, WS_CAPTION | WS_THICKFRAME),
+            "Normal maximized window with WS_CAPTION on auto-hidden taskbar must NOT be treated as fullscreen");
+
+        // Case 3: Auto-hidden taskbar (rcWork == rcMonitor) + borderless game/video (no WS_CAPTION, no WS_THICKFRAME) -> IS fullscreen
+        Assert(FullscreenWatcher.IsWindowBorderlessFullscreen(fullRect, autoHideMon, 0),
+            "Borderless window (style=0) covering monitor with auto-hidden taskbar MUST be detected as fullscreen");
+    }
+
+    private static void TestClipboardPrivacyExclusion()
+    {
+        // 1. Normal text clip -> allowed
+        var normalObj = new DataObject();
+        normalObj.SetText("Hello world");
+        Assert(!ClipboardHistoryService.ShouldExcludeClipboardData(normalObj),
+            "Normal text clipboard object should not be excluded");
+
+        // 2. Password manager sets ExcludeClipboardContentFromMonitorProcessing -> excluded
+        var pwdObj = new DataObject();
+        pwdObj.SetText("SuperSecretPassword123!");
+        pwdObj.SetData(ClipboardHistoryService.FormatExcludeFromMonitoring, true);
+        Assert(ClipboardHistoryService.ShouldExcludeClipboardData(pwdObj),
+            "Clipboard data with ExcludeClipboardContentFromMonitorProcessing must be excluded");
+
+        // 3. Windows CanIncludeInClipboardHistory = 0 (DWORD) -> excluded
+        var noHistObj = new DataObject();
+        noHistObj.SetText("TemporaryAuthToken");
+        noHistObj.SetData(ClipboardHistoryService.FormatCanIncludeInHistory, 0);
+        Assert(ClipboardHistoryService.ShouldExcludeClipboardData(noHistObj),
+            "Clipboard data with CanIncludeInClipboardHistory=0 must be excluded");
+    }
+
+    private static void TestAtomicJsonAndSettings()
+    {
+        string tempFile = Path.Combine(Path.GetTempPath(), $"di_test_settings_{Guid.NewGuid():N}.json");
+        try
+        {
+            var svc = new SettingsService(tempFile);
+            string? lastChangedProp = null;
+            svc.PropertyChanged += prop => lastChangedProp = prop;
+
+            svc.Update(s =>
+            {
+                s.NotchYOffset = 14;
+                s.DoNotDisturb = true;
+                s.MonitorDeviceName = @"\\.\DISPLAY2";
+            }, nameof(AppSettings.NotchYOffset));
+
+            Assert(lastChangedProp == nameof(AppSettings.NotchYOffset), $"Expected PropertyChanged 'NotchYOffset', got '{lastChangedProp}'");
+            svc.SaveNow();
+            Assert(File.Exists(tempFile), "AtomicJsonStore did not write settings file");
+
+            var reloaded = new SettingsService(tempFile);
+            Assert(reloaded.Current.SchemaVersion == 2, "Expected SchemaVersion 2");
+            Assert(Math.Abs(reloaded.Current.NotchYOffset - 14) < 0.001, $"Expected NotchYOffset 14, got {reloaded.Current.NotchYOffset}");
+            Assert(reloaded.Current.DoNotDisturb, "Expected DoNotDisturb=true after reload");
+            Assert(reloaded.Current.MonitorDeviceName == @"\\.\DISPLAY2", "Expected MonitorDeviceName persisted");
+        }
+        finally
+        {
+            try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+        }
+    }
+
+    private static void TestNotificationSuppression()
+    {
+        var settings = new AppSettings { DoNotDisturb = false };
+        settings.MutedNotificationApps.Add("Slack");
+
+        Assert(!NotificationListenerService.ShouldSuppressNotification("Discord", settings, isQuietTime: false),
+            "Unmuted app should not be suppressed when DND and QuietTime are off");
+        Assert(NotificationListenerService.ShouldSuppressNotification("Slack", settings, isQuietTime: false),
+            "Muted app 'Slack' must be suppressed");
+        Assert(NotificationListenerService.ShouldSuppressNotification("Dynamic Island", settings, isQuietTime: false),
+            "Self notifications from 'Dynamic Island' must be suppressed");
+        Assert(NotificationListenerService.ShouldSuppressNotification("Discord", settings, isQuietTime: true),
+            "Notifications must be suppressed during Windows Focus Assist Quiet Time");
+
+        settings.DoNotDisturb = true;
+        Assert(NotificationListenerService.ShouldSuppressNotification("Discord", settings, isQuietTime: false),
+            "All notifications must be suppressed when DoNotDisturb is enabled");
+    }
+
+    private static void TestActivityResolverAndViews()
+    {
+        // Priority: Recording > Media > Call > Countdown > Download > Stopwatch
+        var r1 = ActivityResolver.Resolve(recording: true, mediaPlaying: true, callActive: true, countdownRunning: true, downloading: true, stopwatchActive: true);
+        Assert(r1.HasActivity && r1.ActiveHost == CompactActivityKind.Recording, "Recording must have highest Compact priority");
+        Assert(ActivityResolver.ResolveCompactTargetView(r1.ActiveHost) == ExpandedView.VoiceMemo, "Recording click should route to VoiceMemo");
+
+        var r2 = ActivityResolver.Resolve(recording: false, mediaPlaying: false, callActive: false, countdownRunning: true, downloading: true, stopwatchActive: true);
+        Assert(r2.HasActivity && r2.ActiveHost == CompactActivityKind.Countdown, "Countdown should take priority over Download and Stopwatch");
+
+        var r3 = ActivityResolver.Resolve(recording: false, mediaPlaying: false, callActive: false, countdownRunning: false, downloading: true, stopwatchActive: false);
+        Assert(ActivityResolver.ResolveCompactTargetView(r3.ActiveHost) == ExpandedView.Shelf, "Download click should route to Shelf");
+
+        foreach (var view in Enum.GetValues<ExpandedView>())
+        {
+            string key = view.ToKey();
+            Assert(ExpandedViewExtensions.TryParseKey(key, out var roundTrip) && roundTrip == view,
+                $"ExpandedView round-trip failed for {view} ('{key}')");
+        }
+    }
+
+    private static void TestCountdownTimer()
+    {
+        using var timer = new CountdownTimerService();
+        bool completedFired = false;
+        string? completedLabel = null;
+        timer.Completed += lbl =>
+        {
+            completedFired = true;
+            completedLabel = lbl;
+        };
+
+        timer.StartCountdown(TimeSpan.FromSeconds(10), "Focus");
+        Assert(timer.IsRunning && timer.IsActive, "Timer should be running after StartCountdown");
+
+        timer.AdvanceSimulated(TimeSpan.FromSeconds(4));
+        Assert(!completedFired && timer.Remaining <= TimeSpan.FromSeconds(6.1), $"Expected ~6s remaining, got {timer.Remaining}");
+
+        timer.AdvanceSimulated(TimeSpan.FromSeconds(7));
+        Assert(completedFired && completedLabel == "Focus", "Timer should fire Completed when countdown reaches zero");
+        Assert(!timer.IsRunning && timer.Remaining == TimeSpan.Zero, "Timer should stop at 00:00 after completion");
+    }
+
+    private sealed class DummyDisposable : IDisposable
+    {
+        private readonly List<int> _order;
+        private readonly int _id;
+        public DummyDisposable(List<int> order, int id) { _order = order; _id = id; }
+        public void Dispose() => _order.Add(_id);
+    }
+
+    private static void TestServiceContainerLifecycle()
+    {
+        var order = new List<int>();
+        var container = new ServiceContainer();
+        container.Register<object>(new DummyDisposable(order, 1));
+        container.Register<DummyDisposable>(new DummyDisposable(order, 2));
+        container.Dispose();
+
+        Assert(order.SequenceEqual(new[] { 2, 1 }), $"ServiceContainer must dispose in reverse registration order, got [{string.Join(",", order)}]");
     }
 
     private static void TestQuickCalc()
@@ -144,6 +358,12 @@ internal static class SelfTestRunner
 
         var r6 = QuickCalcService.Evaluate("10 inch in cm");
         Assert(r6.Success && r6.Result == "25.4", $"Expected 25.4 for '10 inch in cm', got {r6.Result}");
+
+        var r7 = QuickCalcService.Evaluate("sqrt(144)");
+        Assert(r7.Success && r7.Result == "12", $"Expected 12 for 'sqrt(144)', got {r7.Result}");
+
+        var r8 = QuickCalcService.Evaluate("2 gb in mb");
+        Assert(r8.Success && r8.Result == "2048", $"Expected 2048 for '2 gb in mb', got {r8.Result}");
     }
 
     private static void TestColorExtractor()
@@ -158,7 +378,7 @@ internal static class SelfTestRunner
             greyPixels[i + 2] = 100; // R
             greyPixels[i + 3] = 255; // A
         }
-        greyBmp.WritePixels(new System.Windows.Int32Rect(0, 0, 16, 16), greyPixels, 16 * 4, 0);
+        greyBmp.WritePixels(new Int32Rect(0, 0, 16, 16), greyPixels, 16 * 4, 0);
         Color neutral = ColorExtractor.Vibrant(greyBmp);
         Assert(neutral.R == 0xE5 && neutral.G == 0xE5 && neutral.B == 0xEA, $"Expected neutral fallback, got {neutral}");
 
@@ -172,7 +392,7 @@ internal static class SelfTestRunner
             redPixels[i + 2] = 240; // R
             redPixels[i + 3] = 255; // A
         }
-        redBmp.WritePixels(new System.Windows.Int32Rect(0, 0, 16, 16), redPixels, 16 * 4, 0);
+        redBmp.WritePixels(new Int32Rect(0, 0, 16, 16), redPixels, 16 * 4, 0);
         Color vivid = ColorExtractor.Vibrant(redBmp);
         Assert(vivid.R > 200 && vivid.R > vivid.B * 2, $"Expected vivid red-dominant accent, got {vivid}");
     }

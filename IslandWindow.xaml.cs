@@ -28,12 +28,13 @@ public partial class IslandWindow : Window
 
     private static readonly ToastContent[] DemoToasts =
     {
-        new("\uE767", "Volume", "65%", ThemeBrushes.BlueColor, TimeSpan.FromSeconds(2.5)),
-        new("\uE702", "AirPods Pro", "Connected · 82%", ThemeBrushes.PurpleColor, TimeSpan.FromSeconds(3.5)),
-        new("\uE851", "Battery low", "15% remaining", ThemeBrushes.RedColor, TimeSpan.FromSeconds(4)),
-        new("\uE709", "Airplane mode", "On", ThemeBrushes.AmberColor, TimeSpan.FromSeconds(2.5)),
+        new("\uE767", "Volume", "65%", ThemeBrushes.BlueColor, TimeSpan.FromSeconds(2.5), null, ToastPriority.Feedback, "volume"),
+        new("\uE702", "AirPods Pro", "Connected · 82%", ThemeBrushes.PurpleColor, TimeSpan.FromSeconds(3.5), "audio", ToastPriority.System),
+        new("\uE851", "Battery low", "15% remaining", ThemeBrushes.RedColor, TimeSpan.FromSeconds(4), "battery", ToastPriority.Critical),
+        new("\uE709", "Airplane mode", "On", ThemeBrushes.AmberColor, TimeSpan.FromSeconds(2.5), null, ToastPriority.System),
     };
 
+    private readonly ServiceContainer _services = new();
     private readonly IslandStateMachine _machine = new();
     private readonly Spring _width, _height, _radius;
     private readonly RectangleGeometry _contentClip = new();
@@ -45,6 +46,7 @@ public partial class IslandWindow : Window
     private readonly FrameworkElement[] _panels;
     private readonly FrameworkElement[] _allContainers;
     private readonly Button[] _dockButtons;
+    private readonly IReadOnlyDictionary<ExpandedView, (FrameworkElement Container, Button DockButton)> _viewRegistry;
     private readonly ScaleTransform[] _bars;
 
     // Observable collections for zero-teardown ItemsControl bindings
@@ -53,7 +55,7 @@ public partial class IslandWindow : Window
     private readonly ObservableCollection<AudioEndpointInfo> _audioEndpoints = new();
     private readonly ObservableCollection<PeripheralDeviceInfo> _peripheralDevices = new();
 
-    // Services
+    // Services (managed via _services container)
     private readonly MediaSessionService _mediaService;
     private readonly AudioSpectrum _audioSpectrum;
     private readonly PowerPlanService _powerPlanService;
@@ -69,12 +71,14 @@ public partial class IslandWindow : Window
     private readonly AudioEndpointService _audioEndpointService;
     private readonly VoiceMemoService _voiceMemoService;
     private readonly PeripheralDeviceService _peripheralService;
+    private readonly CountdownTimerService _countdownService;
     private TrayIconService? _trayIcon;
 
     private readonly float[] _bandLevels = new float[AudioSpectrum.BandCount];
     private readonly float[] _smoothBands = new float[AudioSpectrum.BandCount];
 
-    private string _currentExpandedView = "media";
+    private ExpandedView _currentExpandedView = ExpandedView.Media;
+    private CompactActivityKind _activeCompactHost = CompactActivityKind.None;
     private string? _lastTimeText;
     private string? _lastDateShortText;
     private string? _lastTimerText;
@@ -103,18 +107,21 @@ public partial class IslandWindow : Window
             panel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        _allContainers = new FrameworkElement[]
+        _viewRegistry = new Dictionary<ExpandedView, (FrameworkElement, Button)>
         {
-            MediaContainer, ShelfContainer, ClipboardContainer, CalcContainer,
-            SettingsContainer, AudioContainer, BatteryContainer, VoiceMemoContainer,
-            PeripheralsContainer
+            [ExpandedView.Media] = (MediaContainer, MediaHomeButton),
+            [ExpandedView.Shelf] = (ShelfContainer, ShelfButton),
+            [ExpandedView.Clipboard] = (ClipboardContainer, ClipboardButton),
+            [ExpandedView.Calc] = (CalcContainer, CalcButton),
+            [ExpandedView.Settings] = (SettingsContainer, SettingsButton),
+            [ExpandedView.Audio] = (AudioContainer, AudioButton),
+            [ExpandedView.Battery] = (BatteryContainer, BatteryButton),
+            [ExpandedView.VoiceMemo] = (VoiceMemoContainer, RecordButton),
+            [ExpandedView.Peripherals] = (PeripheralsContainer, PeripheralsButton),
         };
 
-        _dockButtons = new Button[]
-        {
-            MediaHomeButton, ShelfButton, ClipboardButton, CalcButton, AudioButton,
-            BatteryButton, RecordButton, PeripheralsButton, SettingsButton
-        };
+        _allContainers = _viewRegistry.Values.Select(v => v.Container).ToArray();
+        _dockButtons = _viewRegistry.Values.Select(v => v.DockButton).ToArray();
         SetDockActive(MediaHomeButton);
 
         _bars = new[] { Bar0, Bar1, Bar2, Bar3 }.Select(bar =>
@@ -134,28 +141,29 @@ public partial class IslandWindow : Window
         _machine.StateChanged += OnStateChanged;
         _machine.ToastChanged += OnToastChanged;
 
-        _cursor = new CursorTracker(GetHotZone);
+        _cursor = _services.Register(new CursorTracker(GetHotZone));
         _cursor.InsideChanged += OnPointerInsideChanged;
 
-        _fullscreen = new FullscreenWatcher(() => (_hwnd, GetTargetMonitor()));
+        _fullscreen = _services.Register(new FullscreenWatcher(() => (_hwnd, GetTargetMonitor())));
         _fullscreen.Changed += fullscreen => _machine.SetSuppressed(fullscreen);
 
-        // Initialize Services (sharing a single CoreAudio MMDeviceEnumerator)
-        _audioEndpointService = new AudioEndpointService(Dispatcher);
-        _mediaService = new MediaSessionService(Dispatcher);
-        _audioSpectrum = new AudioSpectrum();
-        _powerPlanService = new PowerPlanService(Dispatcher);
-        _bluetoothMonitor = new BluetoothMonitor(Dispatcher);
-        _volumeService = new VolumeService(Dispatcher, _audioEndpointService.SharedEnumerator);
-        _telemetryService = new SystemTelemetryService();
-        _shelfService = new DropShelfService();
-        _privacyService = new PrivacyIndicatorService(Dispatcher, _audioEndpointService.SharedEnumerator);
-        _notificationListener = new NotificationListenerService(Dispatcher);
-        _clipboardService = new ClipboardHistoryService(Dispatcher);
-        _downloadService = new DownloadTrackerService(Dispatcher);
-        _settingsService = new SettingsService();
-        _voiceMemoService = new VoiceMemoService(Dispatcher);
-        _peripheralService = new PeripheralDeviceService(Dispatcher);
+        // Register Services in _services container (sharing a single CoreAudio MMDeviceEnumerator)
+        _settingsService = _services.Register(new SettingsService());
+        _audioEndpointService = _services.Register(new AudioEndpointService(Dispatcher));
+        _mediaService = _services.Register(new MediaSessionService(Dispatcher));
+        _audioSpectrum = _services.Register(new AudioSpectrum());
+        _powerPlanService = _services.Register(new PowerPlanService(Dispatcher));
+        _bluetoothMonitor = _services.Register(new BluetoothMonitor(Dispatcher));
+        _volumeService = _services.Register(new VolumeService(Dispatcher, _audioEndpointService.SharedEnumerator));
+        _telemetryService = _services.Register(new SystemTelemetryService());
+        _shelfService = _services.Register(new DropShelfService());
+        _privacyService = _services.Register(new PrivacyIndicatorService(Dispatcher, _audioEndpointService.SharedEnumerator));
+        _notificationListener = _services.Register(new NotificationListenerService(Dispatcher, () => _settingsService.Current));
+        _clipboardService = _services.Register(new ClipboardHistoryService(Dispatcher));
+        _downloadService = _services.Register(new DownloadTrackerService(Dispatcher));
+        _voiceMemoService = _services.Register(new VoiceMemoService(Dispatcher));
+        _peripheralService = _services.Register(new PeripheralDeviceService(Dispatcher));
+        _countdownService = _services.Register(new CountdownTimerService());
 
         _mediaService.Changed += OnMediaChanged;
         _mediaService.TrackChanged += OnTrackChanged;
@@ -185,6 +193,8 @@ public partial class IslandWindow : Window
         _peripheralService.DevicesChanged += OnPeripheralsChanged;
         _peripheralService.DevicesChanged += _audioEndpointService.SyncBluetoothBatteries;
         _peripheralService.LowBatteryAlert += OnPeripheralLowBatteryAlert;
+        _countdownService.StateChanged += RefreshStopwatchUI;
+        _countdownService.Completed += OnCountdownCompleted;
 
         _clockTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background,
             (_, _) => UpdateClockAndTimeline(), Dispatcher);
@@ -204,7 +214,7 @@ public partial class IslandWindow : Window
         OnPeripheralsChanged(_peripheralService.Devices);
         InitializeVoiceMemoUI();
         ApplySettings();
-        _settingsService.Changed += OnSettingsChanged;
+        _settingsService.PropertyChanged += OnSettingsPropertyChanged;
     }
 
     private void WireEvents()
@@ -213,21 +223,27 @@ public partial class IslandWindow : Window
         {
             if (_machine.State == IslandState.Expanded) return;
 
-            string? targetView = null;
+            ExpandedView? targetView = null;
             if (_machine.State == IslandState.Toast)
             {
-                targetView = _machine.ActiveToast?.TargetView;
+                if (ExpandedViewExtensions.TryParseKey(_machine.ActiveToast?.TargetView, out var parsed))
+                {
+                    targetView = parsed;
+                }
             }
             else if (_machine.State == IslandState.Compact)
             {
-                if (_voiceMemoService.IsRecording) targetView = "voicememo";
-                else if (_downloadService.HasActiveDownloads && !(_mediaService.Current?.IsPlaying ?? false)) targetView = "shelf";
+                var compactTarget = ActivityResolver.ResolveCompactTargetView(_activeCompactHost);
+                if (compactTarget != ExpandedView.Media)
+                {
+                    targetView = compactTarget;
+                }
             }
 
             _machine.ExpandNow();
-            if (!string.IsNullOrEmpty(targetView))
+            if (targetView.HasValue)
             {
-                SwitchExpandedView(targetView);
+                SwitchExpandedView(targetView.Value);
             }
             e.Handled = true;
         };
@@ -253,19 +269,20 @@ public partial class IslandWindow : Window
             }
         };
 
-        MediaHomeButton.Click += (_, _) => SwitchExpandedView("media");
+        MediaHomeButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Media);
         StartPauseButton.Click += (_, _) => ToggleStopwatch();
+        PomodoroButton.Click += (_, _) => StartPomodoroTimer();
         ResetButton.Click += (_, _) => ResetStopwatch();
-        ShelfButton.Click += (_, _) => ToggleShelfView();
+        ShelfButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Shelf);
         ClearShelfButton.Click += (_, _) => _shelfService.Clear();
-        ClipboardButton.Click += (_, _) => ToggleClipboardView();
+        ClipboardButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Clipboard);
         ClearClipboardButton.Click += (_, _) => _clipboardService.Clear();
-        CalcButton.Click += (_, _) => ToggleCalcView();
-        AudioButton.Click += (_, _) => ToggleAudioView();
-        BatteryButton.Click += (_, _) => ToggleBatteryView();
-        RecordButton.Click += (_, _) => ToggleVoiceMemoView();
-        PeripheralsButton.Click += (_, _) => TogglePeripheralsView();
-        SettingsButton.Click += (_, _) => ToggleSettingsView();
+        CalcButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Calc);
+        AudioButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Audio);
+        BatteryButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Battery);
+        RecordButton.Click += (_, _) => SwitchExpandedView(ExpandedView.VoiceMemo);
+        PeripheralsButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Peripherals);
+        SettingsButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Settings);
         MicMuteButton.Click += (_, _) => ToggleMicMute();
         PreviewKeyDown += IslandWindow_PreviewKeyDown;
     }
@@ -277,18 +294,29 @@ public partial class IslandWindow : Window
     private void EvaluateActivity()
     {
         bool mediaPlaying = _mediaService.Current?.IsPlaying ?? false;
-        bool timerActive = _stopwatch.IsRunning || _stopwatch.Elapsed > TimeSpan.Zero;
+        bool stopwatchActive = _stopwatch.IsRunning || _stopwatch.Elapsed > TimeSpan.Zero;
+        bool countdownRunning = _countdownService?.IsActive ?? false;
         bool callActive = !string.IsNullOrWhiteSpace(_privacyService.ActiveCallApp);
         bool downloading = _downloadService.HasActiveDownloads;
         bool recording = _voiceMemoService?.IsRecording ?? false;
-        _machine.SetActivity(mediaPlaying || timerActive || callActive || downloading || recording);
 
-        // Update Compact mode hosts priority: Recording > Media > Call > Download > Timer
-        CompactRecordHost.Visibility = recording ? Visibility.Visible : Visibility.Collapsed;
-        CompactMediaHost.Visibility = !recording && mediaPlaying ? Visibility.Visible : Visibility.Collapsed;
-        CompactCallHost.Visibility = !recording && !mediaPlaying && callActive ? Visibility.Visible : Visibility.Collapsed;
-        CompactDownloadHost.Visibility = !recording && !mediaPlaying && !callActive && downloading ? Visibility.Visible : Visibility.Collapsed;
-        CompactTimerHost.Visibility = !recording && !mediaPlaying && !callActive && !downloading ? Visibility.Visible : Visibility.Collapsed;
+        var (hasActivity, host) = ActivityResolver.Resolve(
+            recording,
+            mediaPlaying,
+            callActive,
+            countdownRunning,
+            downloading,
+            stopwatchActive);
+
+        _activeCompactHost = host;
+        _machine.SetActivity(hasActivity);
+
+        bool showTimerHost = host is CompactActivityKind.Countdown or CompactActivityKind.Stopwatch or CompactActivityKind.None;
+        CompactRecordHost.Visibility = host == CompactActivityKind.Recording ? Visibility.Visible : Visibility.Collapsed;
+        CompactMediaHost.Visibility = host == CompactActivityKind.Media ? Visibility.Visible : Visibility.Collapsed;
+        CompactCallHost.Visibility = host == CompactActivityKind.Call ? Visibility.Visible : Visibility.Collapsed;
+        CompactDownloadHost.Visibility = host == CompactActivityKind.Download ? Visibility.Visible : Visibility.Collapsed;
+        CompactTimerHost.Visibility = showTimerHost ? Visibility.Visible : Visibility.Collapsed;
 
         UpdateSpectrumActivity();
         UpdateClockTimerInterval();
@@ -298,6 +326,7 @@ public partial class IslandWindow : Window
     {
         bool needsSubSecond = _machine.State == IslandState.Expanded ||
                               _stopwatch.IsRunning ||
+                              (_countdownService?.IsRunning ?? false) ||
                               _privacyService.CallStartTime.HasValue;
         var targetInterval = needsSubSecond ? TimeSpan.FromMilliseconds(200) : TimeSpan.FromSeconds(1);
         if (_clockTimer != null && _clockTimer.Interval != targetInterval)
@@ -326,8 +355,22 @@ public partial class IslandWindow : Window
             }
         }
 
-        // Stopwatch formatting (only update TextBlocks when text changes)
-        if (_stopwatch.IsRunning || _lastTimerText == null)
+        // Poll Pomodoro / Countdown completion
+        _countdownService?.PollCompletion();
+
+        // Stopwatch or Countdown formatting (only update TextBlocks when text changes)
+        bool isCountdown = _countdownService is { IsActive: true } || (_countdownService?.TargetDuration > TimeSpan.Zero && !_stopwatch.IsRunning);
+        if (isCountdown && _countdownService != null)
+        {
+            string formatted = _countdownService.FormatRemaining();
+            if (formatted != _lastTimerText)
+            {
+                _lastTimerText = formatted;
+                CompactTimer.Text = formatted;
+                ExpandedTimer.Text = formatted;
+            }
+        }
+        else if (_stopwatch.IsRunning || _lastTimerText == null)
         {
             var elapsed = _stopwatch.Elapsed;
             string formattedTimer = elapsed.TotalHours >= 1 ? elapsed.ToString(@"h\:mm\:ss") : elapsed.ToString(@"mm\:ss");
@@ -444,21 +487,7 @@ public partial class IslandWindow : Window
 
         _settingsService.SaveNow();
         _trayIcon?.Dispose();
-        _cursor.Dispose();
-        _fullscreen.Dispose();
-        _powerPlanService.Dispose();
-        _bluetoothMonitor.Dispose();
-        _audioSpectrum.Dispose();
-        _mediaService.Dispose();
-        _volumeService.Dispose();
-        _telemetryService.Dispose();
-        _privacyService.Dispose();
-        _notificationListener.Dispose();
-        _clipboardService.Dispose();
-        _downloadService.Dispose();
-        _audioEndpointService.Dispose();
-        _voiceMemoService.Dispose();
-        _peripheralService.Dispose();
+        _services.Dispose();
 
         base.OnClosed(e);
     }

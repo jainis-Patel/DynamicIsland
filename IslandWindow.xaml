@@ -247,7 +247,9 @@
                                             <TextBlock x:Name="ExpandedArtist" FontSize="12" Margin="0,2,0,0"
                                                        Foreground="{StaticResource SecondaryBrush}" TextTrimming="CharacterEllipsis" Text="System Audio" />
                                             <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                                                <Border Background="#14FFFFFF" CornerRadius="5" Padding="6,1.5">
+                                                <Border Background="#14FFFFFF" CornerRadius="5" Padding="6,1.5"
+                                                        Cursor="Hand" MouseLeftButtonDown="MediaSourceBadge_Click"
+                                                        ToolTip="Click to switch active media player">
                                                     <TextBlock x:Name="ExpandedSourceApp" FontSize="9.5" FontWeight="Medium"
                                                                Foreground="{StaticResource SecondaryBrush}" Text="Media" />
                                                 </Border>
@@ -287,23 +289,26 @@
                                             </StackPanel>
                                         </StackPanel>
 
-                                        <!-- Interactive Stopwatch Capsule -->
+                                        <!-- Interactive Stopwatch & Pomodoro Countdown Capsule -->
                                         <Border Grid.Column="1" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}"
                                                 BorderThickness="1" CornerRadius="12" Padding="12,7" VerticalAlignment="Center">
                                             <StackPanel HorizontalAlignment="Right">
-                                                <TextBlock HorizontalAlignment="Right" FontSize="9.5" FontWeight="Medium"
+                                                <TextBlock x:Name="ExpandedTimerModeLabel" HorizontalAlignment="Right" FontSize="9.5" FontWeight="Medium"
                                                            Foreground="{StaticResource SecondaryBrush}" Text="Stopwatch" />
                                                 <TextBlock x:Name="ExpandedTimer" Style="{StaticResource Digits}" HorizontalAlignment="Right"
                                                            FontSize="19" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
                                                            Margin="0,1,0,4" Text="00:00" />
                                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                                    <Button x:Name="StartPauseButton" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0,0,4,0" ToolTip="Start / Pause Stopwatch (Ctrl+Alt+A)">
+                                                    <Button x:Name="StartPauseButton" AutomationProperties.Name="Start or Pause Timer" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0,0,4,0" ToolTip="Start / Pause Stopwatch (Ctrl+Alt+A)">
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock x:Name="StartPauseGlyph" Style="{StaticResource Glyph}" FontSize="9" Text="&#xE768;" />
                                                             <TextBlock x:Name="StartPauseLabel" Margin="4,0,0,0" FontSize="9.5" FontWeight="SemiBold" Text="Start" />
                                                         </StackPanel>
                                                     </Button>
-                                                    <Button x:Name="ResetButton" Style="{StaticResource CircleButton}" Width="22" Height="22" ToolTip="Reset Stopwatch">
+                                                    <Button x:Name="PomodoroButton" AutomationProperties.Name="Start 25 Minute Pomodoro" Style="{StaticResource IslandButton}" Height="22" Padding="7,0" Margin="0,0,4,0" ToolTip="Start 25-Minute Pomodoro Countdown">
+                                                        <TextBlock FontSize="9.5" FontWeight="SemiBold" Text="25m" />
+                                                    </Button>
+                                                    <Button x:Name="ResetButton" AutomationProperties.Name="Reset Timer" Style="{StaticResource CircleButton}" Width="22" Height="22" ToolTip="Reset Stopwatch / Timer">
                                                         <TextBlock Style="{StaticResource Glyph}" FontSize="9.5" Text="&#xE72C;" />
                                                     </Button>
                                                 </StackPanel>
@@ -363,14 +368,14 @@
                                                Foreground="{StaticResource SecondaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" Text="0:00" />
 
                                     <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
-                                        <Button x:Name="PrevButton" Style="{StaticResource CircleButton}" Width="26" Height="26" ToolTip="Previous Track">
+                                        <Button x:Name="PrevButton" AutomationProperties.Name="Previous Track" Style="{StaticResource CircleButton}" Width="26" Height="26" ToolTip="Previous Track">
                                             <TextBlock Style="{StaticResource Glyph}" FontSize="10" Text="&#xE892;" />
                                         </Button>
-                                        <Button x:Name="PlayPauseButton" Style="{StaticResource CircleButton}" Margin="4,0"
+                                        <Button x:Name="PlayPauseButton" AutomationProperties.Name="Play or Pause Media" Style="{StaticResource CircleButton}" Margin="4,0"
                                                 Width="28" Height="28" Background="#F5F5F7" Foreground="#0A0A0C" ToolTip="Play / Pause (Ctrl+Alt+Space)">
                                             <TextBlock x:Name="PlayPauseGlyph" Style="{StaticResource Glyph}" FontSize="11.5" Text="&#xE768;" />
                                         </Button>
-                                        <Button x:Name="NextButton" Style="{StaticResource CircleButton}" Width="26" Height="26" ToolTip="Next Track">
+                                        <Button x:Name="NextButton" AutomationProperties.Name="Next Track" Style="{StaticResource CircleButton}" Width="26" Height="26" ToolTip="Next Track">
                                             <TextBlock Style="{StaticResource Glyph}" FontSize="10" Text="&#xE893;" />
                                         </Button>
                                     </StackPanel>
@@ -601,6 +606,9 @@
 
                                 <DockPanel Grid.Row="0" Margin="0,0,0,5" LastChildFill="False">
                                     <TextBlock Style="{StaticResource SectionTitle}" Text="Appearance &amp; Position" />
+                                    <Button x:Name="DndToggleBtn" Click="DndToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="7,0" Margin="8,0,0,0" ToolTip="Toggle Do Not Disturb (Silence Notification Toasts)">
+                                        <TextBlock x:Name="DndToggleText" Text="DND Off" FontSize="9.5" FontWeight="Medium" Foreground="{StaticResource SecondaryBrush}" />
+                                    </Button>
                                     <TextBlock x:Name="SelectedThemeName" Text="Solar Amber" FontSize="10.5" Foreground="{StaticResource SecondaryBrush}" DockPanel.Dock="Right" VerticalAlignment="Center" />
                                 </DockPanel>
 
@@ -705,10 +713,17 @@
                                                         </ControlTemplate>
                                                     </Button.Template>
                                                 </Button>
-                                                <Button Click="ThemeSwatch_Click" Tag="Purple Haze" Width="15" Height="15" Margin="0" Padding="0" Background="#BF5AF2" BorderThickness="0" Cursor="Hand" ToolTip="Purple Haze">
+                                                <Button Click="ThemeSwatch_Click" Tag="Purple Haze" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#BF5AF2" BorderThickness="0" Cursor="Hand" ToolTip="Purple Haze">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
                                                             <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                                <Button Click="ThemeSwatch_Click" Tag="Windows Accent" Width="15" Height="15" Margin="0" Padding="0" Background="#0078D4" BorderThickness="0" Cursor="Hand" ToolTip="Follow Windows Accent Color">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Ellipse Fill="{TemplateBinding Background}" Stroke="#90FFFFFF" StrokeThickness="1.5" />
                                                         </ControlTemplate>
                                                     </Button.Template>
                                                 </Button>
@@ -1078,7 +1093,7 @@
                             <!-- Right: Collapse Chevron -->
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Border Width="1" Height="14" Background="#1CFFFFFF" Margin="4,0,6,0" VerticalAlignment="Center" />
-                                <Button x:Name="CollapseButton" Click="CollapseButton_Click" Style="{StaticResource DockIconButton}"
+                                <Button x:Name="CollapseButton" AutomationProperties.Name="Collapse Dynamic Island" Click="CollapseButton_Click" Style="{StaticResource DockIconButton}"
                                         ToolTip="Collapse (Esc)">
                                     <TextBlock Style="{StaticResource Glyph}" FontSize="10" Text="&#xE70E;" />
                                 </Button>
@@ -1093,12 +1108,12 @@
                                           VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <!-- Now Playing / Home -->
-                                    <Button x:Name="MediaHomeButton" Style="{StaticResource DockIconButton}" ToolTip="Now Playing &amp; Stopwatch">
+                                    <Button x:Name="MediaHomeButton" AutomationProperties.Name="Now Playing and Stopwatch" Style="{StaticResource DockIconButton}" ToolTip="Now Playing &amp; Stopwatch">
                                         <TextBlock Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE8D6;" />
                                     </Button>
 
                                     <!-- Drop Shelf -->
-                                    <Button x:Name="ShelfButton" Style="{StaticResource DockToolButton}" ToolTip="Drop Shelf">
+                                    <Button x:Name="ShelfButton" AutomationProperties.Name="Drop Shelf" Style="{StaticResource DockToolButton}" ToolTip="Drop Shelf">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE8B7;" />
                                             <TextBlock x:Name="ShelfBadgeText" Style="{StaticResource Digits}" Margin="4,0,0,0" FontSize="10" FontWeight="SemiBold" Visibility="Collapsed" />
@@ -1106,7 +1121,7 @@
                                     </Button>
 
                                     <!-- Clipboard -->
-                                    <Button x:Name="ClipboardButton" Style="{StaticResource DockToolButton}" ToolTip="Clipboard (Ctrl+Alt+V)">
+                                    <Button x:Name="ClipboardButton" AutomationProperties.Name="Clipboard History" Style="{StaticResource DockToolButton}" ToolTip="Clipboard (Ctrl+Alt+V)">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE77F;" />
                                             <TextBlock x:Name="ClipboardBadgeText" Style="{StaticResource Digits}" Margin="4,0,0,0" FontSize="10" FontWeight="SemiBold" Visibility="Collapsed" />
@@ -1114,17 +1129,17 @@
                                     </Button>
 
                                     <!-- Quick Calculator -->
-                                    <Button x:Name="CalcButton" Style="{StaticResource DockIconButton}" ToolTip="Calculator &amp; Converter (Ctrl+Alt+C)">
+                                    <Button x:Name="CalcButton" AutomationProperties.Name="Calculator and Unit Converter" Style="{StaticResource DockIconButton}" ToolTip="Calculator &amp; Converter (Ctrl+Alt+C)">
                                         <TextBlock Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE8EF;" />
                                     </Button>
 
                                     <!-- Audio Output -->
-                                    <Button x:Name="AudioButton" Style="{StaticResource DockIconButton}" ToolTip="Audio Output (Ctrl+Alt+O)">
+                                    <Button x:Name="AudioButton" AutomationProperties.Name="Audio Output Devices" Style="{StaticResource DockIconButton}" ToolTip="Audio Output (Ctrl+Alt+O)">
                                         <TextBlock x:Name="AudioButtonGlyph" Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE7F6;" />
                                     </Button>
 
                                     <!-- Battery & Power -->
-                                    <Button x:Name="BatteryButton" Style="{StaticResource DockToolButton}" ToolTip="Battery &amp; Power (Ctrl+Alt+P)">
+                                    <Button x:Name="BatteryButton" AutomationProperties.Name="Battery and Power Mode" Style="{StaticResource DockToolButton}" ToolTip="Battery &amp; Power (Ctrl+Alt+P)">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock x:Name="BatteryButtonGlyph" Style="{StaticResource Glyph}" FontSize="10" Text="&#xE945;" />
                                             <TextBlock x:Name="BatteryBadgeText" Style="{StaticResource Digits}" Margin="4,0,0,0" FontSize="10" FontWeight="Medium" Text="100%" />
@@ -1132,7 +1147,7 @@
                                     </Button>
 
                                     <!-- Voice Memos -->
-                                    <Button x:Name="RecordButton" Style="{StaticResource DockIconButton}" ToolTip="Voice Memos (Ctrl+Alt+R)">
+                                    <Button x:Name="RecordButton" AutomationProperties.Name="Voice Memos" Style="{StaticResource DockIconButton}" ToolTip="Voice Memos (Ctrl+Alt+R)">
                                         <Grid>
                                             <TextBlock x:Name="RecordButtonGlyph" Style="{StaticResource Glyph}" FontSize="10.5" Foreground="#FF453A" Text="&#xE7C8;" />
                                             <TextBlock x:Name="RecordBadgeText" Visibility="Collapsed" />
@@ -1140,17 +1155,17 @@
                                     </Button>
 
                                     <!-- Connected Peripherals -->
-                                    <Button x:Name="PeripheralsButton" Style="{StaticResource DockIconButton}" ToolTip="Connected Devices (Ctrl+Alt+D)">
+                                    <Button x:Name="PeripheralsButton" AutomationProperties.Name="Connected Peripherals" Style="{StaticResource DockIconButton}" ToolTip="Connected Devices (Ctrl+Alt+D)">
                                         <TextBlock x:Name="PeripheralsButtonGlyph" Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE702;" />
                                     </Button>
 
                                     <!-- Mic Mute -->
-                                    <Button x:Name="MicMuteButton" Style="{StaticResource DockIconButton}" ToolTip="Toggle Microphone Mute">
+                                    <Button x:Name="MicMuteButton" AutomationProperties.Name="Toggle Microphone Mute" Style="{StaticResource DockIconButton}" ToolTip="Toggle Microphone Mute">
                                         <TextBlock x:Name="MicMuteGlyph" Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE720;" />
                                     </Button>
 
                                     <!-- Appearance & Settings -->
-                                    <Button x:Name="SettingsButton" Style="{StaticResource DockIconButton}" ToolTip="Appearance &amp; Settings">
+                                    <Button x:Name="SettingsButton" AutomationProperties.Name="Appearance and Settings" Style="{StaticResource DockIconButton}" ToolTip="Appearance &amp; Settings">
                                         <TextBlock Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE713;" />
                                     </Button>
                                 </StackPanel>

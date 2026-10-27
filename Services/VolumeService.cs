@@ -51,7 +51,7 @@ internal sealed class VolumeService : IDisposable
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[VolumeService] Attach failed: {ex.Message}");
+            App.Log($"[VolumeService] Attach failed: {ex.Message}");
         }
     }
 
@@ -97,7 +97,7 @@ internal sealed class VolumeService : IDisposable
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[VolumeService] Step failed: {ex.Message}");
+            App.Log($"[VolumeService] Step failed: {ex.Message}");
             AttachEndpoint();
         }
     }
@@ -112,7 +112,7 @@ internal sealed class VolumeService : IDisposable
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[VolumeService] ToggleMute failed: {ex.Message}");
+            App.Log($"[VolumeService] ToggleMute failed: {ex.Message}");
         }
     }
 

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -26,27 +25,31 @@ public partial class IslandWindow
     private const int HotkeyRecord = 9;
     private const int HotkeyPeripherals = 10;
 
-    private static readonly (int Id, uint Vk)[] HotKeyBindings =
+    private static readonly (int Id, string KeyName, uint DefaultVk)[] HotKeyBindings =
     {
-        (HotkeyStopwatch, 0x41),   // VK_A
-        (HotkeyToast, 0x54),       // VK_T
-        (HotkeyQuit, 0x51),        // VK_Q
-        (HotkeyMedia, 0x20),       // VK_SPACE
-        (HotkeyClipboard, 0x56),   // VK_V
-        (HotkeyCalc, 0x43),        // VK_C
-        (HotkeyAudio, 0x4F),       // VK_O
-        (HotkeyPower, 0x50),       // VK_P
-        (HotkeyRecord, 0x52),      // VK_R
-        (HotkeyPeripherals, 0x44), // VK_D
+        (HotkeyStopwatch, "Stopwatch", 0x41),     // VK_A
+        (HotkeyToast, "TestToast", 0x54),         // VK_T
+        (HotkeyQuit, "Quit", 0x51),               // VK_Q
+        (HotkeyMedia, "MediaPlayPause", 0x20),    // VK_SPACE
+        (HotkeyClipboard, "Clipboard", 0x56),     // VK_V
+        (HotkeyCalc, "Calculator", 0x43),         // VK_C
+        (HotkeyAudio, "AudioDevices", 0x4F),      // VK_O
+        (HotkeyPower, "BatteryPower", 0x50),      // VK_P
+        (HotkeyRecord, "VoiceMemo", 0x52),        // VK_R
+        (HotkeyPeripherals, "Peripherals", 0x44), // VK_D
     };
 
+    private readonly Dictionary<string, bool> _hotkeyRegistrationStatus = new(StringComparer.OrdinalIgnoreCase);
     private IntPtr _hwnd;
     private IntPtr _cachedTargetMonitor;
     private int _cachedMonitorIndex = -1;
+    private string? _cachedMonitorDeviceName;
     private double _dpiScale = 1.0;
     private uint _expandMsg;
     private uint _quitMsg;
     private RECT _windowRectPx;
+
+    public IReadOnlyDictionary<string, bool> HotkeyRegistrationStatus => _hotkeyRegistrationStatus;
 
     protected override async void OnSourceInitialized(EventArgs e)
     {
@@ -75,10 +78,7 @@ public partial class IslandWindow
             ChangeWindowMessageFilter(WM_COPYDATA, MSGFLT_ADD);
             ChangeWindowMessageFilter(WM_COPYGLOBALDATA, MSGFLT_ADD);
 
-            foreach (var (id, vk) in HotKeyBindings)
-            {
-                TryRegisterHotKey(id, vk);
-            }
+            RegisterConfiguredHotKeys();
 
             App.Log("Starting monitors...");
             _cursor.Start();
@@ -93,20 +93,29 @@ public partial class IslandWindow
             _trayIcon = new TrayIconService(
                 _hwnd,
                 onExpand: () => Dispatcher.InvokeAsync(() => _machine.ExpandNow()),
-                onAudioSwitch: () => Dispatcher.InvokeAsync(ToggleAudioView),
-                onPower: () => Dispatcher.InvokeAsync(ToggleBatteryView),
-                onVoiceMemo: () => Dispatcher.InvokeAsync(ToggleVoiceMemoView),
-                onPeripherals: () => Dispatcher.InvokeAsync(TogglePeripheralsView),
-                onSettings: () => Dispatcher.InvokeAsync(ToggleSettingsView),
+                onAudioSwitch: () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Audio)),
+                onPower: () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Battery)),
+                onVoiceMemo: () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.VoiceMemo)),
+                onPeripherals: () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Peripherals)),
+                onSettings: () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Settings)),
                 onTestToast: () => Dispatcher.InvokeAsync(ShowNextDemoToast),
                 onToggleStopwatch: () => Dispatcher.InvokeAsync(ToggleStopwatch),
-                onExit: () => Dispatcher.InvokeAsync(() => Application.Current.Shutdown()));
+                onExit: () => Dispatcher.InvokeAsync(() => Application.Current.Shutdown()),
+                isDndEnabled: () => _settingsService.Current.DoNotDisturb,
+                setDndEnabled: enabled => Dispatcher.InvokeAsync(() => SetDoNotDisturb(enabled)));
 
             await _mediaService.InitializeAsync();
             UpdateSpectrumActivity();
             App.Log("MediaService initialized.");
 
-            _machine.PushToast(new ToastContent("\uE7E7", "Dynamic Island", "Ready · Hover top-center or click to expand", ThemeBrushes.BlueColor, TimeSpan.FromSeconds(3.5)));
+            _machine.PushToast(new ToastContent(
+                "\uE7E7",
+                "Dynamic Island",
+                "Ready · Hover top-center or click to expand",
+                ThemeBrushes.BlueColor,
+                TimeSpan.FromSeconds(3.5),
+                TargetView: null,
+                Priority: ToastPriority.Low));
         }
         catch (Exception ex)
         {
@@ -140,7 +149,7 @@ public partial class IslandWindow
 
             case WM_MOUSEACTIVATE:
                 handled = true;
-                return new IntPtr(_currentExpandedView == "calc" && _machine.State == IslandState.Expanded
+                return new IntPtr(_currentExpandedView == ExpandedView.Calc && _machine.State == IslandState.Expanded
                     ? MA_ACTIVATE
                     : MA_NOACTIVATE);
 
@@ -156,6 +165,16 @@ public partial class IslandWindow
                 }
                 return new IntPtr(HTTRANSPARENT);
             }
+
+            case WM_MOUSEHWHEEL:
+                if (_machine.State != IslandState.Expanded)
+                {
+                    short tilt = unchecked((short)((wParam.ToInt64() >> 16) & 0xFFFF));
+                    if (tilt > 0) _mediaService.Next();
+                    else if (tilt < 0) _mediaService.Previous();
+                    handled = true;
+                }
+                break;
 
             case WM_HOTKEY:
                 OnHotKey(wParam.ToInt32());
@@ -198,13 +217,32 @@ public partial class IslandWindow
     internal IntPtr GetTargetMonitor()
     {
         int idx = _settingsService?.Current.MonitorIndex ?? 0;
-        if (_cachedTargetMonitor != IntPtr.Zero && _cachedMonitorIndex == idx)
+        string? devName = _settingsService?.Current.MonitorDeviceName;
+        if (_cachedTargetMonitor != IntPtr.Zero &&
+            _cachedMonitorIndex == idx &&
+            string.Equals(_cachedMonitorDeviceName, devName, StringComparison.OrdinalIgnoreCase))
         {
             return _cachedTargetMonitor;
         }
 
         var monitors = GetAvailableMonitors();
         _cachedMonitorIndex = idx;
+        _cachedMonitorDeviceName = devName;
+
+        // 1. Prefer matching the stable Win32 monitor device name (e.g. "\\.\DISPLAY2") across dock/undock events
+        if (!string.IsNullOrWhiteSpace(devName))
+        {
+            foreach (var hMon in monitors)
+            {
+                if (string.Equals(GetMonitorDeviceName(hMon), devName, StringComparison.OrdinalIgnoreCase))
+                {
+                    _cachedTargetMonitor = hMon;
+                    return _cachedTargetMonitor;
+                }
+            }
+        }
+
+        // 2. Fallback to MonitorIndex or primary monitor
         _cachedTargetMonitor = (idx >= 0 && idx < monitors.Count)
             ? monitors[idx]
             : MonitorFromPoint(new POINT(), MONITOR_DEFAULTTOPRIMARY);
@@ -299,16 +337,50 @@ public partial class IslandWindow
         };
     }
 
-    private void TryRegisterHotKey(int id, uint vk)
+    private void RegisterConfiguredHotKeys()
     {
-        if (!RegisterHotKey(_hwnd, id, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, vk))
-            Debug.WriteLine($"[Island] Hotkey {id} unavailable (Win32 error {Marshal.GetLastWin32Error()}).");
+        if (_hwnd == IntPtr.Zero) return;
+        UnregisterAllHotKeys();
+
+        bool allowDevHotkeys = _settingsService?.Current.EnableDeveloperHotkeys ?? false;
+#if DEBUG
+        allowDevHotkeys = true;
+#endif
+
+        var custom = _settingsService?.Current.CustomHotkeys;
+        foreach (var (id, keyName, defaultVk) in HotKeyBindings)
+        {
+            if (id == HotkeyToast && !allowDevHotkeys)
+            {
+                continue;
+            }
+
+            uint vk = defaultVk;
+            if (custom != null && custom.TryGetValue(keyName, out uint customVk))
+            {
+                vk = customVk;
+            }
+
+            // Setting a custom VK of 0 disables that hotkey
+            if (vk == 0)
+            {
+                _hotkeyRegistrationStatus[keyName] = false;
+                continue;
+            }
+
+            bool ok = RegisterHotKey(_hwnd, id, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, vk);
+            _hotkeyRegistrationStatus[keyName] = ok;
+            if (!ok)
+            {
+                App.Log($"[HotKey] '{keyName}' (VK=0x{vk:X2}) unavailable (Win32 error {Marshal.GetLastWin32Error()}).");
+            }
+        }
     }
 
     private void UnregisterAllHotKeys()
     {
         if (_hwnd == IntPtr.Zero) return;
-        foreach (var (id, _) in HotKeyBindings)
+        foreach (var (id, _, _) in HotKeyBindings)
         {
             UnregisterHotKey(_hwnd, id);
         }
@@ -321,12 +393,12 @@ public partial class IslandWindow
             case HotkeyStopwatch: ToggleStopwatch(); break;
             case HotkeyToast: ShowNextDemoToast(); break;
             case HotkeyMedia: _mediaService.TogglePlayPause(); break;
-            case HotkeyClipboard: ToggleClipboardView(); break;
-            case HotkeyCalc: ToggleCalcView(); break;
-            case HotkeyAudio: ToggleAudioView(); break;
-            case HotkeyPower: ToggleBatteryView(); break;
+            case HotkeyClipboard: SwitchExpandedView(ExpandedView.Clipboard); break;
+            case HotkeyCalc: SwitchExpandedView(ExpandedView.Calc); break;
+            case HotkeyAudio: SwitchExpandedView(ExpandedView.Audio); break;
+            case HotkeyPower: SwitchExpandedView(ExpandedView.Battery); break;
             case HotkeyRecord: ToggleVoiceRecording(); break;
-            case HotkeyPeripherals: TogglePeripheralsView(); break;
+            case HotkeyPeripherals: SwitchExpandedView(ExpandedView.Peripherals); break;
             case HotkeyQuit: Application.Current.Shutdown(); break;
         }
     }

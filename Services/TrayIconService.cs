@@ -3,7 +3,6 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using DynamicIsland.Core;
-using Microsoft.Win32;
 using static DynamicIsland.Interop.NativeMethods;
 
 namespace DynamicIsland.Services;
@@ -15,8 +14,6 @@ namespace DynamicIsland.Services;
 internal sealed class TrayIconService : IDisposable
 {
     public const int WM_TRAYICON = 0x8001; // WM_APP + 1
-    private const string StartupRunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string AppName = "DynamicIsland";
 
     private readonly IntPtr _hwnd;
     private readonly Action _onExpand;
@@ -28,6 +25,8 @@ internal sealed class TrayIconService : IDisposable
     private readonly Action _onTestToast;
     private readonly Action _onToggleStopwatch;
     private readonly Action _onExit;
+    private readonly Func<bool>? _isDndEnabled;
+    private readonly Action<bool>? _setDndEnabled;
     private IntPtr _hIcon;
     private bool _added;
 
@@ -41,7 +40,9 @@ internal sealed class TrayIconService : IDisposable
         Action onSettings,
         Action onTestToast,
         Action onToggleStopwatch,
-        Action onExit)
+        Action onExit,
+        Func<bool>? isDndEnabled = null,
+        Action<bool>? setDndEnabled = null)
     {
         _hwnd = hwnd;
         _onExpand = onExpand;
@@ -53,6 +54,8 @@ internal sealed class TrayIconService : IDisposable
         _onTestToast = onTestToast;
         _onToggleStopwatch = onToggleStopwatch;
         _onExit = onExit;
+        _isDndEnabled = isDndEnabled;
+        _setDndEnabled = setDndEnabled;
 
         string? exe = Environment.ProcessPath;
         if (!string.IsNullOrEmpty(exe) && File.Exists(exe))
@@ -84,7 +87,7 @@ internal sealed class TrayIconService : IDisposable
                 _onExpand();
                 break;
             case WM_LBUTTONDBLCLK:
-                _onTestToast();
+                _onSettings();
                 break;
             case WM_RBUTTONUP:
                 ShowContextMenu();
@@ -129,24 +132,38 @@ internal sealed class TrayIconService : IDisposable
         itemSettings.Click += (_, _) => _onSettings();
         menu.Items.Add(itemSettings);
 
-        var itemToast = new MenuItem { Header = "Send Test Alert (Ctrl+Alt+T)" };
-        itemToast.Click += (_, _) => _onTestToast();
-        menu.Items.Add(itemToast);
-
         var itemStopwatch = new MenuItem { Header = "Toggle Stopwatch (Ctrl+Alt+A)" };
         itemStopwatch.Click += (_, _) => _onToggleStopwatch();
         menu.Items.Add(itemStopwatch);
 
         menu.Items.Add(new Separator { Background = ThemeBrushes.MenuSeparator });
 
+        if (_isDndEnabled != null && _setDndEnabled != null)
+        {
+            var itemDnd = new MenuItem
+            {
+                Header = "Do Not Disturb (Silence Notification Toasts)",
+                IsCheckable = true,
+                IsChecked = _isDndEnabled()
+            };
+            itemDnd.Click += (_, _) => _setDndEnabled(itemDnd.IsChecked);
+            menu.Items.Add(itemDnd);
+        }
+
         var itemStartup = new MenuItem
         {
             Header = "Run at Windows Startup",
             IsCheckable = true,
-            IsChecked = IsStartupEnabled()
+            IsChecked = StartupService.IsStartupEnabled()
         };
-        itemStartup.Click += (_, _) => SetStartup(itemStartup.IsChecked);
+        itemStartup.Click += (_, _) => StartupService.SetStartup(itemStartup.IsChecked);
         menu.Items.Add(itemStartup);
+
+#if DEBUG
+        var itemToast = new MenuItem { Header = "Send Test Alert (Ctrl+Alt+T)" };
+        itemToast.Click += (_, _) => _onTestToast();
+        menu.Items.Add(itemToast);
+#endif
 
         menu.Items.Add(new Separator { Background = ThemeBrushes.MenuSeparator });
 
@@ -155,31 +172,6 @@ internal sealed class TrayIconService : IDisposable
         menu.Items.Add(itemExit);
 
         menu.IsOpen = true;
-    }
-
-    private static bool IsStartupEnabled()
-    {
-        try
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(StartupRunKey, false);
-            return key?.GetValue(AppName) != null;
-        }
-        catch { return false; }
-    }
-
-    private static void SetStartup(bool enable)
-    {
-        try
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(StartupRunKey, true);
-            if (key == null) return;
-            string? exe = Environment.ProcessPath;
-            if (string.IsNullOrEmpty(exe)) return;
-
-            if (enable) key.SetValue(AppName, $"\"{exe}\"");
-            else key.DeleteValue(AppName, false);
-        }
-        catch { }
     }
 
     public void Dispose()

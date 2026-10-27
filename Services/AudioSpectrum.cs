@@ -115,7 +115,7 @@ internal sealed class AudioSpectrum : IDisposable
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Audio] Loopback start failed: {ex.Message}");
+            App.Log($"[Audio] Loopback start failed: {ex.Message}");
             _capture = null;
         }
     }
@@ -148,7 +148,7 @@ internal sealed class AudioSpectrum : IDisposable
     {
         if (e.Exception is not null)
         {
-            Debug.WriteLine($"[Audio] Loopback stopped: {e.Exception.Message}");
+            App.Log($"[Audio] Loopback stopped: {e.Exception.Message}");
             ScheduleRestart();
         }
     }

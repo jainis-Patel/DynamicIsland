@@ -197,7 +197,7 @@ internal sealed class PrivacyIndicatorService : IDisposable
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[PrivacyService] ToggleMute failed: {ex.Message}");
+            App.Log($"[PrivacyService] ToggleMute failed: {ex.Message}");
             InitCaptureDevice();
         }
         return false;

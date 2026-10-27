@@ -78,6 +78,14 @@ public partial class App : Application
                     var fi = new FileInfo(LogFile);
                     if (fi.Exists && fi.Length > MaxLogSizeBytes)
                     {
+                        try
+                        {
+                            File.Move(LogFile, AppPaths.LogArchiveFile, overwrite: true);
+                        }
+                        catch
+                        {
+                            // Fallback if archive file is locked
+                        }
                         File.WriteAllText(LogFile, batch.ToString());
                     }
                     else

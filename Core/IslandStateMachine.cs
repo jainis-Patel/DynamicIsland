@@ -5,28 +5,43 @@ namespace DynamicIsland.Core;
 
 public enum IslandState { Idle, Compact, Toast, Expanded, Hidden }
 
+public enum ToastPriority
+{
+    Low = 0,
+    Feedback = 1,
+    System = 2,
+    Notification = 3,
+    Critical = 4
+}
+
 public sealed record ToastContent(
     string Glyph,
     string Title,
     string Subtitle,
     Color Accent,
     TimeSpan Duration,
-    string? TargetView = null);
+    string? TargetView = null,
+    ToastPriority Priority = ToastPriority.System,
+    string? Category = null);
 
 /// <summary>
 /// Resolves the visible state from independent inputs, by priority:
 ///   Hidden (fullscreen app) &gt; Expanded (hover/click) &gt; Toast &gt; Compact (activity) &gt; Idle.
 /// Hover is debounced (150 ms enter / 280 ms leave) so the cursor brushing past the top edge
 /// doesn't make the island flicker.
+/// Includes a priority-aware toast queue with category coalescing so low-priority feedback toasts
+/// (e.g. volume steps) never clobber critical alerts or incoming notifications.
 /// </summary>
 public sealed class IslandStateMachine
 {
     public static readonly TimeSpan HoverEnterDelay = TimeSpan.FromMilliseconds(150);
     public static readonly TimeSpan HoverLeaveDelay = TimeSpan.FromMilliseconds(280);
+    public const int MaxQueuedToasts = 5;
 
     private readonly DispatcherTimer _enterTimer;
     private readonly DispatcherTimer _leaveTimer;
     private readonly DispatcherTimer _toastTimer;
+    private readonly List<ToastContent> _toastQueue = new();
 
     private bool _pointerInside;
     private bool _hovered;
@@ -36,6 +51,7 @@ public sealed class IslandStateMachine
 
     public IslandState State { get; private set; } = IslandState.Idle;
     public ToastContent? ActiveToast => _toast;
+    public int QueuedToastCount => _toastQueue.Count;
 
     /// <summary>(previous, next)</summary>
     public event Action<IslandState, IslandState>? StateChanged;
@@ -60,12 +76,7 @@ public sealed class IslandStateMachine
         };
 
         _toastTimer = new DispatcherTimer();
-        _toastTimer.Tick += (_, _) =>
-        {
-            _toastTimer.Stop();
-            _toast = null;
-            Evaluate();
-        };
+        _toastTimer.Tick += (_, _) => AdvanceToast();
     }
 
     public void SetPointerInside(bool inside)
@@ -128,7 +139,88 @@ public sealed class IslandStateMachine
 
     public void PushToast(ToastContent toast)
     {
-        bool replacing = _toast is not null && State == IslandState.Toast;
+        if (_toast is null)
+        {
+            DisplayToastImmediate(toast, replacing: false);
+            return;
+        }
+
+        // 1. Same category coalescing (e.g., rapid volume scroll steps update the active volume toast in-place)
+        if (!string.IsNullOrEmpty(toast.Category) &&
+            string.Equals(toast.Category, _toast.Category, StringComparison.OrdinalIgnoreCase))
+        {
+            DisplayToastImmediate(toast, replacing: State == IslandState.Toast);
+            return;
+        }
+
+        // 2. Incoming toast has equal or higher priority than the active toast
+        if (toast.Priority >= _toast.Priority)
+        {
+            // If a Critical alert preempts an important Notification, re-queue the notification so it isn't lost
+            if (toast.Priority > _toast.Priority && _toast.Priority >= ToastPriority.Notification)
+            {
+                EnqueueToast(_toast);
+            }
+
+            DisplayToastImmediate(toast, replacing: State == IslandState.Toast);
+            return;
+        }
+
+        // 3. Incoming toast has lower priority than the currently visible toast:
+        //    Queue it if it is System priority or higher; coalesce in queue if same category.
+        if (toast.Priority >= ToastPriority.System)
+        {
+            EnqueueToast(toast);
+        }
+    }
+
+    /// <summary>
+    /// Advances to the next queued toast when the current toast timer expires, or clears the active toast.
+    /// </summary>
+    public void AdvanceToast()
+    {
+        _toastTimer.Stop();
+        if (_toastQueue.Count > 0)
+        {
+            var next = _toastQueue[0];
+            _toastQueue.RemoveAt(0);
+            DisplayToastImmediate(next, replacing: State == IslandState.Toast);
+        }
+        else
+        {
+            _toast = null;
+            Evaluate();
+        }
+    }
+
+    private void EnqueueToast(ToastContent toast)
+    {
+        if (!string.IsNullOrEmpty(toast.Category))
+        {
+            int existingIdx = _toastQueue.FindIndex(t =>
+                string.Equals(t.Category, toast.Category, StringComparison.OrdinalIgnoreCase));
+            if (existingIdx >= 0)
+            {
+                _toastQueue[existingIdx] = toast;
+                return;
+            }
+        }
+
+        // Insert ordered by Priority descending (preserving FIFO within the same priority)
+        int insertIndex = _toastQueue.FindIndex(t => t.Priority < toast.Priority);
+        if (insertIndex >= 0)
+            _toastQueue.Insert(insertIndex, toast);
+        else
+            _toastQueue.Add(toast);
+
+        while (_toastQueue.Count > MaxQueuedToasts)
+        {
+            _toastQueue.RemoveAt(_toastQueue.Count - 1);
+        }
+    }
+
+    private void DisplayToastImmediate(ToastContent toast, bool replacing)
+    {
         _toast = toast;
         _toastTimer.Stop();
         _toastTimer.Interval = toast.Duration;

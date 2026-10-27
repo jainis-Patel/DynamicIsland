@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -16,6 +15,7 @@ internal sealed class MediaInfo
     public string Source { get; set; } = "";
     public BitmapSource? Artwork { get; set; }
     public Color? Accent { get; set; }
+    public int ActiveSessionCount { get; set; } = 1;
 
     public bool IsPlaying { get; set; }
     public double PlaybackRate { get; set; } = 1.0;
@@ -46,6 +46,7 @@ internal sealed class MediaInfo
 /// <summary>
 /// Wraps the WinRT GlobalSystemMediaTransportControlsSessionManager: the same API that powers the
 /// Windows volume-flyout media card. Works with Spotify, browsers, Media Player, VLC, etc.
+/// Supports cycling between multiple active media sessions when several apps are open.
 /// All events are marshalled onto the UI dispatcher.
 /// </summary>
 internal sealed class MediaSessionService : IDisposable
@@ -53,6 +54,7 @@ internal sealed class MediaSessionService : IDisposable
     private readonly Dispatcher _ui;
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
     private GlobalSystemMediaTransportControlsSession? _session;
+    private string? _preferredSessionAumid;
     private int _propertiesVersion;
 
     public MediaInfo? Current { get; private set; }
@@ -73,7 +75,7 @@ internal sealed class MediaSessionService : IDisposable
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Media] Session manager unavailable: {ex.Message}");
+            App.Log($"[Media] Session manager unavailable: {ex.Message}");
             return;
         }
 
@@ -84,25 +86,30 @@ internal sealed class MediaSessionService : IDisposable
 
     // ── Commands ─────────────────────────────────────────────────────
 
-    public async void TogglePlayPause()
+    public void TogglePlayPause() => _ = TogglePlayPauseAsync();
+    public void Next() => _ = NextAsync();
+    public void Previous() => _ = PreviousAsync();
+    public void Seek(TimeSpan position) => _ = SeekAsync(position);
+
+    public async Task TogglePlayPauseAsync()
     {
         try { if (_session is not null) await _session.TryTogglePlayPauseAsync(); }
-        catch (Exception ex) { Debug.WriteLine($"[Media] Toggle failed: {ex.Message}"); }
+        catch (Exception ex) { App.Log($"[Media] Toggle failed: {ex.Message}"); }
     }
 
-    public async void Next()
+    public async Task NextAsync()
     {
         try { if (_session is not null) await _session.TrySkipNextAsync(); }
-        catch (Exception ex) { Debug.WriteLine($"[Media] Next failed: {ex.Message}"); }
+        catch (Exception ex) { App.Log($"[Media] Next failed: {ex.Message}"); }
     }
 
-    public async void Previous()
+    public async Task PreviousAsync()
     {
         try { if (_session is not null) await _session.TrySkipPreviousAsync(); }
-        catch (Exception ex) { Debug.WriteLine($"[Media] Previous failed: {ex.Message}"); }
+        catch (Exception ex) { App.Log($"[Media] Previous failed: {ex.Message}"); }
     }
 
-    public async void Seek(TimeSpan position)
+    public async Task SeekAsync(TimeSpan position)
     {
         var media = Current;
         if (_session is null || media is null) return;
@@ -113,7 +120,44 @@ internal sealed class MediaSessionService : IDisposable
         Changed?.Invoke();
 
         try { await _session.TryChangePlaybackPositionAsync((media.StartTime + position).Ticks); }
-        catch (Exception ex) { Debug.WriteLine($"[Media] Seek failed: {ex.Message}"); }
+        catch (Exception ex) { App.Log($"[Media] Seek failed: {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// Cycles to the next available media session (e.g., switching between Spotify and a browser tab).
+    /// Returns the friendly name of the newly selected media source, or <see langword="null"/> if fewer than 2 sessions exist.
+    /// </summary>
+    public string? CycleNextSession()
+    {
+        if (_manager is null) return null;
+        IReadOnlyList<GlobalSystemMediaTransportControlsSession> sessions;
+        try
+        {
+            sessions = _manager.GetSessions();
+        }
+        catch
+        {
+            return null;
+        }
+
+        if (sessions is null || sessions.Count <= 1) return null;
+
+        string? currentId = _session?.SourceAppUserModelId;
+        int currentIndex = -1;
+        for (int i = 0; i < sessions.Count; i++)
+        {
+            if (string.Equals(sessions[i].SourceAppUserModelId, currentId, StringComparison.OrdinalIgnoreCase))
+            {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        int nextIndex = (currentIndex + 1) % sessions.Count;
+        var nextSession = sessions[nextIndex];
+        _preferredSessionAumid = nextSession.SourceAppUserModelId;
+        AttachSessionCore(nextSession, sessions.Count);
+        return Current?.Source;
     }
 
     // ── Session tracking ─────────────────────────────────────────────
@@ -122,14 +166,40 @@ internal sealed class MediaSessionService : IDisposable
     {
         if (_manager is null) return;
 
-        GlobalSystemMediaTransportControlsSession? session;
-        try { session = _manager.GetCurrentSession(); }
-        catch { session = null; }
+        GlobalSystemMediaTransportControlsSession? session = null;
+        int sessionCount = 1;
+        try
+        {
+            var allSessions = _manager.GetSessions();
+            sessionCount = Math.Max(1, allSessions?.Count ?? 1);
+            if (!string.IsNullOrEmpty(_preferredSessionAumid) && allSessions != null)
+            {
+                session = allSessions.FirstOrDefault(s =>
+                    string.Equals(s.SourceAppUserModelId, _preferredSessionAumid, StringComparison.OrdinalIgnoreCase));
+            }
+            session ??= _manager.GetCurrentSession();
+        }
+        catch
+        {
+            session = null;
+        }
 
         string? newId = session?.SourceAppUserModelId;
         if (_session is not null && session is not null && newId == _session.SourceAppUserModelId)
+        {
+            if (Current is not null && Current.ActiveSessionCount != sessionCount)
+            {
+                Current.ActiveSessionCount = sessionCount;
+                Changed?.Invoke();
+            }
             return; // same app, keep existing subscriptions
+        }
 
+        AttachSessionCore(session, sessionCount);
+    }
+
+    private void AttachSessionCore(GlobalSystemMediaTransportControlsSession? session, int sessionCount)
+    {
         DetachSession();
         _session = session;
 
@@ -140,7 +210,12 @@ internal sealed class MediaSessionService : IDisposable
             return;
         }
 
-        Current = new MediaInfo { Source = FriendlyAppName(newId) };
+        string? newId = session.SourceAppUserModelId;
+        Current = new MediaInfo
+        {
+            Source = FriendlyAppName(newId),
+            ActiveSessionCount = sessionCount
+        };
         session.MediaPropertiesChanged += OnMediaPropertiesChanged;
         session.PlaybackInfoChanged += OnPlaybackInfoChanged;
         session.TimelinePropertiesChanged += OnTimelinePropertiesChanged;
@@ -272,12 +347,12 @@ internal sealed class MediaSessionService : IDisposable
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Media] Thumbnail load failed: {ex.Message}");
+            App.Log($"[Media] Thumbnail load failed: {ex.Message}");
             return (null, null);
         }
     }
 
-    private static string FriendlyAppName(string? aumid)
+    internal static string FriendlyAppName(string? aumid)
     {
         if (string.IsNullOrEmpty(aumid)) return "";
         string id = aumid.ToLowerInvariant();

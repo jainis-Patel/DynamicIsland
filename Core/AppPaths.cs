@@ -15,6 +15,7 @@ internal static class AppPaths
     public static string ShelfFile => GetDataFilePath("shelf.json");
     public static string ClipboardFile => GetDataFilePath("clipboard.json");
     public static string LogFile => GetDataFilePath("app.log");
+    public static string LogArchiveFile => GetDataFilePath("app.1.log");
 
     public static string GetDataFilePath(string fileName)
     {

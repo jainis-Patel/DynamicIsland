@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using DynamicIsland.Core;
 using DynamicIsland.Services;
+using static DynamicIsland.Interop.NativeMethods;
 
 namespace DynamicIsland;
 
@@ -18,50 +19,28 @@ public partial class IslandWindow
     //  View Navigation & Dock Strip
     // ═════════════════════════════════════════════════════════════════
 
-    private void SwitchExpandedView(string view)
+    private void SwitchExpandedView(ExpandedView view)
     {
         if (_machine.State != IslandState.Expanded)
         {
             _machine.ExpandNow();
         }
 
-        if (_currentExpandedView == view && view != "media")
+        if (_currentExpandedView == view && view != ExpandedView.Media)
         {
-            view = "media";
+            view = ExpandedView.Media;
         }
 
-        FrameworkElement targetContainer = view switch
-        {
-            "shelf" => ShelfContainer,
-            "clipboard" => ClipboardContainer,
-            "calc" => CalcContainer,
-            "settings" => SettingsContainer,
-            "audio" => AudioContainer,
-            "battery" => BatteryContainer,
-            "voicememo" => VoiceMemoContainer,
-            "peripherals" => PeripheralsContainer,
-            _ => MediaContainer
-        };
-
-        Button? targetButton = view switch
-        {
-            "shelf" => ShelfButton,
-            "clipboard" => ClipboardButton,
-            "calc" => CalcButton,
-            "settings" => SettingsButton,
-            "audio" => AudioButton,
-            "battery" => BatteryButton,
-            "voicememo" => RecordButton,
-            "peripherals" => PeripheralsButton,
-            _ => MediaHomeButton
-        };
+        var (targetContainer, targetButton) = _viewRegistry.TryGetValue(view, out var entry)
+            ? entry
+            : _viewRegistry[ExpandedView.Media];
 
         SetDockActive(targetButton);
         AnimateContainerSwitch(targetContainer);
         _currentExpandedView = view;
-        SetKeyboardFocusable(view == "calc");
+        SetKeyboardFocusable(view == ExpandedView.Calc);
 
-        if (view == "calc")
+        if (view == ExpandedView.Calc)
         {
             Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
             {
@@ -70,7 +49,7 @@ public partial class IslandWindow
                 CalcInputBox.SelectAll();
             }));
         }
-        else if (view == "peripherals")
+        else if (view == ExpandedView.Peripherals)
         {
             _ = _peripheralService.RefreshAsync();
         }
@@ -91,8 +70,8 @@ public partial class IslandWindow
     {
         if (e.Key == Key.Escape && _machine.State == IslandState.Expanded)
         {
-            if (_currentExpandedView != "media")
-                SwitchExpandedView("media");
+            if (_currentExpandedView != ExpandedView.Media)
+                SwitchExpandedView(ExpandedView.Media);
             else
                 _machine.CollapseNow();
 
@@ -100,17 +79,8 @@ public partial class IslandWindow
         }
     }
 
-    private void ToggleShelfView() => SwitchExpandedView("shelf");
-    private void ToggleClipboardView() => SwitchExpandedView("clipboard");
-    private void ToggleCalcView() => SwitchExpandedView("calc");
-    private void ToggleSettingsView() => SwitchExpandedView("settings");
-    private void ToggleAudioView() => SwitchExpandedView("audio");
-    private void ToggleBatteryView() => SwitchExpandedView("battery");
-    private void ToggleVoiceMemoView() => SwitchExpandedView("voicememo");
-    private void TogglePeripheralsView() => SwitchExpandedView("peripherals");
-
     // ═════════════════════════════════════════════════════════════════
-    //  Media, Stopwatch & Telemetry
+    //  Media, Stopwatch, Pomodoro Countdown & Telemetry
     // ═════════════════════════════════════════════════════════════════
 
     private void CommitSeek()
@@ -121,6 +91,24 @@ public partial class IslandWindow
         _mediaService.Seek(TimeSpan.FromSeconds(targetSec));
     }
 
+    private void MediaSourceBadge_Click(object sender, MouseButtonEventArgs e)
+    {
+        string? switchedTo = _mediaService.CycleNextSession();
+        if (!string.IsNullOrEmpty(switchedTo))
+        {
+            _machine.PushToast(new ToastContent(
+                "\uE8D6",
+                "Media Source Switched",
+                $"Active player: {switchedTo}",
+                ThemeBrushes.BlueColor,
+                TimeSpan.FromSeconds(2.0),
+                TargetView: "media",
+                Priority: ToastPriority.Feedback,
+                Category: "mediasource"));
+        }
+        e.Handled = true;
+    }
+
     private void OnTrackChanged()
     {
         var media = _mediaService.Current;
@@ -129,7 +117,15 @@ public partial class IslandWindow
         if (_machine.State != IslandState.Expanded)
         {
             var accent = media.Accent ?? ThemeBrushes.AmberColor;
-            _machine.PushToast(new ToastContent("\uE8D6", media.Title, media.Artist, accent, TimeSpan.FromSeconds(2.8)));
+            _machine.PushToast(new ToastContent(
+                "\uE8D6",
+                media.Title,
+                media.Artist,
+                accent,
+                TimeSpan.FromSeconds(2.8),
+                TargetView: "media",
+                Priority: ToastPriority.System,
+                Category: "track"));
         }
     }
 
@@ -149,7 +145,10 @@ public partial class IslandWindow
 
             ExpandedTitle.Text = media.Title;
             ExpandedArtist.Text = string.IsNullOrWhiteSpace(media.Artist) ? "Unknown Artist" : media.Artist;
-            ExpandedSourceApp.Text = string.IsNullOrWhiteSpace(media.Source) ? "Media" : media.Source;
+            string sourceLabel = string.IsNullOrWhiteSpace(media.Source) ? "Media" : media.Source;
+            ExpandedSourceApp.Text = media.ActiveSessionCount > 1
+                ? $"{sourceLabel} · 1/{media.ActiveSessionCount}"
+                : sourceLabel;
 
             PlayPauseGlyph.Text = media.IsPlaying ? "\uE769" : "\uE768";
             PrevButton.IsEnabled = media.CanPrevious;
@@ -198,23 +197,71 @@ public partial class IslandWindow
 
     private void ToggleStopwatch()
     {
+        if (_countdownService.IsActive)
+        {
+            _countdownService.TogglePause();
+            return;
+        }
+
         if (_stopwatch.IsRunning) _stopwatch.Stop();
         else _stopwatch.Start();
         RefreshStopwatchUI();
     }
 
+    private void StartPomodoroTimer()
+    {
+        _stopwatch.Reset();
+        _lastTimerText = null;
+        if (_countdownService.IsRunning)
+        {
+            _countdownService.TogglePause();
+        }
+        else
+        {
+            _countdownService.StartPomodoro();
+            _machine.PushToast(new ToastContent(
+                "\uE916",
+                "Pomodoro Started",
+                "25:00 focus countdown active",
+                ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(2.2),
+                TargetView: "media",
+                Priority: ToastPriority.Feedback,
+                Category: "timer"));
+        }
+    }
+
     private void ResetStopwatch()
     {
         _stopwatch.Reset();
+        _countdownService.Reset();
         _lastTimerText = null;
         RefreshStopwatchUI();
     }
 
+    private void OnCountdownCompleted(string label)
+    {
+        _lastTimerText = null;
+        RefreshStopwatchUI();
+        _machine.PushToast(new ToastContent(
+            "\uE916",
+            $"{label} Complete!",
+            "Countdown finished · Time for a break",
+            ThemeBrushes.GreenColor,
+            TimeSpan.FromSeconds(4.5),
+            TargetView: "media",
+            Priority: ToastPriority.Critical));
+    }
+
     private void RefreshStopwatchUI()
     {
-        bool running = _stopwatch.IsRunning;
+        bool isCountdown = _countdownService.IsActive;
+        bool running = isCountdown ? _countdownService.IsRunning : _stopwatch.IsRunning;
+        bool hasProgress = isCountdown ? _countdownService.Remaining < _countdownService.TargetDuration : _stopwatch.Elapsed > TimeSpan.Zero;
+
+        ExpandedTimerModeLabel.Text = isCountdown ? _countdownService.Label : "Stopwatch";
         StartPauseGlyph.Text = running ? "\uE769" : "\uE768";
-        StartPauseLabel.Text = running ? "Pause" : _stopwatch.Elapsed > TimeSpan.Zero ? "Resume" : "Start";
+        StartPauseLabel.Text = running ? "Pause" : hasProgress ? "Resume" : "Start";
 
         EvaluateActivity();
         UpdateClockAndTimeline();
@@ -230,6 +277,16 @@ public partial class IslandWindow
     private void Pill_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (_machine.State == IslandState.Expanded) return;
+
+        // Shift + Scroll skips tracks horizontally; standard Scroll adjusts system master volume
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+        {
+            if (e.Delta > 0) _mediaService.Next();
+            else if (e.Delta < 0) _mediaService.Previous();
+            e.Handled = true;
+            return;
+        }
+
         float delta = e.Delta > 0 ? 0.02f : -0.02f;
         _volumeService.StepVolume(delta);
         e.Handled = true;
@@ -244,7 +301,15 @@ public partial class IslandWindow
         string subtitle = isMuted ? "0%" : $"{Math.Round(vol * 100)}%";
         Color accent = isMuted ? ThemeBrushes.RedColor : ThemeBrushes.BlueColor;
 
-        _machine.PushToast(new ToastContent(glyph, title, subtitle, accent, TimeSpan.FromSeconds(1.8)));
+        _machine.PushToast(new ToastContent(
+            glyph,
+            title,
+            subtitle,
+            accent,
+            TimeSpan.FromSeconds(1.8),
+            TargetView: "audio",
+            Priority: ToastPriority.Feedback,
+            Category: "volume"));
     }
 
     private void OnTelemetryUpdated()
@@ -306,7 +371,14 @@ public partial class IslandWindow
             e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files)
         {
             _shelfService.AddPaths(files);
-            _machine.PushToast(new ToastContent("\uE8B7", "Drop Shelf", $"{files.Length} item{(files.Length == 1 ? "" : "s")} added", ThemeBrushes.GreenColor, TimeSpan.FromSeconds(2.8), "shelf"));
+            _machine.PushToast(new ToastContent(
+                "\uE8B7",
+                "Drop Shelf",
+                $"{files.Length} item{(files.Length == 1 ? "" : "s")} added",
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(2.8),
+                TargetView: "shelf",
+                Priority: ToastPriority.System));
         }
     }
 
@@ -351,7 +423,15 @@ public partial class IslandWindow
         if (sender is FrameworkElement { Tag: string path })
         {
             DropShelfService.CopyPath(path);
-            _machine.PushToast(new ToastContent("\uE8C8", "Path Copied", Path.GetFileName(path), ThemeBrushes.BlueColor, TimeSpan.FromSeconds(2)));
+            _machine.PushToast(new ToastContent(
+                "\uE8C8",
+                "Path Copied",
+                Path.GetFileName(path),
+                ThemeBrushes.BlueColor,
+                TimeSpan.FromSeconds(2),
+                TargetView: null,
+                Priority: ToastPriority.Feedback,
+                Category: "clipboard"));
         }
     }
 
@@ -420,7 +500,15 @@ public partial class IslandWindow
         string sub = muted ? "Hardware capture disabled" : "Hardware capture active";
         Color accent = muted ? ThemeBrushes.RedColor : ThemeBrushes.GreenColor;
 
-        _machine.PushToast(new ToastContent(glyph, title, sub, accent, TimeSpan.FromSeconds(2.0)));
+        _machine.PushToast(new ToastContent(
+            glyph,
+            title,
+            sub,
+            accent,
+            TimeSpan.FromSeconds(2.0),
+            TargetView: null,
+            Priority: ToastPriority.Feedback,
+            Category: "mic"));
     }
 
     // ═════════════════════════════════════════════════════════════════
@@ -444,7 +532,15 @@ public partial class IslandWindow
             _clipboardService.CopyItem(item);
             string preview = item.Title;
             if (preview.Length > 24) preview = preview[..21] + "...";
-            _machine.PushToast(new ToastContent("\uE8C8", "Copied to Clipboard", preview, ThemeBrushes.BlueColor, TimeSpan.FromSeconds(1.8)));
+            _machine.PushToast(new ToastContent(
+                "\uE8C8",
+                "Copied to Clipboard",
+                preview,
+                ThemeBrushes.BlueColor,
+                TimeSpan.FromSeconds(1.8),
+                TargetView: "clipboard",
+                Priority: ToastPriority.Feedback,
+                Category: "clipboard"));
         }
     }
 
@@ -471,7 +567,14 @@ public partial class IslandWindow
     private void OnDownloadCompleted(string fileName, string fullPath)
     {
         _shelfService.AddPaths(new[] { fullPath });
-        _machine.PushToast(new ToastContent("\uE896", "Download Complete", fileName, ThemeBrushes.GreenColor, TimeSpan.FromSeconds(3.5), "shelf"));
+        _machine.PushToast(new ToastContent(
+            "\uE896",
+            "Download Complete",
+            fileName,
+            ThemeBrushes.GreenColor,
+            TimeSpan.FromSeconds(3.5),
+            TargetView: "shelf",
+            Priority: ToastPriority.Notification));
     }
 
     private void CalcInputBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -519,7 +622,15 @@ public partial class IslandWindow
         if (!string.IsNullOrEmpty(res))
         {
             Clipboard.SetText(res);
-            _machine.PushToast(new ToastContent("\uE73E", "Copied to Clipboard", res, ThemeBrushes.GreenColor, TimeSpan.FromSeconds(2.0)));
+            _machine.PushToast(new ToastContent(
+                "\uE73E",
+                "Copied to Clipboard",
+                res,
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(2.0),
+                TargetView: "calc",
+                Priority: ToastPriority.Feedback,
+                Category: "clipboard"));
         }
     }
 
@@ -534,18 +645,64 @@ public partial class IslandWindow
         NotchOffsetText.Text = $"{cur.NotchYOffset} px";
         UpdateDockButtonsUI();
         UpdateHaloUI();
+        UpdateDndUI();
         UpdateMonitorUI();
         ApplyTheme(cur.ThemeName);
+        SyncSpringMotionPreferences();
         UpdateSpectrumActivity();
         PositionWindow();
     }
 
-    private void OnSettingsChanged() => ApplySettings();
+    private void OnSettingsPropertyChanged(string? propertyName)
+    {
+        switch (propertyName)
+        {
+            case nameof(AppSettings.NotchYOffset):
+                ApplyGeometry();
+                PositionWindow();
+                break;
+
+            case nameof(AppSettings.DockPosition):
+                UpdateDockButtonsUI();
+                PositionWindow();
+                break;
+
+            case nameof(AppSettings.EnableAmbientGlow):
+                UpdateHaloUI();
+                UpdateSpectrumActivity();
+                EnsureRendering();
+                break;
+
+            case nameof(AppSettings.ThemeName):
+                ApplyTheme(_settingsService.Current.ThemeName);
+                UpdateDockButtonsUI();
+                break;
+
+            case nameof(AppSettings.MonitorIndex):
+            case nameof(AppSettings.MonitorDeviceName):
+                _cachedTargetMonitor = IntPtr.Zero;
+                UpdateMonitorUI();
+                PositionWindow();
+                break;
+
+            case nameof(AppSettings.DoNotDisturb):
+                UpdateDndUI();
+                break;
+
+            case nameof(AppSettings.CustomHotkeys):
+            case nameof(AppSettings.EnableDeveloperHotkeys):
+                RegisterConfiguredHotKeys();
+                break;
+
+            default:
+                ApplySettings();
+                break;
+        }
+    }
 
     private void ApplyTheme(string themeName)
     {
-        var palette = SettingsService.AvailableThemes.FirstOrDefault(t => t.Name == themeName)
-                      ?? SettingsService.AvailableThemes[0];
+        var palette = SettingsService.ResolveTheme(themeName);
 
         SelectedThemeName.Text = palette.Name;
         Resources["AccentBrush"] = ThemeBrushes.CreateFrozen(palette.Accent);
@@ -576,6 +733,14 @@ public partial class IslandWindow
         HaloToggleText.Foreground = on ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
     }
 
+    private void UpdateDndUI()
+    {
+        if (DndToggleText == null) return;
+        bool dnd = _settingsService.Current.DoNotDisturb;
+        DndToggleText.Text = dnd ? "DND On" : "DND Off";
+        DndToggleText.Foreground = dnd ? ThemeBrushes.Amber : ThemeBrushes.SecondaryText;
+    }
+
     private void UpdateMonitorUI()
     {
         if (MonitorSwitchText == null) return;
@@ -589,8 +754,25 @@ public partial class IslandWindow
         var monitors = GetAvailableMonitors();
         int count = Math.Max(1, monitors.Count);
         int nextIdx = (_settingsService.Current.MonitorIndex + 1) % count;
-        _settingsService.Update(s => s.MonitorIndex = nextIdx);
-        _machine.PushToast(new ToastContent("\uE7F4", "Display Switched", $"Moved to Screen {nextIdx + 1} of {count}", ThemeBrushes.BlueColor, TimeSpan.FromSeconds(1.8), "settings"));
+        string? devName = (nextIdx >= 0 && nextIdx < monitors.Count)
+            ? GetMonitorDeviceName(monitors[nextIdx])
+            : null;
+
+        _settingsService.Update(s =>
+        {
+            s.MonitorIndex = nextIdx;
+            s.MonitorDeviceName = devName;
+        }, nameof(AppSettings.MonitorIndex));
+
+        _machine.PushToast(new ToastContent(
+            "\uE7F4",
+            "Display Switched",
+            $"Moved to Screen {nextIdx + 1} of {count}",
+            ThemeBrushes.BlueColor,
+            TimeSpan.FromSeconds(1.8),
+            TargetView: "settings",
+            Priority: ToastPriority.Feedback,
+            Category: "monitor"));
     }
 
     private void NotchOffsetSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -599,33 +781,74 @@ public partial class IslandWindow
         double val = Math.Round(e.NewValue);
         if (Math.Abs(_settingsService.Current.NotchYOffset - val) < 0.01) return;
         NotchOffsetText.Text = $"{val} px";
-        _settingsService.Update(s => s.NotchYOffset = val);
-        ApplyGeometry();
+        _settingsService.Update(s => s.NotchYOffset = val, nameof(AppSettings.NotchYOffset));
     }
 
     private void DockButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: string dock })
         {
-            _settingsService.Update(s => s.DockPosition = dock);
-            _machine.PushToast(new ToastContent("\uE713", "Dock Position", $"Docked {dock}", ThemeBrushes.BlueColor, TimeSpan.FromSeconds(1.5)));
+            _settingsService.Update(s => s.DockPosition = dock, nameof(AppSettings.DockPosition));
+            _machine.PushToast(new ToastContent(
+                "\uE713",
+                "Dock Position",
+                $"Docked {dock}",
+                ThemeBrushes.BlueColor,
+                TimeSpan.FromSeconds(1.5),
+                TargetView: "settings",
+                Priority: ToastPriority.Feedback,
+                Category: "dock"));
         }
     }
 
     private void HaloToggleBtn_Click(object sender, RoutedEventArgs e)
     {
         bool next = !_settingsService.Current.EnableAmbientGlow;
-        _settingsService.Update(s => s.EnableAmbientGlow = next);
-        EnsureRendering();
-        _machine.PushToast(new ToastContent("\uE713", "Ambient Backlight", next ? "Halo Glow Enabled" : "Halo Glow Disabled", ThemeBrushes.BlueColor, TimeSpan.FromSeconds(1.5)));
+        _settingsService.Update(s => s.EnableAmbientGlow = next, nameof(AppSettings.EnableAmbientGlow));
+        _machine.PushToast(new ToastContent(
+            "\uE713",
+            "Ambient Backlight",
+            next ? "Halo Glow Enabled" : "Halo Glow Disabled",
+            ThemeBrushes.BlueColor,
+            TimeSpan.FromSeconds(1.5),
+            TargetView: "settings",
+            Priority: ToastPriority.Feedback,
+            Category: "halo"));
+    }
+
+    private void DndToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        SetDoNotDisturb(!_settingsService.Current.DoNotDisturb);
+    }
+
+    private void SetDoNotDisturb(bool enabled)
+    {
+        _settingsService.Update(s => s.DoNotDisturb = enabled, nameof(AppSettings.DoNotDisturb));
+        _machine.PushToast(new ToastContent(
+            "\uE708",
+            enabled ? "Do Not Disturb On" : "Do Not Disturb Off",
+            enabled ? "Incoming notification toasts silenced" : "Notification toasts enabled",
+            enabled ? ThemeBrushes.AmberColor : ThemeBrushes.GreenColor,
+            TimeSpan.FromSeconds(1.8),
+            TargetView: "settings",
+            Priority: ToastPriority.Feedback,
+            Category: "dnd"));
     }
 
     private void ThemeSwatch_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: string themeName })
         {
-            _settingsService.Update(s => s.ThemeName = themeName);
-            _machine.PushToast(new ToastContent("\uE790", "Theme Applied", themeName, ThemeBrushes.GreenColor, TimeSpan.FromSeconds(1.8)));
+            _settingsService.Update(s => s.ThemeName = themeName, nameof(AppSettings.ThemeName));
+            _machine.PushToast(new ToastContent(
+                "\uE790",
+                "Theme Applied",
+                themeName,
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(1.8),
+                TargetView: "settings",
+                Priority: ToastPriority.Feedback,
+                Category: "theme"));
         }
     }
 
@@ -648,7 +871,15 @@ public partial class IslandWindow
         AudioButtonGlyph.Text = newDef.Glyph;
         _volumeService.ReattachDefaultEndpoint();
         _audioSpectrum.NotifyDefaultDeviceChanged();
-        _machine.PushToast(new ToastContent(newDef.Glyph, "Audio Output Switched", newDef.Name, ThemeBrushes.BlueColor, TimeSpan.FromSeconds(2.8), "audio"));
+        _machine.PushToast(new ToastContent(
+            newDef.Glyph,
+            "Audio Output Switched",
+            newDef.Name,
+            ThemeBrushes.BlueColor,
+            TimeSpan.FromSeconds(2.8),
+            TargetView: "audio",
+            Priority: ToastPriority.System,
+            Category: "audiodevice"));
     }
 
     private void AudioEndpointCard_Click(object sender, MouseButtonEventArgs e)
@@ -656,7 +887,15 @@ public partial class IslandWindow
         if (sender is FrameworkElement { DataContext: AudioEndpointInfo { IsDefault: false } endpoint })
         {
             _audioEndpointService.SetDefaultEndpoint(endpoint.Id);
-            _machine.PushToast(new ToastContent(endpoint.Glyph, "Audio Output", $"Active: {endpoint.Name}", ThemeBrushes.GreenColor, TimeSpan.FromSeconds(2.0)));
+            _machine.PushToast(new ToastContent(
+                endpoint.Glyph,
+                "Audio Output",
+                $"Active: {endpoint.Name}",
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(2.0),
+                TargetView: "audio",
+                Priority: ToastPriority.Feedback,
+                Category: "audiodevice"));
         }
     }
 
@@ -718,7 +957,15 @@ public partial class IslandWindow
 
     private void OnChargingPulseTriggered(int percent, string timeEstimate)
     {
-        _machine.PushToast(new ToastContent("\uE945", "Charging", $"{percent}% · {timeEstimate}", ThemeBrushes.GreenColor, TimeSpan.FromSeconds(3.5), "battery"));
+        _machine.PushToast(new ToastContent(
+            "\uE945",
+            "Charging",
+            $"{percent}% · {timeEstimate}",
+            ThemeBrushes.GreenColor,
+            TimeSpan.FromSeconds(3.5),
+            TargetView: "battery",
+            Priority: ToastPriority.System,
+            Category: "power"));
         PillGlowColor.Color = ThemeBrushes.GreenColor;
         PillGlow.Opacity = 0.95;
         EnsureRendering();
@@ -726,30 +973,45 @@ public partial class IslandWindow
 
     private void OnPowerDisconnectedTriggered(int percent, string timeEstimate)
     {
-        _machine.PushToast(new ToastContent("\uEBB5", "On Battery", $"{percent}% · {timeEstimate}", ThemeBrushes.MutedGreyColor, TimeSpan.FromSeconds(3.0), "battery"));
+        _machine.PushToast(new ToastContent(
+            "\uEBB5",
+            "On Battery",
+            $"{percent}% · {timeEstimate}",
+            ThemeBrushes.MutedGreyColor,
+            TimeSpan.FromSeconds(3.0),
+            TargetView: "battery",
+            Priority: ToastPriority.System,
+            Category: "power"));
     }
 
     private void OnLowBatteryTriggered(int percent)
     {
-        _machine.PushToast(new ToastContent("\uEBA0", "Battery Low", $"{percent}% remaining · Plug in soon", ThemeBrushes.RedColor, TimeSpan.FromSeconds(4.0), "battery"));
+        _machine.PushToast(new ToastContent(
+            "\uEBA0",
+            "Battery Low",
+            $"{percent}% remaining · Plug in soon",
+            ThemeBrushes.RedColor,
+            TimeSpan.FromSeconds(4.0),
+            TargetView: "battery",
+            Priority: ToastPriority.Critical));
     }
 
     private void PlanPerfCard_Click(object sender, MouseButtonEventArgs e)
     {
         _powerPlanService.SetActiveScheme("Performance");
-        _machine.PushToast(new ToastContent("\uE945", "Best Performance", "Windows Power Scheme Applied", ThemeBrushes.AmberColor, TimeSpan.FromSeconds(2.0)));
+        _machine.PushToast(new ToastContent("\uE945", "Best Performance", "Windows Power Scheme Applied", ThemeBrushes.AmberColor, TimeSpan.FromSeconds(2.0), "battery", ToastPriority.Feedback, "powerplan"));
     }
 
     private void PlanBalancedCard_Click(object sender, MouseButtonEventArgs e)
     {
         _powerPlanService.SetActiveScheme("Balanced");
-        _machine.PushToast(new ToastContent("\uE74C", "Balanced Mode", "Recommended Scheme Applied", ThemeBrushes.BlueColor, TimeSpan.FromSeconds(2.0)));
+        _machine.PushToast(new ToastContent("\uE74C", "Balanced Mode", "Recommended Scheme Applied", ThemeBrushes.BlueColor, TimeSpan.FromSeconds(2.0), "battery", ToastPriority.Feedback, "powerplan"));
     }
 
     private void PlanSaverCard_Click(object sender, MouseButtonEventArgs e)
     {
         _powerPlanService.SetActiveScheme("PowerSaver");
-        _machine.PushToast(new ToastContent("\uEC0A", "Power Saver", "Battery Saver Scheme Applied", ThemeBrushes.GreenColor, TimeSpan.FromSeconds(2.0)));
+        _machine.PushToast(new ToastContent("\uEC0A", "Power Saver", "Battery Saver Scheme Applied", ThemeBrushes.GreenColor, TimeSpan.FromSeconds(2.0), "battery", ToastPriority.Feedback, "powerplan"));
     }
 
     // ═════════════════════════════════════════════════════════════════
@@ -779,7 +1041,14 @@ public partial class IslandWindow
             RecordHalo.Opacity = 0.5;
             EvaluateActivity();
             EnsureRendering();
-            _machine.PushToast(new ToastContent("\uE7C8", "Recording Started", "Audio dictation memo active", ThemeBrushes.RedColor, TimeSpan.FromSeconds(2.0)));
+            _machine.PushToast(new ToastContent(
+                "\uE7C8",
+                "Recording Started",
+                "Audio dictation memo active",
+                ThemeBrushes.RedColor,
+                TimeSpan.FromSeconds(2.0),
+                TargetView: "voicememo",
+                Priority: ToastPriority.System));
         }
     }
 
@@ -833,7 +1102,14 @@ public partial class IslandWindow
         LastMemoDuration.Text = FormatTime(info.Duration);
 
         _shelfService.AddPaths(new[] { info.FilePath });
-        _machine.PushToast(new ToastContent("\uE7C8", "Voice Memo Saved", $"{info.FileName} · {FormatTime(info.Duration)}", ThemeBrushes.RedColor, TimeSpan.FromSeconds(3.5), "voicememo"));
+        _machine.PushToast(new ToastContent(
+            "\uE7C8",
+            "Voice Memo Saved",
+            $"{info.FileName} · {FormatTime(info.Duration)}",
+            ThemeBrushes.RedColor,
+            TimeSpan.FromSeconds(3.5),
+            TargetView: "voicememo",
+            Priority: ToastPriority.Notification));
         EvaluateActivity();
     }
 
@@ -860,7 +1136,14 @@ public partial class IslandWindow
         if (!string.IsNullOrEmpty(_voiceMemoService.LastSavedFilePath) && File.Exists(_voiceMemoService.LastSavedFilePath))
         {
             _shelfService.AddPaths(new[] { _voiceMemoService.LastSavedFilePath });
-            _machine.PushToast(new ToastContent("\uE8B7", "Added to Shelf", Path.GetFileName(_voiceMemoService.LastSavedFilePath), ThemeBrushes.GreenColor, TimeSpan.FromSeconds(2.5)));
+            _machine.PushToast(new ToastContent(
+                "\uE8B7",
+                "Added to Shelf",
+                Path.GetFileName(_voiceMemoService.LastSavedFilePath),
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(2.5),
+                TargetView: "shelf",
+                Priority: ToastPriority.Feedback));
         }
     }
 
@@ -872,7 +1155,10 @@ public partial class IslandWindow
             if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
             Process.Start(new ProcessStartInfo("explorer.exe", $"\"{dir}\"") { UseShellExecute = true });
         }
-        catch { }
+        catch (Exception ex)
+        {
+            App.Log($"[VoiceMemo] OpenMemosFolder failed: {ex.Message}");
+        }
     }
 
     // ═════════════════════════════════════════════════════════════════
@@ -891,12 +1177,34 @@ public partial class IslandWindow
 
     private void OnPeripheralLowBatteryAlert(PeripheralDeviceInfo dev)
     {
-        _machine.PushToast(new ToastContent("\uE851", dev.Name, $"Battery low · {dev.BatteryPercent}% remaining", ThemeBrushes.RedColor, TimeSpan.FromSeconds(4.5), "peripherals"));
+        _machine.PushToast(new ToastContent(
+            "\uE851",
+            dev.Name,
+            $"Battery low · {dev.BatteryPercent}% remaining",
+            ThemeBrushes.RedColor,
+            TimeSpan.FromSeconds(4.5),
+            TargetView: "peripherals",
+            Priority: ToastPriority.Critical));
     }
 
     private async void RefreshPeripheralsBtn_Click(object sender, RoutedEventArgs e)
     {
-        await _peripheralService.RefreshAsync();
-        _machine.PushToast(new ToastContent("\uE72C", "Peripherals Refreshed", $"{_peripheralService.ConnectedCount} devices found", ThemeBrushes.BlueColor, TimeSpan.FromSeconds(2.0)));
+        try
+        {
+            await _peripheralService.RefreshAsync();
+            _machine.PushToast(new ToastContent(
+                "\uE72C",
+                "Peripherals Refreshed",
+                $"{_peripheralService.ConnectedCount} devices found",
+                ThemeBrushes.BlueColor,
+                TimeSpan.FromSeconds(2.0),
+                TargetView: "peripherals",
+                Priority: ToastPriority.Feedback,
+                Category: "peripherals"));
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Peripherals] Refresh failed: {ex.Message}");
+        }
     }
 }

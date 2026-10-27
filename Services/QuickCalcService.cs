@@ -6,13 +6,15 @@ namespace DynamicIsland.Services;
 
 /// <summary>
 /// Lightweight inline calculator and unit converter for the Dynamic Island.
-/// Parses expressions such as '12 * 85', '2 ^ 10', '15% of 600', '150 km in miles', '72 f in c', etc.
+/// Parses expressions such as '12 * 85', '2 ^ 10', 'sqrt(144)', '15% of 600',
+/// '150 km in miles', '72 f in c', '16 gb in mb', etc.
 /// </summary>
 internal static class QuickCalcService
 {
-    private static readonly Regex PercentOfRegex = new(@"^([\d\.]+)\s*%\s*(?:of)\s*([\d\.]+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex UnitConvertRegex = new(@"^([\d\.]+)\s*([a-zA-Z]+)\s*(?:in|to)\s*([a-zA-Z]+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex PowerRegex = new(@"^([\d\.]+)\s*\^\s*([\d\.]+)$", RegexOptions.Compiled);
+    private static readonly Regex PercentOfRegex = new(@"^([+-]?[\d\.]+)\s*%\s*(?:of)\s*([+-]?[\d\.]+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex UnitConvertRegex = new(@"^([+-]?[\d\.]+)\s*([a-zA-Z]+)\s*(?:in|to)\s*([a-zA-Z]+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex PowerRegex = new(@"^([+-]?[\d\.]+)\s*\^\s*([+-]?[\d\.]+)$", RegexOptions.Compiled);
+    private static readonly Regex SqrtRegex = new(@"^sqrt\s*\(\s*([\d\.]+)\s*\)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex MultiplyXRegex = new(@"(?<=[\d\)])\s*[xX]\s*(?=[\d\(])", RegexOptions.Compiled);
 
     private static readonly DataTable SharedTable = new();
@@ -35,7 +37,7 @@ internal static class QuickCalcService
             return (true, FormatDouble(res), $"{pct}% of {baseVal}");
         }
 
-        // 2. Unit conversion: "100 km in miles", "72 f in c", "150 lbs in kg"
+        // 2. Unit conversion: "100 km in miles", "72 f in c", "150 lbs in kg", "4 gb in mb"
         var unitMatch = UnitConvertRegex.Match(trimmed);
         if (unitMatch.Success &&
             double.TryParse(unitMatch.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double val))
@@ -50,17 +52,29 @@ internal static class QuickCalcService
             }
         }
 
-        // 3. Exponentiation check: "2 ^ 10"
+        // 3. Square root: "sqrt(144)"
+        var sqrtMatch = SqrtRegex.Match(trimmed);
+        if (sqrtMatch.Success &&
+            double.TryParse(sqrtMatch.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double sqVal) &&
+            sqVal >= 0)
+        {
+            double res = Math.Sqrt(sqVal);
+            return (true, FormatDouble(res), $"√{sqVal}");
+        }
+
+        // 4. Exponentiation check: "2 ^ 10"
         var powMatch = PowerRegex.Match(trimmed);
         if (powMatch.Success &&
             double.TryParse(powMatch.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double b) &&
             double.TryParse(powMatch.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double exp))
         {
             double res = Math.Pow(b, exp);
+            if (double.IsNaN(res) || double.IsInfinity(res))
+                return (false, "", "");
             return (true, FormatDouble(res), $"{b}^{exp}");
         }
 
-        // 4. Mathematical expression via shared DataTable
+        // 5. Mathematical expression via shared DataTable
         try
         {
             string sanitized = SanitizeMath(trimmed);
@@ -72,10 +86,15 @@ internal static class QuickCalcService
             if (result != null && result != DBNull.Value)
             {
                 double d = Convert.ToDouble(result, CultureInfo.InvariantCulture);
+                if (double.IsNaN(d) || double.IsInfinity(d))
+                    return (false, "", "");
                 return (true, FormatDouble(d), sanitized);
             }
         }
-        catch { }
+        catch
+        {
+            // Expression is incomplete while user is still typing
+        }
 
         return (false, "", "");
     }
@@ -106,6 +125,16 @@ internal static class QuickCalcService
         // Weight
         if (from is "kg" or "kilogram" or "kilograms" && to is "lbs" or "lb" or "pound" or "pounds") return val * 2.20462;
         if (from is "lbs" or "lb" or "pound" or "pounds" && to is "kg" or "kilogram" or "kilograms") return val / 2.20462;
+        if (from is "g" or "gram" or "grams" && to is "oz" or "ounce" or "ounces") return val / 28.3495;
+        if (from is "oz" or "ounce" or "ounces" && to is "g" or "gram" or "grams") return val * 28.3495;
+
+        // Digital Storage (binary 1024 base)
+        if (from == "gb" && to == "mb") return val * 1024.0;
+        if (from == "mb" && to == "gb") return val / 1024.0;
+        if (from == "tb" && to == "gb") return val * 1024.0;
+        if (from == "gb" && to == "tb") return val / 1024.0;
+        if (from == "mb" && to == "kb") return val * 1024.0;
+        if (from == "kb" && to == "mb") return val / 1024.0;
 
         // Common currency approximations
         if (from == "usd" && to == "inr") return val * 83.5;

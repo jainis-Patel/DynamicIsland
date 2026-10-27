@@ -1,5 +1,4 @@
 using System.IO;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Media;
@@ -34,8 +33,10 @@ public sealed class ClipboardItem
 
 /// <summary>
 /// Listens to real-time Windows clipboard updates using Win32 AddClipboardFormatListener.
+/// Honors Windows and password-manager privacy exclusion markers (e.g. 1Password, Bitwarden, KeePass)
+/// so sensitive secrets are never captured or persisted to disk.
 /// Categorizes clips into Text, Colors (with swatches), URLs, and Images (with bounded memory footprint),
-/// and persists text/URL/color clips across restarts.
+/// and atomically persists text/URL/color clips across restarts.
 /// </summary>
 internal sealed class ClipboardHistoryService : IDisposable
 {
@@ -48,7 +49,15 @@ internal sealed class ClipboardHistoryService : IDisposable
         DateTime CreatedAt);
 
     private static readonly string PersistencePath = AppPaths.ClipboardFile;
-    private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
+    private static readonly object SaveFileLock = new();
+
+    /// <summary>
+    /// Standard clipboard format names used by Windows 10/11 and password managers (1Password, Bitwarden,
+    /// KeePass, LastPass, Windows Security) to mark sensitive/ephemeral clipboard data.
+    /// </summary>
+    public const string FormatExcludeFromMonitoring = "ExcludeClipboardContentFromMonitorProcessing";
+    public const string FormatCanIncludeInHistory = "CanIncludeInClipboardHistory";
+    public const string FormatClipboardViewerIgnore = "Clipboard Viewer Ignore";
 
     private readonly Dispatcher _ui;
     private IntPtr _hwnd;
@@ -75,6 +84,91 @@ internal sealed class ClipboardHistoryService : IDisposable
     {
         _ui = ui;
         LoadPersistedHistory();
+    }
+
+    /// <summary>
+    /// Inspects an <see cref="IDataObject"/> for Windows / password-manager privacy markers.
+    /// Returns <see langword="true"/> when the clipboard entry must NOT be captured or persisted.
+    /// </summary>
+    public static bool ShouldExcludeClipboardData(IDataObject? dataObject)
+    {
+        if (dataObject is null) return true;
+
+        try
+        {
+            // 1. Explicit exclusion marker set by password managers and security tools
+            if (dataObject.GetDataPresent(FormatExcludeFromMonitoring))
+            {
+                var raw = TryGetFormatData(dataObject, FormatExcludeFromMonitoring);
+                if (raw is null || !IsExplicitZeroOrFalse(raw))
+                {
+                    return true;
+                }
+            }
+
+            if (dataObject.GetDataPresent(FormatClipboardViewerIgnore))
+            {
+                return true;
+            }
+
+            // 2. Windows 10/11 CanIncludeInClipboardHistory (DWORD == 0 means exclude from history)
+            if (dataObject.GetDataPresent(FormatCanIncludeInHistory))
+            {
+                var raw = TryGetFormatData(dataObject, FormatCanIncludeInHistory);
+                if (raw is not null && IsExplicitZeroOrFalse(raw))
+                {
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[ClipboardHistory] Privacy check error: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    private static object? TryGetFormatData(IDataObject dataObject, string format)
+    {
+        try
+        {
+            return dataObject.GetData(format);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static bool IsExplicitZeroOrFalse(object value) => value switch
+    {
+        bool b => !b,
+        int i => i == 0,
+        uint u => u == 0,
+        byte by => by == 0,
+        byte[] bytes => bytes.Length > 0 && bytes.All(b => b == 0),
+        MemoryStream ms => IsStreamAllZero(ms),
+        _ => false
+    };
+
+    private static bool IsStreamAllZero(MemoryStream ms)
+    {
+        if (ms.Length == 0) return false;
+        long pos = ms.Position;
+        try
+        {
+            ms.Position = 0;
+            for (int i = 0; i < Math.Min(ms.Length, 4); i++)
+            {
+                if (ms.ReadByte() != 0) return false;
+            }
+            return true;
+        }
+        finally
+        {
+            ms.Position = pos;
+        }
     }
 
     /// <summary>
@@ -124,6 +218,13 @@ internal sealed class ClipboardHistoryService : IDisposable
     {
         try
         {
+            IDataObject? dataObj = Clipboard.GetDataObject();
+            if (ShouldExcludeClipboardData(dataObj))
+            {
+                App.Log("[ClipboardHistory] Ignored sensitive clipboard update (privacy exclusion flag present).");
+                return;
+            }
+
             if (!Clipboard.ContainsText() && !Clipboard.ContainsImage() && !Clipboard.ContainsFileDropList())
                 return;
 
@@ -168,7 +269,10 @@ internal sealed class ClipboardHistoryService : IDisposable
                             SwatchColor = color
                         };
                     }
-                    catch { }
+                    catch
+                    {
+                        // Not a valid color string; continue to URL/Text checks
+                    }
                 }
 
                 // 2. Check if it's a Web URL
@@ -179,10 +283,13 @@ internal sealed class ClipboardHistoryService : IDisposable
                     string domain = text;
                     try
                     {
-                        var uri = new Uri(text.StartsWith("http") ? text : "https://" + text);
+                        var uri = new Uri(text.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? text : "https://" + text);
                         domain = uri.Host;
                     }
-                    catch { }
+                    catch
+                    {
+                        // Keep raw text as title fallback
+                    }
 
                     newItem = new ClipboardItem
                     {
@@ -197,7 +304,7 @@ internal sealed class ClipboardHistoryService : IDisposable
                 if (newItem == null)
                 {
                     string singleLine = text.Replace("\r", " ").Replace("\n", " ");
-                    if (singleLine.Length > 40) singleLine = singleLine.Substring(0, 37) + "...";
+                    if (singleLine.Length > 40) singleLine = singleLine[..37] + "...";
 
                     newItem = new ClipboardItem
                     {
@@ -213,7 +320,6 @@ internal sealed class ClipboardHistoryService : IDisposable
             {
                 lock (_items)
                 {
-                    // Avoid duplicates at top
                     if (_items.Count > 0 && _items[0].RawText != null && _items[0].RawText == newItem.RawText)
                         return;
 
@@ -227,7 +333,7 @@ internal sealed class ClipboardHistoryService : IDisposable
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ClipboardHistory] Error reading clipboard: {ex.Message}");
+            App.Log($"[ClipboardHistory] Error reading clipboard: {ex.Message}");
         }
     }
 
@@ -245,7 +351,10 @@ internal sealed class ClipboardHistoryService : IDisposable
                 _lastText = item.RawText;
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            App.Log($"[ClipboardHistory] CopyItem error: {ex.Message}");
+        }
     }
 
     public void Remove(string id)
@@ -271,43 +380,37 @@ internal sealed class ClipboardHistoryService : IDisposable
 
     private void LoadPersistedHistory()
     {
-        try
+        var dtos = AtomicJsonStore.Load<List<PersistedClipDto>?>(PersistencePath, () => null);
+        if (dtos == null) return;
+
+        lock (_items)
         {
-            if (!File.Exists(PersistencePath)) return;
-            string json = File.ReadAllText(PersistencePath);
-            var dtos = JsonSerializer.Deserialize<List<PersistedClipDto>>(json);
-            if (dtos == null) return;
-
-            lock (_items)
+            foreach (var dto in dtos.Take(MaxHistory))
             {
-                foreach (var dto in dtos.Take(MaxHistory))
+                if (string.IsNullOrEmpty(dto.RawText)) continue;
+                Color? swatch = null;
+                if (!string.IsNullOrEmpty(dto.SwatchHex))
                 {
-                    if (string.IsNullOrEmpty(dto.RawText)) continue;
-                    Color? swatch = null;
-                    if (!string.IsNullOrEmpty(dto.SwatchHex))
-                    {
-                        try { swatch = (Color)ColorConverter.ConvertFromString(dto.SwatchHex); }
-                        catch { }
-                    }
-
-                    _items.Add(new ClipboardItem
-                    {
-                        Type = dto.Type,
-                        Title = dto.Title,
-                        Subtitle = dto.Subtitle,
-                        RawText = dto.RawText,
-                        SwatchColor = swatch,
-                        CreatedAt = dto.CreatedAt
-                    });
+                    try { swatch = (Color)ColorConverter.ConvertFromString(dto.SwatchHex); }
+                    catch { }
                 }
 
-                if (_items.Count > 0)
+                _items.Add(new ClipboardItem
                 {
-                    _lastText = _items[0].RawText;
-                }
+                    Type = dto.Type,
+                    Title = dto.Title,
+                    Subtitle = dto.Subtitle,
+                    RawText = dto.RawText,
+                    SwatchColor = swatch,
+                    CreatedAt = dto.CreatedAt
+                });
+            }
+
+            if (_items.Count > 0)
+            {
+                _lastText = _items[0].RawText;
             }
         }
-        catch { }
     }
 
     private void SavePersistedHistoryAsync()
@@ -327,15 +430,7 @@ internal sealed class ClipboardHistoryService : IDisposable
                 .ToList();
         }
 
-        _ = Task.Run(() =>
-        {
-            try
-            {
-                string json = JsonSerializer.Serialize(snapshot, JsonOpts);
-                File.WriteAllText(PersistencePath, json);
-            }
-            catch { }
-        });
+        _ = Task.Run(() => AtomicJsonStore.Save(PersistencePath, snapshot, SaveFileLock));
     }
 
     public void Dispose()

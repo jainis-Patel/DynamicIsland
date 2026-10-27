@@ -12,18 +12,15 @@
     <AssemblyName>DynamicIsland</AssemblyName>
     <!-- Per-Monitor V2 DPI awareness so GetCursorPos/GetWindowRect return physical pixels. -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <!-- Avoid emitting 13 unused localized satellite resource folders in bin/ and publish/ -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- WASAPI loopback capture + FFT for the live audio meter. -->
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
   </ItemGroup>
-
-  <Target Name="SyncPublishFolder" AfterTargets="Build" Condition="Exists('$(ProjectDir)publish')">
-    <Exec Command="powershell -NoProfile -Command &quot;Remove-Item -Force '$(ProjectDir)publish\DynamicIsland.dll.old','$(ProjectDir)publish\DynamicIsland.exe.old' -ErrorAction SilentlyContinue; if (Test-Path '$(ProjectDir)publish\DynamicIsland.dll') { Move-Item -Force '$(ProjectDir)publish\DynamicIsland.dll' '$(ProjectDir)publish\DynamicIsland.dll.old' -ErrorAction SilentlyContinue }; if (Test-Path '$(ProjectDir)publish\DynamicIsland.exe') { Move-Item -Force '$(ProjectDir)publish\DynamicIsland.exe' '$(ProjectDir)publish\DynamicIsland.exe.old' -ErrorAction SilentlyContinue }; Copy-Item -Force '$(TargetDir)DynamicIsland.dll' '$(ProjectDir)publish\DynamicIsland.dll' -ErrorAction SilentlyContinue; Copy-Item -Force '$(TargetDir)DynamicIsland.exe' '$(ProjectDir)publish\DynamicIsland.exe' -ErrorAction SilentlyContinue; Remove-Item -Force '$(ProjectDir)publish\DynamicIsland.dll.old','$(ProjectDir)publish\DynamicIsland.exe.old' -ErrorAction SilentlyContinue&quot;"
-          IgnoreExitCode="true" />
-  </Target>
 
 </Project>

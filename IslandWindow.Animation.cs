@@ -26,10 +26,23 @@ public partial class IslandWindow
         return ease;
     }
 
+    private bool IsReducedMotion =>
+        (_settingsService?.Current.ReduceMotion ?? false) || !SystemParameters.ClientAreaAnimation;
+
+    private void SyncSpringMotionPreferences()
+    {
+        // Critically damped (damping = 36 for stiffness = 320 -> zeta ≈ 1.006, zero overshoot) when reduced motion is active
+        double damping = IsReducedMotion ? 36 : 26;
+        _width.Damping = damping;
+        _height.Damping = damping;
+        _radius.Damping = damping;
+    }
+
     private bool BarsAnimating =>
         _machine.State == IslandState.Compact &&
         ((_mediaService.Current?.IsPlaying ?? false) ||
          _stopwatch.IsRunning ||
+         (_countdownService?.IsRunning ?? false) ||
          !string.IsNullOrWhiteSpace(_privacyService.ActiveCallApp) ||
          (_voiceMemoService?.IsRecording ?? false));
 
@@ -72,6 +85,8 @@ public partial class IslandWindow
 
     private void OnStateChanged(IslandState previous, IslandState next)
     {
+        SyncSpringMotionPreferences();
+
         var shape = Shapes[next];
         _width.Target = shape.Width;
         _height.Target = shape.Height;
@@ -95,7 +110,7 @@ public partial class IslandWindow
         }
         else if (previous == IslandState.Expanded)
         {
-            _currentExpandedView = "media";
+            _currentExpandedView = ExpandedView.Media;
             SetKeyboardFocusable(false);
             SetDockActive(MediaHomeButton);
             foreach (var c in _allContainers)
@@ -122,7 +137,7 @@ public partial class IslandWindow
         ToastSubtitle.Text = toast.Subtitle;
         PillGlowColor.Color = toast.Accent;
 
-        if (replacing)
+        if (replacing && !IsReducedMotion)
         {
             _width.Velocity += 260;
             _height.Velocity += 90;
@@ -140,6 +155,7 @@ public partial class IslandWindow
 
     private void CrossfadeTo(IslandState state)
     {
+        bool reduced = IsReducedMotion;
         var active = PanelFor(state);
         foreach (var panel in _panels)
         {
@@ -178,11 +194,11 @@ public partial class IslandWindow
             var scale = (ScaleTransform)panel.RenderTransform;
             var grow = new DoubleAnimation
             {
-                From = on ? 0.92 : null,
+                From = on ? (reduced ? 0.98 : 0.92) : null,
                 To = on ? 1 : 0.96,
-                Duration = TimeSpan.FromMilliseconds(on ? 320 : 120),
+                Duration = TimeSpan.FromMilliseconds(on ? (reduced ? 180 : 320) : 120),
                 BeginTime = fade.BeginTime,
-                EasingFunction = on ? SharedPanelBackOut : SharedCubicOut,
+                EasingFunction = (on && !reduced) ? SharedPanelBackOut : SharedCubicOut,
             };
             scale.BeginAnimation(ScaleTransform.ScaleXProperty, grow);
             scale.BeginAnimation(ScaleTransform.ScaleYProperty, grow);
@@ -206,6 +222,7 @@ public partial class IslandWindow
 
     private void AnimateContainerSwitch(FrameworkElement newContainer)
     {
+        bool reduced = IsReducedMotion;
         foreach (var c in _allContainers)
         {
             if (c != newContainer && c.Visibility == Visibility.Visible)
@@ -228,16 +245,16 @@ public partial class IslandWindow
             newContainer.RenderTransform = tt;
         }
 
-        tt.Y = 6;
+        tt.Y = reduced ? 0 : 6;
         newContainer.Opacity = 0;
 
         var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160))
         {
             EasingFunction = SharedCubicOut
         };
-        var slideIn = new DoubleAnimation(6, 0, TimeSpan.FromMilliseconds(180))
+        var slideIn = new DoubleAnimation(reduced ? 0 : 6, 0, TimeSpan.FromMilliseconds(180))
         {
-            EasingFunction = SharedContainerBackOut
+            EasingFunction = reduced ? SharedCubicOut : SharedContainerBackOut
         };
 
         newContainer.BeginAnimation(OpacityProperty, fadeIn);
@@ -394,7 +411,7 @@ public partial class IslandWindow
 
         _audioSpectrum.ReadBands(_bandLevels);
         bool isMusicPlaying = _mediaService.Current?.IsPlaying ?? false;
-        bool isStopwatchRunning = _stopwatch.IsRunning;
+        bool isTimerRunning = _stopwatch.IsRunning || (_countdownService?.IsRunning ?? false);
         bool isCallActive = !string.IsNullOrWhiteSpace(_privacyService.ActiveCallApp);
         bool isRecording = _voiceMemoService?.IsRecording ?? false;
 
@@ -408,12 +425,12 @@ public partial class IslandWindow
                 double wave = peak * (0.65 + 0.35 * Math.Sin(t * 7.5 + i * 1.5));
                 target = (float)wave;
             }
-            else if (target < 0.08f && (isStopwatchRunning || isCallActive))
+            else if (target < 0.08f && (isTimerRunning || isCallActive))
             {
                 double wave = (0.5 + 0.5 * Math.Sin(t * (5.5 + i * 1.8) + i * 1.3)) * 0.72;
                 target = (float)wave;
             }
-            else if (!isMusicPlaying && !isStopwatchRunning && !isCallActive)
+            else if (!isMusicPlaying && !isTimerRunning && !isCallActive)
             {
                 target = 0f;
             }

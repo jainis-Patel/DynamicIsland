@@ -9,7 +9,10 @@ namespace DynamicIsland.Interop;
 internal static class NativeMethods
 {
     // ── Window styles ────────────────────────────────────────────────
+    public const int GWL_STYLE = -16;
     public const int GWL_EXSTYLE = -20;
+    public const long WS_CAPTION = 0x00C00000L;
+    public const long WS_THICKFRAME = 0x00040000L;
     public const long WS_EX_TOPMOST = 0x00000008;
     public const long WS_EX_TRANSPARENT = 0x00000020;
     public const long WS_EX_TOOLWINDOW = 0x00000080;
@@ -23,6 +26,7 @@ internal static class NativeMethods
     public const int WM_SETTINGCHANGE = 0x001A;
     public const int WM_DISPLAYCHANGE = 0x007E;
     public const int WM_NCHITTEST = 0x0084;
+    public const int WM_MOUSEHWHEEL = 0x020E;
     public const int WM_HOTKEY = 0x0312;
     public const int WM_CLIPBOARDUPDATE = 0x031D;
     public const uint WM_DROPFILES = 0x0233;
@@ -97,6 +101,17 @@ internal static class NativeMethods
         public RECT rcMonitor;
         public RECT rcWork;
         public uint dwFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct MONITORINFOEX
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string szDevice;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -221,6 +236,10 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetMonitorInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetMonitorInfoEx(IntPtr hMonitor, ref MONITORINFOEX lpmi);
+
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -337,6 +356,9 @@ internal static class NativeMethods
         [MarshalAs(UnmanagedType.Bool)] bool fAsynchronous);
 
     // ── Helpers ──────────────────────────────────────────────────────
+    public static long GetStyle(IntPtr hWnd) =>
+        IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, GWL_STYLE).ToInt64() : GetWindowLong32(hWnd, GWL_STYLE);
+
     public static long GetExStyle(IntPtr hWnd) =>
         IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, GWL_EXSTYLE).ToInt64() : GetWindowLong32(hWnd, GWL_EXSTYLE);
 
@@ -344,5 +366,14 @@ internal static class NativeMethods
     {
         if (IntPtr.Size == 8) SetWindowLongPtr64(hWnd, GWL_EXSTYLE, new IntPtr(style));
         else SetWindowLong32(hWnd, GWL_EXSTYLE, unchecked((int)style));
+    }
+
+    public static string? GetMonitorDeviceName(IntPtr hMonitor)
+    {
+        if (hMonitor == IntPtr.Zero) return null;
+        var info = new MONITORINFOEX { cbSize = Marshal.SizeOf<MONITORINFOEX>() };
+        return GetMonitorInfoEx(hMonitor, ref info) && !string.IsNullOrWhiteSpace(info.szDevice)
+            ? info.szDevice
+            : null;
     }
 }

@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.IO;
-using System.Text.Json;
 using System.Windows;
 using DynamicIsland.Core;
 
@@ -10,12 +9,12 @@ internal sealed record ShelfItem(string FullPath, string FileName, string FileSi
 
 /// <summary>
 /// Manages the Drop Shelf ("Drop Notch") temporary holding tray for dragged files,
-/// with automatic persistence across app restarts.
+/// with crash-safe atomic JSON persistence across app restarts.
 /// </summary>
 internal sealed class DropShelfService
 {
     private static readonly string ShelfFile = AppPaths.ShelfFile;
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static readonly object SaveLock = new();
 
     private readonly List<ShelfItem> _items = new();
 
@@ -71,36 +70,22 @@ internal sealed class DropShelfService
 
     private void LoadPersistedItems()
     {
-        try
-        {
-            if (!File.Exists(ShelfFile)) return;
-            string json = File.ReadAllText(ShelfFile);
-            var paths = JsonSerializer.Deserialize<string[]>(json);
-            if (paths == null) return;
+        var paths = AtomicJsonStore.Load<string[]?>(ShelfFile, () => null);
+        if (paths == null) return;
 
-            foreach (var path in paths)
+        foreach (var path in paths)
+        {
+            if (TryCreateItem(path, out var item) && item != null)
             {
-                if (TryCreateItem(path, out var item) && item != null)
-                {
-                    _items.Add(item);
-                }
+                _items.Add(item);
             }
         }
-        catch { }
     }
 
     private void SaveAsync()
     {
         string[] paths = _items.Select(i => i.FullPath).ToArray();
-        Task.Run(() =>
-        {
-            try
-            {
-                string json = JsonSerializer.Serialize(paths, JsonOptions);
-                File.WriteAllText(ShelfFile, json);
-            }
-            catch { }
-        });
+        _ = Task.Run(() => AtomicJsonStore.Save(ShelfFile, paths, SaveLock));
     }
 
     private static bool TryCreateItem(string path, out ShelfItem? item)
@@ -123,7 +108,10 @@ internal sealed class DropShelfService
                 return true;
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            App.Log($"[DropShelf] Failed to inspect '{path}': {ex.Message}");
+        }
         return false;
     }
 
@@ -136,12 +124,22 @@ internal sealed class DropShelfService
             else if (Directory.Exists(path))
                 Process.Start("explorer.exe", $"\"{path}\"");
         }
-        catch { }
+        catch (Exception ex)
+        {
+            App.Log($"[DropShelf] Reveal error: {ex.Message}");
+        }
     }
 
     public static void CopyPath(string path)
     {
-        try { Clipboard.SetText(path); } catch { }
+        try
+        {
+            Clipboard.SetText(path);
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[DropShelf] CopyPath error: {ex.Message}");
+        }
     }
 
     private static string FormatFileSize(long bytes) => bytes switch

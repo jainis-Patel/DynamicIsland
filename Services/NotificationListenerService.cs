@@ -1,29 +1,32 @@
-using System.Diagnostics;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Windows.Foundation.Metadata;
 using Windows.UI.Notifications;
 using Windows.UI.Notifications.Management;
 using DynamicIsland.Core;
+using static DynamicIsland.Interop.NativeMethods;
 
 namespace DynamicIsland.Services;
 
 /// <summary>
 /// Listens to incoming Windows Action Center notifications (e.g. Discord, Slack, WhatsApp, Outlook)
 /// using Windows 10/11 UserNotificationListener and converts them into Dynamic Island toasts.
+/// Respects Do Not Disturb, Windows Focus Assist / Quiet Time, self-notification filtering, and per-app mute lists.
 /// </summary>
 internal sealed class NotificationListenerService : IDisposable
 {
     private readonly Dispatcher _ui;
+    private readonly Func<AppSettings>? _getSettings;
     private UserNotificationListener? _listener;
     private bool _initialized;
     private bool _accessGranted;
 
     public event Action<ToastContent>? NotificationReceived;
 
-    public NotificationListenerService(Dispatcher ui)
+    public NotificationListenerService(Dispatcher ui, Func<AppSettings>? getSettings = null)
     {
         _ui = ui;
+        _getSettings = getSettings;
     }
 
     public async Task InitializeAsync()
@@ -32,14 +35,14 @@ internal sealed class NotificationListenerService : IDisposable
         {
             if (!ApiInformation.IsTypePresent("Windows.UI.Notifications.Management.UserNotificationListener"))
             {
-                Debug.WriteLine("[NotificationListener] UserNotificationListener API not present on this Windows build.");
+                App.Log("[NotificationListener] UserNotificationListener API not present on this Windows build.");
                 return;
             }
 
             _listener = UserNotificationListener.Current;
             var access = await _listener.RequestAccessAsync();
             _accessGranted = access == UserNotificationListenerAccessStatus.Allowed;
-            Debug.WriteLine($"[NotificationListener] Access status: {access}");
+            App.Log($"[NotificationListener] Access status: {access}");
 
             if (_accessGranted)
             {
@@ -49,8 +52,59 @@ internal sealed class NotificationListenerService : IDisposable
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[NotificationListener] Init failed: {ex.Message}");
+            App.Log($"[NotificationListener] Init failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Evaluates whether a notification from <paramref name="appName"/> should be suppressed due to
+    /// Do Not Disturb, self-notification filtering, or per-app mute settings.
+    /// </summary>
+    internal static bool ShouldSuppressNotification(string appName, AppSettings? settings, bool isQuietTime = false)
+    {
+        if (isQuietTime) return true;
+        if (settings is { DoNotDisturb: true }) return true;
+
+        if (!string.IsNullOrWhiteSpace(appName))
+        {
+            // Ignore notifications originating from Dynamic Island itself
+            if (appName.Contains("Dynamic Island", StringComparison.OrdinalIgnoreCase) ||
+                appName.Contains("DynamicIsland", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (settings?.MutedNotificationApps is { Count: > 0 } mutedList)
+            {
+                foreach (var muted in mutedList)
+                {
+                    if (!string.IsNullOrWhiteSpace(muted) &&
+                        appName.Contains(muted, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsWindowsFocusAssistActive()
+    {
+        try
+        {
+            if (SHQueryUserNotificationState(out var state) == 0)
+            {
+                return state is QUERY_USER_NOTIFICATION_STATE.QUNS_QUIET_TIME
+                             or QUERY_USER_NOTIFICATION_STATE.QUNS_PRESENTATION_MODE
+                             or QUERY_USER_NOTIFICATION_STATE.QUNS_RUNNING_D3D_FULL_SCREEN;
+            }
+        }
+        catch
+        {
+        }
+        return false;
     }
 
     private void OnNotificationChanged(UserNotificationListener sender, UserNotificationChangedEventArgs args)
@@ -63,6 +117,11 @@ internal sealed class NotificationListenerService : IDisposable
             if (notif == null) return;
 
             string appName = notif.AppInfo?.DisplayInfo?.DisplayName ?? "Notification";
+            if (ShouldSuppressNotification(appName, _getSettings?.Invoke(), IsWindowsFocusAssistActive()))
+            {
+                return;
+            }
+
             string title = "";
             string body = "";
 
@@ -91,12 +150,14 @@ internal sealed class NotificationListenerService : IDisposable
                     string.IsNullOrWhiteSpace(title) ? appName : $"{appName} · {title}",
                     body,
                     accent,
-                    TimeSpan.FromSeconds(3.5)));
+                    TimeSpan.FromSeconds(3.5),
+                    TargetView: null,
+                    Priority: ToastPriority.Notification));
             });
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[NotificationListener] Error reading notification: {ex.Message}");
+            App.Log($"[NotificationListener] Error reading notification: {ex.Message}");
         }
     }
 
@@ -107,7 +168,7 @@ internal sealed class NotificationListenerService : IDisposable
         if (n.Contains("chat") || n.Contains("message") || n.Contains("whatsapp") || n.Contains("telegram") || n.Contains("slack") || n.Contains("discord")) return "\uE8BD";
         if (n.Contains("teams") || n.Contains("zoom") || n.Contains("meet") || n.Contains("call")) return "\uE717";
         if (n.Contains("update") || n.Contains("windows")) return "\uE777";
-        return "\uE7E7"; // Generic notification star/alert
+        return "\uE7E7";
     }
 
     private static Color AccentForAppName(string name)
