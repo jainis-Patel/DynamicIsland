@@ -25,6 +25,7 @@
             <Border.Background>
                 <RadialGradientBrush Center="0.5,0.42" GradientOrigin="0.5,0.42" RadiusX="0.5" RadiusY="0.5">
                     <GradientStop x:Name="PillGlowColor" Color="#FF9F0A" Offset="0" />
+                    <GradientStop x:Name="PillGlowSecondaryColor" Color="#55FF9F0A" Offset="0.52" />
                     <GradientStop Color="#00000000" Offset="1" />
                 </RadialGradientBrush>
             </Border.Background>
@@ -294,11 +295,25 @@
                                                 <Border Margin="0,0,5,0" Background="#12FFFFFF" BorderBrush="#16FFFFFF" BorderThickness="1" CornerRadius="5" Padding="6,1.5">
                                                     <TextBlock x:Name="ClockRamText" Style="{StaticResource Digits}" FontSize="9.5" FontWeight="Medium" Foreground="#86868B" Text="RAM 0%" />
                                                 </Border>
-                                                <Border x:Name="ClockWifiBadge" Background="#12FFFFFF" BorderBrush="#16FFFFFF" BorderThickness="1" CornerRadius="5" Padding="6,1.5"
+                                                <Border x:Name="ClockWifiBadge" Margin="0,0,5,0" Background="#12FFFFFF" BorderBrush="#16FFFFFF" BorderThickness="1" CornerRadius="5" Padding="6,1.5"
                                                         Cursor="Hand" MouseLeftButtonDown="ClockWifiBadge_Click" ToolTip="Click to open Wi-Fi &amp; Network Hub">
                                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                         <TextBlock x:Name="ClockWifiGlyph" Style="{StaticResource Glyph}" FontSize="9" Foreground="#30D158" VerticalAlignment="Center" Margin="0,0,4,0" Text="&#xE701;" />
                                                         <TextBlock x:Name="ClockWifiText" Style="{StaticResource Digits}" FontSize="9.5" FontWeight="Medium" Foreground="#86868B" Text="Wi-Fi" />
+                                                    </StackPanel>
+                                                </Border>
+                                                <Border x:Name="ClockWeatherBadge" Margin="0,0,5,0" Background="#12FFFFFF" BorderBrush="#16FFFFFF" BorderThickness="1" CornerRadius="5" Padding="6,1.5"
+                                                        Cursor="Hand" MouseLeftButtonDown="ClockWeatherBadge_Click" ToolTip="Live Weather · Click for 4-day forecast">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <TextBlock x:Name="ClockWeatherGlyph" Style="{StaticResource Glyph}" FontSize="9.5" Foreground="#FF9F0A" VerticalAlignment="Center" Margin="0,0,4,0" Text="&#xE706;" />
+                                                        <TextBlock x:Name="ClockWeatherText" Style="{StaticResource Digits}" FontSize="9.5" FontWeight="Medium" Foreground="#86868B" Text="24°C" />
+                                                    </StackPanel>
+                                                </Border>
+                                                <Border x:Name="ClockCalendarBadge" Visibility="Collapsed" Background="#1E0A84FF" BorderBrush="#400A84FF" BorderThickness="1" CornerRadius="5" Padding="6,1.5"
+                                                        Cursor="Hand" MouseLeftButtonDown="ClockCalendarBadge_Click" ToolTip="Click to join upcoming meeting or open Calendar">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <TextBlock Style="{StaticResource Glyph}" FontSize="9" Foreground="#0A84FF" VerticalAlignment="Center" Margin="0,0,4,0" Text="&#xE787;" />
+                                                        <TextBlock x:Name="ClockCalendarText" FontSize="9.5" FontWeight="SemiBold" Foreground="#F5F5F7" MaxWidth="92" TextTrimming="CharacterEllipsis" Text="Meeting" />
                                                     </StackPanel>
                                                 </Border>
                                             </StackPanel>
@@ -409,8 +424,11 @@
                                         <TextBlock Style="{StaticResource SectionTitle}" Text="Drop Shelf" />
                                         <TextBlock x:Name="ShelfCountText" FontSize="11" Foreground="{StaticResource SecondaryBrush}" Margin="8,0,0,0" VerticalAlignment="Center" Text="0 items" />
                                     </StackPanel>
-                                    <Button x:Name="ClearShelfButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0" ToolTip="Clear Shelf">
+                                    <Button x:Name="ClearShelfButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="5,0,0,0" ToolTip="Clear Shelf">
                                         <TextBlock Text="Clear" FontSize="10" FontWeight="Medium" Foreground="#FF453A" />
+                                    </Button>
+                                    <Button x:Name="ZipShelfButton" Click="ZipShelfButton_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0" ToolTip="Bundle all shelf files into a single .zip archive">
+                                        <TextBlock Text="Zip All" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
                                     </Button>
                                 </DockPanel>
 
@@ -493,8 +511,14 @@
                                         <TextBlock Style="{StaticResource SectionTitle}" Text="Clipboard" />
                                         <TextBlock x:Name="ClipboardCountText" FontSize="11" Foreground="{StaticResource SecondaryBrush}" Margin="8,0,0,0" VerticalAlignment="Center" Text="0 items" />
                                     </StackPanel>
-                                    <Button x:Name="ClearClipboardButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0" ToolTip="Clear Clipboard History">
+                                    <Button x:Name="ClearClipboardButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="4,0,0,0" ToolTip="Clear Unpinned Clipboard History">
                                         <TextBlock Text="Clear" FontSize="10" FontWeight="Medium" Foreground="#FF453A" />
+                                    </Button>
+                                    <Button x:Name="OcrClipboardButton" Click="OcrClipboardButton_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="4,0,0,0" ToolTip="Extract Text (OCR) from Clipboard Screenshot / Image">
+                                        <TextBlock Text="OCR Image" FontSize="9.5" FontWeight="Medium" Foreground="#0A84FF" />
+                                    </Button>
+                                    <Button x:Name="EyedropperButton" Click="EyedropperButton_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0" ToolTip="Sample Screen Pixel Color Under Cursor (1.2s delay)">
+                                        <TextBlock Text="Pick Color" FontSize="9.5" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" />
                                     </Button>
                                 </DockPanel>
 
@@ -537,8 +561,12 @@
                                                                         Background="{Binding SwatchColor, Converter={StaticResource ColorToBrushConverter}}" />
                                                                 <TextBlock Text="{Binding TimeAgo}" Style="{StaticResource Digits}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center" />
                                                                 <Button Tag="{Binding Id}" Click="RemoveClipboardItem_Click" DockPanel.Dock="Right"
-                                                                        Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="3,0,0,0" ToolTip="Remove">
+                                                                        Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Remove">
                                                                     <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8.5" Foreground="#86868B" />
+                                                                </Button>
+                                                                <Button Tag="{Binding Id}" Click="PinClipboardItem_Click" DockPanel.Dock="Right"
+                                                                        Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Pin / Unpin Snippet">
+                                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding PinGlyph}" FontSize="9" Foreground="{Binding PinForeground}" />
                                                                 </Button>
                                                             </DockPanel>
                                                             <Grid Grid.Row="1" Margin="0,2,0,0">
@@ -621,8 +649,14 @@
 
                                 <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
                                     <TextBlock Style="{StaticResource SectionTitle}" Text="Settings &amp; Liquid Physics" VerticalAlignment="Center" />
-                                    <Button x:Name="ResetSettingsBtn" Click="ResetSettingsBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="5,0,0,0" ToolTip="Reset All Settings to Default">
+                                    <Button x:Name="ResetSettingsBtn" Click="ResetSettingsBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="4,0,0,0" ToolTip="Reset All Settings to Default">
                                         <TextBlock Text="Reset" FontSize="9.5" FontWeight="Medium" Foreground="{StaticResource SecondaryBrush}" />
+                                    </Button>
+                                    <Button x:Name="ImportSettingsBtn" Click="ImportSettingsBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="4,0,0,0" ToolTip="Import Settings JSON">
+                                        <TextBlock Text="Import" FontSize="9.5" FontWeight="Medium" Foreground="{StaticResource SecondaryBrush}" />
+                                    </Button>
+                                    <Button x:Name="ExportSettingsBtn" Click="ExportSettingsBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="4,0,0,0" ToolTip="Export Settings JSON">
+                                        <TextBlock Text="Export" FontSize="9.5" FontWeight="Medium" Foreground="{StaticResource SecondaryBrush}" />
                                     </Button>
                                     <Button x:Name="LiquidPulseBtn" Click="LiquidPulseBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="6,0,0,0" ToolTip="Test Gooey Liquid Bounce Impulse">
                                         <TextBlock Text="✦ Liquid Pulse" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
@@ -752,21 +786,24 @@
                                             </Border>
                                         </Grid>
 
-                                        <!-- Row 4: Notifications, Motion Mode & Windows Startup Quick-Toggles -->
+                                        <!-- Row 4: Notifications, Motion Mode, Volume Key OSD & Windows Startup Quick-Toggles -->
                                         <Border Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,4" Margin="0,0,0,5">
                                             <DockPanel LastChildFill="False">
                                                 <TextBlock Text="Behavior" FontSize="10.5" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
                                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                                    <Button x:Name="DndToggleBtn" Click="DndToggleBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,4,0" ToolTip="Toggle Do Not Disturb (Silence Notification Toasts)">
+                                                    <Button x:Name="DndToggleBtn" Click="DndToggleBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0" ToolTip="Toggle Do Not Disturb (Silence Notification Toasts)">
                                                         <TextBlock x:Name="DndToggleText" Text="DND Off" FontSize="9.5" FontWeight="Medium" Foreground="{StaticResource SecondaryBrush}" />
                                                     </Button>
-                                                    <Button x:Name="BannerModeBtn" Click="BannerModeBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,4,0" ToolTip="Show Notifications in Island Only (Dismiss Native Windows Popups)">
+                                                    <Button x:Name="BannerModeBtn" Click="BannerModeBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0" ToolTip="Show Notifications in Island Only (Dismiss Native Windows Popups)">
                                                         <TextBlock x:Name="BannerModeText" Text="Island Only" FontSize="9.5" FontWeight="Medium" Foreground="#30D158" />
                                                     </Button>
-                                                    <Button x:Name="MotionModeBtn" Click="MotionModeBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,4,0" ToolTip="Toggle between Gooey Liquid Physics and Reduced Motion">
+                                                    <Button x:Name="MotionModeBtn" Click="MotionModeBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0" ToolTip="Toggle between Gooey Liquid Physics and Reduced Motion">
                                                         <TextBlock x:Name="MotionModeText" Text="Liquid Motion" FontSize="9.5" FontWeight="Medium" Foreground="#30D158" />
                                                     </Button>
-                                                    <Button x:Name="StartupToggleBtn" Click="StartupToggleBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0" ToolTip="Launch Dynamic Island Automatically at Windows Sign-In">
+                                                    <Button x:Name="VolumeOsdBtn" Click="VolumeOsdBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0" ToolTip="Intercept Hardware Volume Keys to Trigger Island Volume Toast">
+                                                        <TextBlock x:Name="VolumeOsdText" Text="Vol Hook Off" FontSize="9.5" FontWeight="Medium" Foreground="{StaticResource SecondaryBrush}" />
+                                                    </Button>
+                                                    <Button x:Name="StartupToggleBtn" Click="StartupToggleBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0" ToolTip="Launch Dynamic Island Automatically at Windows Sign-In">
                                                         <TextBlock x:Name="StartupToggleText" Text="Startup Off" FontSize="9.5" FontWeight="Medium" Foreground="{StaticResource SecondaryBrush}" />
                                                     </Button>
                                                 </StackPanel>
@@ -774,7 +811,7 @@
                                         </Border>
 
                                         <!-- Row 5: Accent Color Swatches -->
-                                        <Border Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,5">
+                                        <Border Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,5" Margin="0,0,0,5">
                                             <DockPanel LastChildFill="False">
                                                 <TextBlock Text="Accent Theme" FontSize="10.5" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
                                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -830,11 +867,65 @@
                                                 </StackPanel>
                                             </DockPanel>
                                         </Border>
+
+                                        <!-- Row 6: Interactive Keyboard Shortcuts Recorder (Ctrl+Alt + Key) -->
+                                        <Border Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,5" Margin="0,0,0,5">
+                                            <DockPanel LastChildFill="False">
+                                                <TextBlock x:Name="HotkeySectionLabel" Text="Shortcuts (Ctrl+Alt)" FontSize="10.5" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                    <Button x:Name="HotkeyBindClipboardBtn" Click="HotkeyRecordBtn_Click" Tag="Clipboard" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,4,0" ToolTip="Click to rebind Clipboard shortcut">
+                                                        <TextBlock x:Name="HotkeyBindClipboardText" Text="Clip: V" FontSize="9" />
+                                                    </Button>
+                                                    <Button x:Name="HotkeyBindCalcBtn" Click="HotkeyRecordBtn_Click" Tag="Calculator" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,4,0" ToolTip="Click to rebind Calculator shortcut">
+                                                        <TextBlock x:Name="HotkeyBindCalcText" Text="Calc: C" FontSize="9" />
+                                                    </Button>
+                                                    <Button x:Name="HotkeyBindAudioBtn" Click="HotkeyRecordBtn_Click" Tag="AudioDevices" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,4,0" ToolTip="Click to rebind Audio shortcut">
+                                                        <TextBlock x:Name="HotkeyBindAudioText" Text="Audio: O" FontSize="9" />
+                                                    </Button>
+                                                    <Button x:Name="HotkeyBindWifiBtn" Click="HotkeyRecordBtn_Click" Tag="Network" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,4,0" ToolTip="Click to rebind Wi-Fi shortcut">
+                                                        <TextBlock x:Name="HotkeyBindWifiText" Text="Wi-Fi: W" FontSize="9" />
+                                                    </Button>
+                                                    <Button x:Name="HotkeyBindTimerBtn" Click="HotkeyRecordBtn_Click" Tag="Stopwatch" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0" ToolTip="Click to rebind Timer shortcut">
+                                                        <TextBlock x:Name="HotkeyBindTimerText" Text="Timer: A" FontSize="9" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+
+                                        <!-- Row 7: Dock Icon Customization (Show / Hide Optional Dock Tabs) -->
+                                        <Border Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,5">
+                                            <DockPanel LastChildFill="False">
+                                                <TextBlock Text="Dock Icons" FontSize="10.5" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                    <Button x:Name="DockPinShelfBtn" Click="DockPinToggleBtn_Click" Tag="shelf" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0" ToolTip="Show / Hide Drop Shelf in Dock">
+                                                        <TextBlock Text="Shelf" FontSize="9" />
+                                                    </Button>
+                                                    <Button x:Name="DockPinClipBtn" Click="DockPinToggleBtn_Click" Tag="clipboard" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0" ToolTip="Show / Hide Clipboard in Dock">
+                                                        <TextBlock Text="Clip" FontSize="9" />
+                                                    </Button>
+                                                    <Button x:Name="DockPinCalcBtn" Click="DockPinToggleBtn_Click" Tag="calc" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0" ToolTip="Show / Hide Calculator in Dock">
+                                                        <TextBlock Text="Calc" FontSize="9" />
+                                                    </Button>
+                                                    <Button x:Name="DockPinMemoBtn" Click="DockPinToggleBtn_Click" Tag="voicememo" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0" ToolTip="Show / Hide Voice Memos in Dock">
+                                                        <TextBlock Text="Memo" FontSize="9" />
+                                                    </Button>
+                                                    <Button x:Name="DockPinDevicesBtn" Click="DockPinToggleBtn_Click" Tag="peripherals" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0" ToolTip="Show / Hide Connected Devices in Dock">
+                                                        <TextBlock Text="BT" FontSize="9" />
+                                                    </Button>
+                                                    <Button x:Name="DockPinWifiBtn" Click="DockPinToggleBtn_Click" Tag="network" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0" ToolTip="Show / Hide Wi-Fi in Dock">
+                                                        <TextBlock Text="Wi-Fi" FontSize="9" />
+                                                    </Button>
+                                                    <Button x:Name="DockPinNotifBtn" Click="DockPinToggleBtn_Click" Tag="notifications" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0" ToolTip="Show / Hide Notifications in Dock">
+                                                        <TextBlock Text="Alerts" FontSize="9" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
                                     </StackPanel>
                                 </ScrollViewer>
                             </Grid>
 
-                            <!-- 6. Audio Output Switcher Container -->
+                            <!-- 6. Audio Output Switcher & Per-App Volume Mixer Container -->
                             <Grid x:Name="AudioContainer" Visibility="Collapsed">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -842,90 +933,150 @@
                                 </Grid.RowDefinitions>
 
                                 <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
-                                    <TextBlock Style="{StaticResource SectionTitle}" Text="Audio Output" />
-                                    <TextBlock Text="Scroll or click to switch" FontSize="10.5" Foreground="{StaticResource SecondaryBrush}" DockPanel.Dock="Right" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="AudioSectionTitle" Style="{StaticResource SectionTitle}" Text="Audio Output" />
+                                    <Button x:Name="AudioModeToggleBtn" Click="AudioModeToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0" ToolTip="Switch between Output Devices and Per-App Volume Mixer">
+                                        <TextBlock x:Name="AudioModeToggleText" Text="App Mixer" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                                    </Button>
                                 </DockPanel>
 
-                                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
-                                              PanningMode="HorizontalOnly" PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel">
-                                    <ItemsControl x:Name="AudioEndpointsControl">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Orientation="Horizontal" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Width="154" Height="82" Margin="0,0,8,0" CornerRadius="10"
-                                                        BorderThickness="1" Padding="10,7" Cursor="Hand" MouseLeftButtonDown="AudioEndpointCard_Click">
-                                                    <Border.Style>
-                                                        <Style TargetType="Border">
-                                                            <Setter Property="Background" Value="{StaticResource CardSurfaceBrush}" />
-                                                            <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
-                                                            <Style.Triggers>
-                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter Property="BorderBrush" Value="#38FFFFFF" />
-                                                                    <Setter Property="Background" Value="#1A1A22" />
-                                                                </Trigger>
-                                                                <DataTrigger Binding="{Binding IsDefault}" Value="True">
-                                                                    <Setter Property="BorderBrush" Value="#4830D158" />
-                                                                    <Setter Property="Background" Value="#142219" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Border.Style>
-                                                    <Grid>
-                                                        <Grid.RowDefinitions>
-                                                            <RowDefinition Height="Auto" />
-                                                            <RowDefinition Height="*" />
-                                                            <RowDefinition Height="Auto" />
-                                                        </Grid.RowDefinitions>
+                                <Grid Grid.Row="1">
+                                    <ScrollViewer x:Name="AudioEndpointsScrollViewer" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                                  PanningMode="HorizontalOnly" PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel">
+                                        <ItemsControl x:Name="AudioEndpointsControl">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Width="154" Height="82" Margin="0,0,8,0" CornerRadius="10"
+                                                            BorderThickness="1" Padding="10,7" Cursor="Hand" MouseLeftButtonDown="AudioEndpointCard_Click">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Background" Value="{StaticResource CardSurfaceBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                                                                <Style.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter Property="BorderBrush" Value="#38FFFFFF" />
+                                                                        <Setter Property="Background" Value="#1A1A22" />
+                                                                    </Trigger>
+                                                                    <DataTrigger Binding="{Binding IsDefault}" Value="True">
+                                                                        <Setter Property="BorderBrush" Value="#4830D158" />
+                                                                        <Setter Property="Background" Value="#142219" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto" />
+                                                                <RowDefinition Height="*" />
+                                                                <RowDefinition Height="Auto" />
+                                                            </Grid.RowDefinitions>
 
-                                                        <DockPanel Grid.Row="0" LastChildFill="False">
-                                                            <Border Width="22" Height="22" CornerRadius="11" Background="#1AFFFFFF" VerticalAlignment="Center">
-                                                                <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="11.5" Foreground="#F5F5F7" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                            </Border>
+                                                            <DockPanel Grid.Row="0" LastChildFill="False">
+                                                                <Border Width="22" Height="22" CornerRadius="11" Background="#1AFFFFFF" VerticalAlignment="Center">
+                                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="11.5" Foreground="#F5F5F7" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                </Border>
 
-                                                            <Border DockPanel.Dock="Right" Visibility="{Binding IsDefault, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                                    Background="#2430D158" CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
-                                                                <TextBlock Text="Active" FontSize="9" FontWeight="SemiBold" Foreground="#30D158" />
-                                                            </Border>
+                                                                <Border DockPanel.Dock="Right" Visibility="{Binding IsDefault, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                                        Background="#2430D158" CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
+                                                                    <TextBlock Text="Active" FontSize="9" FontWeight="SemiBold" Foreground="#30D158" />
+                                                                </Border>
 
-                                                            <Border DockPanel.Dock="Right" Visibility="{Binding BatteryPercent, Converter={StaticResource NullToVisibilityConverter}}"
-                                                                    Background="#18FFFFFF" CornerRadius="4" Padding="4,1" Margin="0,0,4,0" VerticalAlignment="Center">
-                                                                <TextBlock Text="{Binding BatteryPercent, StringFormat='{}{0}%'}" Style="{StaticResource Digits}" FontSize="9" Foreground="{StaticResource SecondaryBrush}" />
-                                                            </Border>
-                                                        </DockPanel>
+                                                                <Border DockPanel.Dock="Right" Visibility="{Binding BatteryPercent, Converter={StaticResource NullToVisibilityConverter}}"
+                                                                        Background="#18FFFFFF" CornerRadius="4" Padding="4,1" Margin="0,0,4,0" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding BatteryPercent, StringFormat='{}{0}%'}" Style="{StaticResource Digits}" FontSize="9" Foreground="{StaticResource SecondaryBrush}" />
+                                                                </Border>
+                                                            </DockPanel>
 
-                                                        <StackPanel Grid.Row="1" VerticalAlignment="Center">
-                                                            <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7"
-                                                                       TextTrimming="CharacterEllipsis" />
-                                                            <TextBlock Text="{Binding DeviceType}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" />
-                                                        </StackPanel>
+                                                            <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7"
+                                                                           TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Text="{Binding DeviceType}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" />
+                                                            </StackPanel>
 
-                                                        <Grid Grid.Row="2">
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="*" />
-                                                                <ColumnDefinition Width="Auto" />
-                                                            </Grid.ColumnDefinitions>
-                                                            <Slider Style="{StaticResource IslandSlider}" Minimum="0" Maximum="1"
-                                                                    Value="{Binding Volume, Mode=OneWay}"
-                                                                    Tag="{Binding Id}"
-                                                                    ValueChanged="EndpointSlider_ValueChanged"
-                                                                    VerticalAlignment="Center" />
-                                                            <TextBlock Grid.Column="1" Margin="6,0,0,0" Style="{StaticResource Digits}" FontSize="9.5"
-                                                                       Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center"
-                                                                       Text="{Binding Volume, Converter={StaticResource VolumePercentConverter}}" />
+                                                            <Grid Grid.Row="2">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <Slider Style="{StaticResource IslandSlider}" Minimum="0" Maximum="1"
+                                                                        Value="{Binding Volume, Mode=OneWay}"
+                                                                        Tag="{Binding Id}"
+                                                                        ValueChanged="EndpointSlider_ValueChanged"
+                                                                        VerticalAlignment="Center" />
+                                                                <TextBlock Grid.Column="1" Margin="6,0,0,0" Style="{StaticResource Digits}" FontSize="9.5"
+                                                                           Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center"
+                                                                           Text="{Binding Volume, Converter={StaticResource VolumePercentConverter}}" />
+                                                            </Grid>
                                                         </Grid>
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+
+                                    <ScrollViewer x:Name="AudioAppMixerScrollViewer" Visibility="Collapsed" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                                  PanningMode="HorizontalOnly" PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel">
+                                        <ItemsControl x:Name="AudioAppSessionsControl">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Width="146" Height="82" Margin="0,0,8,0" CornerRadius="10"
+                                                            Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}"
+                                                            BorderThickness="1" Padding="10,7">
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto" />
+                                                                <RowDefinition Height="*" />
+                                                                <RowDefinition Height="Auto" />
+                                                            </Grid.RowDefinitions>
+
+                                                            <DockPanel Grid.Row="0" LastChildFill="False">
+                                                                <Border Width="22" Height="22" CornerRadius="11" Background="#1AFFFFFF" VerticalAlignment="Center">
+                                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="11" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                </Border>
+                                                                <Button DockPanel.Dock="Right" Tag="{Binding ProcessId}" Click="AppSessionMuteBtn_Click"
+                                                                        Style="{StaticResource CircleButton}" Width="20" Height="20" ToolTip="Mute / Unmute App">
+                                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding MuteGlyph}" FontSize="9.5" Foreground="#F5F5F7" />
+                                                                </Button>
+                                                            </DockPanel>
+
+                                                            <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding AppName}" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Text="{Binding Subtitle}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                            </StackPanel>
+
+                                                            <Grid Grid.Row="2">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <Slider Style="{StaticResource IslandSlider}" Minimum="0" Maximum="1"
+                                                                        Value="{Binding Volume, Mode=OneWay}"
+                                                                        Tag="{Binding ProcessId}"
+                                                                        ValueChanged="AppSessionSlider_ValueChanged"
+                                                                        VerticalAlignment="Center" />
+                                                                <TextBlock Grid.Column="1" Margin="6,0,0,0" Style="{StaticResource Digits}" FontSize="9.5"
+                                                                           Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center"
+                                                                           Text="{Binding Volume, Converter={StaticResource VolumePercentConverter}}" />
+                                                            </Grid>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Grid>
                             </Grid>
 
-                            <!-- 7. Battery & Power Mode Container -->
+                            <!-- 7. Battery, Display Brightness & Power Mode Container -->
                             <Grid x:Name="BatteryContainer" Visibility="Collapsed">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -933,7 +1084,7 @@
                                 </Grid.RowDefinitions>
 
                                 <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
-                                    <TextBlock Style="{StaticResource SectionTitle}" Text="Battery &amp; Power" />
+                                    <TextBlock Style="{StaticResource SectionTitle}" Text="Battery &amp; Display" />
                                     <Border x:Name="BatteryHeaderBadge" DockPanel.Dock="Right" Background="#16FFFFFF" CornerRadius="4" Padding="6,1.5" VerticalAlignment="Center">
                                         <TextBlock x:Name="BatteryHeaderBadgeText" Text="Power Source" FontSize="9.5" FontWeight="Medium" Foreground="{StaticResource SecondaryBrush}" />
                                     </Border>
@@ -945,26 +1096,41 @@
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
-                                    <Border Grid.Row="0" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12,8" Margin="0,0,0,6">
+                                    <Border Grid.Row="0" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="11,7" Margin="0,0,0,6">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="125" />
                                             </Grid.ColumnDefinitions>
 
-                                            <Border Grid.Column="0" Width="76" Height="30" CornerRadius="8" Background="#0A0A0D" BorderBrush="#28FFFFFF" BorderThickness="1" VerticalAlignment="Center">
+                                            <Border Grid.Column="0" Width="72" Height="28" CornerRadius="8" Background="#0A0A0D" BorderBrush="#28FFFFFF" BorderThickness="1" VerticalAlignment="Center">
                                                 <Grid>
-                                                    <Border x:Name="BatteryLevelFill" HorizontalAlignment="Left" CornerRadius="6" Background="#30D158" Width="68" Margin="2" />
+                                                    <Border x:Name="BatteryLevelFill" HorizontalAlignment="Left" CornerRadius="6" Background="#30D158" Width="64" Margin="2" />
                                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                        <TextBlock x:Name="BatteryChargingBolt" Style="{StaticResource Glyph}" Text="&#xE945;" FontSize="10.5" Foreground="#FFFFFF" Margin="0,0,2,0" />
-                                                        <TextBlock x:Name="BatteryHeroPercentText" Style="{StaticResource Digits}" Text="100%" FontSize="11.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                        <TextBlock x:Name="BatteryChargingBolt" Style="{StaticResource Glyph}" Text="&#xE945;" FontSize="10" Foreground="#FFFFFF" Margin="0,0,2,0" />
+                                                        <TextBlock x:Name="BatteryHeroPercentText" Style="{StaticResource Digits}" Text="100%" FontSize="11" FontWeight="SemiBold" Foreground="#FFFFFF" />
                                                     </StackPanel>
                                                 </Grid>
                                             </Border>
 
-                                            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                                <TextBlock x:Name="BatteryStatusSubtitle" Text="AC Power" FontSize="11.5" FontWeight="Medium" Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock x:Name="BatteryTimeEstimate" Text="Fully Charged" FontSize="10" Foreground="{StaticResource SecondaryBrush}" Margin="0,1,0,0" />
+                                            <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
+                                                <TextBlock x:Name="BatteryStatusSubtitle" Text="AC Power" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock x:Name="BatteryTimeEstimate" Text="Fully Charged" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+
+                                            <!-- Display Brightness Control (WMI + DDC/CI) -->
+                                            <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                <DockPanel LastChildFill="False" Margin="0,0,0,2">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE706;" FontSize="9.5" Foreground="#FF9F0A" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                                        <TextBlock Text="Brightness" FontSize="9.5" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                    <TextBlock x:Name="BrightnessValueText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9.5" FontWeight="SemiBold" Foreground="{StaticResource SecondaryBrush}" Text="80%" />
+                                                </DockPanel>
+                                                <Slider x:Name="BrightnessSlider" Style="{StaticResource IslandSlider}"
+                                                        Minimum="5" Maximum="100" Value="80" ValueChanged="BrightnessSlider_ValueChanged"
+                                                        ToolTip="Adjust Display Brightness (or use Alt + Scroll on collapsed pill)" />
                                             </StackPanel>
                                         </Grid>
                                     </Border>
@@ -1302,6 +1468,77 @@
                                     </Grid>
                                 </Grid>
                             </Grid>
+
+                            <!-- 11. Notification History Center Container -->
+                            <Grid x:Name="NotificationsContainer" Visibility="Collapsed">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource SectionTitle}" Text="Notifications" />
+                                        <TextBlock x:Name="NotificationsCountText" FontSize="11" Foreground="{StaticResource SecondaryBrush}" Margin="8,0,0,0" VerticalAlignment="Center" Text="0 items" />
+                                    </StackPanel>
+                                    <Button x:Name="ClearNotificationsButton" Click="ClearNotificationsButton_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0" ToolTip="Clear Notification History">
+                                        <TextBlock Text="Clear All" FontSize="10" FontWeight="Medium" Foreground="#FF453A" />
+                                    </Button>
+                                </DockPanel>
+
+                                <Grid Grid.Row="1">
+                                    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                                  PanningMode="HorizontalOnly" PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel">
+                                        <ItemsControl x:Name="NotificationsItemsControl">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Width="168" Height="82" Margin="0,0,8,0" CornerRadius="10"
+                                                            Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}"
+                                                            BorderThickness="1" Padding="10,7">
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto" />
+                                                                <RowDefinition Height="Auto" />
+                                                                <RowDefinition Height="*" />
+                                                            </Grid.RowDefinitions>
+
+                                                            <DockPanel Grid.Row="0" LastChildFill="False">
+                                                                <Border Width="18" Height="18" CornerRadius="9" Background="{Binding IconBgBrush}" VerticalAlignment="Center">
+                                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="9.5" Foreground="{Binding AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                </Border>
+                                                                <TextBlock Text="{Binding AppName}" FontSize="9.5" FontWeight="SemiBold" Foreground="{Binding AccentBrush}" Margin="6,0,0,0" VerticalAlignment="Center" MaxWidth="76" TextTrimming="CharacterEllipsis" />
+
+                                                                <Button Tag="{Binding Id}" Click="RemoveNotificationItem_Click" DockPanel.Dock="Right" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Dismiss Notification">
+                                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8.5" Foreground="#86868B" />
+                                                                </Button>
+                                                                <Button Tag="{Binding AppName}" Click="MuteAppNotification_Click" DockPanel.Dock="Right" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Mute Notifications from this App">
+                                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE74F;" FontSize="9" Foreground="#86868B" />
+                                                                </Button>
+                                                                <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" Style="{StaticResource Digits}" FontSize="8.5" Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,2,0" />
+                                                            </DockPanel>
+
+                                                            <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" Foreground="#F5F5F7"
+                                                                       Margin="0,3,0,1" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Grid.Row="2" Text="{Binding Body}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}"
+                                                                       TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+
+                                    <StackPanel x:Name="NotificationsEmptyPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E7;" FontSize="20" Foreground="#515156" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Recent notifications captured by Dynamic Island appear here" FontSize="11" Foreground="{StaticResource SecondaryBrush}" Margin="0,4,0,0" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
                         </Grid>
 
                         <!-- Subtle 1px Hairline Divider Separating View Content from Bottom Dock -->
@@ -1383,6 +1620,14 @@
                                         <TextBlock x:Name="NetworkButtonGlyph" Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE701;" />
                                     </Button>
 
+                                    <!-- Notification History Center -->
+                                    <Button x:Name="NotificationsButton" AutomationProperties.Name="Notification History Center" Style="{StaticResource DockToolButton}" ToolTip="Notification Center (Ctrl+Alt+N)">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock x:Name="NotificationsButtonGlyph" Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE7E7;" />
+                                            <TextBlock x:Name="NotificationsBadgeText" Style="{StaticResource Digits}" Margin="4,0,0,0" FontSize="10" FontWeight="SemiBold" Visibility="Collapsed" />
+                                        </StackPanel>
+                                    </Button>
+
                                     <!-- Mic Mute -->
                                     <Button x:Name="MicMuteButton" AutomationProperties.Name="Toggle Microphone Mute" Style="{StaticResource DockIconButton}" ToolTip="Toggle Microphone Mute">
                                         <TextBlock x:Name="MicMuteGlyph" Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE720;" />
@@ -1409,5 +1654,38 @@
                 </Border>
             </Border>
         </Grid>
+
+        <!-- iOS-Style Split-Droplet Secondary Activity Bubble (Detaches when 2 live activities run simultaneously in Compact mode) -->
+        <Border x:Name="SecondaryDroplet" Width="34" Height="34" CornerRadius="17"
+                HorizontalAlignment="Center" VerticalAlignment="Top"
+                Visibility="Collapsed" Opacity="0" Cursor="Hand"
+                RenderTransformOrigin="0.5,0.5"
+                MouseLeftButtonDown="SecondaryDroplet_Click"
+                ToolTip="Secondary Live Activity · Click to expand">
+            <Border.RenderTransform>
+                <TransformGroup>
+                    <ScaleTransform x:Name="SecondaryDropletScale" ScaleX="0.6" ScaleY="0.6" />
+                    <TranslateTransform x:Name="SecondaryDropletTranslate" X="0" Y="0" />
+                </TransformGroup>
+            </Border.RenderTransform>
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#FF030304" Offset="0" />
+                    <GradientStop Color="#FF08080B" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border.BorderBrush>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#14FFFFFF" Offset="0" />
+                    <GradientStop Color="#26FFFFFF" Offset="1" />
+                </LinearGradientBrush>
+            </Border.BorderBrush>
+            <Border.BorderThickness>1,0,1,1</Border.BorderThickness>
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="14" ShadowDepth="3" Direction="270" Opacity="0.65" Color="Black" RenderingBias="Performance" />
+            </Border.Effect>
+            <TextBlock x:Name="SecondaryDropletGlyph" Style="{StaticResource Glyph}" FontSize="12"
+                       Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Text="&#xE916;" />
+        </Border>
     </Grid>
 </Window>

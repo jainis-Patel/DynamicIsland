@@ -25,24 +25,28 @@ public partial class IslandWindow
     private const int HotkeyRecord = 9;
     private const int HotkeyPeripherals = 10;
     private const int HotkeyNetwork = 11;
+    private const int HotkeyNotifications = 12;
 
     private static readonly (int Id, string KeyName, uint DefaultVk)[] HotKeyBindings =
     {
-        (HotkeyStopwatch, "Stopwatch", 0x41),     // VK_A
-        (HotkeyToast, "TestToast", 0x54),         // VK_T
-        (HotkeyQuit, "Quit", 0x51),               // VK_Q
-        (HotkeyMedia, "MediaPlayPause", 0x20),    // VK_SPACE
-        (HotkeyClipboard, "Clipboard", 0x56),     // VK_V
-        (HotkeyCalc, "Calculator", 0x43),         // VK_C
-        (HotkeyAudio, "AudioDevices", 0x4F),      // VK_O
-        (HotkeyPower, "BatteryPower", 0x50),      // VK_P
-        (HotkeyRecord, "VoiceMemo", 0x52),        // VK_R
-        (HotkeyPeripherals, "Peripherals", 0x44), // VK_D
-        (HotkeyNetwork, "Network", 0x57),         // VK_W
+        (HotkeyStopwatch, "Stopwatch", 0x41),         // VK_A
+        (HotkeyToast, "TestToast", 0x54),             // VK_T
+        (HotkeyQuit, "Quit", 0x51),                   // VK_Q
+        (HotkeyMedia, "MediaPlayPause", 0x20),        // VK_SPACE
+        (HotkeyClipboard, "Clipboard", 0x56),         // VK_V
+        (HotkeyCalc, "Calculator", 0x43),             // VK_C
+        (HotkeyAudio, "AudioDevices", 0x4F),          // VK_O
+        (HotkeyPower, "BatteryPower", 0x50),          // VK_P
+        (HotkeyRecord, "VoiceMemo", 0x52),            // VK_R
+        (HotkeyPeripherals, "Peripherals", 0x44),     // VK_D
+        (HotkeyNetwork, "Network", 0x57),             // VK_W
+        (HotkeyNotifications, "Notifications", 0x4E), // VK_N
     };
 
     private readonly Dictionary<string, bool> _hotkeyRegistrationStatus = new(StringComparer.OrdinalIgnoreCase);
     private IntPtr _hwnd;
+    private IntPtr _llKeyboardHook;
+    private LowLevelKeyboardProc? _llKeyboardProc;
     private IntPtr _cachedTargetMonitor;
     private int _cachedMonitorIndex = -1;
     private string? _cachedMonitorDeviceName;
@@ -90,8 +94,12 @@ public partial class IslandWindow
             _downloadService.Start();
             _peripheralService.Start();
             _networkService.Start();
+            _weatherService.Start();
+            _calendarService.Start();
+            _brightnessService.InitializeAsync();
             _clipboardService.Attach(_hwnd);
             _ = _notificationListener.InitializeAsync();
+            UpdateVolumeKeyHook();
 
             _trayIcon = new TrayIconService(
                 _hwnd,
@@ -155,7 +163,7 @@ public partial class IslandWindow
 
             case WM_MOUSEACTIVATE:
                 handled = true;
-                return new IntPtr(_currentExpandedView == ExpandedView.Calc && _machine.State == IslandState.Expanded
+                return new IntPtr((_currentExpandedView == ExpandedView.Calc || _recordingHotkeyAction != null) && _machine.State == IslandState.Expanded
                     ? MA_ACTIVATE
                     : MA_NOACTIVATE);
 
@@ -335,11 +343,14 @@ public partial class IslandWindow
         double effectiveH = Math.Max(shape.Height, _height.Value) * scaleFactor;
         int halfWidth = (int)Math.Round((effectiveW / 2 + HoverSlopDip) * _dpiScale);
         int centerX = _windowRectPx.Left + _windowRectPx.Width / 2;
+        int dropletExtraRight = _dropletOffset.Value > 0.05
+            ? (int)Math.Round(48 * scaleFactor * _dpiScale)
+            : 0;
 
         return new RECT
         {
             Left = centerX - halfWidth,
-            Right = centerX + halfWidth,
+            Right = centerX + halfWidth + dropletExtraRight,
             Top = _windowRectPx.Top - 2,
             Bottom = _windowRectPx.Top + (int)Math.Round((effectiveH + HoverSlopDip) * _dpiScale),
         };
@@ -387,11 +398,63 @@ public partial class IslandWindow
 
     private void UnregisterAllHotKeys()
     {
+        UninstallVolumeKeyHook();
         if (_hwnd == IntPtr.Zero) return;
         foreach (var (id, _, _) in HotKeyBindings)
         {
             UnregisterHotKey(_hwnd, id);
         }
+    }
+
+    private void UpdateVolumeKeyHook()
+    {
+        bool enable = _settingsService?.Current.EnableVolumeKeyOsd ?? true;
+        if (enable && _llKeyboardHook == IntPtr.Zero)
+        {
+            try
+            {
+                _llKeyboardProc = LowLevelKeyboardCallback;
+                IntPtr hMod = GetModuleHandle(null);
+                _llKeyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, _llKeyboardProc, hMod, 0);
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[VolumeHook] SetWindowsHookEx failed: {ex.Message}");
+            }
+        }
+        else if (!enable && _llKeyboardHook != IntPtr.Zero)
+        {
+            UninstallVolumeKeyHook();
+        }
+    }
+
+    private void UninstallVolumeKeyHook()
+    {
+        if (_llKeyboardHook != IntPtr.Zero)
+        {
+            try { UnhookWindowsHookEx(_llKeyboardHook); } catch { }
+            _llKeyboardHook = IntPtr.Zero;
+        }
+    }
+
+    private IntPtr LowLevelKeyboardCallback(int nCode, IntPtr wParam, IntPtr lParam)
+    {
+        if (nCode >= 0 && (wParam.ToInt32() == WM_KEYDOWN || wParam.ToInt32() == WM_SYSKEYDOWN))
+        {
+            int vkCode = Marshal.ReadInt32(lParam);
+            if (vkCode == VK_VOLUME_UP || vkCode == VK_VOLUME_DOWN || vkCode == VK_VOLUME_MUTE)
+            {
+                _ = Dispatcher.InvokeAsync(async () =>
+                {
+                    await Task.Delay(35);
+                    if (_machine.State != IslandState.Expanded && (_settingsService?.Current.EnableVolumeKeyOsd ?? true))
+                    {
+                        OnVolumeChanged(_volumeService.CurrentVolume, _volumeService.IsMuted);
+                    }
+                });
+            }
+        }
+        return CallNextHookEx(_llKeyboardHook, nCode, wParam, lParam);
     }
 
     private void OnHotKey(int id)
@@ -408,6 +471,7 @@ public partial class IslandWindow
             case HotkeyRecord: ToggleVoiceRecording(); break;
             case HotkeyPeripherals: SwitchExpandedView(ExpandedView.Peripherals); break;
             case HotkeyNetwork: SwitchExpandedView(ExpandedView.Network); break;
+            case HotkeyNotifications: SwitchExpandedView(ExpandedView.Notifications); break;
             case HotkeyQuit: Application.Current.Shutdown(); break;
         }
     }

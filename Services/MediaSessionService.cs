@@ -15,6 +15,7 @@ internal sealed class MediaInfo
     public string Source { get; set; } = "";
     public BitmapSource? Artwork { get; set; }
     public Color? Accent { get; set; }
+    public Color? SecondaryAccent { get; set; }
     public int ActiveSessionCount { get; set; } = 1;
 
     public bool IsPlaying { get; set; }
@@ -310,21 +311,23 @@ internal sealed class MediaSessionService : IDisposable
         {
             media.Artwork = null;
             media.Accent = null;
+            media.SecondaryAccent = null;
         }
         Changed?.Invoke();
         if (trackChanged && title.Length > 0) TrackChanged?.Invoke();
 
         if (properties.Thumbnail is { } thumbnail)
         {
-            var (artwork, accent) = await Task.Run(() => LoadThumbnailAndAccentAsync(thumbnail));
+            var (artwork, accent, secondary) = await Task.Run(() => LoadThumbnailAndAccentAsync(thumbnail));
             if (version != _propertiesVersion || !ReferenceEquals(media, Current)) return;
             media.Artwork = artwork;
             media.Accent = accent;
+            media.SecondaryAccent = secondary;
             Changed?.Invoke();
         }
     }
 
-    private static async Task<(BitmapSource? Artwork, Color? Accent)> LoadThumbnailAndAccentAsync(IRandomAccessStreamReference reference)
+    private static async Task<(BitmapSource? Artwork, Color? Accent, Color? Secondary)> LoadThumbnailAndAccentAsync(IRandomAccessStreamReference reference)
     {
         try
         {
@@ -342,13 +345,13 @@ internal sealed class MediaSessionService : IDisposable
             image.EndInit();
             image.Freeze();
 
-            var accent = ColorExtractor.Vibrant(image);
-            return (image, accent);
+            var (accent, secondary) = ColorExtractor.ExtractPalette(image);
+            return (image, accent, secondary);
         }
         catch (Exception ex)
         {
             App.Log($"[Media] Thumbnail load failed: {ex.Message}");
-            return (null, null);
+            return (null, null, null);
         }
     }
 

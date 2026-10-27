@@ -9,9 +9,27 @@ using static DynamicIsland.Interop.NativeMethods;
 namespace DynamicIsland.Services;
 
 /// <summary>
+/// Represents a captured Windows notification stored in the in-memory Notification History ring buffer.
+/// </summary>
+public sealed class NotificationHistoryItem
+{
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+    public string AppName { get; init; } = "";
+    public string Title { get; init; } = "";
+    public string Body { get; init; } = "";
+    public string Glyph { get; init; } = "\uE7E7";
+    public Color Accent { get; init; }
+    public Brush AccentBrush { get; init; } = ThemeBrushes.Blue;
+    public Brush IconBgBrush { get; init; } = ThemeBrushes.DockActiveBg;
+    public DateTime ReceivedAt { get; init; } = DateTime.Now;
+    public string TimeText => ReceivedAt.ToString("HH:mm");
+}
+
+/// <summary>
 /// Listens to incoming Windows Action Center notifications (e.g. Discord, Slack, WhatsApp, Outlook)
 /// using Windows 10/11 UserNotificationListener and converts them into Dynamic Island toasts.
-/// Respects Do Not Disturb, Windows Focus Assist / Quiet Time, self-notification filtering, and per-app mute lists.
+/// Maintains a 25-item ring buffer of recent notifications so dismissed banners can be reviewed,
+/// and respects Do Not Disturb, Windows Focus Assist / Quiet Time, self-notification filtering, and per-app mute lists.
 /// </summary>
 /// <remarks>
 /// <see cref="UserNotificationListener.NotificationChanged"/> is only raised for packaged (MSIX) apps with
@@ -21,18 +39,37 @@ namespace DynamicIsland.Services;
 /// </remarks>
 internal sealed class NotificationListenerService : IDisposable
 {
+    public const int MaxHistoryCount = 25;
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(750);
 
     private readonly Dispatcher _ui;
     private readonly Func<AppSettings>? _getSettings;
     private readonly HashSet<uint> _seenIds = new();
+    private readonly List<NotificationHistoryItem> _history = new();
     private UserNotificationListener? _listener;
     private DispatcherTimer? _pollTimer;
     private bool _eventSubscribed;
     private bool _polling;
     private bool _disposed;
 
+    public IReadOnlyList<NotificationHistoryItem> History
+    {
+        get
+        {
+            lock (_history) return _history.ToList();
+        }
+    }
+
+    public int HistoryCount
+    {
+        get
+        {
+            lock (_history) return _history.Count;
+        }
+    }
+
     public event Action<ToastContent>? NotificationReceived;
+    public event Action? HistoryChanged;
 
     public NotificationListenerService(Dispatcher ui, Func<AppSettings>? getSettings = null)
     {
@@ -213,6 +250,8 @@ internal sealed class NotificationListenerService : IDisposable
             string glyph = GlyphForAppName(appName);
             Color accent = AccentForAppName(appName);
 
+            RecordNotification(appName, title, body, glyph, accent);
+
             App.Log($"[NotificationListener] Showing notification from '{appName}'.");
             NotificationReceived?.Invoke(new ToastContent(
                 glyph,
@@ -220,7 +259,7 @@ internal sealed class NotificationListenerService : IDisposable
                 body,
                 accent,
                 TimeSpan.FromSeconds(4),
-                TargetView: null,
+                TargetView: "notifications",
                 Priority: ToastPriority.Notification));
 
             // Show it in the island *instead of* the Windows banner: removing the notification
@@ -234,6 +273,63 @@ internal sealed class NotificationListenerService : IDisposable
         catch (Exception ex)
         {
             App.Log($"[NotificationListener] Error reading notification: {ex.Message}");
+        }
+    }
+
+    public NotificationHistoryItem RecordNotification(string appName, string title, string body, string? glyphOverride = null, Color? accentOverride = null)
+    {
+        string glyph = glyphOverride ?? GlyphForAppName(appName);
+        Color accent = accentOverride ?? AccentForAppName(appName);
+        var item = new NotificationHistoryItem
+        {
+            AppName = string.IsNullOrWhiteSpace(appName) ? "Notification" : appName.Trim(),
+            Title = string.IsNullOrWhiteSpace(title) ? appName : title.Trim(),
+            Body = string.IsNullOrWhiteSpace(body) ? title.Trim() : body.Trim(),
+            Glyph = glyph,
+            Accent = accent,
+            AccentBrush = ThemeBrushes.CreateFrozen(accent),
+            IconBgBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0x28, accent.R, accent.G, accent.B)),
+            ReceivedAt = DateTime.Now
+        };
+
+        lock (_history)
+        {
+            _history.Insert(0, item);
+            while (_history.Count > MaxHistoryCount)
+            {
+                _history.RemoveAt(_history.Count - 1);
+            }
+        }
+
+        HistoryChanged?.Invoke();
+        return item;
+    }
+
+    public bool RemoveHistoryItem(string id)
+    {
+        bool removed;
+        lock (_history)
+        {
+            removed = _history.RemoveAll(i => i.Id == id) > 0;
+        }
+        if (removed)
+        {
+            HistoryChanged?.Invoke();
+        }
+        return removed;
+    }
+
+    public void ClearHistory()
+    {
+        bool hadItems;
+        lock (_history)
+        {
+            hadItems = _history.Count > 0;
+            _history.Clear();
+        }
+        if (hadItems)
+        {
+            HistoryChanged?.Invoke();
         }
     }
 

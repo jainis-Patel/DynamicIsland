@@ -19,6 +19,9 @@ internal sealed class VolumeService : IDisposable
     private float _lastVolume = -1f;
     private bool _lastMute;
 
+    public float CurrentVolume => _volume?.MasterVolumeLevelScalar ?? (_lastVolume >= 0f ? _lastVolume : 0.5f);
+    public bool IsMuted => _volume?.Mute ?? _lastMute;
+
     public event Action<float, bool>? VolumeChanged;
 
     public VolumeService(Dispatcher ui, MMDeviceEnumerator enumerator)

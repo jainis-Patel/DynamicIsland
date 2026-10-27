@@ -14,6 +14,8 @@ namespace DynamicIsland;
 public partial class IslandWindow
 {
     private Point _dragStartPoint;
+    private string? _recordingHotkeyAction;
+    private bool _isAudioAppMixerMode;
 
     // ═════════════════════════════════════════════════════════════════
     //  View Navigation & Dock Strip
@@ -39,6 +41,7 @@ public partial class IslandWindow
         SetDockActive(targetButton);
         AnimateContainerSwitch(targetContainer);
         _currentExpandedView = view;
+        _recordingHotkeyAction = null;
         SetKeyboardFocusable(view == ExpandedView.Calc);
 
         // Morph the pill bigger (480x336) when selecting Settings, or back to 420x190 for other views,
@@ -52,6 +55,9 @@ public partial class IslandWindow
         if (view == ExpandedView.Settings && previousView != ExpandedView.Settings)
         {
             UpdateStartupUI();
+            UpdateVolumeOsdUI();
+            UpdateHotkeysUI();
+            UpdateDockVisibilityUI();
             TriggerLiquidImpulse(260, 320, 42);
         }
         else if (previousView == ExpandedView.Settings && view != ExpandedView.Settings)
@@ -73,6 +79,10 @@ public partial class IslandWindow
                 CalcInputBox.SelectAll();
             }));
         }
+        else if (view == ExpandedView.Audio && _isAudioAppMixerMode)
+        {
+            _audioEndpointService.RefreshAppSessions();
+        }
         else if (view == ExpandedView.Peripherals)
         {
             _ = _peripheralService.RefreshAsync();
@@ -82,6 +92,17 @@ public partial class IslandWindow
             _ = _networkService.RefreshRadioStatesAsync();
             _networkService.Sample();
         }
+    }
+
+    private void SecondaryDroplet_Click(object sender, MouseButtonEventArgs e)
+    {
+        var targetView = ActivityResolver.ResolveCompactTargetView(_secondaryCompactHost);
+        _machine.ExpandNow();
+        if (targetView != ExpandedView.Media)
+        {
+            SwitchExpandedView(targetView);
+        }
+        e.Handled = true;
     }
 
     private void HorizontalScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -97,6 +118,40 @@ public partial class IslandWindow
 
     private void IslandWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (_recordingHotkeyAction != null)
+        {
+            Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin)
+            {
+                return;
+            }
+
+            string action = _recordingHotkeyAction;
+            _recordingHotkeyAction = null;
+            SetKeyboardFocusable(false);
+
+            if (key != Key.Escape)
+            {
+                int vk = KeyInterop.VirtualKeyFromKey(key);
+                if (vk > 0)
+                {
+                    _settingsService.Update(s => s.CustomHotkeys[action] = (uint)vk, nameof(AppSettings.CustomHotkeys));
+                    _machine.PushToast(new ToastContent(
+                        "\uE765",
+                        "Hotkey Bound",
+                        $"{action} → Ctrl+Alt+{key}",
+                        ThemeBrushes.GreenColor,
+                        TimeSpan.FromSeconds(1.8),
+                        TargetView: "settings",
+                        Priority: ToastPriority.Feedback,
+                        Category: "hotkey"));
+                }
+            }
+            UpdateHotkeysUI();
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.Escape && _machine.State == IslandState.Expanded)
         {
             if (_currentExpandedView != ExpandedView.Media)
@@ -204,6 +259,7 @@ public partial class IslandWindow
             {
                 Resources["AccentBrush"] = ThemeBrushes.CreateFrozen(media.Accent.Value);
                 PillGlowColor.Color = media.Accent.Value;
+                PillGlowSecondaryColor.Color = media.SecondaryAccent ?? media.Accent.Value;
             }
 
             CompactTrackText.Text = media.Title;
@@ -307,11 +363,27 @@ public partial class IslandWindow
     {
         if (_machine.State == IslandState.Expanded) return;
 
-        // Shift + Scroll skips tracks horizontally; standard Scroll adjusts system master volume
+        // Shift + Scroll skips tracks horizontally; Alt + Scroll adjusts display brightness; standard Scroll adjusts system master volume
         if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
         {
             if (e.Delta > 0) _mediaService.Next();
             else if (e.Delta < 0) _mediaService.Previous();
+            e.Handled = true;
+            return;
+        }
+
+        if ((Keyboard.Modifiers & ModifierKeys.Alt) != 0)
+        {
+            int pct = _brightnessService.StepBrightness(e.Delta > 0 ? 5 : -5);
+            _machine.PushToast(new ToastContent(
+                "\uE706",
+                "Brightness",
+                $"{pct}%",
+                ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(1.8),
+                TargetView: "battery",
+                Priority: ToastPriority.Feedback,
+                Category: "brightness"));
             e.Handled = true;
             return;
         }
@@ -417,7 +489,29 @@ public partial class IslandWindow
         ShelfBadgeText.Visibility = _shelfService.HasItems ? Visibility.Visible : Visibility.Collapsed;
         ShelfCountText.Text = $"{_shelfService.Count} item{(_shelfService.Count == 1 ? "" : "s")}";
         ShelfEmptyPlaceholder.Visibility = _shelfService.HasItems ? Visibility.Collapsed : Visibility.Visible;
+        if (ZipShelfButton != null)
+        {
+            ZipShelfButton.Visibility = _shelfService.HasItems ? Visibility.Visible : Visibility.Collapsed;
+        }
         SyncObservableCollection(_shelfItems, _shelfService.Items);
+    }
+
+    private void ZipShelfButton_Click(object sender, RoutedEventArgs e)
+    {
+        string? zipPath = _shelfService.CreateZipBundle();
+        if (!string.IsNullOrEmpty(zipPath))
+        {
+            DropShelfService.CopyPath(zipPath);
+            _machine.PushToast(new ToastContent(
+                "\uF012",
+                "ZIP Archive Created",
+                $"{Path.GetFileName(zipPath)} · Path copied",
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(2.8),
+                TargetView: "shelf",
+                Priority: ToastPriority.Feedback,
+                Category: "shelfzip"));
+        }
     }
 
     private void ShelfItem_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -582,6 +676,108 @@ public partial class IslandWindow
         }
     }
 
+    private void PinClipboardItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string id })
+        {
+            bool pinned = _clipboardService.TogglePin(id);
+            _machine.PushToast(new ToastContent(
+                pinned ? "\uE840" : "\uE718",
+                pinned ? "Clip Pinned" : "Clip Unpinned",
+                pinned ? "Protected from history clear & eviction" : "Standard history retention",
+                pinned ? ThemeBrushes.AmberColor : ThemeBrushes.MutedGreyColor,
+                TimeSpan.FromSeconds(1.6),
+                TargetView: "clipboard",
+                Priority: ToastPriority.Feedback,
+                Category: "clipboardpin"));
+            e.Handled = true;
+        }
+    }
+
+    private async void EyedropperButton_Click(object sender, RoutedEventArgs e)
+    {
+        _machine.PushToast(new ToastContent(
+            "\uEF3C",
+            "Eyedropper Armed",
+            "Sampling pixel under cursor in 1.2s...",
+            ThemeBrushes.AmberColor,
+            TimeSpan.FromSeconds(1.2),
+            TargetView: "clipboard",
+            Priority: ToastPriority.Feedback,
+            Category: "eyedropper"));
+
+        await Task.Delay(1200);
+        var sample = ScreenToolsService.SampleCursorPixelColor();
+        try { Clipboard.SetText(sample.Hex); } catch { }
+
+        _machine.PushToast(new ToastContent(
+            "\uEF3C",
+            $"Sampled {sample.Hex}",
+            $"{sample.RgbText} · Copied to clipboard",
+            sample.Color,
+            TimeSpan.FromSeconds(3.0),
+            TargetView: "clipboard",
+            Priority: ToastPriority.Feedback,
+            Category: "eyedropper"));
+    }
+
+    private async void OcrClipboardButton_Click(object sender, RoutedEventArgs e)
+    {
+        System.Windows.Media.Imaging.BitmapSource? bmp = null;
+        try
+        {
+            if (Clipboard.ContainsImage())
+            {
+                bmp = Clipboard.GetImage();
+            }
+        }
+        catch { }
+
+        bmp ??= _clipboardService.Items.FirstOrDefault(i => i.ImagePreview != null)?.ImagePreview as System.Windows.Media.Imaging.BitmapSource;
+        if (bmp == null)
+        {
+            _machine.PushToast(new ToastContent(
+                "\uE8BCE",
+                "No Image in Clipboard",
+                "Copy a screenshot first (Win+Shift+S) to extract text",
+                ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(2.5),
+                TargetView: "clipboard",
+                Priority: ToastPriority.Feedback,
+                Category: "ocr"));
+            return;
+        }
+
+        string? text = await ScreenToolsService.ExtractTextFromBitmapAsync(bmp);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            _machine.PushToast(new ToastContent(
+                "\uE8BCE",
+                "No Text Detected",
+                "Windows OCR found no readable text in image",
+                ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(2.2),
+                TargetView: "clipboard",
+                Priority: ToastPriority.Feedback,
+                Category: "ocr"));
+            return;
+        }
+
+        try { Clipboard.SetText(text); } catch { }
+        string preview = text.Replace("\r", " ").Replace("\n", " ").Trim();
+        if (preview.Length > 36) preview = preview[..33] + "...";
+
+        _machine.PushToast(new ToastContent(
+            "\uE73E",
+            "OCR Text Copied",
+            preview,
+            ThemeBrushes.GreenColor,
+            TimeSpan.FromSeconds(3.0),
+            TargetView: "clipboard",
+            Priority: ToastPriority.Feedback,
+            Category: "ocr"));
+    }
+
     private void OnDownloadsChanged()
     {
         if (_downloadService.HasActiveDownloads)
@@ -698,6 +894,9 @@ public partial class IslandWindow
         UpdateBannerModeUI();
         UpdateMotionModeUI();
         UpdateStartupUI();
+        UpdateVolumeOsdUI();
+        UpdateHotkeysUI();
+        UpdateDockVisibilityUI();
         UpdateMonitorUI();
         ApplyTheme(cur.ThemeName);
         SyncSpringMotionPreferences();
@@ -760,6 +959,15 @@ public partial class IslandWindow
                 UpdateBannerModeUI();
                 break;
 
+            case nameof(AppSettings.EnableVolumeKeyOsd):
+                UpdateVolumeOsdUI();
+                UpdateVolumeKeyHook();
+                break;
+
+            case nameof(AppSettings.HiddenDockViews):
+                UpdateDockVisibilityUI();
+                break;
+
             case nameof(AppSettings.ReduceMotion):
                 UpdateMotionModeUI();
                 SyncSpringMotionPreferences();
@@ -770,6 +978,7 @@ public partial class IslandWindow
             case nameof(AppSettings.CustomHotkeys):
             case nameof(AppSettings.EnableDeveloperHotkeys):
                 RegisterConfiguredHotKeys();
+                UpdateHotkeysUI();
                 break;
 
             default:
@@ -785,6 +994,7 @@ public partial class IslandWindow
         SelectedThemeName.Text = palette.Name;
         Resources["AccentBrush"] = ThemeBrushes.CreateFrozen(palette.Accent);
         PillGlowColor.Color = palette.Glow;
+        PillGlowSecondaryColor.Color = palette.Accent;
 
         EnsureRendering();
     }
@@ -994,6 +1204,146 @@ public partial class IslandWindow
         UpdateStartupUI();
     }
 
+    private void UpdateVolumeOsdUI()
+    {
+        if (VolumeOsdText == null) return;
+        bool on = _settingsService.Current.EnableVolumeKeyOsd;
+        VolumeOsdText.Text = on ? "Vol Keys On" : "Vol Keys Off";
+        VolumeOsdText.Foreground = on ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
+    }
+
+    private void VolumeOsdBtn_Click(object sender, RoutedEventArgs e)
+    {
+        bool next = !_settingsService.Current.EnableVolumeKeyOsd;
+        _settingsService.Update(s => s.EnableVolumeKeyOsd = next, nameof(AppSettings.EnableVolumeKeyOsd));
+    }
+
+    private void ExportSettingsBtn_Click(object sender, RoutedEventArgs e)
+    {
+        string path = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Downloads",
+            "DynamicIsland_Settings_Backup.json");
+
+        if (_settingsService.ExportToFile(path))
+        {
+            _shelfService.AddPaths(new[] { path });
+            _machine.PushToast(new ToastContent(
+                "\uEDE1",
+                "Settings Exported",
+                "Saved to Downloads & added to Drop Shelf",
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(2.5),
+                TargetView: "settings",
+                Priority: ToastPriority.Feedback,
+                Category: "settingsio"));
+        }
+    }
+
+    private void ImportSettingsBtn_Click(object sender, RoutedEventArgs e)
+    {
+        string? candidate = _shelfService.Items
+            .FirstOrDefault(i => i.FullPath.EndsWith(".json", StringComparison.OrdinalIgnoreCase))?.FullPath;
+        candidate ??= Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Downloads",
+            "DynamicIsland_Settings_Backup.json");
+
+        if (File.Exists(candidate) && _settingsService.ImportFromFile(candidate))
+        {
+            TriggerLiquidImpulse(320, 160, 35);
+            _machine.PushToast(new ToastContent(
+                "\uE8B5",
+                "Settings Imported",
+                Path.GetFileName(candidate),
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(2.5),
+                TargetView: "settings",
+                Priority: ToastPriority.Feedback,
+                Category: "settingsio"));
+        }
+        else
+        {
+            _machine.PushToast(new ToastContent(
+                "\uE8B5",
+                "No Backup JSON Found",
+                "Export first or drop a .json backup onto Drop Shelf",
+                ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(2.5),
+                TargetView: "settings",
+                Priority: ToastPriority.Feedback,
+                Category: "settingsio"));
+        }
+    }
+
+    private void HotkeyRecordBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string action })
+        {
+            _recordingHotkeyAction = action;
+            SetKeyboardFocusable(true);
+            UpdateHotkeysUI();
+        }
+    }
+
+    private void UpdateHotkeysUI()
+    {
+        if (HotkeyBindClipboardText == null) return;
+        var custom = _settingsService.Current.CustomHotkeys;
+
+        string FormatVk(string action, string label, uint defaultVk)
+        {
+            if (_recordingHotkeyAction == action) return "Press key...";
+            uint vk = (custom != null && custom.TryGetValue(action, out uint c)) ? c : defaultVk;
+            if (vk == 0) return $"{label}: Off";
+            Key k = KeyInterop.KeyFromVirtualKey((int)vk);
+            return $"{label}: {k}";
+        }
+
+        HotkeyBindClipboardText.Text = FormatVk("Clipboard", "Clip", 0x56);
+        HotkeyBindCalcText.Text = FormatVk("Calculator", "Calc", 0x43);
+        HotkeyBindAudioText.Text = FormatVk("AudioDevices", "Audio", 0x4F);
+        HotkeyBindWifiText.Text = FormatVk("Network", "Wi-Fi", 0x57);
+        HotkeyBindTimerText.Text = FormatVk("Stopwatch", "Timer", 0x41);
+    }
+
+    private void DockPinToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string viewKey })
+        {
+            _settingsService.Update(s =>
+            {
+                if (!s.HiddenDockViews.Remove(viewKey))
+                {
+                    s.HiddenDockViews.Add(viewKey);
+                }
+            }, nameof(AppSettings.HiddenDockViews));
+        }
+    }
+
+    private void UpdateDockVisibilityUI()
+    {
+        var hidden = _settingsService.Current.HiddenDockViews;
+        void ApplyPin(string key, Button dockBtn, Button? pinBtn)
+        {
+            bool isHidden = hidden.Contains(key);
+            dockBtn.Visibility = isHidden ? Visibility.Collapsed : Visibility.Visible;
+            if (pinBtn != null)
+            {
+                pinBtn.Opacity = isHidden ? 0.42 : 1.0;
+                pinBtn.BorderBrush = isHidden ? Brushes.Transparent : ThemeBrushes.Green;
+            }
+        }
+
+        ApplyPin("shelf", ShelfButton, DockPinShelfBtn);
+        ApplyPin("clipboard", ClipboardButton, DockPinClipBtn);
+        ApplyPin("notifications", NotificationsButton, DockPinNotifBtn);
+        ApplyPin("calc", CalcButton, DockPinCalcBtn);
+        ApplyPin("voicememo", RecordButton, DockPinMemoBtn);
+        ApplyPin("peripherals", PeripheralsButton, DockPinDevicesBtn);
+        ApplyPin("network", NetworkButton, DockPinWifiBtn);
+    }
+
     private void DockButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: string dock })
@@ -1117,6 +1467,51 @@ public partial class IslandWindow
         }
     }
 
+    private void AudioModeToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        _isAudioAppMixerMode = !_isAudioAppMixerMode;
+        if (AudioSectionTitle != null)
+        {
+            AudioSectionTitle.Text = _isAudioAppMixerMode ? "Per-App Volume Mixer" : "Audio Output";
+        }
+        if (AudioModeToggleText != null)
+        {
+            AudioModeToggleText.Text = _isAudioAppMixerMode ? "Output Devices" : "App Mixer";
+            AudioModeToggleText.Foreground = _isAudioAppMixerMode ? ThemeBrushes.Green : ThemeBrushes.Blue;
+        }
+        if (AudioEndpointsScrollViewer != null && AudioAppMixerScrollViewer != null)
+        {
+            AudioEndpointsScrollViewer.Visibility = _isAudioAppMixerMode ? Visibility.Collapsed : Visibility.Visible;
+            AudioAppMixerScrollViewer.Visibility = _isAudioAppMixerMode ? Visibility.Visible : Visibility.Collapsed;
+        }
+        if (_isAudioAppMixerMode)
+        {
+            _audioEndpointService.RefreshAppSessions();
+        }
+    }
+
+    private void OnAudioAppSessionsChanged(IReadOnlyList<AppAudioSessionInfo> sessions)
+    {
+        SyncObservableCollection(_audioAppSessions, sessions);
+    }
+
+    private void AppSessionSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (sender is Slider { Tag: uint pid, IsMouseCaptureWithin: true })
+        {
+            _audioEndpointService.SetAppSessionVolume(pid, (float)e.NewValue);
+        }
+    }
+
+    private void AppSessionMuteBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: uint pid })
+        {
+            _audioEndpointService.ToggleAppSessionMute(pid);
+            _audioEndpointService.RefreshAppSessions();
+        }
+    }
+
     // ═════════════════════════════════════════════════════════════════
     //  Smart Battery & Power Management Widget
     // ═════════════════════════════════════════════════════════════════
@@ -1137,7 +1532,7 @@ public partial class IslandWindow
             : "On Battery";
 
         double pct = Math.Clamp(status.BatteryPercent / 100.0, 0.05, 1.0);
-        BatteryLevelFill.Width = pct * 72;
+        BatteryLevelFill.Width = pct * 68;
 
         BatteryLevelFill.Background = status.IsCharging || status.BatteryPercent > 30
             ? ThemeBrushes.Green
@@ -1566,6 +1961,137 @@ public partial class IslandWindow
     private void HotspotCard_Click(object sender, MouseButtonEventArgs e)
     {
         NetworkService.OpenMobileHotspotSettings();
+        e.Handled = true;
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    //  Display Brightness Control (WMI & DDC/CI)
+    // ═════════════════════════════════════════════════════════════════
+
+    private void OnBrightnessChanged(int pct)
+    {
+        if (BrightnessSlider == null || BrightnessValueText == null) return;
+        BrightnessValueText.Text = $"{pct}%";
+        if (!BrightnessSlider.IsMouseCaptureWithin)
+        {
+            BrightnessSlider.Value = pct;
+        }
+    }
+
+    private void BrightnessSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_brightnessService == null || BrightnessValueText == null) return;
+        int pct = (int)Math.Round(e.NewValue);
+        BrightnessValueText.Text = $"{pct}%";
+        if (BrightnessSlider.IsMouseCaptureWithin)
+        {
+            _brightnessService.SetBrightness(pct);
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    //  Notification Center History Drawer & Per-App Mute
+    // ═════════════════════════════════════════════════════════════════
+
+    private void OnNotificationHistoryChanged()
+    {
+        if (NotificationsBadgeText == null) return;
+        var items = _notificationListener.History;
+        NotificationsBadgeText.Text = items.Count.ToString();
+        NotificationsBadgeText.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        NotificationsCountText.Text = $"{items.Count} item{(items.Count == 1 ? "" : "s")}";
+        NotificationsEmptyPlaceholder.Visibility = items.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+        ClearNotificationsButton.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        SyncObservableCollection(_notificationHistoryItems, items);
+    }
+
+    private void ClearNotificationsButton_Click(object sender, RoutedEventArgs e)
+    {
+        _notificationListener.ClearHistory();
+    }
+
+    private void RemoveNotificationItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string id })
+        {
+            _notificationListener.RemoveHistoryItem(id);
+            e.Handled = true;
+        }
+    }
+
+    private void MuteAppNotification_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string appName } && !string.IsNullOrWhiteSpace(appName))
+        {
+            _settingsService.Update(s => s.MutedNotificationApps.Add(appName), nameof(AppSettings.MutedNotificationApps));
+            _machine.PushToast(new ToastContent(
+                "\uE74F",
+                "App Muted",
+                $"{appName} notifications silenced in Island",
+                ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(2.2),
+                TargetView: "notifications",
+                Priority: ToastPriority.Feedback,
+                Category: "notifmute"));
+            e.Handled = true;
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    //  Live Weather & Upcoming Calendar Agenda Glance
+    // ═════════════════════════════════════════════════════════════════
+
+    private void OnWeatherUpdated(WeatherSnapshot snap)
+    {
+        if (ClockWeatherBadge == null) return;
+        if (snap.IsAvailable)
+        {
+            ClockWeatherGlyph.Text = snap.Glyph;
+            ClockWeatherText.Text = snap.BadgeText;
+            ClockWeatherBadge.ToolTip = $"{snap.LocationName} · {snap.Condition} · {snap.SummaryLine}";
+            ClockWeatherBadge.Visibility = Visibility.Visible;
+        }
+    }
+
+    private async void ClockWeatherBadge_Click(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        await _weatherService.RefreshAsync();
+        var snap = _weatherService.Current;
+        if (snap.IsAvailable)
+        {
+            _machine.PushToast(new ToastContent(
+                snap.Glyph,
+                $"{snap.LocationName} · {snap.TempC}°C",
+                $"{snap.Condition} · {snap.SummaryLine}",
+                ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(2.5),
+                TargetView: null,
+                Priority: ToastPriority.Feedback,
+                Category: "weather"));
+        }
+    }
+
+    private void OnCalendarUpdated(CalendarEventInfo? evt)
+    {
+        if (ClockCalendarBadge == null) return;
+        if (evt != null)
+        {
+            ClockCalendarText.Text = evt.TimeBadgeText;
+            ClockCalendarBadge.ToolTip = string.IsNullOrWhiteSpace(evt.Location)
+                ? evt.Subject
+                : $"{evt.Subject} · {evt.Location}";
+            ClockCalendarBadge.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            ClockCalendarBadge.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void ClockCalendarBadge_Click(object sender, MouseButtonEventArgs e)
+    {
+        CalendarService.LaunchEventOrCalendar(_calendarService.NextEvent);
         e.Handled = true;
     }
 }

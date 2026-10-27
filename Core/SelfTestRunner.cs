@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using DynamicIsland.Services;
 using static DynamicIsland.Interop.NativeMethods;
 
@@ -56,6 +57,11 @@ internal static class SelfTestRunner
         Run("AppPaths: Writable data directory resolution & XAML dictionary validation", TestAppPaths);
         Run("ThemeBrushes: Pre-allocated brushes are frozen for render-thread safety", TestThemeBrushesFrozen);
         Run("AudioSpectrum: Lock-free band read & idle zeroing", TestAudioSpectrumLockFree);
+        Run("NotificationListenerService: 25-item history ring buffer, item removal & clear", TestNotificationHistoryBuffer);
+        Run("WeatherService & CalendarService: Open-Meteo JSON parsing, WMO glyphs & meeting URL extraction", TestWeatherAndCalendarParsing);
+        Run("ActivityResolver: Split-pill secondary droplet activity resolution & glyph mapping", TestSecondaryDropletActivity);
+        Run("ClipboardHistoryService: DPAPI encryption round-trip & pinned clip eviction resistance", TestClipboardDpapiAndPinning);
+        Run("DropShelfService & SettingsService: One-click ZIP bundle creation & settings export/import", TestDropShelfZipAndSettingsBackup);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -483,5 +489,143 @@ internal static class SelfTestRunner
         float[] bands = { 0.8f, 0.7f, 0.6f, 0.5f };
         spectrum.ReadBands(bands);
         Assert(bands.All(b => b == 0f), "Inactive AudioSpectrum.ReadBands must zero destination buffer without locking");
+    }
+
+    private static void TestNotificationHistoryBuffer()
+    {
+        string tempSettings = Path.Combine(Path.GetTempPath(), $"di_notif_test_{Guid.NewGuid():N}.json");
+        try
+        {
+            var settingsSvc = new SettingsService(tempSettings);
+            using var listener = new NotificationListenerService(Dispatcher.CurrentDispatcher, () => settingsSvc.Current);
+
+            for (int i = 1; i <= 30; i++)
+            {
+                listener.RecordNotification("Discord", $"Message #{i}", $"Body {i}", "\uE8F2");
+            }
+
+            Assert(listener.HistoryCount == NotificationListenerService.MaxHistoryCount,
+                $"Expected ring buffer capped at {NotificationListenerService.MaxHistoryCount}, got {listener.HistoryCount}");
+            Assert(listener.History[0].AppName == "Discord" && listener.History[0].Title == "Message #30",
+                $"Expected newest item at index 0, got '{listener.History[0].Title}'");
+
+            string firstId = listener.History[0].Id;
+            listener.RemoveHistoryItem(firstId);
+            Assert(listener.HistoryCount == NotificationListenerService.MaxHistoryCount - 1, "Expected count decremented after RemoveHistoryItem");
+
+            listener.ClearHistory();
+            Assert(listener.HistoryCount == 0, "Expected empty history after ClearHistory");
+        }
+        finally
+        {
+            try { if (File.Exists(tempSettings)) File.Delete(tempSettings); } catch { }
+        }
+    }
+
+    private static void TestWeatherAndCalendarParsing()
+    {
+        string sampleJson = """
+        {
+          "current": {
+            "temperature_2m": 24.6,
+            "weather_code": 2,
+            "is_day": 1
+          }
+        }
+        """;
+
+        var snap = WeatherService.ParseOpenMeteoForecastJson(sampleJson, "Tokyo");
+        Assert(snap.IsAvailable, "WeatherService failed to parse valid Open-Meteo JSON");
+        Assert(snap.LocationName == "Tokyo" && snap.TempC == 25, $"Parsed temperature mismatch: {snap.TempC}");
+        Assert(snap.Condition == "Partly Cloudy", $"Expected 'Partly Cloudy' for WMO code 2, got '{snap.Condition}'");
+
+        string? zoomUrl = CalendarService.ExtractMeetingUrl("Join our call at https://us02web.zoom.us/j/81234567890?pwd=abc right now!");
+        Assert(zoomUrl == "https://us02web.zoom.us/j/81234567890?pwd=abc", $"Unexpected Zoom URL: {zoomUrl}");
+
+        string? meetUrl = CalendarService.ExtractMeetingUrl("Standup link: https://meet.google.com/abc-defg-hij");
+        Assert(meetUrl == "https://meet.google.com/abc-defg-hij", $"Unexpected Google Meet URL: {meetUrl}");
+    }
+
+    private static void TestSecondaryDropletActivity()
+    {
+        var split = ActivityResolver.ResolveWithSecondary(
+            recording: false,
+            mediaPlaying: true,
+            callActive: false,
+            countdownRunning: true,
+            downloading: false,
+            stopwatchActive: true);
+
+        Assert(split.HasActivity, "Expected HasActivity=true");
+        Assert(split.PrimaryHost == CompactActivityKind.Media, $"Expected PrimaryHost=Media, got {split.PrimaryHost}");
+        Assert(split.SecondaryHost == CompactActivityKind.Countdown, $"Expected SecondaryHost=Countdown, got {split.SecondaryHost}");
+        Assert(!string.IsNullOrEmpty(ActivityResolver.GlyphForActivity(split.SecondaryHost)), "SecondaryHost glyph must not be empty");
+    }
+
+    private static void TestClipboardDpapiAndPinning()
+    {
+        string secret = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
+        string? protectedStr = ClipboardHistoryService.ProtectText(secret);
+        Assert(protectedStr != null && protectedStr.StartsWith("dpapi:", StringComparison.Ordinal), "Protected text must have 'dpapi:' prefix");
+        Assert(!protectedStr!.Contains("Bearer", StringComparison.Ordinal), "Protected text must not expose plaintext");
+
+        string? roundTrip = ClipboardHistoryService.UnprotectText(protectedStr);
+        Assert(roundTrip == secret, "DPAPI UnprotectText round-trip mismatch");
+
+        using var clipSvc = new ClipboardHistoryService(Dispatcher.CurrentDispatcher);
+        var pinnedItem = new ClipboardItem { Id = "pin1", Title = "Pinned Snippet", RawText = "Pinned", IsPinned = true };
+        clipSvc.InsertClipItem(pinnedItem);
+
+        for (int i = 0; i < 15; i++)
+        {
+            clipSvc.InsertClipItem(new ClipboardItem { Id = $"u{i}", Title = $"Unpinned {i}", RawText = $"Val {i}" });
+        }
+
+        Assert(clipSvc.Items.Any(x => x.Id == "pin1" && x.IsPinned), "Pinned item must survive ring-buffer eviction");
+        clipSvc.Clear();
+        Assert(clipSvc.Items.Count == 1 && clipSvc.Items[0].Id == "pin1", "Pinned item must survive Clear()");
+    }
+
+    private static void TestDropShelfZipAndSettingsBackup()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), $"di_zip_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            string fileA = Path.Combine(tempDir, "alpha.txt");
+            string fileB = Path.Combine(tempDir, "beta.txt");
+            File.WriteAllText(fileA, "Hello Alpha");
+            File.WriteAllText(fileB, "Hello Beta");
+
+            var shelf = new DropShelfService();
+            shelf.Clear();
+            shelf.AddPaths(new[] { fileA, fileB });
+
+            string? zipPath = shelf.CreateZipBundle(tempDir);
+            Assert(!string.IsNullOrEmpty(zipPath) && File.Exists(zipPath), "DropShelfService.CreateZipBundle did not create .zip archive");
+            Assert(new FileInfo(zipPath!).Length > 50, "Created ZIP archive is unexpectedly empty");
+
+            string s1Path = Path.Combine(tempDir, "s1.json");
+            string s2Path = Path.Combine(tempDir, "s2.json");
+            string exportPath = Path.Combine(tempDir, "backup.json");
+
+            var svc1 = new SettingsService(s1Path);
+            svc1.Update(s =>
+            {
+                s.ThemeName = "Cyber Neon";
+                s.LiquidIntensity = 0.92;
+                s.HiddenDockViews.Add("calc");
+            });
+            Assert(svc1.ExportToFile(exportPath), "SettingsService.ExportToFile failed");
+
+            var svc2 = new SettingsService(s2Path);
+            Assert(svc2.ImportFromFile(exportPath), "SettingsService.ImportFromFile failed");
+            Assert(svc2.Current.ThemeName == "Cyber Neon" && svc2.Current.HiddenDockViews.Contains("calc"),
+                "Imported settings did not match exported values");
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, recursive: true); } catch { }
+        }
     }
 }

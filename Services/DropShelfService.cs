@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Windows;
 using DynamicIsland.Core;
 
@@ -139,6 +140,70 @@ internal sealed class DropShelfService
         catch (Exception ex)
         {
             App.Log($"[DropShelf] CopyPath error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Bundles all existing files and folders currently on the Drop Shelf into a single <c>.zip</c> archive,
+    /// adds the resulting archive to the top of the shelf, and returns its path.
+    /// </summary>
+    public string? CreateZipBundle(string? targetDirectory = null)
+    {
+        var snapshot = _items
+            .Select(i => i.FullPath)
+            .Where(p => File.Exists(p) || Directory.Exists(p))
+            .ToList();
+
+        if (snapshot.Count == 0) return null;
+
+        try
+        {
+            string outDir = targetDirectory
+                            ?? Path.GetDirectoryName(snapshot[0])
+                            ?? AppPaths.DataDirectory;
+            Directory.CreateDirectory(outDir);
+
+            string zipName = $"DropShelf_{DateTime.Now:yyyyMMdd_HHmmss}.zip";
+            string zipPath = Path.Combine(outDir, zipName);
+            if (File.Exists(zipPath)) File.Delete(zipPath);
+
+            using (var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+            {
+                var usedEntryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var path in snapshot)
+                {
+                    if (string.Equals(path, zipPath, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    if (File.Exists(path))
+                    {
+                        string entryName = Path.GetFileName(path);
+                        int suffix = 1;
+                        while (!usedEntryNames.Add(entryName))
+                        {
+                            entryName = $"{Path.GetFileNameWithoutExtension(path)}_{suffix++}{Path.GetExtension(path)}";
+                        }
+                        archive.CreateEntryFromFile(path, entryName, CompressionLevel.Fastest);
+                    }
+                    else if (Directory.Exists(path))
+                    {
+                        var dirInfo = new DirectoryInfo(path);
+                        foreach (var file in dirInfo.EnumerateFiles("*", SearchOption.AllDirectories))
+                        {
+                            string rel = Path.Combine(dirInfo.Name, Path.GetRelativePath(path, file.FullName));
+                            archive.CreateEntryFromFile(file.FullName, rel, CompressionLevel.Fastest);
+                        }
+                    }
+                }
+            }
+
+            AddPaths(new[] { zipPath });
+            return zipPath;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[DropShelf] CreateZipBundle failed: {ex.Message}");
+            return null;
         }
     }
 

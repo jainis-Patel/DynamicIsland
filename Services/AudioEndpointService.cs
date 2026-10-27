@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
@@ -76,6 +77,50 @@ public sealed class AudioEndpointInfo : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
 }
 
+public sealed class AppAudioSessionInfo : INotifyPropertyChanged
+{
+    private float _volume;
+    private bool _isMuted;
+
+    public uint ProcessId { get; init; }
+    public string AppName { get; init; } = "";
+    public string Subtitle { get; init; } = "App Audio";
+    public string Glyph { get; init; } = "\uE8D6";
+
+    public float Volume
+    {
+        get => _volume;
+        set
+        {
+            if (Math.Abs(_volume - value) > 0.001f)
+            {
+                _volume = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public bool IsMuted
+    {
+        get => _isMuted;
+        set
+        {
+            if (_isMuted != value)
+            {
+                _isMuted = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(MuteGlyph));
+            }
+        }
+    }
+
+    public string MuteGlyph => _isMuted ? "\uE74F" : "\uE767";
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void OnPropertyChanged([CallerMemberName] string? prop = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+}
+
 /// <summary>
 /// Monitors Windows CoreAudio playback endpoints (Speakers, Headphones, Bluetooth Earbuds, HDMI),
 /// detects active defaults, queries battery telemetry, and allows 1-click output switching via IPolicyConfig.
@@ -90,10 +135,12 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
     private string? _lastDefaultId;
 
     public IReadOnlyList<AudioEndpointInfo> Endpoints { get; private set; } = Array.Empty<AudioEndpointInfo>();
+    public IReadOnlyList<AppAudioSessionInfo> AppSessions { get; private set; } = Array.Empty<AppAudioSessionInfo>();
     public AudioEndpointInfo? CurrentDefault { get; private set; }
     public MMDeviceEnumerator SharedEnumerator => _enumerator;
 
     public event Action<IReadOnlyList<AudioEndpointInfo>>? EndpointsChanged;
+    public event Action<IReadOnlyList<AppAudioSessionInfo>>? AppSessionsChanged;
     public event Action<AudioEndpointInfo>? DefaultChanged;
     public event Action? DefaultCaptureChanged;
 
@@ -268,6 +315,196 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
                 App.Log($"[AudioEndpointService] ToggleEndpointMute error: {ex.Message}");
             }
         });
+    }
+
+    public void RefreshAppSessions()
+    {
+        if (_disposed) return;
+
+        Task.Run(() =>
+        {
+            try
+            {
+                using var dev = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                if (dev == null) return;
+
+                var sessions = dev.AudioSessionManager.Sessions;
+                var byPid = new Dictionary<uint, AppAudioSessionInfo>();
+                uint selfPid = (uint)Environment.ProcessId;
+
+                for (int i = 0; i < sessions.Count; i++)
+                {
+                    var s = sessions[i];
+                    try
+                    {
+                        if (s.State == AudioSessionState.AudioSessionStateExpired)
+                            continue;
+
+                        uint pid = s.GetProcessID;
+                        if (pid == selfPid) continue;
+
+                        float vol = s.SimpleAudioVolume.Volume;
+                        bool muted = s.SimpleAudioVolume.Mute;
+
+                        if (s.IsSystemSoundsSession || pid == 0)
+                        {
+                            if (!byPid.ContainsKey(0))
+                            {
+                                byPid[0] = new AppAudioSessionInfo
+                                {
+                                    ProcessId = 0,
+                                    AppName = "System Sounds",
+                                    Subtitle = "Windows Audio",
+                                    Glyph = "\uE777",
+                                    Volume = vol,
+                                    IsMuted = muted
+                                };
+                            }
+                            continue;
+                        }
+
+                        if (byPid.ContainsKey(pid)) continue;
+
+                        string appName = ResolveAppName(pid, s.DisplayName);
+                        if (string.IsNullOrWhiteSpace(appName)) continue;
+
+                        byPid[pid] = new AppAudioSessionInfo
+                        {
+                            ProcessId = pid,
+                            AppName = appName,
+                            Subtitle = s.State == AudioSessionState.AudioSessionStateActive ? "Playing Audio" : "Idle Session",
+                            Glyph = GlyphForAppAudio(appName),
+                            Volume = vol,
+                            IsMuted = muted
+                        };
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                var result = byPid.Values
+                    .OrderByDescending(x => x.Subtitle == "Playing Audio")
+                    .ThenBy(x => x.ProcessId == 0)
+                    .ThenBy(x => x.AppName)
+                    .ToList();
+
+                AppSessions = result;
+                _ui.InvokeAsync(() => AppSessionsChanged?.Invoke(AppSessions));
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[AudioEndpointService] RefreshAppSessions error: {ex.Message}");
+            }
+        });
+    }
+
+    public void SetAppSessionVolume(uint processId, float volume)
+    {
+        float clamped = Math.Clamp(volume, 0f, 1f);
+        var sessionInfo = AppSessions.FirstOrDefault(a => a.ProcessId == processId);
+        if (sessionInfo != null)
+        {
+            sessionInfo.Volume = clamped;
+        }
+
+        Task.Run(() =>
+        {
+            try
+            {
+                using var dev = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                if (dev == null) return;
+                var sessions = dev.AudioSessionManager.Sessions;
+                for (int i = 0; i < sessions.Count; i++)
+                {
+                    var s = sessions[i];
+                    if ((processId == 0 && (s.IsSystemSoundsSession || s.GetProcessID == 0)) ||
+                        (processId != 0 && s.GetProcessID == processId))
+                    {
+                        s.SimpleAudioVolume.Volume = clamped;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[AudioEndpointService] SetAppSessionVolume error: {ex.Message}");
+            }
+        });
+    }
+
+    public void ToggleAppSessionMute(uint processId)
+    {
+        Task.Run(() =>
+        {
+            try
+            {
+                using var dev = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                if (dev == null) return;
+                var sessions = dev.AudioSessionManager.Sessions;
+                bool? nextMute = null;
+
+                for (int i = 0; i < sessions.Count; i++)
+                {
+                    var s = sessions[i];
+                    if ((processId == 0 && (s.IsSystemSoundsSession || s.GetProcessID == 0)) ||
+                        (processId != 0 && s.GetProcessID == processId))
+                    {
+                        nextMute ??= !s.SimpleAudioVolume.Mute;
+                        s.SimpleAudioVolume.Mute = nextMute.Value;
+                    }
+                }
+
+                if (nextMute.HasValue)
+                {
+                    bool finalMute = nextMute.Value;
+                    _ui.InvokeAsync(() =>
+                    {
+                        var info = AppSessions.FirstOrDefault(a => a.ProcessId == processId);
+                        if (info != null) info.IsMuted = finalMute;
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[AudioEndpointService] ToggleAppSessionMute error: {ex.Message}");
+            }
+        });
+    }
+
+    private static string ResolveAppName(uint pid, string? displayName)
+    {
+        if (!string.IsNullOrWhiteSpace(displayName) && !displayName.StartsWith("@%", StringComparison.Ordinal))
+        {
+            return displayName.Trim();
+        }
+
+        try
+        {
+            using var proc = Process.GetProcessById((int)pid);
+            if (!string.IsNullOrWhiteSpace(proc.MainWindowTitle) && proc.ProcessName.Equals("ApplicationFrameHost", StringComparison.OrdinalIgnoreCase))
+            {
+                return proc.MainWindowTitle;
+            }
+            string raw = proc.ProcessName;
+            if (raw.Length > 0)
+            {
+                return char.ToUpperInvariant(raw[0]) + raw[1..];
+            }
+        }
+        catch
+        {
+        }
+        return "";
+    }
+
+    private static string GlyphForAppAudio(string appName)
+    {
+        string n = appName.ToLowerInvariant();
+        if (n.Contains("spotify") || n.Contains("music") || n.Contains("itunes") || n.Contains("tidal")) return "\uE8D6";
+        if (n.Contains("chrome") || n.Contains("edge") || n.Contains("firefox") || n.Contains("brave") || n.Contains("opera")) return "\uE774";
+        if (n.Contains("discord") || n.Contains("teams") || n.Contains("zoom") || n.Contains("slack") || n.Contains("whatsapp")) return "\uE8BD";
+        if (n.Contains("vlc") || n.Contains("mpv") || n.Contains("video")) return "\uE714";
+        return "\uE767";
     }
 
     private static (string Type, string Glyph) InferDeviceTypeAndGlyph(string name)

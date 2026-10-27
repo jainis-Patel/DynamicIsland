@@ -10,6 +10,14 @@ internal static class ColorExtractor
 
     public static Color Vibrant(BitmapSource source)
     {
+        return ExtractPalette(source).Primary;
+    }
+
+    /// <summary>
+    /// Extracts both a primary and secondary vibrant hue from album art for dual-stop ambient shimmer.
+    /// </summary>
+    public static (Color Primary, Color Secondary) ExtractPalette(BitmapSource source)
+    {
         try
         {
             var small = new TransformedBitmap(source,
@@ -31,14 +39,43 @@ internal static class ColorExtractor
             }
 
             ToHsv(r / total, g / total, b / total, out double hue, out double sat, out _);
-            if (sat < 0.12) return Neutral; // essentially monochrome artwork
+            if (sat < 0.12) return (Neutral, Color.FromRgb(0x8E, 0x8E, 0x93)); // essentially monochrome artwork
 
-            // Normalise for a dark UI: punchy saturation, high brightness.
-            return FromHsv(hue, Math.Clamp(sat * 1.15, 0.45, 0.85), 0.95);
+            var primary = FromHsv(hue, Math.Clamp(sat * 1.15, 0.45, 0.85), 0.95);
+
+            // Accumulate a second cluster of pixels whose hue differs from primary hue by >= 30°
+            double r2 = 0, g2 = 0, b2 = 0, total2 = 0;
+            for (int i = 0; i < pixels.Length; i += 4)
+            {
+                double pb = pixels[i] / 255.0, pg = pixels[i + 1] / 255.0, pr = pixels[i + 2] / 255.0;
+                ToHsv(pr, pg, pb, out double ph, out double s, out double v);
+                double diff = Math.Abs(ph - hue);
+                if (diff > 180) diff = 360 - diff;
+                if (diff >= 28 && s > 0.15)
+                {
+                    double w2 = s * v * (diff / 180.0);
+                    r2 += pr * w2; g2 += pg * w2; b2 += pb * w2; total2 += w2;
+                }
+            }
+
+            Color secondary;
+            if (total2 > 0.05)
+            {
+                ToHsv(r2 / total2, g2 / total2, b2 / total2, out double hue2, out double sat2, out _);
+                secondary = FromHsv(hue2, Math.Clamp(sat2 * 1.1, 0.40, 0.85), 0.88);
+            }
+            else
+            {
+                // Analogous shifted hue when cover art has a single dominant color family
+                double shiftedHue = (hue + 38.0) % 360.0;
+                secondary = FromHsv(shiftedHue, Math.Clamp(sat * 1.05, 0.40, 0.80), 0.85);
+            }
+
+            return (primary, secondary);
         }
         catch
         {
-            return Neutral;
+            return (Neutral, Color.FromRgb(0x8E, 0x8E, 0x93));
         }
     }
 

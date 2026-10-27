@@ -19,6 +19,7 @@ public partial class IslandWindow
     private double _appliedHeight = -1;
     private double _appliedRadius = -1;
     private double _appliedOffset = double.NaN;
+    private double _appliedDroplet = -1;
 
     private static T CreateFrozenEase<T>(T ease) where T : Freezable
     {
@@ -65,6 +66,26 @@ public partial class IslandWindow
         // Slightly softer radius spring creates an organic liquid lag on corner rounding
         _radius.Stiffness = stiffness * 0.86;
         _radius.Damping = damping * 0.92;
+
+        _dropletOffset.Stiffness = stiffness * 0.90;
+        _dropletOffset.Damping = damping * 0.88;
+    }
+
+    private void UpdateSecondaryDropletTarget()
+    {
+        bool showDroplet = _machine.State == IslandState.Compact && _secondaryCompactHost != CompactActivityKind.None;
+        double newTarget = showDroplet ? 1.0 : 0.0;
+        if (Math.Abs(_dropletOffset.Target - newTarget) > 0.01)
+        {
+            _dropletOffset.Target = newTarget;
+            TriggerLiquidImpulse(showDroplet ? 140 : -120, showDroplet ? -35 : 30, 12);
+        }
+
+        if (showDroplet && SecondaryDropletGlyph != null)
+        {
+            SecondaryDropletGlyph.Text = ActivityResolver.GlyphForActivity(_secondaryCompactHost);
+        }
+        EnsureRendering();
     }
 
     /// <summary>
@@ -190,6 +211,7 @@ public partial class IslandWindow
         }
 
         _telemetryService.SetActive(next == IslandState.Expanded);
+        UpdateSecondaryDropletTarget();
         UpdateSpectrumActivity();
         UpdateClockTimerInterval();
         EnsureRendering();
@@ -203,6 +225,7 @@ public partial class IslandWindow
         ToastTitle.Text = toast.Title;
         ToastSubtitle.Text = toast.Subtitle;
         PillGlowColor.Color = toast.Accent;
+        PillGlowSecondaryColor.Color = toast.Accent;
 
         if (replacing && !IsReducedMotion)
         {
@@ -355,11 +378,12 @@ public partial class IslandWindow
         _width.Step(dt);
         _height.Step(dt);
         _radius.Step(dt);
+        _dropletOffset.Step(dt);
         ApplyGeometry();
         UpdateLiveBars(now.TotalSeconds);
         bool glowSettled = UpdateAmbientHalo();
 
-        if (_width.IsAtRest && _height.IsAtRest && _radius.IsAtRest && !BarsAnimating && glowSettled)
+        if (_width.IsAtRest && _height.IsAtRest && _radius.IsAtRest && _dropletOffset.IsAtRest && !BarsAnimating && glowSettled)
         {
             StopRendering();
         }
@@ -436,6 +460,7 @@ public partial class IslandWindow
         double h = Math.Max(1, _height.Value);
         double r = Math.Clamp(_radius.Value, 0, Math.Min(w, h) / 2);
         double offset = _settingsService?.Current.NotchYOffset ?? 0;
+        double dropT = _dropletOffset.Value;
         double liquid = IsReducedMotion ? 0.0 : Math.Clamp(_settingsService?.Current.LiquidIntensity ?? 0.65, 0.0, 1.0);
 
         // Gooey squash-and-stretch velocity deformation (volume-conserving droplet physics)
@@ -449,6 +474,7 @@ public partial class IslandWindow
             Math.Abs(h - _appliedHeight) < 0.005 &&
             Math.Abs(r - _appliedRadius) < 0.005 &&
             Math.Abs(offset - _appliedOffset) < 0.005 &&
+            Math.Abs(dropT - _appliedDroplet) < 0.002 &&
             Math.Abs(PillDeformScale.ScaleX - deformX) < 0.002 &&
             Math.Abs(PillDeformScale.ScaleY - deformY) < 0.002)
         {
@@ -459,9 +485,29 @@ public partial class IslandWindow
         _appliedHeight = h;
         _appliedRadius = r;
         _appliedOffset = offset;
+        _appliedDroplet = dropT;
 
         PillDeformScale.ScaleX = deformX;
         PillDeformScale.ScaleY = deformY;
+
+        if (SecondaryDroplet != null)
+        {
+            if (dropT > 0.01)
+            {
+                SecondaryDroplet.Visibility = Visibility.Visible;
+                SecondaryDroplet.Opacity = Math.Clamp(dropT * 1.25, 0.0, 1.0);
+                SecondaryDropletTranslate.X = (w / 2.0 + 24.0) * dropT;
+                SecondaryDropletTranslate.Y = offset;
+                double dropVel = Math.Clamp(_dropletOffset.Velocity / 8.0, -0.35, 0.35) * liquid;
+                SecondaryDropletScale.ScaleX = Math.Clamp(0.45 + 0.55 * dropT + dropVel, 0.3, 1.28);
+                SecondaryDropletScale.ScaleY = Math.Clamp(0.45 + 0.55 * dropT - dropVel * 0.65, 0.3, 1.22);
+            }
+            else if (SecondaryDroplet.Visibility != Visibility.Collapsed)
+            {
+                SecondaryDroplet.Visibility = Visibility.Collapsed;
+                SecondaryDroplet.Opacity = 0;
+            }
+        }
 
         // Dynamic liquid droplet corner-rounding boost during high-velocity morphs
         double motionEnergy = Math.Min(1.0, (Math.Abs(vx) + Math.Abs(vy)) * 0.65);

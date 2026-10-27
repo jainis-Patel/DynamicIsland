@@ -59,7 +59,7 @@ public partial class IslandWindow : Window
 
     private readonly ServiceContainer _services = new();
     private readonly IslandStateMachine _machine = new();
-    private readonly Spring _width, _height, _radius;
+    private readonly Spring _width, _height, _radius, _dropletOffset;
     private readonly RectangleGeometry _contentClip = new();
     private readonly Stopwatch _stopwatch = new();
     private readonly CursorTracker _cursor;
@@ -76,7 +76,9 @@ public partial class IslandWindow : Window
     private readonly ObservableCollection<ShelfItem> _shelfItems = new();
     private readonly ObservableCollection<ClipboardItem> _clipboardItems = new();
     private readonly ObservableCollection<AudioEndpointInfo> _audioEndpoints = new();
+    private readonly ObservableCollection<AppAudioSessionInfo> _audioAppSessions = new();
     private readonly ObservableCollection<PeripheralDeviceInfo> _peripheralDevices = new();
+    private readonly ObservableCollection<NotificationHistoryItem> _notificationHistoryItems = new();
 
     // Services (managed via _services container)
     private readonly MediaSessionService _mediaService;
@@ -96,6 +98,9 @@ public partial class IslandWindow : Window
     private readonly PeripheralDeviceService _peripheralService;
     private readonly CountdownTimerService _countdownService;
     private readonly NetworkService _networkService;
+    private readonly WeatherService _weatherService;
+    private readonly CalendarService _calendarService;
+    private readonly BrightnessService _brightnessService;
     private TrayIconService? _trayIcon;
 
     private readonly float[] _bandLevels = new float[AudioSpectrum.BandCount];
@@ -103,6 +108,7 @@ public partial class IslandWindow : Window
 
     private ExpandedView _currentExpandedView = ExpandedView.Media;
     private CompactActivityKind _activeCompactHost = CompactActivityKind.None;
+    private CompactActivityKind _secondaryCompactHost = CompactActivityKind.None;
     private string? _lastTimeText;
     private string? _lastDateShortText;
     private string? _lastTimerText;
@@ -117,6 +123,7 @@ public partial class IslandWindow : Window
         _width = new Spring(idle.Width);
         _height = new Spring(idle.Height);
         _radius = new Spring(idle.Radius);
+        _dropletOffset = new Spring(0);
 
         ContentHost.Clip = _contentClip;
 
@@ -143,6 +150,7 @@ public partial class IslandWindow : Window
             [ExpandedView.VoiceMemo] = (VoiceMemoContainer, RecordButton),
             [ExpandedView.Peripherals] = (PeripheralsContainer, PeripheralsButton),
             [ExpandedView.Network] = (NetworkContainer, NetworkButton),
+            [ExpandedView.Notifications] = (NotificationsContainer, NotificationsButton),
         };
 
         _allContainers = _viewRegistry.Values.Select(v => v.Container).ToArray();
@@ -161,7 +169,9 @@ public partial class IslandWindow : Window
         ShelfItemsControl.ItemsSource = _shelfItems;
         ClipboardItemsControl.ItemsSource = _clipboardItems;
         AudioEndpointsControl.ItemsSource = _audioEndpoints;
+        AudioAppSessionsControl.ItemsSource = _audioAppSessions;
         PeripheralsItemsControl.ItemsSource = _peripheralDevices;
+        NotificationsItemsControl.ItemsSource = _notificationHistoryItems;
 
         _machine.StateChanged += OnStateChanged;
         _machine.ToastChanged += OnToastChanged;
@@ -190,6 +200,9 @@ public partial class IslandWindow : Window
         _peripheralService = _services.Register(new PeripheralDeviceService(Dispatcher));
         _countdownService = _services.Register(new CountdownTimerService());
         _networkService = _services.Register(new NetworkService(Dispatcher));
+        _weatherService = _services.Register(new WeatherService(Dispatcher, () => _settingsService.Current));
+        _calendarService = _services.Register(new CalendarService(Dispatcher));
+        _brightnessService = _services.Register(new BrightnessService(Dispatcher, GetTargetMonitor));
 
         _mediaService.Changed += OnMediaChanged;
         _mediaService.TrackChanged += OnTrackChanged;
@@ -207,10 +220,12 @@ public partial class IslandWindow : Window
         _shelfService.Changed += OnShelfChanged;
         _privacyService.StateChanged += OnPrivacyStateChanged;
         _notificationListener.NotificationReceived += toast => _machine.PushToast(toast);
+        _notificationListener.HistoryChanged += () => Dispatcher.InvokeAsync(OnNotificationHistoryChanged);
         _clipboardService.Changed += OnClipboardChanged;
         _downloadService.ActiveDownloadsChanged += OnDownloadsChanged;
         _downloadService.DownloadCompleted += OnDownloadCompleted;
         _audioEndpointService.EndpointsChanged += OnAudioEndpointsChanged;
+        _audioEndpointService.AppSessionsChanged += OnAudioAppSessionsChanged;
         _audioEndpointService.DefaultChanged += OnDefaultAudioEndpointChanged;
         _audioEndpointService.DefaultCaptureChanged += () => _privacyService.ReattachCaptureDevice();
         _voiceMemoService.RecordingTick += OnVoiceMemoTick;
@@ -223,6 +238,9 @@ public partial class IslandWindow : Window
         _countdownService.Completed += OnCountdownCompleted;
         _networkService.Updated += OnNetworkUpdated;
         _networkService.ConnectivityAlert += toast => _machine.PushToast(toast);
+        _weatherService.Updated += OnWeatherUpdated;
+        _calendarService.Updated += OnCalendarUpdated;
+        _brightnessService.BrightnessChanged += OnBrightnessChanged;
 
         _clockTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background,
             (_, _) => UpdateClockAndTimeline(), Dispatcher);
@@ -237,10 +255,14 @@ public partial class IslandWindow : Window
         OnShelfChanged();
         OnClipboardChanged();
         OnDownloadsChanged();
+        OnNotificationHistoryChanged();
         OnAudioEndpointsChanged(_audioEndpointService.Endpoints);
         OnPowerStatusChanged(_powerPlanService.Current);
         OnPeripheralsChanged(_peripheralService.Devices);
         OnNetworkUpdated(_networkService.Current);
+        OnWeatherUpdated(_weatherService.Current);
+        OnCalendarUpdated(_calendarService.NextEvent);
+        OnBrightnessChanged(_brightnessService.BrightnessPercent);
         InitializeVoiceMemoUI();
         ApplySettings();
         _settingsService.PropertyChanged += OnSettingsPropertyChanged;
@@ -312,6 +334,7 @@ public partial class IslandWindow : Window
         RecordButton.Click += (_, _) => SwitchExpandedView(ExpandedView.VoiceMemo);
         PeripheralsButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Peripherals);
         NetworkButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Network);
+        NotificationsButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Notifications);
         SettingsButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Settings);
         MicMuteButton.Click += (_, _) => ToggleMicMute();
         PreviewKeyDown += IslandWindow_PreviewKeyDown;
@@ -330,7 +353,7 @@ public partial class IslandWindow : Window
         bool downloading = _downloadService.HasActiveDownloads;
         bool recording = _voiceMemoService?.IsRecording ?? false;
 
-        var (hasActivity, host) = ActivityResolver.Resolve(
+        var (hasActivity, host, secondaryHost) = ActivityResolver.ResolveWithSecondary(
             recording,
             mediaPlaying,
             callActive,
@@ -339,6 +362,7 @@ public partial class IslandWindow : Window
             stopwatchActive);
 
         _activeCompactHost = host;
+        _secondaryCompactHost = secondaryHost;
         _machine.SetActivity(hasActivity);
 
         bool showTimerHost = host is CompactActivityKind.Countdown or CompactActivityKind.Stopwatch or CompactActivityKind.None;
@@ -348,6 +372,7 @@ public partial class IslandWindow : Window
         CompactDownloadHost.Visibility = host == CompactActivityKind.Download ? Visibility.Visible : Visibility.Collapsed;
         CompactTimerHost.Visibility = showTimerHost ? Visibility.Visible : Visibility.Collapsed;
 
+        UpdateSecondaryDropletTarget();
         UpdateSpectrumActivity();
         UpdateClockTimerInterval();
     }

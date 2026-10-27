@@ -1,4 +1,8 @@
+using System.ComponentModel;
 using System.IO;
+using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Media;
@@ -18,8 +22,10 @@ public enum ClipboardItemType
     File
 }
 
-public sealed class ClipboardItem
+public sealed class ClipboardItem : INotifyPropertyChanged
 {
+    private bool _isPinned;
+
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
     public ClipboardItemType Type { get; init; }
     public string Title { get; init; } = "";
@@ -29,6 +35,28 @@ public sealed class ClipboardItem
     public ImageSource? ImagePreview { get; init; }
     public DateTime CreatedAt { get; init; } = DateTime.Now;
     public string TimeAgo => CreatedAt.ToString("HH:mm");
+
+    public bool IsPinned
+    {
+        get => _isPinned;
+        set
+        {
+            if (_isPinned != value)
+            {
+                _isPinned = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PinGlyph));
+                OnPropertyChanged(nameof(PinForeground));
+            }
+        }
+    }
+
+    public string PinGlyph => _isPinned ? "\uE840" : "\uE718";
+    public Brush PinForeground => _isPinned ? ThemeBrushes.Amber : ThemeBrushes.SecondaryText;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void OnPropertyChanged([CallerMemberName] string? prop = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
 }
 
 /// <summary>
@@ -46,7 +74,11 @@ internal sealed class ClipboardHistoryService : IDisposable
         string Subtitle,
         string? RawText,
         string? SwatchHex,
-        DateTime CreatedAt);
+        DateTime CreatedAt,
+        bool IsPinned = false);
+
+    private const string DpapiPrefix = "dpapi:";
+    private static readonly byte[] DpapiEntropy = Encoding.UTF8.GetBytes("DynamicIsland.ClipboardHistory.v1");
 
     private static readonly string PersistencePath = AppPaths.ClipboardFile;
     private static readonly object SaveFileLock = new();
@@ -318,22 +350,110 @@ internal sealed class ClipboardHistoryService : IDisposable
 
             if (newItem != null)
             {
-                lock (_items)
-                {
-                    if (_items.Count > 0 && _items[0].RawText != null && _items[0].RawText == newItem.RawText)
-                        return;
-
-                    _items.Insert(0, newItem);
-                    if (_items.Count > MaxHistory)
-                        _items.RemoveAt(_items.Count - 1);
-                }
-                SavePersistedHistoryAsync();
-                Changed?.Invoke();
+                InsertClipItem(newItem);
             }
         }
         catch (Exception ex)
         {
             App.Log($"[ClipboardHistory] Error reading clipboard: {ex.Message}");
+        }
+    }
+
+    internal void InsertClipItem(ClipboardItem newItem)
+    {
+        lock (_items)
+        {
+            if (_items.Any(i => i.RawText != null && i.RawText == newItem.RawText))
+                return;
+
+            // Insert right after any pinned items (or at index 0 if the new item itself is pinned)
+            int insertIndex = newItem.IsPinned ? 0 : _items.TakeWhile(i => i.IsPinned).Count();
+            _items.Insert(insertIndex, newItem);
+
+            while (_items.Count > MaxHistory)
+            {
+                int evictIdx = _items.FindLastIndex(i => !i.IsPinned);
+                if (evictIdx >= 0)
+                    _items.RemoveAt(evictIdx);
+                else
+                    break;
+            }
+        }
+
+        SavePersistedHistoryAsync();
+        Changed?.Invoke();
+    }
+
+    public bool TogglePin(string id)
+    {
+        bool pinned = false;
+        bool found = false;
+        lock (_items)
+        {
+            var item = _items.FirstOrDefault(i => i.Id == id);
+            if (item != null)
+            {
+                item.IsPinned = !item.IsPinned;
+                pinned = item.IsPinned;
+                found = true;
+
+                // Keep pinned items grouped at the front in chronological order
+                var ordered = _items
+                    .OrderByDescending(i => i.IsPinned)
+                    .ThenByDescending(i => i.CreatedAt)
+                    .ToList();
+                _items.Clear();
+                _items.AddRange(ordered);
+            }
+        }
+
+        if (found)
+        {
+            SavePersistedHistoryAsync();
+            Changed?.Invoke();
+        }
+        return pinned;
+    }
+
+    /// <summary>
+    /// Encrypts a clipboard text payload using Windows DPAPI (<see cref="DataProtectionScope.CurrentUser"/>)
+    /// so persisted clipboard snippets are unreadable outside the current Windows user profile.
+    /// </summary>
+    public static string? ProtectText(string? plainText)
+    {
+        if (string.IsNullOrEmpty(plainText)) return plainText;
+        try
+        {
+            byte[] plainBytes = Encoding.UTF8.GetBytes(plainText);
+            byte[] encrypted = ProtectedData.Protect(plainBytes, DpapiEntropy, DataProtectionScope.CurrentUser);
+            return DpapiPrefix + Convert.ToBase64String(encrypted);
+        }
+        catch
+        {
+            return plainText;
+        }
+    }
+
+    /// <summary>
+    /// Decrypts a DPAPI-protected clipboard payload, or returns legacy plaintext strings unchanged.
+    /// </summary>
+    public static string? UnprotectText(string? storedText)
+    {
+        if (string.IsNullOrEmpty(storedText)) return storedText;
+        if (!storedText.StartsWith(DpapiPrefix, StringComparison.Ordinal))
+        {
+            return storedText;
+        }
+
+        try
+        {
+            byte[] cipherBytes = Convert.FromBase64String(storedText[DpapiPrefix.Length..]);
+            byte[] plainBytes = ProtectedData.Unprotect(cipherBytes, DpapiEntropy, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(plainBytes);
+        }
+        catch
+        {
+            return null;
         }
     }
 
@@ -373,7 +493,11 @@ internal sealed class ClipboardHistoryService : IDisposable
 
     public void Clear()
     {
-        lock (_items) _items.Clear();
+        lock (_items)
+        {
+            // Preserve pinned items when clearing clipboard history
+            _items.RemoveAll(i => !i.IsPinned);
+        }
         SavePersistedHistoryAsync();
         Changed?.Invoke();
     }
@@ -387,7 +511,11 @@ internal sealed class ClipboardHistoryService : IDisposable
         {
             foreach (var dto in dtos.Take(MaxHistory))
             {
-                if (string.IsNullOrEmpty(dto.RawText)) continue;
+                string? rawText = UnprotectText(dto.RawText);
+                if (string.IsNullOrEmpty(rawText)) continue;
+                string title = UnprotectText(dto.Title) ?? dto.Title;
+                string subtitle = UnprotectText(dto.Subtitle) ?? dto.Subtitle;
+
                 Color? swatch = null;
                 if (!string.IsNullOrEmpty(dto.SwatchHex))
                 {
@@ -398,11 +526,12 @@ internal sealed class ClipboardHistoryService : IDisposable
                 _items.Add(new ClipboardItem
                 {
                     Type = dto.Type,
-                    Title = dto.Title,
-                    Subtitle = dto.Subtitle,
-                    RawText = dto.RawText,
+                    Title = title,
+                    Subtitle = subtitle,
+                    RawText = rawText,
                     SwatchColor = swatch,
-                    CreatedAt = dto.CreatedAt
+                    CreatedAt = dto.CreatedAt,
+                    IsPinned = dto.IsPinned
                 });
             }
 
@@ -422,11 +551,12 @@ internal sealed class ClipboardHistoryService : IDisposable
                 .Where(i => i.Type != ClipboardItemType.Image && !string.IsNullOrEmpty(i.RawText))
                 .Select(i => new PersistedClipDto(
                     i.Type,
-                    i.Title,
-                    i.Subtitle,
-                    i.RawText,
+                    ProtectText(i.Title) ?? i.Title,
+                    ProtectText(i.Subtitle) ?? i.Subtitle,
+                    ProtectText(i.RawText),
                     i.SwatchColor?.ToString(),
-                    i.CreatedAt))
+                    i.CreatedAt,
+                    i.IsPinned))
                 .ToList();
         }
 

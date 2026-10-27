@@ -26,6 +26,9 @@ public sealed class AppSettings
     /// <summary>Pill capsule surface opacity from 0.65 (translucent dark glass) to 1.0 (true OLED pitch-black).</summary>
     public double BackdropOpacity { get; set; } = 1.0;
     public bool EnableDeveloperHotkeys { get; set; } = false;
+    public bool EnableVolumeKeyOsd { get; set; } = false;
+    public string? WeatherCityOverride { get; set; }
+    public List<string> HiddenDockViews { get; set; } = new();
     public List<string> MutedNotificationApps { get; set; } = new();
     public Dictionary<string, uint> CustomHotkeys { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
@@ -102,6 +105,7 @@ internal sealed class SettingsService
     private static AppSettings Load(string path)
     {
         var settings = AtomicJsonStore.Load(path, () => new AppSettings());
+        settings.HiddenDockViews ??= new List<string>();
         settings.MutedNotificationApps ??= new List<string>();
         settings.CustomHotkeys ??= new Dictionary<string, uint>(StringComparer.OrdinalIgnoreCase);
         settings.LiquidIntensity = Math.Clamp(settings.LiquidIntensity, 0.0, 1.0);
@@ -113,6 +117,32 @@ internal sealed class SettingsService
             settings.SchemaVersion = 2;
         }
         return settings;
+    }
+
+    public bool ExportToFile(string filePath)
+    {
+        return AtomicJsonStore.Save(filePath, Current, _saveLock);
+    }
+
+    public bool ImportFromFile(string filePath)
+    {
+        try
+        {
+            var imported = Load(filePath);
+            lock (_saveLock)
+            {
+                Current = imported;
+            }
+            SaveNow();
+            PropertyChanged?.Invoke(null);
+            Changed?.Invoke();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[SettingsService] ImportFromFile failed: {ex.Message}");
+            return false;
+        }
     }
 
     private void ScheduleSave()
