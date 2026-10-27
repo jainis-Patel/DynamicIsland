@@ -267,10 +267,11 @@ public partial class IslandWindow
 
         double leftDip;
         string dock = _settingsService?.Current.DockPosition ?? "Center";
+        double pillMarginInsideWindow = Math.Max(0, (Width - 480) / 2.0);
         if (dock == "Left")
-            leftDip = (info.rcWork.Left + 24 * scale) / scale;
+            leftDip = (info.rcWork.Left / scale) + 24 - pillMarginInsideWindow;
         else if (dock == "Right")
-            leftDip = (info.rcWork.Right - Width * scale - 24 * scale) / scale;
+            leftDip = (info.rcWork.Right / scale) - Width - 24 + pillMarginInsideWindow;
         else
             leftDip = (info.rcMonitor.Left + (info.rcMonitor.Width - Width * scale) / 2) / scale;
 
@@ -325,9 +326,10 @@ public partial class IslandWindow
         if (_hwnd == IntPtr.Zero || _machine.State == IslandState.Hidden) return null;
         if (_windowRectPx.Width <= 0) return null;
 
-        var shape = Shapes[_machine.State];
-        double effectiveW = Math.Max(shape.Width, _width.Value);
-        double effectiveH = Math.Max(shape.Height, _height.Value);
+        var shape = GetTargetShape(_machine.State);
+        double scaleFactor = _settingsService?.Current.IslandScale ?? 1.0;
+        double effectiveW = Math.Max(shape.Width, _width.Value) * scaleFactor;
+        double effectiveH = Math.Max(shape.Height, _height.Value) * scaleFactor;
         int halfWidth = (int)Math.Round((effectiveW / 2 + HoverSlopDip) * _dpiScale);
         int centerX = _windowRectPx.Left + _windowRectPx.Width / 2;
 

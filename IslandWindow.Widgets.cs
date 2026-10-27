@@ -26,6 +26,7 @@ public partial class IslandWindow
             _machine.ExpandNow();
         }
 
+        var previousView = _currentExpandedView;
         if (_currentExpandedView == view && view != ExpandedView.Media)
         {
             view = ExpandedView.Media;
@@ -39,6 +40,29 @@ public partial class IslandWindow
         AnimateContainerSwitch(targetContainer);
         _currentExpandedView = view;
         SetKeyboardFocusable(view == ExpandedView.Calc);
+
+        // Morph the pill bigger (480x336) when selecting Settings, or back to 420x190 for other views,
+        // accompanied by a gooey liquid droplet velocity impulse.
+        SyncSpringMotionPreferences();
+        var targetShape = GetTargetShape(_machine.State, view);
+        _width.Target = targetShape.Width;
+        _height.Target = targetShape.Height;
+        _radius.Target = targetShape.Radius;
+
+        if (view == ExpandedView.Settings && previousView != ExpandedView.Settings)
+        {
+            UpdateStartupUI();
+            TriggerLiquidImpulse(260, 320, 42);
+        }
+        else if (previousView == ExpandedView.Settings && view != ExpandedView.Settings)
+        {
+            TriggerLiquidImpulse(-220, -240, -32);
+        }
+        else
+        {
+            TriggerLiquidImpulse(165, -65, 22);
+        }
+        EnsureRendering();
 
         if (view == ExpandedView.Calc)
         {
@@ -353,7 +377,7 @@ public partial class IslandWindow
     private void Window_PreviewDragLeave(object sender, DragEventArgs e)
     {
         DropOverlay.Visibility = Visibility.Collapsed;
-        var shape = Shapes[_machine.State];
+        var shape = GetTargetShape(_machine.State);
         _width.Target = shape.Width;
         _height.Target = shape.Height;
         EnsureRendering();
@@ -362,7 +386,7 @@ public partial class IslandWindow
     private void Window_PreviewDrop(object sender, DragEventArgs e)
     {
         DropOverlay.Visibility = Visibility.Collapsed;
-        var shape = Shapes[_machine.State];
+        var shape = GetTargetShape(_machine.State);
         _width.Target = shape.Width;
         _height.Target = shape.Height;
         EnsureRendering();
@@ -635,7 +659,7 @@ public partial class IslandWindow
     }
 
     // ═════════════════════════════════════════════════════════════════
-    //  Customization Settings & Laptop Notch Offset
+    //  Customization Settings, Liquid Physics & Laptop Notch Offset
     // ═════════════════════════════════════════════════════════════════
 
     private void ApplySettings()
@@ -643,9 +667,32 @@ public partial class IslandWindow
         var cur = _settingsService.Current;
         NotchOffsetSlider.Value = cur.NotchYOffset;
         NotchOffsetText.Text = $"{cur.NotchYOffset} px";
+
+        double liquidPct = Math.Round(cur.LiquidIntensity * 100);
+        LiquidIntensitySlider.Value = liquidPct;
+        LiquidIntensityText.Text = $"{liquidPct}%";
+
+        double speedPct = Math.Round(cur.AnimationSpeed * 100);
+        AnimationSpeedSlider.Value = speedPct;
+        AnimationSpeedText.Text = $"{speedPct}%";
+
+        double scalePct = Math.Round(cur.IslandScale * 100);
+        IslandScaleSlider.Value = scalePct;
+        IslandScaleText.Text = $"{scalePct}%";
+        RootScaleTransform.ScaleX = cur.IslandScale;
+        RootScaleTransform.ScaleY = cur.IslandScale;
+
+        double opacityPct = Math.Round(cur.BackdropOpacity * 100);
+        BackdropOpacitySlider.Value = opacityPct;
+        BackdropOpacityText.Text = $"{opacityPct}%";
+        PillBackground.Opacity = Math.Clamp(cur.BackdropOpacity, 0.65, 1.0);
+
         UpdateDockButtonsUI();
         UpdateHaloUI();
         UpdateDndUI();
+        UpdateBannerModeUI();
+        UpdateMotionModeUI();
+        UpdateStartupUI();
         UpdateMonitorUI();
         ApplyTheme(cur.ThemeName);
         SyncSpringMotionPreferences();
@@ -655,11 +702,26 @@ public partial class IslandWindow
 
     private void OnSettingsPropertyChanged(string? propertyName)
     {
+        var cur = _settingsService.Current;
         switch (propertyName)
         {
             case nameof(AppSettings.NotchYOffset):
                 ApplyGeometry();
                 PositionWindow();
+                break;
+
+            case nameof(AppSettings.LiquidIntensity):
+            case nameof(AppSettings.AnimationSpeed):
+                SyncSpringMotionPreferences();
+                break;
+
+            case nameof(AppSettings.IslandScale):
+                RootScaleTransform.ScaleX = cur.IslandScale;
+                RootScaleTransform.ScaleY = cur.IslandScale;
+                break;
+
+            case nameof(AppSettings.BackdropOpacity):
+                PillBackground.Opacity = Math.Clamp(cur.BackdropOpacity, 0.65, 1.0);
                 break;
 
             case nameof(AppSettings.DockPosition):
@@ -674,7 +736,7 @@ public partial class IslandWindow
                 break;
 
             case nameof(AppSettings.ThemeName):
-                ApplyTheme(_settingsService.Current.ThemeName);
+                ApplyTheme(cur.ThemeName);
                 UpdateDockButtonsUI();
                 break;
 
@@ -687,6 +749,17 @@ public partial class IslandWindow
 
             case nameof(AppSettings.DoNotDisturb):
                 UpdateDndUI();
+                break;
+
+            case nameof(AppSettings.ReplaceWindowsBanners):
+                UpdateBannerModeUI();
+                break;
+
+            case nameof(AppSettings.ReduceMotion):
+                UpdateMotionModeUI();
+                SyncSpringMotionPreferences();
+                _appliedWidth = -1;
+                ApplyGeometry();
                 break;
 
             case nameof(AppSettings.CustomHotkeys):
@@ -741,6 +814,30 @@ public partial class IslandWindow
         DndToggleText.Foreground = dnd ? ThemeBrushes.Amber : ThemeBrushes.SecondaryText;
     }
 
+    private void UpdateBannerModeUI()
+    {
+        if (BannerModeText == null) return;
+        bool replace = _settingsService.Current.ReplaceWindowsBanners;
+        BannerModeText.Text = replace ? "Island Only" : "Island + Win";
+        BannerModeText.Foreground = replace ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
+    }
+
+    private void UpdateMotionModeUI()
+    {
+        if (MotionModeText == null) return;
+        bool reduced = _settingsService.Current.ReduceMotion;
+        MotionModeText.Text = reduced ? "Reduced Motion" : "Liquid Motion";
+        MotionModeText.Foreground = reduced ? ThemeBrushes.Amber : ThemeBrushes.Green;
+    }
+
+    private void UpdateStartupUI()
+    {
+        if (StartupToggleText == null) return;
+        bool on = StartupService.IsStartupEnabled();
+        StartupToggleText.Text = on ? "Startup On" : "Startup Off";
+        StartupToggleText.Foreground = on ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
+    }
+
     private void UpdateMonitorUI()
     {
         if (MonitorSwitchText == null) return;
@@ -775,6 +872,56 @@ public partial class IslandWindow
             Category: "monitor"));
     }
 
+    private void LiquidIntensitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_settingsService == null || LiquidIntensityText == null) return;
+        double pct = Math.Round(e.NewValue);
+        double normalized = Math.Clamp(pct / 100.0, 0.0, 1.0);
+        if (Math.Abs(_settingsService.Current.LiquidIntensity - normalized) < 0.005) return;
+
+        LiquidIntensityText.Text = $"{pct}%";
+        _settingsService.Update(s => s.LiquidIntensity = normalized, nameof(AppSettings.LiquidIntensity));
+
+        // Give a live gooey ripple as the user drags so they immediately feel the liquid elasticity
+        if (LiquidIntensitySlider.IsMouseCaptureWithin && Math.Abs(_width.Velocity) < 80)
+        {
+            TriggerLiquidImpulse(140, -55, 18);
+        }
+    }
+
+    private void AnimationSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_settingsService == null || AnimationSpeedText == null) return;
+        double pct = Math.Round(e.NewValue);
+        double normalized = Math.Clamp(pct / 100.0, 0.5, 1.6);
+        if (Math.Abs(_settingsService.Current.AnimationSpeed - normalized) < 0.005) return;
+
+        AnimationSpeedText.Text = $"{pct}%";
+        _settingsService.Update(s => s.AnimationSpeed = normalized, nameof(AppSettings.AnimationSpeed));
+    }
+
+    private void IslandScaleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_settingsService == null || IslandScaleText == null) return;
+        double pct = Math.Round(e.NewValue);
+        double normalized = Math.Clamp(pct / 100.0, 0.85, 1.25);
+        if (Math.Abs(_settingsService.Current.IslandScale - normalized) < 0.005) return;
+
+        IslandScaleText.Text = $"{pct}%";
+        _settingsService.Update(s => s.IslandScale = normalized, nameof(AppSettings.IslandScale));
+    }
+
+    private void BackdropOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_settingsService == null || BackdropOpacityText == null) return;
+        double pct = Math.Round(e.NewValue);
+        double normalized = Math.Clamp(pct / 100.0, 0.65, 1.0);
+        if (Math.Abs(_settingsService.Current.BackdropOpacity - normalized) < 0.005) return;
+
+        BackdropOpacityText.Text = $"{pct}%";
+        _settingsService.Update(s => s.BackdropOpacity = normalized, nameof(AppSettings.BackdropOpacity));
+    }
+
     private void NotchOffsetSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_settingsService == null || NotchOffsetText == null) return;
@@ -782,6 +929,64 @@ public partial class IslandWindow
         if (Math.Abs(_settingsService.Current.NotchYOffset - val) < 0.01) return;
         NotchOffsetText.Text = $"{val} px";
         _settingsService.Update(s => s.NotchYOffset = val, nameof(AppSettings.NotchYOffset));
+    }
+
+    private void LiquidPulseBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_settingsService.Current.ReduceMotion)
+        {
+            _settingsService.Update(s => s.ReduceMotion = false, nameof(AppSettings.ReduceMotion));
+        }
+        TriggerLiquidImpulse(480, -220, 55);
+    }
+
+    private void ResetSettingsBtn_Click(object sender, RoutedEventArgs e)
+    {
+        _settingsService.Update(s =>
+        {
+            s.LiquidIntensity = 0.65;
+            s.AnimationSpeed = 1.0;
+            s.IslandScale = 1.0;
+            s.NotchYOffset = 0;
+            s.BackdropOpacity = 1.0;
+            s.DockPosition = "Center";
+            s.ThemeName = "Solar Amber";
+            s.EnableAmbientGlow = true;
+            s.ReduceMotion = false;
+        });
+        TriggerLiquidImpulse(360, 180, 40);
+    }
+
+    private void BannerModeBtn_Click(object sender, RoutedEventArgs e)
+    {
+        bool next = !_settingsService.Current.ReplaceWindowsBanners;
+        _settingsService.Update(s => s.ReplaceWindowsBanners = next, nameof(AppSettings.ReplaceWindowsBanners));
+        _machine.PushToast(new ToastContent(
+            "\uE7E7",
+            next ? "Island-Only Notifications" : "Island + Windows Banners",
+            next ? "Native Windows popups dismissed after island toast" : "Native Windows popups remain in Action Center",
+            ThemeBrushes.BlueColor,
+            TimeSpan.FromSeconds(1.8),
+            TargetView: "settings",
+            Priority: ToastPriority.Feedback,
+            Category: "banners"));
+    }
+
+    private void MotionModeBtn_Click(object sender, RoutedEventArgs e)
+    {
+        bool next = !_settingsService.Current.ReduceMotion;
+        _settingsService.Update(s => s.ReduceMotion = next, nameof(AppSettings.ReduceMotion));
+        if (!next)
+        {
+            TriggerLiquidImpulse(320, -140, 35);
+        }
+    }
+
+    private void StartupToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        bool next = !StartupService.IsStartupEnabled();
+        StartupService.SetStartup(next);
+        UpdateStartupUI();
     }
 
     private void DockButton_Click(object sender, RoutedEventArgs e)

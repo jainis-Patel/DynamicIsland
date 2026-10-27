@@ -17,6 +17,14 @@ public sealed class AppSettings
     /// <summary>When true, Windows notification banners are dismissed after being shown in the island.</summary>
     public bool ReplaceWindowsBanners { get; set; } = true;
     public bool ReduceMotion { get; set; } = false;
+    /// <summary>Gooey / liquid animation intensity from 0.0 (critically damped, no bounce) to 1.0 (ultra-gooey droplet bounce &amp; squash/stretch).</summary>
+    public double LiquidIntensity { get; set; } = 0.65;
+    /// <summary>Animation speed multiplier from 0.5 (slow syrupy liquid) to 1.6 (snappy).</summary>
+    public double AnimationSpeed { get; set; } = 1.0;
+    /// <summary>Overall Dynamic Island size scale multiplier from 0.85 (85%) to 1.25 (125%).</summary>
+    public double IslandScale { get; set; } = 1.0;
+    /// <summary>Pill capsule surface opacity from 0.65 (translucent dark glass) to 1.0 (true OLED pitch-black).</summary>
+    public double BackdropOpacity { get; set; } = 1.0;
     public bool EnableDeveloperHotkeys { get; set; } = false;
     public List<string> MutedNotificationApps { get; set; } = new();
     public Dictionary<string, uint> CustomHotkeys { get; set; } = new(StringComparer.OrdinalIgnoreCase);
@@ -96,6 +104,10 @@ internal sealed class SettingsService
         var settings = AtomicJsonStore.Load(path, () => new AppSettings());
         settings.MutedNotificationApps ??= new List<string>();
         settings.CustomHotkeys ??= new Dictionary<string, uint>(StringComparer.OrdinalIgnoreCase);
+        settings.LiquidIntensity = Math.Clamp(settings.LiquidIntensity, 0.0, 1.0);
+        settings.AnimationSpeed = settings.AnimationSpeed <= 0.1 ? 1.0 : Math.Clamp(settings.AnimationSpeed, 0.5, 1.6);
+        settings.IslandScale = settings.IslandScale <= 0.1 ? 1.0 : Math.Clamp(settings.IslandScale, 0.85, 1.25);
+        settings.BackdropOpacity = settings.BackdropOpacity <= 0.1 ? 1.0 : Math.Clamp(settings.BackdropOpacity, 0.65, 1.0);
         if (settings.SchemaVersion < 2)
         {
             settings.SchemaVersion = 2;

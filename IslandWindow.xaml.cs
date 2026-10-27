@@ -26,6 +26,22 @@ public partial class IslandWindow : Window
         [IslandState.Hidden] = new(120, 28, 14),
     };
 
+    /// <summary>Expanded geometry when the Settings view is selected (expands wider and taller).</summary>
+    private static readonly PillShape SettingsExpandedShape = new(480, 336, 36);
+
+    private PillShape GetTargetShape(IslandState state, ExpandedView? viewOverride = null)
+    {
+        if (state == IslandState.Expanded)
+        {
+            var activeView = viewOverride ?? _currentExpandedView;
+            if (activeView == ExpandedView.Settings)
+            {
+                return SettingsExpandedShape;
+            }
+        }
+        return Shapes[state];
+    }
+
     private static readonly ToastContent[] DemoToasts =
     {
         new("\uE767", "Volume", "65%", ThemeBrushes.BlueColor, TimeSpan.FromSeconds(2.5), null, ToastPriority.Feedback, "volume"),

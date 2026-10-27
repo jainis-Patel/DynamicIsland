@@ -29,13 +29,60 @@ public partial class IslandWindow
     private bool IsReducedMotion =>
         (_settingsService?.Current.ReduceMotion ?? false) || !SystemParameters.ClientAreaAnimation;
 
+    /// <summary>
+    /// Computes analytical spring stiffness and damping from user-configured gooey/liquid intensity (0..1)
+    /// and animation speed multiplier (0.5..1.6).
+    /// </summary>
+    internal static (double Stiffness, double Damping) ComputeSpringParameters(double liquidIntensity, double animationSpeed, bool reducedMotion)
+    {
+        double speed = Math.Clamp(animationSpeed, 0.5, 1.6);
+        double liquid = reducedMotion ? 0.0 : Math.Clamp(liquidIntensity, 0.0, 1.0);
+
+        // Stiffness scales with speed^2 so natural frequency omega_0 scales linearly with speed
+        double stiffness = 320.0 * speed * speed;
+
+        // Damping ratio zeta ranges from 1.02 (critically damped, zero overshoot) at 0% liquid
+        // down to 0.36 (bouncy, gelatinous liquid droplet oscillation) at 100% liquid.
+        double zeta = 1.02 - (0.66 * liquid);
+        double damping = 2.0 * zeta * Math.Sqrt(stiffness);
+        return (stiffness, damping);
+    }
+
     private void SyncSpringMotionPreferences()
     {
-        // Critically damped (damping = 36 for stiffness = 320 -> zeta ≈ 1.006, zero overshoot) when reduced motion is active
-        double damping = IsReducedMotion ? 36 : 26;
+        var cur = _settingsService?.Current;
+        var (stiffness, damping) = ComputeSpringParameters(
+            cur?.LiquidIntensity ?? 0.65,
+            cur?.AnimationSpeed ?? 1.0,
+            IsReducedMotion);
+
+        _width.Stiffness = stiffness;
         _width.Damping = damping;
+
+        _height.Stiffness = stiffness;
         _height.Damping = damping;
-        _radius.Damping = damping;
+
+        // Slightly softer radius spring creates an organic liquid lag on corner rounding
+        _radius.Stiffness = stiffness * 0.86;
+        _radius.Damping = damping * 0.92;
+    }
+
+    /// <summary>
+    /// Injects a gooey velocity impulse into the analytical springs, creating a liquid droplet
+    /// swell and squash-and-stretch oscillation proportional to <c>LiquidIntensity</c>.
+    /// </summary>
+    private void TriggerLiquidImpulse(double widthVel, double heightVel, double radiusVel = 0)
+    {
+        if (IsReducedMotion) return;
+        double liquid = Math.Clamp(_settingsService?.Current.LiquidIntensity ?? 0.65, 0.0, 1.0);
+        if (liquid <= 0.01) return;
+
+        double scale = 0.25 + 1.25 * liquid;
+        _width.Velocity += widthVel * scale;
+        _height.Velocity += heightVel * scale;
+        _radius.Velocity += radiusVel * scale;
+        _appliedWidth = -1;
+        EnsureRendering();
     }
 
     private bool BarsAnimating =>
@@ -71,6 +118,7 @@ public partial class IslandWindow
                 _width.Target = 136;
                 _height.Target = 30;
                 _radius.Target = 15;
+                TriggerLiquidImpulse(140, 45, 12);
             }
             else
             {
@@ -78,6 +126,7 @@ public partial class IslandWindow
                 _width.Target = idle.Width;
                 _height.Target = idle.Height;
                 _radius.Target = idle.Radius;
+                TriggerLiquidImpulse(-110, -35, -10);
             }
             EnsureRendering();
         }
@@ -87,10 +136,41 @@ public partial class IslandWindow
     {
         SyncSpringMotionPreferences();
 
-        var shape = Shapes[next];
+        if (previous == IslandState.Expanded && next != IslandState.Expanded)
+        {
+            _currentExpandedView = ExpandedView.Media;
+            SetKeyboardFocusable(false);
+            SetDockActive(MediaHomeButton);
+            foreach (var c in _allContainers)
+            {
+                bool isMedia = c == MediaContainer;
+                c.BeginAnimation(OpacityProperty, null);
+                c.Visibility = isMedia ? Visibility.Visible : Visibility.Collapsed;
+                c.Opacity = isMedia ? 1 : 0;
+            }
+        }
+
+        var shape = GetTargetShape(next);
         _width.Target = shape.Width;
         _height.Target = shape.Height;
         _radius.Target = shape.Radius;
+
+        if (next == IslandState.Expanded)
+        {
+            TriggerLiquidImpulse(290, 210, 40);
+        }
+        else if (previous == IslandState.Expanded)
+        {
+            TriggerLiquidImpulse(-240, -170, -30);
+        }
+        else if (next == IslandState.Toast)
+        {
+            TriggerLiquidImpulse(250, 95, 30);
+        }
+        else if (next == IslandState.Compact)
+        {
+            TriggerLiquidImpulse(180, 50, 18);
+        }
 
         CrossfadeTo(next);
 
@@ -107,19 +187,6 @@ public partial class IslandWindow
         if (next == IslandState.Expanded)
         {
             UpdateMediaTimelineUI();
-        }
-        else if (previous == IslandState.Expanded)
-        {
-            _currentExpandedView = ExpandedView.Media;
-            SetKeyboardFocusable(false);
-            SetDockActive(MediaHomeButton);
-            foreach (var c in _allContainers)
-            {
-                bool isMedia = c == MediaContainer;
-                c.BeginAnimation(OpacityProperty, null);
-                c.Visibility = isMedia ? Visibility.Visible : Visibility.Collapsed;
-                c.Opacity = isMedia ? 1 : 0;
-            }
         }
 
         _telemetryService.SetActive(next == IslandState.Expanded);
@@ -139,9 +206,7 @@ public partial class IslandWindow
 
         if (replacing && !IsReducedMotion)
         {
-            _width.Velocity += 260;
-            _height.Velocity += 90;
-            EnsureRendering();
+            TriggerLiquidImpulse(280, 105, 30);
         }
     }
 
@@ -371,11 +436,21 @@ public partial class IslandWindow
         double h = Math.Max(1, _height.Value);
         double r = Math.Clamp(_radius.Value, 0, Math.Min(w, h) / 2);
         double offset = _settingsService?.Current.NotchYOffset ?? 0;
+        double liquid = IsReducedMotion ? 0.0 : Math.Clamp(_settingsService?.Current.LiquidIntensity ?? 0.65, 0.0, 1.0);
+
+        // Gooey squash-and-stretch velocity deformation (volume-conserving droplet physics)
+        double vx = Math.Clamp(_width.Velocity / 1600.0, -1.0, 1.0);
+        double vy = Math.Clamp(_height.Velocity / 1300.0, -1.0, 1.0);
+        double deformStrength = 0.14 * liquid;
+        double deformX = _width.IsAtRest && _height.IsAtRest ? 1.0 : Math.Clamp(1.0 + deformStrength * (vx - 0.45 * vy), 0.84, 1.20);
+        double deformY = _width.IsAtRest && _height.IsAtRest ? 1.0 : Math.Clamp(1.0 + deformStrength * (vy - 0.50 * vx), 0.84, 1.20);
 
         if (Math.Abs(w - _appliedWidth) < 0.005 &&
             Math.Abs(h - _appliedHeight) < 0.005 &&
             Math.Abs(r - _appliedRadius) < 0.005 &&
-            Math.Abs(offset - _appliedOffset) < 0.005)
+            Math.Abs(offset - _appliedOffset) < 0.005 &&
+            Math.Abs(PillDeformScale.ScaleX - deformX) < 0.002 &&
+            Math.Abs(PillDeformScale.ScaleY - deformY) < 0.002)
         {
             return;
         }
@@ -385,24 +460,42 @@ public partial class IslandWindow
         _appliedRadius = r;
         _appliedOffset = offset;
 
-        double topR = Math.Clamp(offset * 1.5, 0, r);
+        PillDeformScale.ScaleX = deformX;
+        PillDeformScale.ScaleY = deformY;
+
+        // Dynamic liquid droplet corner-rounding boost during high-velocity morphs
+        double motionEnergy = Math.Min(1.0, (Math.Abs(vx) + Math.Abs(vy)) * 0.65);
+        double effectiveR = Math.Clamp(r + (r * 0.22 * liquid * motionEnergy), 0, Math.Min(w, h) / 2);
+        double topR = Math.Clamp((offset * 1.5) + (effectiveR * 0.18 * liquid * motionEnergy), 0, effectiveR);
 
         Pill.Width = w;
         Pill.Height = h;
 
-        var corners = new CornerRadius(topR, topR, r, r);
+        // Smoothly expand/contract ExpandedPanel when morphing between normal Expanded (420x190) and Settings (480x336)
+        if (_machine.State == IslandState.Expanded && w >= 360 && h >= 160)
+        {
+            ExpandedPanel.Width = w;
+            ExpandedPanel.Height = h;
+        }
+        else
+        {
+            ExpandedPanel.Width = Math.Max(420, w);
+            ExpandedPanel.Height = Math.Max(190, h);
+        }
+
+        var corners = new CornerRadius(topR, topR, effectiveR, effectiveR);
         PillBackground.CornerRadius = corners;
         PillStroke.CornerRadius = corners;
         DropOverlay.CornerRadius = corners;
 
-        _contentClip.Rect = new Rect(0, topR > 0 ? 0 : -r, w, topR > 0 ? h : h + r);
-        _contentClip.RadiusX = r;
-        _contentClip.RadiusY = r;
+        _contentClip.Rect = new Rect(0, topR > 0 ? 0 : -effectiveR, w, topR > 0 ? h : h + effectiveR);
+        _contentClip.RadiusX = effectiveR;
+        _contentClip.RadiusY = effectiveR;
 
         PillGlow.Width = w + 56;
         PillGlow.Height = h + 32;
         double glowTopR = topR > 0 ? topR + 12 : 0;
-        PillGlow.CornerRadius = new CornerRadius(glowTopR, glowTopR, r + 12, r + 12);
+        PillGlow.CornerRadius = new CornerRadius(glowTopR, glowTopR, effectiveR + 12, effectiveR + 12);
     }
 
     private void UpdateLiveBars(double t)

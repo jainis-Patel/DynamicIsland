@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Dynamic Island"
-        Width="480" Height="240"
+        Width="660" Height="500"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False"
         Topmost="True" Focusable="False" AllowDrop="True"
@@ -14,7 +14,11 @@
         PreviewDragLeave="Window_PreviewDragLeave"
         PreviewDrop="Window_PreviewDrop">
 
-    <Grid x:Name="Root">
+    <Grid x:Name="Root" RenderTransformOrigin="0.5,0">
+        <Grid.RenderTransform>
+            <ScaleTransform x:Name="RootScaleTransform" ScaleX="1" ScaleY="1" />
+        </Grid.RenderTransform>
+
         <!-- Ambient halo / back-glow responding to media artwork accent and bass FFT (zero-shader radial falloff) -->
         <Border x:Name="PillGlow" HorizontalAlignment="Center" VerticalAlignment="Top"
                 Width="120" Height="28" Opacity="0" Visibility="Collapsed" IsHitTestVisible="False">
@@ -26,10 +30,14 @@
             </Border.Background>
         </Border>
 
-        <!-- The morphing pill. Width/Height/CornerRadius are driven per-frame by analytical springs. -->
+        <!-- The morphing pill. Width/Height/CornerRadius are driven per-frame by analytical springs + gooey deformation. -->
         <Grid x:Name="Pill" HorizontalAlignment="Center" VerticalAlignment="Top"
               Width="120" Height="28" Background="Transparent"
+              RenderTransformOrigin="0.5,0"
               PreviewMouseWheel="Pill_PreviewMouseWheel">
+            <Grid.RenderTransform>
+                <ScaleTransform x:Name="PillDeformScale" ScaleX="1" ScaleY="1" />
+            </Grid.RenderTransform>
 
             <!-- True OLED pitch-black capsule surface -->
             <Border x:Name="PillBackground" CornerRadius="0,0,14,14">
@@ -597,140 +605,226 @@
                                 </Grid>
                             </Grid>
 
-                            <!-- 5. Appearance & Notch Settings Container -->
+                            <!-- 5. Appearance, Liquid Physics & Notch Settings Container (Expands Island to 480x336) -->
                             <Grid x:Name="SettingsContainer" Visibility="Collapsed">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
 
-                                <DockPanel Grid.Row="0" Margin="0,0,0,5" LastChildFill="False">
-                                    <TextBlock Style="{StaticResource SectionTitle}" Text="Appearance &amp; Position" />
-                                    <Button x:Name="DndToggleBtn" Click="DndToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="7,0" Margin="8,0,0,0" ToolTip="Toggle Do Not Disturb (Silence Notification Toasts)">
-                                        <TextBlock x:Name="DndToggleText" Text="DND Off" FontSize="9.5" FontWeight="Medium" Foreground="{StaticResource SecondaryBrush}" />
+                                <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+                                    <TextBlock Style="{StaticResource SectionTitle}" Text="Settings &amp; Liquid Physics" VerticalAlignment="Center" />
+                                    <Button x:Name="ResetSettingsBtn" Click="ResetSettingsBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="5,0,0,0" ToolTip="Reset All Settings to Default">
+                                        <TextBlock Text="Reset" FontSize="9.5" FontWeight="Medium" Foreground="{StaticResource SecondaryBrush}" />
                                     </Button>
-                                    <TextBlock x:Name="SelectedThemeName" Text="Solar Amber" FontSize="10.5" Foreground="{StaticResource SecondaryBrush}" DockPanel.Dock="Right" VerticalAlignment="Center" />
+                                    <Button x:Name="LiquidPulseBtn" Click="LiquidPulseBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="6,0,0,0" ToolTip="Test Gooey Liquid Bounce Impulse">
+                                        <TextBlock Text="✦ Liquid Pulse" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                                    </Button>
+                                    <TextBlock x:Name="SelectedThemeName" Text="Solar Amber" FontSize="10" Foreground="{StaticResource SecondaryBrush}" DockPanel.Dock="Right" VerticalAlignment="Center" />
                                 </DockPanel>
 
-                                <Grid Grid.Row="1">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-
-                                    <Border Grid.Row="0" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,4" Margin="0,0,0,4">
-                                        <Grid>
+                                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+                                    <StackPanel>
+                                        <!-- Row 1: Gooey / Liquidy Physics & Animation Speed -->
+                                        <Grid Margin="0,0,0,5">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="42" />
+                                                <ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="Top Margin" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" Margin="0,0,12,0" />
-                                            <Slider x:Name="NotchOffsetSlider" Grid.Column="1" Style="{StaticResource IslandSlider}"
-                                                    Minimum="0" Maximum="45" Value="0" ValueChanged="NotchOffsetSlider_ValueChanged" />
-                                            <TextBlock x:Name="NotchOffsetText" Grid.Column="2" Style="{StaticResource Digits}"
-                                                       FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource SecondaryBrush}"
-                                                       HorizontalAlignment="Right" VerticalAlignment="Center" Text="0 px" />
+
+                                            <Border Grid.Column="0" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,5">
+                                                <StackPanel>
+                                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
+                                                        <TextBlock Text="Gooey &amp; Liquidy" FontSize="10.5" FontWeight="SemiBold" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                        <TextBlock x:Name="LiquidIntensityText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Text="65%" />
+                                                    </DockPanel>
+                                                    <Slider x:Name="LiquidIntensitySlider" Style="{StaticResource IslandSlider}"
+                                                            Minimum="0" Maximum="100" Value="65" ValueChanged="LiquidIntensitySlider_ValueChanged"
+                                                            ToolTip="Controls droplet bounce, overshoot, and gooey squash-and-stretch deformation" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <Border Grid.Column="2" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,5">
+                                                <StackPanel>
+                                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
+                                                        <TextBlock Text="Animation Speed" FontSize="10.5" FontWeight="SemiBold" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                        <TextBlock x:Name="AnimationSpeedText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource SecondaryBrush}" Text="100%" />
+                                                    </DockPanel>
+                                                    <Slider x:Name="AnimationSpeedSlider" Style="{StaticResource IslandSlider}"
+                                                            Minimum="50" Maximum="160" Value="100" ValueChanged="AnimationSpeedSlider_ValueChanged"
+                                                            ToolTip="Controls how fast or syrupy the island morphs (50% slow liquid to 160% snappy)" />
+                                                </StackPanel>
+                                            </Border>
                                         </Grid>
-                                    </Border>
 
-                                    <Grid Grid.Row="1" Margin="0,0,0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="8" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
+                                        <!-- Row 2: Island Size Scale, Top Margin & Glass Opacity -->
+                                        <Grid Margin="0,0,0,5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
 
-                                        <Border Grid.Column="0" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,4">
+                                            <Border Grid.Column="0" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="9,5">
+                                                <StackPanel>
+                                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
+                                                        <TextBlock Text="Island Size" FontSize="10.5" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                        <TextBlock x:Name="IslandScaleText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource SecondaryBrush}" Text="100%" />
+                                                    </DockPanel>
+                                                    <Slider x:Name="IslandScaleSlider" Style="{StaticResource IslandSlider}"
+                                                            Minimum="85" Maximum="125" Value="100" ValueChanged="IslandScaleSlider_ValueChanged"
+                                                            ToolTip="Scales the overall size of Dynamic Island (85% to 125%)" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <Border Grid.Column="2" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="9,5">
+                                                <StackPanel>
+                                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
+                                                        <TextBlock Text="Top Margin" FontSize="10.5" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                        <TextBlock x:Name="NotchOffsetText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource SecondaryBrush}" Text="0 px" />
+                                                    </DockPanel>
+                                                    <Slider x:Name="NotchOffsetSlider" Style="{StaticResource IslandSlider}"
+                                                            Minimum="0" Maximum="45" Value="0" ValueChanged="NotchOffsetSlider_ValueChanged"
+                                                            ToolTip="Vertical distance from the top edge of the monitor" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <Border Grid.Column="4" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="9,5">
+                                                <StackPanel>
+                                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
+                                                        <TextBlock Text="Glass Opacity" FontSize="10.5" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                        <TextBlock x:Name="BackdropOpacityText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource SecondaryBrush}" Text="100%" />
+                                                    </DockPanel>
+                                                    <Slider x:Name="BackdropOpacitySlider" Style="{StaticResource IslandSlider}"
+                                                            Minimum="65" Maximum="100" Value="100" ValueChanged="BackdropOpacitySlider_ValueChanged"
+                                                            ToolTip="Adjusts capsule surface from translucent dark glass (65%) to pitch-black OLED (100%)" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+
+                                        <!-- Row 3: Screen Alignment & Display / Halo -->
+                                        <Grid Margin="0,0,0,5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Border Grid.Column="0" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,4">
+                                                <DockPanel LastChildFill="False">
+                                                    <TextBlock Text="Align" FontSize="10.5" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                        <Button x:Name="DockLeftBtn" Click="DockButton_Click" Tag="Left" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
+                                                            <TextBlock Text="Left" FontSize="9.5" />
+                                                        </Button>
+                                                        <Button x:Name="DockCenterBtn" Click="DockButton_Click" Tag="Center" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
+                                                            <TextBlock Text="Center" FontSize="9.5" />
+                                                        </Button>
+                                                        <Button x:Name="DockRightBtn" Click="DockButton_Click" Tag="Right" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0">
+                                                            <TextBlock Text="Right" FontSize="9.5" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Border>
+
+                                            <Border Grid.Column="2" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,4">
+                                                <DockPanel LastChildFill="False">
+                                                    <TextBlock Text="Display" FontSize="10.5" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                        <Button x:Name="MonitorSwitchBtn" Click="MonitorSwitchBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,4,0" ToolTip="Switch Monitor">
+                                                            <TextBlock x:Name="MonitorSwitchText" Text="Screen 1" FontSize="9.5" FontWeight="Medium" Foreground="#F5F5F7" />
+                                                        </Button>
+                                                        <Button x:Name="HaloToggleBtn" Click="HaloToggleBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0" ToolTip="Toggle Ambient Halo">
+                                                            <TextBlock x:Name="HaloToggleText" Text="Glow On" FontSize="9.5" FontWeight="Medium" Foreground="#30D158" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Border>
+                                        </Grid>
+
+                                        <!-- Row 4: Notifications, Motion Mode & Windows Startup Quick-Toggles -->
+                                        <Border Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,4" Margin="0,0,0,5">
                                             <DockPanel LastChildFill="False">
-                                                <TextBlock Text="Align" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                <TextBlock Text="Behavior" FontSize="10.5" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
                                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                                    <Button x:Name="DockLeftBtn" Click="DockButton_Click" Tag="Left" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
-                                                        <TextBlock Text="Left" FontSize="9.5" />
+                                                    <Button x:Name="DndToggleBtn" Click="DndToggleBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,4,0" ToolTip="Toggle Do Not Disturb (Silence Notification Toasts)">
+                                                        <TextBlock x:Name="DndToggleText" Text="DND Off" FontSize="9.5" FontWeight="Medium" Foreground="{StaticResource SecondaryBrush}" />
                                                     </Button>
-                                                    <Button x:Name="DockCenterBtn" Click="DockButton_Click" Tag="Center" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
-                                                        <TextBlock Text="Center" FontSize="9.5" />
+                                                    <Button x:Name="BannerModeBtn" Click="BannerModeBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,4,0" ToolTip="Show Notifications in Island Only (Dismiss Native Windows Popups)">
+                                                        <TextBlock x:Name="BannerModeText" Text="Island Only" FontSize="9.5" FontWeight="Medium" Foreground="#30D158" />
                                                     </Button>
-                                                    <Button x:Name="DockRightBtn" Click="DockButton_Click" Tag="Right" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0">
-                                                        <TextBlock Text="Right" FontSize="9.5" />
+                                                    <Button x:Name="MotionModeBtn" Click="MotionModeBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,4,0" ToolTip="Toggle between Gooey Liquid Physics and Reduced Motion">
+                                                        <TextBlock x:Name="MotionModeText" Text="Liquid Motion" FontSize="9.5" FontWeight="Medium" Foreground="#30D158" />
+                                                    </Button>
+                                                    <Button x:Name="StartupToggleBtn" Click="StartupToggleBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0" ToolTip="Launch Dynamic Island Automatically at Windows Sign-In">
+                                                        <TextBlock x:Name="StartupToggleText" Text="Startup Off" FontSize="9.5" FontWeight="Medium" Foreground="{StaticResource SecondaryBrush}" />
                                                     </Button>
                                                 </StackPanel>
                                             </DockPanel>
                                         </Border>
 
-                                        <Border Grid.Column="2" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,4">
+                                        <!-- Row 5: Accent Color Swatches -->
+                                        <Border Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,5">
                                             <DockPanel LastChildFill="False">
-                                                <TextBlock Text="Display" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
-                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                                    <Button x:Name="MonitorSwitchBtn" Click="MonitorSwitchBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,4,0" ToolTip="Switch Monitor">
-                                                        <TextBlock x:Name="MonitorSwitchText" Text="Screen 1" FontSize="9.5" FontWeight="Medium" Foreground="#F5F5F7" />
+                                                <TextBlock Text="Accent Theme" FontSize="10.5" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button Click="ThemeSwatch_Click" Tag="Solar Amber" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#FF9F0A" BorderThickness="0" Cursor="Hand" ToolTip="Solar Amber">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
+                                                            </ControlTemplate>
+                                                        </Button.Template>
                                                     </Button>
-                                                    <Button x:Name="HaloToggleBtn" Click="HaloToggleBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0" ToolTip="Toggle Ambient Halo">
-                                                        <TextBlock x:Name="HaloToggleText" Text="Glow On" FontSize="9.5" FontWeight="Medium" Foreground="#30D158" />
+                                                    <Button Click="ThemeSwatch_Click" Tag="Apple Neon" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#0A84FF" BorderThickness="0" Cursor="Hand" ToolTip="Apple Neon">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                    </Button>
+                                                    <Button Click="ThemeSwatch_Click" Tag="Cyberpunk Cyan" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#00F0FF" BorderThickness="0" Cursor="Hand" ToolTip="Cyberpunk Cyan">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                    </Button>
+                                                    <Button Click="ThemeSwatch_Click" Tag="Emerald Green" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#30D158" BorderThickness="0" Cursor="Hand" ToolTip="Emerald Green">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                    </Button>
+                                                    <Button Click="ThemeSwatch_Click" Tag="Monochrome Frost" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#E5E5EA" BorderThickness="0" Cursor="Hand" ToolTip="Monochrome Frost">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                    </Button>
+                                                    <Button Click="ThemeSwatch_Click" Tag="Purple Haze" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#BF5AF2" BorderThickness="0" Cursor="Hand" ToolTip="Purple Haze">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                    </Button>
+                                                    <Button Click="ThemeSwatch_Click" Tag="Windows Accent" Width="15" Height="15" Margin="0" Padding="0" Background="#0078D4" BorderThickness="0" Cursor="Hand" ToolTip="Follow Windows Accent Color">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Ellipse Fill="{TemplateBinding Background}" Stroke="#90FFFFFF" StrokeThickness="1.5" />
+                                                            </ControlTemplate>
+                                                        </Button.Template>
                                                     </Button>
                                                 </StackPanel>
                                             </DockPanel>
                                         </Border>
-                                    </Grid>
-
-                                    <Border Grid.Row="2" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,5">
-                                        <DockPanel LastChildFill="False">
-                                            <TextBlock Text="Accent Color" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
-                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Button Click="ThemeSwatch_Click" Tag="Solar Amber" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#FF9F0A" BorderThickness="0" Cursor="Hand" ToolTip="Solar Amber">
-                                                    <Button.Template>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
-                                                        </ControlTemplate>
-                                                    </Button.Template>
-                                                </Button>
-                                                <Button Click="ThemeSwatch_Click" Tag="Apple Neon" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#0A84FF" BorderThickness="0" Cursor="Hand" ToolTip="Apple Neon">
-                                                    <Button.Template>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
-                                                        </ControlTemplate>
-                                                    </Button.Template>
-                                                </Button>
-                                                <Button Click="ThemeSwatch_Click" Tag="Cyberpunk Cyan" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#00F0FF" BorderThickness="0" Cursor="Hand" ToolTip="Cyberpunk Cyan">
-                                                    <Button.Template>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
-                                                        </ControlTemplate>
-                                                    </Button.Template>
-                                                </Button>
-                                                <Button Click="ThemeSwatch_Click" Tag="Emerald Green" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#30D158" BorderThickness="0" Cursor="Hand" ToolTip="Emerald Green">
-                                                    <Button.Template>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
-                                                        </ControlTemplate>
-                                                    </Button.Template>
-                                                </Button>
-                                                <Button Click="ThemeSwatch_Click" Tag="Monochrome Frost" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#E5E5EA" BorderThickness="0" Cursor="Hand" ToolTip="Monochrome Frost">
-                                                    <Button.Template>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
-                                                        </ControlTemplate>
-                                                    </Button.Template>
-                                                </Button>
-                                                <Button Click="ThemeSwatch_Click" Tag="Purple Haze" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#BF5AF2" BorderThickness="0" Cursor="Hand" ToolTip="Purple Haze">
-                                                    <Button.Template>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
-                                                        </ControlTemplate>
-                                                    </Button.Template>
-                                                </Button>
-                                                <Button Click="ThemeSwatch_Click" Tag="Windows Accent" Width="15" Height="15" Margin="0" Padding="0" Background="#0078D4" BorderThickness="0" Cursor="Hand" ToolTip="Follow Windows Accent Color">
-                                                    <Button.Template>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Ellipse Fill="{TemplateBinding Background}" Stroke="#90FFFFFF" StrokeThickness="1.5" />
-                                                        </ControlTemplate>
-                                                    </Button.Template>
-                                                </Button>
-                                            </StackPanel>
-                                        </DockPanel>
-                                    </Border>
-                                </Grid>
+                                    </StackPanel>
+                                </ScrollViewer>
                             </Grid>
 
                             <!-- 6. Audio Output Switcher Container -->

@@ -84,6 +84,12 @@ internal static class SelfTestRunner
         for (int i = 0; i < 90; i++) s60.Step(1.0 / 60.0);
         Assert(s60.IsAtRest, "Spring did not settle to rest after 1.6s");
         Assert(Math.Abs(s60.Value - 420) < 0.001, $"Spring settled at wrong target: {s60.Value}");
+
+        // Verify gooey liquid parameter mapping: higher LiquidIntensity lowers damping (more liquid overshoot)
+        var (stiffCrisp, dampCrisp) = IslandWindow.ComputeSpringParameters(0.0, 1.0, reducedMotion: false);
+        var (stiffLiquid, dampLiquid) = IslandWindow.ComputeSpringParameters(1.0, 1.0, reducedMotion: false);
+        Assert(Math.Abs(stiffCrisp - stiffLiquid) < 1e-6 && dampLiquid < dampCrisp,
+            "100% LiquidIntensity must produce lower damping (more liquid bounce) than 0%");
     }
 
     private static void TestSpringStalledFrame()
@@ -240,6 +246,10 @@ internal static class SelfTestRunner
                 s.NotchYOffset = 14;
                 s.DoNotDisturb = true;
                 s.MonitorDeviceName = @"\\.\DISPLAY2";
+                s.LiquidIntensity = 0.85;
+                s.AnimationSpeed = 1.25;
+                s.IslandScale = 1.15;
+                s.BackdropOpacity = 0.80;
             }, nameof(AppSettings.NotchYOffset));
 
             Assert(lastChangedProp == nameof(AppSettings.NotchYOffset), $"Expected PropertyChanged 'NotchYOffset', got '{lastChangedProp}'");
@@ -251,6 +261,10 @@ internal static class SelfTestRunner
             Assert(Math.Abs(reloaded.Current.NotchYOffset - 14) < 0.001, $"Expected NotchYOffset 14, got {reloaded.Current.NotchYOffset}");
             Assert(reloaded.Current.DoNotDisturb, "Expected DoNotDisturb=true after reload");
             Assert(reloaded.Current.MonitorDeviceName == @"\\.\DISPLAY2", "Expected MonitorDeviceName persisted");
+            Assert(Math.Abs(reloaded.Current.LiquidIntensity - 0.85) < 0.001, "Expected LiquidIntensity 0.85 persisted");
+            Assert(Math.Abs(reloaded.Current.AnimationSpeed - 1.25) < 0.001, "Expected AnimationSpeed 1.25 persisted");
+            Assert(Math.Abs(reloaded.Current.IslandScale - 1.15) < 0.001, "Expected IslandScale 1.15 persisted");
+            Assert(Math.Abs(reloaded.Current.BackdropOpacity - 0.80) < 0.001, "Expected BackdropOpacity 0.80 persisted");
         }
         finally
         {
