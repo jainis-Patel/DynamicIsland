@@ -20,6 +20,39 @@ public static class Program
             return 0;
         }
 
+        // Check for Silent or GUI Uninstall Mode
+        if (Core.InstallerService.IsUninstallMode(args))
+        {
+            if (Core.InstallerService.IsSilent(args))
+            {
+                Core.InstallerService.Uninstall(removeUserData: false, out _);
+                return 0;
+            }
+
+            App.StartupMode = InstallerStartupMode.Uninstall;
+            RunApp();
+            return 0;
+        }
+
+        // Check for Silent or GUI Setup/Install Mode
+        if (Core.InstallerService.IsInstallerMode(args))
+        {
+            if (Core.InstallerService.IsSilent(args))
+            {
+                Core.InstallerService.Install(
+                    targetDir: null,
+                    createDesktopShortcut: true,
+                    createStartMenuShortcut: true,
+                    autoStartOnBoot: true,
+                    out _);
+                return 0;
+            }
+
+            App.StartupMode = InstallerStartupMode.Setup;
+            RunApp();
+            return 0;
+        }
+
         App.Log("Program.Main started.");
 
         var currentDesktopName = GetCurrentDesktopName();

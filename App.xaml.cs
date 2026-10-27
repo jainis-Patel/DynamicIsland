@@ -7,8 +7,17 @@ using static DynamicIsland.Interop.NativeMethods;
 
 namespace DynamicIsland;
 
+public enum InstallerStartupMode
+{
+    Normal,
+    Setup,
+    Uninstall
+}
+
 public partial class App : Application
 {
+    public static InstallerStartupMode StartupMode { get; set; } = InstallerStartupMode.Normal;
+
     private static readonly string LogFile = AppPaths.LogFile;
     private const long MaxLogSizeBytes = 512 * 1024; // Cap log file at 512 KB
 
@@ -116,6 +125,26 @@ public partial class App : Application
             FlushLogs();
             args.Handled = true;
         };
+
+        if (StartupMode == InstallerStartupMode.Setup)
+        {
+            Log("App started in Setup Wizard mode.");
+            base.OnStartup(e);
+            var setupWin = new Views.SetupWindow();
+            MainWindow = setupWin;
+            setupWin.Show();
+            return;
+        }
+
+        if (StartupMode == InstallerStartupMode.Uninstall)
+        {
+            Log("App started in Uninstall mode.");
+            base.OnStartup(e);
+            var uninstallWin = new Views.UninstallWindow();
+            MainWindow = uninstallWin;
+            uninstallWin.Show();
+            return;
+        }
 
         _singleInstance = new Mutex(true, @"Local\DynamicIsland.SingleInstance", out _ownsMutex);
         if (!_ownsMutex)

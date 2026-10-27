@@ -63,6 +63,7 @@ internal static class SelfTestRunner
         Run("ClipboardHistoryService: DPAPI encryption round-trip & pinned clip eviction resistance", TestClipboardDpapiAndPinning);
         Run("DropShelfService & SettingsService: One-click ZIP bundle creation & settings export/import", TestDropShelfZipAndSettingsBackup);
         Run("NetworkService & PeripheralDeviceService: Netsh Wi-Fi SSID parsing, signal tiers & Bluetooth states", TestWifiParserAndPeripheralStatus);
+        Run("InstallerService: CLI argument routing, path resolution & shortcut synthesis", TestInstallerService);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -693,5 +694,42 @@ SSID 3 : Home_Router
         };
         Assert(connBt.IsLowBattery && connBt.RightHeaderText == "15%" && connBt.CardOpacity == 1.0,
             "Connected low-battery peripheral must have IsLowBattery == true");
+    }
+
+    private static void TestInstallerService()
+    {
+        // CLI argument and binary name detection
+        Assert(InstallerService.IsInstallerMode(new[] { "--install" }, @"C:\App\DynamicIsland.exe"), "--install must trigger installer mode");
+        Assert(InstallerService.IsInstallerMode(new[] { "/install" }, @"C:\App\DynamicIsland.exe"), "/install must trigger installer mode");
+        Assert(InstallerService.IsInstallerMode(new[] { "-i" }, @"C:\App\DynamicIsland.exe"), "-i must trigger installer mode");
+        Assert(InstallerService.IsInstallerMode(Array.Empty<string>(), @"C:\Downloads\DynamicIsland-Setup.exe"), "Binary named Setup must trigger installer mode");
+        Assert(!InstallerService.IsInstallerMode(new[] { "--other" }, @"C:\App\DynamicIsland.exe"), "Generic argument with DynamicIsland.exe must not trigger installer mode");
+        Assert(InstallerService.IsUninstallMode(new[] { "--uninstall" }), "--uninstall must trigger uninstall mode");
+        Assert(InstallerService.IsSilent(new[] { "--silent" }), "--silent flag must be recognized");
+        Assert(InstallerService.IsSilent(new[] { "/S" }), "/S flag must be recognized");
+
+        // Path resolution
+        string installDir = InstallerService.GetDefaultInstallDir();
+        Assert(installDir.Contains("DynamicIsland", StringComparison.OrdinalIgnoreCase), "Install dir must contain DynamicIsland");
+        string exePath = InstallerService.GetInstalledExePath();
+        Assert(exePath.EndsWith("DynamicIsland.exe", StringComparison.OrdinalIgnoreCase), "Installed exe path must end with DynamicIsland.exe");
+
+        // Shortcut creation in temp directory
+        string tempDir = Path.Combine(Path.GetTempPath(), $"di_shortcut_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            string dummyTarget = Path.Combine(tempDir, "test_target.exe");
+            File.WriteAllText(dummyTarget, "dummy");
+            string shortcutPath = Path.Combine(tempDir, "TestShortcut.lnk");
+
+            bool ok = InstallerService.CreateShortcut(shortcutPath, dummyTarget, "Test Description");
+            Assert(ok && File.Exists(shortcutPath), "InstallerService.CreateShortcut must successfully generate a .lnk file");
+            Assert(new FileInfo(shortcutPath).Length > 0, "Shortcut file must not be 0 bytes");
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, recursive: true); } catch { }
+        }
     }
 }
