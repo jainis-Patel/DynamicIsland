@@ -186,15 +186,15 @@
     <!-- Apple Segmented Dock Tool Pill -->
     <Style x:Key="DockToolButton" TargetType="Button" BasedOn="{StaticResource IslandButton}">
         <Setter Property="Height" Value="26" />
-        <Setter Property="Padding" Value="8,0" />
-        <Setter Property="Margin" Value="0,0,3,0" />
+        <Setter Property="Padding" Value="6.5,0" />
+        <Setter Property="Margin" Value="0,0,2.5,0" />
         <Setter Property="Foreground" Value="#E5E5EA" />
         <Setter Property="Background" Value="#12FFFFFF" />
     </Style>
 
     <!-- Compact Dock Icon Pill -->
     <Style x:Key="DockIconButton" TargetType="Button" BasedOn="{StaticResource DockToolButton}">
-        <Setter Property="Width" Value="28" />
+        <Setter Property="Width" Value="26" />
         <Setter Property="Height" Value="26" />
         <Setter Property="Padding" Value="0" />
     </Style>

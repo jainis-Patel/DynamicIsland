@@ -22,7 +22,7 @@ public partial class IslandWindow : Window
         [IslandState.Idle] = new(120, 28, 14),
         [IslandState.Compact] = new(220, 34, 17),
         [IslandState.Toast] = new(320, 56, 26),
-        [IslandState.Expanded] = new(420, 190, 32),
+        [IslandState.Expanded] = new(452, 190, 32),
         [IslandState.Hidden] = new(120, 28, 14),
     };
 

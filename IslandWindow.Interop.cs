@@ -26,6 +26,7 @@ public partial class IslandWindow
     private const int HotkeyPeripherals = 10;
     private const int HotkeyNetwork = 11;
     private const int HotkeyNotifications = 12;
+    private const int HotkeySettings = 13;
 
     private static readonly (int Id, string KeyName, uint DefaultVk)[] HotKeyBindings =
     {
@@ -41,6 +42,7 @@ public partial class IslandWindow
         (HotkeyPeripherals, "Peripherals", 0x44),     // VK_D
         (HotkeyNetwork, "Network", 0x57),             // VK_W
         (HotkeyNotifications, "Notifications", 0x4E), // VK_N
+        (HotkeySettings, "Settings", 0x53),           // VK_S
     };
 
     private readonly Dictionary<string, bool> _hotkeyRegistrationStatus = new(StringComparer.OrdinalIgnoreCase);
@@ -181,14 +183,21 @@ public partial class IslandWindow
             }
 
             case WM_MOUSEHWHEEL:
+            {
+                short tilt = unchecked((short)((wParam.ToInt64() >> 16) & 0xFFFF));
                 if (_machine.State != IslandState.Expanded)
                 {
-                    short tilt = unchecked((short)((wParam.ToInt64() >> 16) & 0xFFFF));
                     if (tilt > 0) _mediaService.Next();
                     else if (tilt < 0) _mediaService.Previous();
                     handled = true;
                 }
+                else if (DockScrollViewer != null)
+                {
+                    DockScrollViewer.ScrollToHorizontalOffset(DockScrollViewer.HorizontalOffset + (tilt * 0.65));
+                    handled = true;
+                }
                 break;
+            }
 
             case WM_HOTKEY:
                 OnHotKey(wParam.ToInt32());
@@ -472,6 +481,7 @@ public partial class IslandWindow
             case HotkeyPeripherals: SwitchExpandedView(ExpandedView.Peripherals); break;
             case HotkeyNetwork: SwitchExpandedView(ExpandedView.Network); break;
             case HotkeyNotifications: SwitchExpandedView(ExpandedView.Notifications); break;
+            case HotkeySettings: SwitchExpandedView(ExpandedView.Settings); break;
             case HotkeyQuit: Application.Current.Shutdown(); break;
         }
     }

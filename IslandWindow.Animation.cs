@@ -517,7 +517,7 @@ public partial class IslandWindow
         Pill.Width = w;
         Pill.Height = h;
 
-        // Smoothly expand/contract ExpandedPanel when morphing between normal Expanded (420x190) and Settings (480x336)
+        // Smoothly expand/contract ExpandedPanel when morphing between normal Expanded (452x190) and Settings (480x336)
         if (_machine.State == IslandState.Expanded && w >= 360 && h >= 160)
         {
             ExpandedPanel.Width = w;
@@ -525,7 +525,7 @@ public partial class IslandWindow
         }
         else
         {
-            ExpandedPanel.Width = Math.Max(420, w);
+            ExpandedPanel.Width = Math.Max(452, w);
             ExpandedPanel.Height = Math.Max(190, h);
         }
 

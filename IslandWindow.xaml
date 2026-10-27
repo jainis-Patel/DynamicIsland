@@ -210,8 +210,8 @@
                     </Grid>
                 </Grid>
 
-                <!-- ── Expanded Interactive Surface (420x190) ───────── -->
-                <Grid x:Name="ExpandedPanel" Width="420" Height="190"
+                <!-- ── Expanded Interactive Surface (452x190) ───────── -->
+                <Grid x:Name="ExpandedPanel" Width="452" Height="190"
                       HorizontalAlignment="Center" VerticalAlignment="Top">
                     <Grid Margin="16,13,16,11">
                         <Grid.RowDefinitions>
@@ -1544,25 +1544,30 @@
                         <!-- Subtle 1px Hairline Divider Separating View Content from Bottom Dock -->
                         <Border Grid.Row="1" Height="1" Background="#14FFFFFF" Margin="0,6,0,5" />
 
-                        <!-- Bottom Row: Symmetrical Apple Segmented Dock (all 10 items + Collapse fit simultaneously with zero scrolling) -->
-                        <DockPanel Grid.Row="2" VerticalAlignment="Center" Height="26" LastChildFill="True">
-                            <!-- Right: Collapse Chevron -->
+                        <!-- Bottom Row: Symmetrical Apple Segmented Dock (Settings + Collapse pinned right, all items fit simultaneously + scrollable) -->
+                        <DockPanel Grid.Row="2" VerticalAlignment="Center" Height="26" LastChildFill="True" Background="Transparent">
+                            <!-- Right: Always-Visible Settings Gear & Collapse Chevron -->
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Border Width="1" Height="14" Background="#1CFFFFFF" Margin="4,0,6,0" VerticalAlignment="Center" />
+                                <Border Width="1" Height="14" Background="#1CFFFFFF" Margin="3,0,5,0" VerticalAlignment="Center" />
+                                <Button x:Name="SettingsButton" AutomationProperties.Name="Appearance and Settings" Style="{StaticResource DockIconButton}"
+                                        Margin="0,0,3,0" ToolTip="Appearance &amp; Settings (Ctrl+Alt+S)">
+                                    <TextBlock Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE713;" />
+                                </Button>
                                 <Button x:Name="CollapseButton" AutomationProperties.Name="Collapse Dynamic Island" Click="CollapseButton_Click" Style="{StaticResource DockIconButton}"
-                                        ToolTip="Collapse (Esc)">
+                                        Margin="0" ToolTip="Collapse (Esc)">
                                     <TextBlock Style="{StaticResource Glyph}" FontSize="10" Text="&#xE70E;" />
                                 </Button>
                             </StackPanel>
 
                             <!-- Center/Left: Segmented View Switcher Pills -->
                             <ScrollViewer x:Name="DockScrollViewer"
+                                          Background="Transparent"
                                           HorizontalScrollBarVisibility="Hidden"
                                           VerticalScrollBarVisibility="Disabled"
                                           PanningMode="HorizontalOnly"
                                           PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel"
                                           VerticalAlignment="Center">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Background="Transparent">
                                     <!-- Now Playing / Home -->
                                     <Button x:Name="MediaHomeButton" AutomationProperties.Name="Now Playing and Stopwatch" Style="{StaticResource DockIconButton}" ToolTip="Now Playing &amp; Stopwatch">
                                         <TextBlock Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE8D6;" />
@@ -1631,11 +1636,6 @@
                                     <!-- Mic Mute -->
                                     <Button x:Name="MicMuteButton" AutomationProperties.Name="Toggle Microphone Mute" Style="{StaticResource DockIconButton}" ToolTip="Toggle Microphone Mute">
                                         <TextBlock x:Name="MicMuteGlyph" Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE720;" />
-                                    </Button>
-
-                                    <!-- Appearance & Settings -->
-                                    <Button x:Name="SettingsButton" AutomationProperties.Name="Appearance and Settings" Style="{StaticResource DockIconButton}" ToolTip="Appearance &amp; Settings">
-                                        <TextBlock Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE713;" />
                                     </Button>
                                 </StackPanel>
                             </ScrollViewer>
