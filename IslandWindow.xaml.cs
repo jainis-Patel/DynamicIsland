@@ -79,6 +79,7 @@ public partial class IslandWindow : Window
     private readonly ObservableCollection<AppAudioSessionInfo> _audioAppSessions = new();
     private readonly ObservableCollection<PeripheralDeviceInfo> _peripheralDevices = new();
     private readonly ObservableCollection<NotificationHistoryItem> _notificationHistoryItems = new();
+    private readonly ObservableCollection<WifiNetworkInfo> _wifiNetworks = new();
 
     // Services (managed via _services container)
     private readonly MediaSessionService _mediaService;
@@ -175,6 +176,7 @@ public partial class IslandWindow : Window
         AudioAppSessionsControl.ItemsSource = _audioAppSessions;
         PeripheralsItemsControl.ItemsSource = _peripheralDevices;
         NotificationsItemsControl.ItemsSource = _notificationHistoryItems;
+        WifiNetworksItemsControl.ItemsSource = _wifiNetworks;
 
         _machine.StateChanged += OnStateChanged;
         _machine.ToastChanged += OnToastChanged;
@@ -240,6 +242,7 @@ public partial class IslandWindow : Window
         _countdownService.StateChanged += RefreshStopwatchUI;
         _countdownService.Completed += OnCountdownCompleted;
         _networkService.Updated += OnNetworkUpdated;
+        _networkService.WifiNetworksChanged += OnWifiNetworksChanged;
         _networkService.ConnectivityAlert += toast => _machine.PushToast(toast);
         _weatherService.Updated += OnWeatherUpdated;
         _calendarService.Updated += OnCalendarUpdated;

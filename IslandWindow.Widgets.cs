@@ -16,6 +16,7 @@ public partial class IslandWindow
     private Point _dragStartPoint;
     private string? _recordingHotkeyAction;
     private bool _isAudioAppMixerMode;
+    private bool _isWifiScannerMode;
 
     // ═════════════════════════════════════════════════════════════════
     //  View Navigation & Dock Strip
@@ -1797,7 +1798,7 @@ public partial class IslandWindow
             _machine.PushToast(new ToastContent(
                 "\uE72C",
                 "Peripherals Refreshed",
-                $"{_peripheralService.ConnectedCount} devices found",
+                $"{_peripheralService.ConnectedCount} connected · {_peripheralService.Devices.Count} paired",
                 ThemeBrushes.BlueColor,
                 TimeSpan.FromSeconds(2.0),
                 TargetView: "peripherals",
@@ -1808,6 +1809,49 @@ public partial class IslandWindow
         {
             App.Log($"[Peripherals] Refresh failed: {ex.Message}");
         }
+    }
+
+    private void OpenBluetoothSettingsBtn_Click(object sender, RoutedEventArgs e)
+    {
+        PeripheralDeviceService.OpenBluetoothSettings();
+    }
+
+    private async void PeripheralCard_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: PeripheralDeviceInfo dev }) return;
+        e.Handled = true;
+
+        // Check if this Bluetooth device matches an audio output endpoint
+        var audioMatch = _audioEndpointService.Endpoints.FirstOrDefault(ep =>
+            ep.Name.Contains(dev.Name, StringComparison.OrdinalIgnoreCase) ||
+            dev.Name.Contains(ep.Name, StringComparison.OrdinalIgnoreCase));
+
+        if (audioMatch != null && !audioMatch.IsDefault)
+        {
+            _audioEndpointService.SetDefaultEndpoint(audioMatch.Id);
+            _machine.PushToast(new ToastContent(
+                dev.Glyph,
+                "Audio Routed",
+                $"Switched output to {dev.Name}",
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(2.2),
+                TargetView: "peripherals",
+                Priority: ToastPriority.Feedback,
+                Category: "audiodevice"));
+            return;
+        }
+
+        _machine.PushToast(new ToastContent(
+            dev.Glyph,
+            dev.IsConnected ? dev.Name : $"Connecting {dev.Name}...",
+            dev.IsConnected ? dev.BatteryStatusText : "Waking paired Bluetooth peripheral",
+            ThemeBrushes.BlueColor,
+            TimeSpan.FromSeconds(2.2),
+            TargetView: "peripherals",
+            Priority: ToastPriority.Feedback,
+            Category: "peripherals"));
+
+        await _peripheralService.ConnectDeviceAsync(dev);
     }
 
     // ═════════════════════════════════════════════════════════════════
@@ -1951,8 +1995,58 @@ public partial class IslandWindow
 
     private void WifiNetworksCard_Click(object sender, MouseButtonEventArgs e)
     {
-        NetworkService.OpenAvailableNetworksFlyout();
+        SetWifiScannerMode(true);
         e.Handled = true;
+    }
+
+    private void ScanWifiModeBtn_Click(object sender, RoutedEventArgs e)
+    {
+        SetWifiScannerMode(!_isWifiScannerMode);
+    }
+
+    private async void SetWifiScannerMode(bool scannerMode)
+    {
+        _isWifiScannerMode = scannerMode;
+        if (NetworkSectionTitle != null)
+        {
+            NetworkSectionTitle.Text = _isWifiScannerMode ? "Available Wi-Fi Networks" : "Wi-Fi & Connectivity";
+        }
+        if (ScanWifiModeText != null)
+        {
+            ScanWifiModeText.Text = _isWifiScannerMode ? "← Overview" : "Scan SSIDs";
+        }
+        if (NetworkOverviewHost != null && WifiScannerHost != null)
+        {
+            NetworkOverviewHost.Visibility = _isWifiScannerMode ? Visibility.Collapsed : Visibility.Visible;
+            WifiScannerHost.Visibility = _isWifiScannerMode ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        if (_isWifiScannerMode)
+        {
+            await _networkService.ScanWifiNetworksAsync();
+        }
+    }
+
+    private void OnWifiNetworksChanged(IReadOnlyList<WifiNetworkInfo> networks)
+    {
+        SyncObservableCollection(_wifiNetworks, networks);
+    }
+
+    private async void WifiNetworkCard_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: WifiNetworkInfo net }) return;
+        e.Handled = true;
+
+        var (ok, msg) = await _networkService.ConnectWifiNetworkAsync(net);
+        _machine.PushToast(new ToastContent(
+            net.Glyph,
+            ok ? net.Ssid : "Wi-Fi Authentication",
+            msg,
+            ok ? ThemeBrushes.GreenColor : ThemeBrushes.AmberColor,
+            TimeSpan.FromSeconds(2.5),
+            TargetView: "network",
+            Priority: ToastPriority.Feedback,
+            Category: "wifi"));
     }
 
     private void HotspotCard_Click(object sender, MouseButtonEventArgs e)

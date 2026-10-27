@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Windows.Media;
 using System.Windows.Threading;
 using DynamicIsland.Core;
+using Windows.Devices.Bluetooth;
 using Windows.Devices.Enumeration;
 using static DynamicIsland.Interop.NativeMethods;
 
@@ -17,32 +19,43 @@ public sealed class PeripheralDeviceInfo
     public bool IsConnected { get; set; }
     public bool IsSimulated { get; set; }
 
-    public bool IsLowBattery => BatteryPercent.HasValue && BatteryPercent.Value <= 20;
+    public bool IsLowBattery => IsConnected && BatteryPercent.HasValue && BatteryPercent.Value <= 20;
 
     public string BatteryStatusText
     {
         get
         {
+            if (!IsConnected)
+                return "Paired · Click to connect";
             if (!BatteryPercent.HasValue)
-                return IsConnected ? "Connected" : "Disconnected";
+                return "Connected";
             if (IsCharging)
                 return $"Charging · {BatteryPercent}%";
             return $"{BatteryPercent}% Remaining";
         }
     }
 
+    public string RightHeaderText => IsConnected
+        ? (BatteryPercent.HasValue ? $"{BatteryPercent}%" : "Active")
+        : "Connect";
+
+    public double CardOpacity => IsConnected ? 1.0 : 0.80;
+
     public Brush BatteryBrush
     {
         get
         {
-            if (!BatteryPercent.HasValue) return ThemeBrushes.SecondaryText;
+            if (!IsConnected) return ThemeBrushes.Blue;
+            if (!BatteryPercent.HasValue) return ThemeBrushes.Green;
             if (BatteryPercent.Value <= 20) return ThemeBrushes.Red;
             if (BatteryPercent.Value <= 45) return ThemeBrushes.Amber;
             return ThemeBrushes.Green;
         }
     }
 
-    public double BatteryFillWidth => BatteryPercent.HasValue ? Math.Clamp((BatteryPercent.Value / 100.0) * 44.0, 4.0, 44.0) : 0;
+    public double BatteryFillWidth => IsConnected
+        ? (BatteryPercent.HasValue ? Math.Clamp((BatteryPercent.Value / 100.0) * 44.0, 4.0, 44.0) : 44.0)
+        : 0;
 }
 
 /// <summary>
@@ -228,7 +241,8 @@ internal sealed class PeripheralDeviceService : IDisposable
     {
         try
         {
-            const string aqs = "System.Devices.Aep.ProtocolId:=\"{e0cbf06c-cd35-4697-bb81-2c022f7b8842}\"";
+            // Query both Classic Bluetooth and BLE paired devices
+            const string aqs = "(System.Devices.Aep.ProtocolId:=\"{e0cbf06c-cd35-4697-bb81-2c022f7b8842}\" OR System.Devices.Aep.ProtocolId:=\"{bb7bb05e-5972-42b5-94fc-76eaa7084d49}\") AND System.Devices.Aep.IsPaired:=System.StructuredQueryType.Boolean#True";
             string[] properties =
             {
                 "System.ItemNameDisplay",
@@ -238,10 +252,11 @@ internal sealed class PeripheralDeviceService : IDisposable
             };
 
             var collection = await DeviceInformation.FindAllAsync(aqs, properties);
+            var byName = new Dictionary<string, PeripheralDeviceInfo>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var dev in collection)
             {
-                string name = dev.Name;
+                string name = dev.Name?.Trim() ?? "";
                 if (string.IsNullOrWhiteSpace(name)) continue;
 
                 bool isConnected = dev.Properties.TryGetValue("System.Devices.Aep.IsConnected", out var connObj) && connObj is bool b && b;
@@ -253,26 +268,94 @@ internal sealed class PeripheralDeviceService : IDisposable
                     else if (battObj is int iVal) battery = iVal;
                 }
 
-                if (isConnected || battery.HasValue)
+                var (category, glyph) = CategorizeDevice(name);
+                var candidate = new PeripheralDeviceInfo
                 {
-                    var (category, glyph) = CategorizeDevice(name);
-                    list.Add(new PeripheralDeviceInfo
+                    Id = dev.Id,
+                    Name = name,
+                    Category = category,
+                    Glyph = glyph,
+                    BatteryPercent = battery ?? (isConnected ? 80 : null),
+                    IsConnected = isConnected,
+                    IsCharging = false
+                };
+
+                if (byName.TryGetValue(name, out var existing))
+                {
+                    if ((candidate.IsConnected && !existing.IsConnected) ||
+                        (candidate.BatteryPercent.HasValue && !existing.BatteryPercent.HasValue))
                     {
-                        Id = dev.Id,
-                        Name = name,
-                        Category = category,
-                        Glyph = glyph,
-                        BatteryPercent = battery ?? 80,
-                        IsConnected = isConnected,
-                        IsCharging = false
-                    });
+                        byName[name] = candidate;
+                    }
                 }
+                else
+                {
+                    byName[name] = candidate;
+                }
+            }
+
+            foreach (var item in byName.Values
+                .OrderByDescending(d => d.IsConnected)
+                .ThenByDescending(d => d.Category == "Headset")
+                .ThenBy(d => d.Name))
+            {
+                list.Add(item);
             }
         }
         catch (Exception ex)
         {
             App.Log($"[PeripheralService] WinRT Device query: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Initiates a WinRT Bluetooth connection wake-up for a paired Classic BT or BLE peripheral.
+    /// </summary>
+    public async Task<bool> ConnectDeviceAsync(PeripheralDeviceInfo dev)
+    {
+        if (dev == null || string.IsNullOrWhiteSpace(dev.Id)) return false;
+
+        bool triggered = await Task.Run(async () =>
+        {
+            try
+            {
+                using var btDevice = await BluetoothDevice.FromIdAsync(dev.Id);
+                if (btDevice != null)
+                {
+                    var rfcomm = await btDevice.GetRfcommServicesAsync(BluetoothCacheMode.Uncached);
+                    _ = rfcomm?.Services?.Count;
+                    return true;
+                }
+            }
+            catch { }
+
+            try
+            {
+                using var bleDevice = await BluetoothLEDevice.FromIdAsync(dev.Id);
+                if (bleDevice != null)
+                {
+                    var gatt = await bleDevice.GetGattServicesAsync(BluetoothCacheMode.Uncached);
+                    _ = gatt?.Services?.Count;
+                    return true;
+                }
+            }
+            catch { }
+
+            return false;
+        }).ConfigureAwait(false);
+
+        await Task.Delay(700).ConfigureAwait(false);
+        await RefreshAsync().ConfigureAwait(false);
+        return triggered;
+    }
+
+    public static void OpenBluetoothSettings()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("ms-settings:bluetooth") { UseShellExecute = true });
+        }
+        catch { }
     }
 
     private static (string category, string glyph) CategorizeDevice(string name)

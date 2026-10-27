@@ -62,6 +62,7 @@ internal static class SelfTestRunner
         Run("ActivityResolver: Split-pill secondary droplet activity resolution & glyph mapping", TestSecondaryDropletActivity);
         Run("ClipboardHistoryService: DPAPI encryption round-trip & pinned clip eviction resistance", TestClipboardDpapiAndPinning);
         Run("DropShelfService & SettingsService: One-click ZIP bundle creation & settings export/import", TestDropShelfZipAndSettingsBackup);
+        Run("NetworkService & PeripheralDeviceService: Netsh Wi-Fi SSID parsing, signal tiers & Bluetooth states", TestWifiParserAndPeripheralStatus);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -627,5 +628,70 @@ internal static class SelfTestRunner
         {
             try { Directory.Delete(tempDir, recursive: true); } catch { }
         }
+    }
+
+    private static void TestWifiParserAndPeripheralStatus()
+    {
+        string sampleNetsh = @"
+Interface name : Wi-Fi
+There are 3 networks currently visible.
+
+SSID 1 : WorkStation_5G
+    Network type            : Infrastructure
+    Authentication          : WPA2-Personal
+    Encryption              : CCMP
+    BSSID 1                 : 00:11:22:33:44:55
+         Signal             : 92%
+         Radio type         : 802.11ax
+         Channel            : 36
+
+SSID 2 : Coffee_Guest
+    Network type            : Infrastructure
+    Authentication          : Open
+    Encryption              : None
+    BSSID 1                 : aa:bb:cc:dd:ee:ff
+         Signal             : 45%
+
+SSID 3 : Home_Router
+    Network type            : Infrastructure
+    Authentication          : WPA3-Personal
+    Encryption              : CCMP
+    BSSID 1                 : 11:22:33:44:55:66
+         Signal             : 82%
+";
+        var saved = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Home_Router" };
+        var list = NetworkService.ParseNetshNetworksOutput(sampleNetsh, saved, connectedSsid: "WorkStation_5G");
+
+        Assert(list.Count == 3, $"Expected 3 networks, parsed {list.Count}");
+        // Connected network must be first
+        Assert(list[0].Ssid == "WorkStation_5G" && list[0].IsConnected && list[0].SignalBars == 4,
+            "Connected network must be ordered first with 4 bars");
+        // Saved profile (Home_Router) should come before unsaved (Coffee_Guest)
+        Assert(list[1].Ssid == "Home_Router" && list[1].IsSavedProfile && !list[1].IsConnected,
+            "Saved network Home_Router must be second");
+        Assert(list[2].Ssid == "Coffee_Guest" && !list[2].IsSavedProfile && list[2].SignalBars == 2,
+            "Coffee_Guest must be third with 2 bars");
+
+        // Verify PeripheralDeviceInfo properties
+        var pairedBt = new PeripheralDeviceInfo
+        {
+            Id = "bt1",
+            Name = "Sony WH-1000XM4",
+            Category = "Headset",
+            IsConnected = false
+        };
+        Assert(pairedBt.RightHeaderText == "Connect" && pairedBt.CardOpacity == 0.80 && pairedBt.BatteryStatusText.Contains("Click to connect"),
+            "Disconnected paired peripheral should display Connect and prompt to click");
+
+        var connBt = new PeripheralDeviceInfo
+        {
+            Id = "bt2",
+            Name = "AirPods Pro",
+            Category = "Headset",
+            IsConnected = true,
+            BatteryPercent = 15
+        };
+        Assert(connBt.IsLowBattery && connBt.RightHeaderText == "15%" && connBt.CardOpacity == 1.0,
+            "Connected low-battery peripheral must have IsLowBattery == true");
     }
 }

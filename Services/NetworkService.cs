@@ -1,12 +1,34 @@
 using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
+using System.Windows.Media;
 using System.Windows.Threading;
 using DynamicIsland.Core;
 using Windows.Devices.Radios;
 using Windows.Networking.Connectivity;
 
 namespace DynamicIsland.Services;
+
+public sealed class WifiNetworkInfo
+{
+    public string Ssid { get; init; } = "";
+    public int SignalPercent { get; init; }
+    public int SignalBars { get; init; }
+    public string Glyph { get; init; } = "\uE701";
+    public string SecurityText { get; init; } = "WPA2";
+    public bool IsConnected { get; init; }
+    public bool IsSavedProfile { get; init; }
+
+    public string Subtitle => IsConnected
+        ? $"Connected · {SignalPercent}%"
+        : IsSavedProfile
+            ? $"Saved · {SignalPercent}%"
+            : $"{SecurityText} · {SignalPercent}%";
+
+    public string ActionText => IsConnected ? "Active" : (IsSavedProfile ? "Connect" : "Join");
+    public Brush ActionForeground => IsConnected ? ThemeBrushes.Green : ThemeBrushes.Blue;
+}
 
 public sealed record NetworkStatusSnapshot(
     bool IsConnected,
@@ -62,6 +84,12 @@ internal sealed class NetworkService : IDisposable
 
     public event Action<NetworkStatusSnapshot>? Updated;
     public event Action<ToastContent>? ConnectivityAlert;
+    public event Action<IReadOnlyList<WifiNetworkInfo>>? WifiNetworksChanged;
+
+    private List<WifiNetworkInfo> _wifiNetworks = new();
+    private int _scanningWifi;
+
+    public IReadOnlyList<WifiNetworkInfo> WifiNetworks => _wifiNetworks;
 
     public NetworkService(Dispatcher ui)
     {
@@ -175,6 +203,229 @@ internal sealed class NetworkService : IDisposable
     public static void OpenMobileHotspotSettings() => OpenUri("ms-settings:network-mobilehotspot");
 
     public static void OpenNetworkSettings() => OpenUri("ms-settings:network-status");
+
+    public async Task<IReadOnlyList<WifiNetworkInfo>> ScanWifiNetworksAsync()
+    {
+        if (Interlocked.CompareExchange(ref _scanningWifi, 1, 0) != 0)
+            return _wifiNetworks;
+
+        try
+        {
+            string? activeSsid = Current.IsWifi && Current.IsConnected ? Current.ConnectionName : null;
+            var networks = await Task.Run(() =>
+            {
+                var saved = GetSavedWlanProfiles();
+                string netshOut = RunNetshCommand("wlan show networks mode=bssid");
+                var parsed = ParseNetshNetworksOutput(netshOut, saved, activeSsid);
+
+                // Ensure the currently connected Wi-Fi network is always present at the top
+                if (!string.IsNullOrWhiteSpace(activeSsid) &&
+                    parsed.All(n => !string.Equals(n.Ssid, activeSsid, StringComparison.OrdinalIgnoreCase)))
+                {
+                    int bars = Math.Clamp(Current.SignalBars, 1, 4);
+                    parsed.Insert(0, new WifiNetworkInfo
+                    {
+                        Ssid = activeSsid,
+                        SignalBars = bars,
+                        SignalPercent = bars * 25,
+                        Glyph = ResolveGlyph(true, true, false, bars),
+                        SecurityText = "Connected",
+                        IsConnected = true,
+                        IsSavedProfile = true
+                    });
+                }
+
+                return parsed;
+            }).ConfigureAwait(false);
+
+            await _ui.InvokeAsync(() =>
+            {
+                _wifiNetworks = networks;
+                WifiNetworksChanged?.Invoke(_wifiNetworks);
+            });
+
+            return networks;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[NetworkService] ScanWifiNetworksAsync failed: {ex.Message}");
+            return _wifiNetworks;
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _scanningWifi, 0);
+        }
+    }
+
+    public async Task<(bool Success, string Message)> ConnectWifiNetworkAsync(WifiNetworkInfo network)
+    {
+        if (network == null || string.IsNullOrWhiteSpace(network.Ssid))
+            return (false, "Invalid network");
+
+        if (network.IsConnected)
+            return (true, $"Already connected to {network.Ssid}");
+
+        bool connectedViaNetsh = await Task.Run(() =>
+        {
+            try
+            {
+                string safeSsid = network.Ssid.Replace("\"", "");
+                string output = RunNetshCommand($"wlan connect name=\"{safeSsid}\" ssid=\"{safeSsid}\"");
+                return output.Contains("successfully", StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }).ConfigureAwait(false);
+
+        if (connectedViaNetsh)
+        {
+            await Task.Delay(900).ConfigureAwait(false);
+            _ = _ui.InvokeAsync(() =>
+            {
+                Sample(suppressAlert: false);
+                _ = ScanWifiNetworksAsync();
+            });
+            return (true, $"Connecting to {network.Ssid}...");
+        }
+
+        // If no saved profile exists for this SSID (requires password entry), open Windows Wi-Fi flyout
+        OpenAvailableNetworksFlyout();
+        return (false, $"Enter password for {network.Ssid} in Windows Wi-Fi prompt");
+    }
+
+    private static HashSet<string> GetSavedWlanProfiles()
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        string output = RunNetshCommand("wlan show profiles");
+        if (string.IsNullOrWhiteSpace(output)) return set;
+
+        foreach (string rawLine in output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            int colon = rawLine.IndexOf(':');
+            if (colon > 0 && rawLine.Contains("Profile", StringComparison.OrdinalIgnoreCase))
+            {
+                string profile = rawLine[(colon + 1)..].Trim();
+                if (!string.IsNullOrWhiteSpace(profile))
+                {
+                    set.Add(profile);
+                }
+            }
+        }
+        return set;
+    }
+
+    private static string RunNetshCommand(string args)
+    {
+        try
+        {
+            using var proc = new Process
+            {
+                StartInfo = new ProcessStartInfo("netsh", args)
+                {
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            proc.Start();
+            string output = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit(2000);
+            return output;
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    /// <summary>
+    /// Deterministic parser for <c>netsh wlan show networks mode=bssid</c> output.
+    /// Extracts SSIDs, max signal percentage across BSSIDs, security type, and saved/connected state.
+    /// </summary>
+    internal static List<WifiNetworkInfo> ParseNetshNetworksOutput(
+        string netshOutput,
+        IReadOnlySet<string> savedProfiles,
+        string? connectedSsid)
+    {
+        var results = new List<WifiNetworkInfo>();
+        if (string.IsNullOrWhiteSpace(netshOutput))
+            return results;
+
+        string? currentSsid = null;
+        string currentAuth = "WPA2";
+        int bestSignalPct = 0;
+
+        void FlushCurrent()
+        {
+            if (string.IsNullOrWhiteSpace(currentSsid)) return;
+            int pct = bestSignalPct > 0 ? Math.Clamp(bestSignalPct, 5, 100) : 65;
+            int bars = pct >= 78 ? 4 : pct >= 55 ? 3 : pct >= 32 ? 2 : 1;
+            bool isConn = !string.IsNullOrWhiteSpace(connectedSsid) &&
+                          string.Equals(currentSsid, connectedSsid, StringComparison.OrdinalIgnoreCase);
+            bool isSaved = isConn || savedProfiles.Contains(currentSsid);
+
+            var existingIdx = results.FindIndex(r => string.Equals(r.Ssid, currentSsid, StringComparison.OrdinalIgnoreCase));
+            var info = new WifiNetworkInfo
+            {
+                Ssid = currentSsid,
+                SignalPercent = pct,
+                SignalBars = bars,
+                Glyph = ResolveGlyph(true, true, false, bars),
+                SecurityText = currentAuth,
+                IsConnected = isConn,
+                IsSavedProfile = isSaved
+            };
+
+            if (existingIdx >= 0)
+            {
+                if (info.SignalPercent > results[existingIdx].SignalPercent || info.IsConnected)
+                    results[existingIdx] = info;
+            }
+            else
+            {
+                results.Add(info);
+            }
+        }
+
+        foreach (string rawLine in netshOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string line = rawLine.Trim();
+            if (Regex.IsMatch(line, @"^SSID\s+\d+\s*:", RegexOptions.IgnoreCase))
+            {
+                FlushCurrent();
+                int colon = line.IndexOf(':');
+                currentSsid = colon >= 0 ? line[(colon + 1)..].Trim() : "";
+                currentAuth = "WPA2";
+                bestSignalPct = 0;
+            }
+            else if (currentSsid != null && line.StartsWith("Authentication", StringComparison.OrdinalIgnoreCase))
+            {
+                int colon = line.IndexOf(':');
+                if (colon >= 0)
+                {
+                    currentAuth = line[(colon + 1)..].Trim();
+                }
+            }
+            else if (currentSsid != null && line.Contains('%'))
+            {
+                var m = Regex.Match(line, @"(\d{1,3})\s*%");
+                if (m.Success && int.TryParse(m.Groups[1].Value, out int sig))
+                {
+                    bestSignalPct = Math.Max(bestSignalPct, sig);
+                }
+            }
+        }
+
+        FlushCurrent();
+
+        return results
+            .OrderByDescending(r => r.IsConnected)
+            .ThenByDescending(r => r.IsSavedProfile)
+            .ThenByDescending(r => r.SignalPercent)
+            .ToList();
+    }
 
     private static void OpenUri(string uri)
     {
