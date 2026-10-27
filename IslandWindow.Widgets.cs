@@ -77,6 +77,11 @@ public partial class IslandWindow
         {
             _ = _peripheralService.RefreshAsync();
         }
+        else if (view == ExpandedView.Network)
+        {
+            _ = _networkService.RefreshRadioStatesAsync();
+            _networkService.Sample();
+        }
     }
 
     private void HorizontalScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -1411,5 +1416,156 @@ public partial class IslandWindow
         {
             App.Log($"[Peripherals] Refresh failed: {ex.Message}");
         }
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    //  Wi-Fi, Network & Connectivity Hub
+    // ═════════════════════════════════════════════════════════════════
+
+    private void OnNetworkUpdated(NetworkStatusSnapshot snap)
+    {
+        if (NetworkButtonGlyph == null) return;
+
+        NetworkButtonGlyph.Text = snap.Glyph;
+        NetworkButtonGlyph.Foreground = snap.IsConnected ? ThemeBrushes.PrimaryText : ThemeBrushes.Amber;
+
+        // Hero Clock Wi-Fi / Live Throughput Badge
+        ClockWifiGlyph.Text = snap.Glyph;
+        ClockWifiGlyph.Foreground = snap.IsConnected ? ThemeBrushes.Green : ThemeBrushes.Amber;
+        ClockWifiText.Text = snap.IsConnected
+            ? (snap.DownloadBytesPerSec >= 1024 ? $"↓ {snap.DownloadSpeedText}" : snap.ConnectionName)
+            : "Offline";
+
+        // Network Hub Container
+        NetworkIpText.Text = $"IP: {snap.LocalIpv4}";
+        NetworkHeroGlyph.Text = snap.Glyph;
+        NetworkHeroGlyph.Foreground = snap.IsConnected ? ThemeBrushes.Green : ThemeBrushes.Amber;
+        NetworkHeroIconBg.Background = snap.IsConnected
+            ? ThemeBrushes.CreateFrozen(Color.FromArgb(0x24, 0x30, 0xD1, 0x58))
+            : ThemeBrushes.CreateFrozen(Color.FromArgb(0x24, 0xFF, 0x9F, 0x0A));
+
+        NetworkHeroName.Text = snap.ConnectionName;
+        if (snap.IsConnected)
+        {
+            string kind = snap.IsWifi ? $"Wi-Fi · {snap.SignalBars}/4 Bars" : (snap.IsEthernet ? "Ethernet" : "Connected");
+            string link = snap.LinkSpeedMbps > 0 ? $" · {snap.LinkSpeedMbps} Mbps" : "";
+            NetworkHeroSubtitle.Text = $"{kind}{link}";
+        }
+        else
+        {
+            NetworkHeroSubtitle.Text = snap.IsWifiRadioOn ? "No Internet Access" : "Wi-Fi Radio Off";
+        }
+
+        NetworkDownSpeedText.Text = snap.DownloadSpeedText;
+        NetworkUpSpeedText.Text = snap.UploadSpeedText;
+
+        // Quick-Toggle Cards (Wi-Fi & Bluetooth Radios)
+        bool wifiOn = snap.IsWifiRadioOn;
+        WifiToggleGlyph.Foreground = wifiOn ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
+        WifiToggleStateText.Text = wifiOn ? (snap.IsWifi && snap.IsConnected ? snap.ConnectionName : "On") : "Off";
+        WifiToggleStateText.Foreground = wifiOn ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
+        WifiToggleCard.Background = wifiOn
+            ? ThemeBrushes.CreateFrozen(Color.FromArgb(0x18, 0x30, 0xD1, 0x58))
+            : ThemeBrushes.ButtonSubtleBg;
+        WifiToggleCard.BorderBrush = wifiOn
+            ? ThemeBrushes.CreateFrozen(Color.FromArgb(0x45, 0x30, 0xD1, 0x58))
+            : Brushes.Transparent;
+
+        bool btOn = snap.IsBluetoothRadioOn;
+        BtToggleGlyph.Foreground = btOn ? ThemeBrushes.Blue : ThemeBrushes.SecondaryText;
+        BtToggleStateText.Text = btOn ? "On" : "Off";
+        BtToggleStateText.Foreground = btOn ? ThemeBrushes.Blue : ThemeBrushes.SecondaryText;
+        BtToggleCard.Background = btOn
+            ? ThemeBrushes.CreateFrozen(Color.FromArgb(0x18, 0x0A, 0x84, 0xFF))
+            : ThemeBrushes.ButtonSubtleBg;
+        BtToggleCard.BorderBrush = btOn
+            ? ThemeBrushes.CreateFrozen(Color.FromArgb(0x45, 0x0A, 0x84, 0xFF))
+            : Brushes.Transparent;
+    }
+
+    private void ClockWifiBadge_Click(object sender, MouseButtonEventArgs e)
+    {
+        SwitchExpandedView(ExpandedView.Network);
+        e.Handled = true;
+    }
+
+    private void NetworkIpBadge_Click(object sender, MouseButtonEventArgs e)
+    {
+        string ip = _networkService.Current.LocalIpv4;
+        if (!string.IsNullOrWhiteSpace(ip) && ip != "—")
+        {
+            try
+            {
+                Clipboard.SetText(ip);
+                _machine.PushToast(new ToastContent(
+                    "\uE8C8",
+                    "IPv4 Copied",
+                    ip,
+                    ThemeBrushes.GreenColor,
+                    TimeSpan.FromSeconds(2.0),
+                    TargetView: "network",
+                    Priority: ToastPriority.Feedback,
+                    Category: "clipboard"));
+            }
+            catch { }
+        }
+        e.Handled = true;
+    }
+
+    private void OpenNetworkSettingsBtn_Click(object sender, RoutedEventArgs e)
+    {
+        NetworkService.OpenNetworkSettings();
+    }
+
+    private async void WifiToggleCard_Click(object sender, MouseButtonEventArgs e)
+    {
+        TriggerLiquidImpulse(180, -70, 22);
+        bool toggled = await _networkService.ToggleWifiRadioAsync();
+        if (toggled)
+        {
+            bool on = _networkService.Current.IsWifiRadioOn;
+            _machine.PushToast(new ToastContent(
+                on ? "\uE701" : "\uEB5E",
+                on ? "Wi-Fi Enabled" : "Wi-Fi Disabled",
+                on ? "Scanning for networks..." : "Wireless radio turned off",
+                on ? ThemeBrushes.GreenColor : ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(2.0),
+                TargetView: "network",
+                Priority: ToastPriority.Feedback,
+                Category: "wifi"));
+        }
+        e.Handled = true;
+    }
+
+    private async void BtToggleCard_Click(object sender, MouseButtonEventArgs e)
+    {
+        TriggerLiquidImpulse(180, -70, 22);
+        bool toggled = await _networkService.ToggleBluetoothRadioAsync();
+        if (toggled)
+        {
+            bool on = _networkService.Current.IsBluetoothRadioOn;
+            _machine.PushToast(new ToastContent(
+                "\uE702",
+                on ? "Bluetooth Enabled" : "Bluetooth Disabled",
+                on ? "Wireless radio active" : "Bluetooth radio turned off",
+                on ? ThemeBrushes.BlueColor : ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(2.0),
+                TargetView: "network",
+                Priority: ToastPriority.Feedback,
+                Category: "bluetooth"));
+        }
+        e.Handled = true;
+    }
+
+    private void WifiNetworksCard_Click(object sender, MouseButtonEventArgs e)
+    {
+        NetworkService.OpenAvailableNetworksFlyout();
+        e.Handled = true;
+    }
+
+    private void HotspotCard_Click(object sender, MouseButtonEventArgs e)
+    {
+        NetworkService.OpenMobileHotspotSettings();
+        e.Handled = true;
     }
 }

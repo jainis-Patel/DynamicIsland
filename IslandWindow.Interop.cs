@@ -24,6 +24,7 @@ public partial class IslandWindow
     private const int HotkeyPower = 8;
     private const int HotkeyRecord = 9;
     private const int HotkeyPeripherals = 10;
+    private const int HotkeyNetwork = 11;
 
     private static readonly (int Id, string KeyName, uint DefaultVk)[] HotKeyBindings =
     {
@@ -37,6 +38,7 @@ public partial class IslandWindow
         (HotkeyPower, "BatteryPower", 0x50),      // VK_P
         (HotkeyRecord, "VoiceMemo", 0x52),        // VK_R
         (HotkeyPeripherals, "Peripherals", 0x44), // VK_D
+        (HotkeyNetwork, "Network", 0x57),         // VK_W
     };
 
     private readonly Dictionary<string, bool> _hotkeyRegistrationStatus = new(StringComparer.OrdinalIgnoreCase);
@@ -87,6 +89,7 @@ public partial class IslandWindow
             _privacyService.Start();
             _downloadService.Start();
             _peripheralService.Start();
+            _networkService.Start();
             _clipboardService.Attach(_hwnd);
             _ = _notificationListener.InitializeAsync();
 
@@ -404,6 +407,7 @@ public partial class IslandWindow
             case HotkeyPower: SwitchExpandedView(ExpandedView.Battery); break;
             case HotkeyRecord: ToggleVoiceRecording(); break;
             case HotkeyPeripherals: SwitchExpandedView(ExpandedView.Peripherals); break;
+            case HotkeyNetwork: SwitchExpandedView(ExpandedView.Network); break;
             case HotkeyQuit: Application.Current.Shutdown(); break;
         }
     }

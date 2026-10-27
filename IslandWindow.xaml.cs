@@ -29,6 +29,9 @@ public partial class IslandWindow : Window
     /// <summary>Expanded geometry when the Settings view is selected (expands wider and taller).</summary>
     private static readonly PillShape SettingsExpandedShape = new(480, 336, 36);
 
+    /// <summary>Expanded geometry when the Wi-Fi &amp; Connectivity view is selected.</summary>
+    private static readonly PillShape NetworkExpandedShape = new(452, 208, 34);
+
     private PillShape GetTargetShape(IslandState state, ExpandedView? viewOverride = null)
     {
         if (state == IslandState.Expanded)
@@ -37,6 +40,10 @@ public partial class IslandWindow : Window
             if (activeView == ExpandedView.Settings)
             {
                 return SettingsExpandedShape;
+            }
+            if (activeView == ExpandedView.Network)
+            {
+                return NetworkExpandedShape;
             }
         }
         return Shapes[state];
@@ -88,6 +95,7 @@ public partial class IslandWindow : Window
     private readonly VoiceMemoService _voiceMemoService;
     private readonly PeripheralDeviceService _peripheralService;
     private readonly CountdownTimerService _countdownService;
+    private readonly NetworkService _networkService;
     private TrayIconService? _trayIcon;
 
     private readonly float[] _bandLevels = new float[AudioSpectrum.BandCount];
@@ -134,6 +142,7 @@ public partial class IslandWindow : Window
             [ExpandedView.Battery] = (BatteryContainer, BatteryButton),
             [ExpandedView.VoiceMemo] = (VoiceMemoContainer, RecordButton),
             [ExpandedView.Peripherals] = (PeripheralsContainer, PeripheralsButton),
+            [ExpandedView.Network] = (NetworkContainer, NetworkButton),
         };
 
         _allContainers = _viewRegistry.Values.Select(v => v.Container).ToArray();
@@ -180,6 +189,7 @@ public partial class IslandWindow : Window
         _voiceMemoService = _services.Register(new VoiceMemoService(Dispatcher));
         _peripheralService = _services.Register(new PeripheralDeviceService(Dispatcher));
         _countdownService = _services.Register(new CountdownTimerService());
+        _networkService = _services.Register(new NetworkService(Dispatcher));
 
         _mediaService.Changed += OnMediaChanged;
         _mediaService.TrackChanged += OnTrackChanged;
@@ -211,6 +221,8 @@ public partial class IslandWindow : Window
         _peripheralService.LowBatteryAlert += OnPeripheralLowBatteryAlert;
         _countdownService.StateChanged += RefreshStopwatchUI;
         _countdownService.Completed += OnCountdownCompleted;
+        _networkService.Updated += OnNetworkUpdated;
+        _networkService.ConnectivityAlert += toast => _machine.PushToast(toast);
 
         _clockTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background,
             (_, _) => UpdateClockAndTimeline(), Dispatcher);
@@ -228,6 +240,7 @@ public partial class IslandWindow : Window
         OnAudioEndpointsChanged(_audioEndpointService.Endpoints);
         OnPowerStatusChanged(_powerPlanService.Current);
         OnPeripheralsChanged(_peripheralService.Devices);
+        OnNetworkUpdated(_networkService.Current);
         InitializeVoiceMemoUI();
         ApplySettings();
         _settingsService.PropertyChanged += OnSettingsPropertyChanged;
@@ -298,6 +311,7 @@ public partial class IslandWindow : Window
         BatteryButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Battery);
         RecordButton.Click += (_, _) => SwitchExpandedView(ExpandedView.VoiceMemo);
         PeripheralsButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Peripherals);
+        NetworkButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Network);
         SettingsButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Settings);
         MicMuteButton.Click += (_, _) => ToggleMicMute();
         PreviewKeyDown += IslandWindow_PreviewKeyDown;

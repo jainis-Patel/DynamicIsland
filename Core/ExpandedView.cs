@@ -14,7 +14,8 @@ public enum ExpandedView
     Audio,
     Battery,
     VoiceMemo,
-    Peripherals
+    Peripherals,
+    Network
 }
 
 public static class ExpandedViewExtensions
@@ -29,6 +30,7 @@ public static class ExpandedViewExtensions
         ExpandedView.Battery => "battery",
         ExpandedView.VoiceMemo => "voicememo",
         ExpandedView.Peripherals => "peripherals",
+        ExpandedView.Network => "network",
         _ => "media"
     };
 
@@ -68,6 +70,10 @@ public static class ExpandedViewExtensions
                 return true;
             case "peripherals":
                 view = ExpandedView.Peripherals;
+                return true;
+            case "network":
+            case "wifi":
+                view = ExpandedView.Network;
                 return true;
             default:
                 view = ExpandedView.Media;

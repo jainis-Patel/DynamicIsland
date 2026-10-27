@@ -310,6 +310,15 @@ internal static class SelfTestRunner
             Assert(ExpandedViewExtensions.TryParseKey(key, out var roundTrip) && roundTrip == view,
                 $"ExpandedView round-trip failed for {view} ('{key}')");
         }
+
+        Assert(ExpandedViewExtensions.TryParseKey("wifi", out var wifiView) && wifiView == ExpandedView.Network,
+            "Expected 'wifi' alias to resolve to ExpandedView.Network");
+        Assert(NetworkService.ResolveGlyph(connected: false, isWifi: true, isEthernet: false, signalBars: 0) == "\uEB5E",
+            "Expected disconnected Wi-Fi glyph");
+        Assert(NetworkService.ResolveGlyph(connected: true, isWifi: true, isEthernet: false, signalBars: 4) == "\uE701",
+            "Expected 4-bar Wi-Fi glyph");
+        Assert(NetworkService.FormatBandwidth(2 * 1024 * 1024) == "2.0 MB/s",
+            $"Expected '2.0 MB/s', got '{NetworkService.FormatBandwidth(2 * 1024 * 1024)}'");
     }
 
     private static void TestCountdownTimer()
