@@ -37,7 +37,7 @@ public partial class UninstallWindow : Window
     {
         if (_isUninstalled)
         {
-            Application.Current.Shutdown();
+            Application.Current?.Shutdown();
             return;
         }
 
@@ -45,9 +45,10 @@ public partial class UninstallWindow : Window
         KeepBtn.IsEnabled = false;
         RemoveUserDataCheck.IsEnabled = false;
 
-        UninstallProgressBar.Visibility = Visibility.Visible;
+        StatusContainer.Visibility = Visibility.Visible;
+        ProgressBarContainer.Visibility = Visibility.Visible;
         UninstallProgressBar.IsIndeterminate = true;
-        StatusText.Text = "Removing Dynamic Island...";
+        StatusText.Text = "Removing Dynamic Island files and shortcuts...";
         StatusText.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x45, 0x3A));
 
         bool removeData = RemoveUserDataCheck.IsChecked == true;
@@ -58,21 +59,22 @@ public partial class UninstallWindow : Window
             return (success, err);
         });
 
-        UninstallProgressBar.IsIndeterminate = false;
-        UninstallProgressBar.Value = 100;
-
         if (result.success)
         {
             _isUninstalled = true;
-            StatusText.Text = "✓ Dynamic Island has been successfully uninstalled.";
-            StatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x30, 0xD1, 0x58));
+            ProgressBarContainer.Visibility = Visibility.Collapsed;
+            StatusContainer.Visibility = Visibility.Collapsed;
+            SuccessCard.Visibility = Visibility.Visible;
+
             KeepBtn.Visibility = Visibility.Collapsed;
-            UninstallBtn.Content = "Close";
-            UninstallBtn.Background = new SolidColorBrush(Color.FromRgb(0x48, 0x48, 0x4A));
+            UninstallBtn.MinWidth = 120;
+            UninstallBtnText.Text = "Close";
+            UninstallBtn.Background = new SolidColorBrush(Color.FromRgb(0x28, 0x2A, 0x38));
             UninstallBtn.IsEnabled = true;
         }
         else
         {
+            ProgressBarContainer.Visibility = Visibility.Collapsed;
             StatusText.Text = $"Uninstall error: {result.err ?? "Unknown error"}";
             UninstallBtn.IsEnabled = true;
             KeepBtn.IsEnabled = true;
