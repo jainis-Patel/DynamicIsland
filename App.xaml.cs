@@ -1,0 +1,166 @@
+using System.IO;
+using System.Text;
+using System.Threading.Channels;
+using System.Windows;
+using DynamicIsland.Core;
+using static DynamicIsland.Interop.NativeMethods;
+
+namespace DynamicIsland;
+
+public partial class App : Application
+{
+    private static readonly string LogFile = AppPaths.LogFile;
+    private const long MaxLogSizeBytes = 512 * 1024; // Cap log file at 512 KB
+
+    private static readonly Channel<string> LogChannel = Channel.CreateBounded<string>(
+        new BoundedChannelOptions(256)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true,
+            SingleWriter = false
+        });
+
+    private Mutex? _singleInstance;
+    private bool _ownsMutex;
+
+    static App()
+    {
+        _ = Task.Run(ProcessLogQueueAsync);
+    }
+
+    /// <summary>
+    /// Non-blocking asynchronous logger. Queues log entries in memory and flushes on a background worker
+    /// so disk I/O never stalls the 60-240 Hz WPF UI thread.
+    /// </summary>
+    public static void Log(string msg)
+    {
+        LogChannel.Writer.TryWrite($"[{DateTime.Now:HH:mm:ss.fff}] {msg}");
+    }
+
+    public static void FlushLogs()
+    {
+        try
+        {
+            var batch = new StringBuilder(512);
+            while (LogChannel.Reader.TryRead(out string? line))
+            {
+                batch.AppendLine(line);
+            }
+            if (batch.Length > 0)
+            {
+                File.AppendAllText(LogFile, batch.ToString());
+            }
+        }
+        catch
+        {
+            // Ignore logging I/O failures
+        }
+    }
+
+    private static async Task ProcessLogQueueAsync()
+    {
+        var batch = new StringBuilder(512);
+        var reader = LogChannel.Reader;
+
+        while (await reader.WaitToReadAsync().ConfigureAwait(false))
+        {
+            batch.Clear();
+            while (reader.TryRead(out string? line))
+            {
+                batch.AppendLine(line);
+                if (batch.Length >= 4096) break;
+            }
+
+            if (batch.Length > 0)
+            {
+                try
+                {
+                    var fi = new FileInfo(LogFile);
+                    if (fi.Exists && fi.Length > MaxLogSizeBytes)
+                    {
+                        File.WriteAllText(LogFile, batch.ToString());
+                    }
+                    else
+                    {
+                        File.AppendAllText(LogFile, batch.ToString());
+                    }
+                }
+                catch
+                {
+                    // Ignore logging I/O failures
+                }
+            }
+        }
+    }
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        Log("=== App OnStartup ===");
+
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            Log($"AppDomain UnhandledException: {args.ExceptionObject}");
+            FlushLogs();
+        };
+        DispatcherUnhandledException += (_, args) =>
+        {
+            Log($"DispatcherUnhandledException: {args.Exception}");
+            FlushLogs();
+            args.Handled = true;
+        };
+
+        _singleInstance = new Mutex(true, @"Local\DynamicIsland.SingleInstance", out _ownsMutex);
+        if (!_ownsMutex)
+        {
+            Log("Another instance is already running. Signaling existing instance to shut down and replacing it.");
+            Program.SignalStopOnDefaultDesktop();
+            try
+            {
+                _ownsMutex = _singleInstance.WaitOne(TimeSpan.FromMilliseconds(2500));
+            }
+            catch (AbandonedMutexException)
+            {
+                _ownsMutex = true;
+            }
+
+            if (!_ownsMutex)
+            {
+                Log("Existing instance did not release mutex in time. Expanding existing instance.");
+                uint expandMsg = RegisterWindowMessage("DYNAMIC_ISLAND_EXPAND");
+                PostMessage(HWND_BROADCAST, expandMsg, IntPtr.Zero, IntPtr.Zero);
+                Shutdown();
+                return;
+            }
+        }
+
+        base.OnStartup(e);
+
+        try
+        {
+            Log("Creating IslandWindow...");
+            var island = new IslandWindow();
+            MainWindow = island;
+            Log("Showing IslandWindow...");
+            island.Show();
+            Log("IslandWindow shown successfully.");
+        }
+        catch (Exception ex)
+        {
+            Log($"Exception during window creation/show: {ex}");
+            throw;
+        }
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        Log($"=== App OnExit (code={e.ApplicationExitCode}) ===");
+        LogChannel.Writer.TryComplete();
+        FlushLogs();
+        if (_ownsMutex)
+        {
+            try { _singleInstance?.ReleaseMutex(); } catch { }
+        }
+        _singleInstance?.Dispose();
+        base.OnExit(e);
+    }
+}

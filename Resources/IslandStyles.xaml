@@ -1,0 +1,263 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:core="clr-namespace:DynamicIsland.Core">
+
+    <core:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
+    <core:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+    <core:ColorToBrushConverter x:Key="ColorToBrushConverter" />
+    <core:VolumePercentConverter x:Key="VolumePercentConverter" />
+    <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+    <SolidColorBrush x:Key="AccentBrush" Color="#FF9F0A" />
+    <SolidColorBrush x:Key="SecondaryBrush" Color="#86868B" />
+    <SolidColorBrush x:Key="TertiaryBrush" Color="#515156" />
+    <SolidColorBrush x:Key="CardSurfaceBrush" Color="#121216" />
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#1AFFFFFF" />
+
+    <!-- Minimal 3.5px Apple-style dark pill ScrollBar (eliminates ugly white Windows scrollbars) -->
+    <Style TargetType="{x:Type ScrollBar}">
+        <Setter Property="Stylus.IsFlicksEnabled" Value="False" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ScrollBar}">
+                    <Grid Background="Transparent" SnapsToDevicePixels="True">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True" Focusable="False">
+                            <Track.Thumb>
+                                <Thumb>
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="{x:Type Thumb}">
+                                            <Border Background="#38FFFFFF" CornerRadius="2" />
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="Orientation" Value="Horizontal">
+                <Setter Property="Height" Value="3.5" />
+                <Setter Property="MinHeight" Value="3.5" />
+                <Setter Property="Margin" Value="0,2,0,0" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type ScrollBar}">
+                            <Grid Background="Transparent" SnapsToDevicePixels="True">
+                                <Track x:Name="PART_Track" IsDirectionReversed="False" Focusable="False">
+                                    <Track.Thumb>
+                                        <Thumb>
+                                            <Thumb.Template>
+                                                <ControlTemplate TargetType="{x:Type Thumb}">
+                                                    <Border Background="#38FFFFFF" CornerRadius="1.75" />
+                                                </ControlTemplate>
+                                            </Thumb.Template>
+                                        </Thumb>
+                                    </Track.Thumb>
+                                </Track>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Trigger>
+            <Trigger Property="Orientation" Value="Vertical">
+                <Setter Property="Width" Value="3.5" />
+                <Setter Property="MinWidth" Value="3.5" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="Glyph" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="Digits" TargetType="TextBlock">
+        <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Concentric Card Title Style (Apple HIG sentence-case subheadline) -->
+    <Style x:Key="SectionTitle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="#F5F5F7" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Pill button: subtle hover veil + fluid spring press scale. Never steals focus. -->
+    <Style x:Key="IslandButton" TargetType="Button">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Padding" Value="9,0" />
+        <Setter Property="Margin" Value="0,0,3,0" />
+        <Setter Property="Foreground" Value="#F5F5F7" />
+        <Setter Property="Background" Value="#16FFFFFF" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="Press" />
+                        </Grid.RenderTransform>
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="13" />
+                        <Border x:Name="Veil" Background="White" Opacity="0" CornerRadius="13" />
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Veil" Storyboard.TargetProperty="Opacity"
+                                                         To="0.10" Duration="0:0:0.10" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Veil" Storyboard.TargetProperty="Opacity"
+                                                         To="0" Duration="0:0:0.18" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Press" Storyboard.TargetProperty="ScaleX"
+                                                         To="0.93" Duration="0:0:0.07" />
+                                        <DoubleAnimation Storyboard.TargetName="Press" Storyboard.TargetProperty="ScaleY"
+                                                         To="0.93" Duration="0:0:0.07" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Press" Storyboard.TargetProperty="ScaleX"
+                                                         To="1" Duration="0:0:0.28">
+                                            <DoubleAnimation.EasingFunction>
+                                                <BackEase EasingMode="EaseOut" Amplitude="0.45" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="Press" Storyboard.TargetProperty="ScaleY"
+                                                         To="1" Duration="0:0:0.28">
+                                            <DoubleAnimation.EasingFunction>
+                                                <BackEase EasingMode="EaseOut" Amplitude="0.45" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.35" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CircleButton" TargetType="Button" BasedOn="{StaticResource IslandButton}">
+        <Setter Property="Width" Value="26" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0" />
+    </Style>
+
+    <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource IslandButton}">
+        <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="Foreground" Value="#0A0A0C" />
+    </Style>
+
+    <!-- Apple Segmented Dock Tool Pill -->
+    <Style x:Key="DockToolButton" TargetType="Button" BasedOn="{StaticResource IslandButton}">
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Padding" Value="8,0" />
+        <Setter Property="Margin" Value="0,0,3,0" />
+        <Setter Property="Foreground" Value="#E5E5EA" />
+        <Setter Property="Background" Value="#12FFFFFF" />
+    </Style>
+
+    <!-- Compact Dock Icon Pill -->
+    <Style x:Key="DockIconButton" TargetType="Button" BasedOn="{StaticResource DockToolButton}">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <!-- Compact Live Activity Equalizer Bar (dynamically colored by artwork/theme AccentBrush) -->
+    <Style x:Key="Bar" TargetType="Rectangle">
+        <Setter Property="Width" Value="2.5" />
+        <Setter Property="Height" Value="14" />
+        <Setter Property="RadiusX" Value="1.25" />
+        <Setter Property="RadiusY" Value="1.25" />
+        <Setter Property="Margin" Value="1.25,0" />
+        <Setter Property="Fill" Value="{DynamicResource AccentBrush}" />
+    </Style>
+
+    <!-- Minimalist iOS Live Activity Scrubber Track -->
+    <Style x:Key="IslandSlider" TargetType="Slider">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Height" Value="14" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid VerticalAlignment="Center" Background="Transparent">
+                        <Border Height="3.5" Background="#24FFFFFF" CornerRadius="1.75" />
+                        <Track x:Name="PART_Track">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="Slider.DecreaseLarge">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate>
+                                            <Border Height="3.5" Background="#F5F5F7" CornerRadius="1.75" />
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Cursor="Hand">
+                                    <Thumb.Template>
+                                        <ControlTemplate>
+                                            <Ellipse x:Name="ThumbCircle" Width="8" Height="8" Fill="#FFFFFF" />
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="ThumbCircle" Property="Width" Value="10.5" />
+                                                    <Setter TargetName="ThumbCircle" Property="Height" Value="10.5" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="Slider.IncreaseLarge">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate>
+                                            <Border Height="3.5" Background="Transparent" />
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

@@ -1,0 +1,1174 @@
+<Window x:Class="DynamicIsland.IslandWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Dynamic Island"
+        Width="480" Height="240"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False"
+        Topmost="True" Focusable="False" AllowDrop="True"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        FontFamily="Segoe UI Variable Display, Segoe UI" Foreground="#F5F5F7"
+        TextOptions.TextFormattingMode="Ideal"
+        PreviewDragEnter="Window_PreviewDragEnter"
+        PreviewDragOver="Window_PreviewDragOver"
+        PreviewDragLeave="Window_PreviewDragLeave"
+        PreviewDrop="Window_PreviewDrop">
+
+    <Grid x:Name="Root">
+        <!-- Ambient halo / back-glow responding to media artwork accent and bass FFT (zero-shader radial falloff) -->
+        <Border x:Name="PillGlow" HorizontalAlignment="Center" VerticalAlignment="Top"
+                Width="120" Height="28" Opacity="0" Visibility="Collapsed" IsHitTestVisible="False">
+            <Border.Background>
+                <RadialGradientBrush Center="0.5,0.42" GradientOrigin="0.5,0.42" RadiusX="0.5" RadiusY="0.5">
+                    <GradientStop x:Name="PillGlowColor" Color="#FF9F0A" Offset="0" />
+                    <GradientStop Color="#00000000" Offset="1" />
+                </RadialGradientBrush>
+            </Border.Background>
+        </Border>
+
+        <!-- The morphing pill. Width/Height/CornerRadius are driven per-frame by analytical springs. -->
+        <Grid x:Name="Pill" HorizontalAlignment="Center" VerticalAlignment="Top"
+              Width="120" Height="28" Background="Transparent"
+              PreviewMouseWheel="Pill_PreviewMouseWheel">
+
+            <!-- True OLED pitch-black capsule surface -->
+            <Border x:Name="PillBackground" CornerRadius="0,0,14,14">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#FF030304" Offset="0" />
+                        <GradientStop Color="#FF08080B" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="22" ShadowDepth="5" Direction="270"
+                                      Opacity="0.72" Color="Black" RenderingBias="Performance" />
+                </Border.Effect>
+            </Border>
+
+            <!-- Subtle 1px specular rim matching Apple Dynamic Island / macOS Alcove -->
+            <Border x:Name="PillStroke" CornerRadius="0,0,14,14" BorderThickness="1,0,1,1">
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#12FFFFFF" Offset="0" />
+                        <GradientStop Color="#24FFFFFF" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
+            </Border>
+
+            <Grid x:Name="ContentHost">
+
+                <!-- ── Idle (120x28) ────────────────────────────────── -->
+                <Grid x:Name="IdlePanel" Width="120" Height="28"
+                      HorizontalAlignment="Center" VerticalAlignment="Top">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <!-- Privacy & Hardware Lens Cluster -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,8,0" VerticalAlignment="Center">
+                            <!-- Camera Active Dot (iOS Green) -->
+                            <Grid x:Name="CamPrivacyDot" Margin="0,0,4,0" Visibility="Collapsed" VerticalAlignment="Center" ToolTip="Camera In Use">
+                                <Ellipse Width="10" Height="10">
+                                    <Ellipse.Fill>
+                                        <RadialGradientBrush>
+                                            <GradientStop Color="#8030D158" Offset="0" />
+                                            <GradientStop Color="#0030D158" Offset="1" />
+                                        </RadialGradientBrush>
+                                    </Ellipse.Fill>
+                                </Ellipse>
+                                <Ellipse Width="5.5" Height="5.5" Fill="#30D158" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Grid>
+
+                            <!-- Microphone Active Dot (iOS Orange) -->
+                            <Grid x:Name="MicPrivacyDot" Margin="0,0,4,0" Visibility="Collapsed" VerticalAlignment="Center" ToolTip="Microphone In Use">
+                                <Ellipse Width="10" Height="10">
+                                    <Ellipse.Fill>
+                                        <RadialGradientBrush>
+                                            <GradientStop Color="#80FF9F0A" Offset="0" />
+                                            <GradientStop Color="#00FF9F0A" Offset="1" />
+                                        </RadialGradientBrush>
+                                    </Ellipse.Fill>
+                                </Ellipse>
+                                <Ellipse Width="5.5" Height="5.5" Fill="#FF9F0A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Grid>
+
+                            <!-- Recessed TrueDepth Camera Lens Ring when idle -->
+                            <Grid x:Name="IdleSensorDot" VerticalAlignment="Center">
+                                <Ellipse Width="8" Height="8" Fill="#0E0E13" Stroke="#24242E" StrokeThickness="1" />
+                                <Ellipse Width="3" Height="3" Fill="#1D1D28" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Grid>
+                        </StackPanel>
+
+                        <TextBlock x:Name="IdleClock" Style="{StaticResource Digits}"
+                                   FontSize="12" FontWeight="SemiBold"
+                                   Foreground="#F5F5F7" Text="12:00" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- ── Compact Live Activity (220x34) ───────────────── -->
+                <Grid x:Name="CompactPanel" Width="220" Height="34"
+                      HorizontalAlignment="Center" VerticalAlignment="Top">
+                    <!-- Leading Region (Left) -->
+                    <Grid HorizontalAlignment="Left" VerticalAlignment="Center" Margin="11,0,0,0">
+                        <Grid x:Name="CompactMediaHost" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Width="20" Height="20" CornerRadius="6" Background="#1AFFFFFF" ClipToBounds="True">
+                                    <Grid>
+                                        <TextBlock x:Name="CompactArtFallback" Style="{StaticResource Glyph}"
+                                                   Text="&#xE8D6;" FontSize="10.5" HorizontalAlignment="Center" Foreground="#86868B" />
+                                        <Image x:Name="CompactArtImage" Stretch="UniformToFill" />
+                                    </Grid>
+                                </Border>
+                                <TextBlock x:Name="CompactTrackText" FontSize="11.5" FontWeight="Medium"
+                                           Foreground="#F5F5F7" Margin="8,0,0,0" MaxWidth="112"
+                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Text="Title" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid x:Name="CompactCallHost" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Width="20" Height="20" CornerRadius="10" Background="#2630D158" ClipToBounds="True">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE717;" FontSize="10.5" HorizontalAlignment="Center" Foreground="#30D158" />
+                                </Border>
+                                <TextBlock x:Name="CompactCallText" FontSize="11.5" FontWeight="SemiBold"
+                                           Foreground="#30D158" Margin="8,0,0,0" MaxWidth="112"
+                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Text="Call" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid x:Name="CompactDownloadHost" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Width="20" Height="20" CornerRadius="10" Background="#260A84FF" ClipToBounds="True">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" FontSize="10.5" HorizontalAlignment="Center" Foreground="#0A84FF" />
+                                </Border>
+                                <TextBlock x:Name="CompactDownloadText" FontSize="11.5" FontWeight="Medium"
+                                           Foreground="#F5F5F7" Margin="8,0,0,0" MaxWidth="112"
+                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Text="Downloading" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid x:Name="CompactRecordHost" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Width="20" Height="20" CornerRadius="10" Background="#26FF453A" ClipToBounds="True">
+                                    <Ellipse Width="7" Height="7" Fill="#FF453A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock x:Name="CompactRecordText" Style="{StaticResource Digits}" FontSize="11.5" FontWeight="SemiBold"
+                                           Foreground="#FF453A" Margin="8,0,0,0" MaxWidth="112"
+                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Text="00:00" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid x:Name="CompactTimerHost">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Width="20" Height="20" CornerRadius="10" Background="#22FF9F0A">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE916;" FontSize="10.5"
+                                               HorizontalAlignment="Center" Foreground="{DynamicResource AccentBrush}" />
+                                </Border>
+                                <TextBlock x:Name="CompactTimer" Style="{StaticResource Digits}" Margin="8,0,0,0"
+                                           FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
+                                           VerticalAlignment="Center" Text="00:00" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+
+                    <!-- Trailing Region (Right): Live 4-band audio waveform -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Margin="0,0,13,0">
+                        <Rectangle x:Name="Bar0" Style="{StaticResource Bar}" />
+                        <Rectangle x:Name="Bar1" Style="{StaticResource Bar}" />
+                        <Rectangle x:Name="Bar2" Style="{StaticResource Bar}" />
+                        <Rectangle x:Name="Bar3" Style="{StaticResource Bar}" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- ── Toast / Alert Banner (320x56) ────────────────── -->
+                <Grid x:Name="ToastPanel" Width="320" Height="56"
+                      HorizontalAlignment="Center" VerticalAlignment="Top">
+                    <Grid Margin="14,0,18,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="ToastIconBg" Width="34" Height="34" CornerRadius="17"
+                                VerticalAlignment="Center" Background="#280A84FF">
+                            <TextBlock x:Name="ToastGlyph" Style="{StaticResource Glyph}" HorizontalAlignment="Center"
+                                       FontSize="15" Foreground="#0A84FF" Text="&#xE767;" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="ToastTitle" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" Text="Volume" />
+                            <TextBlock x:Name="ToastSubtitle" FontSize="11.5" Margin="0,1,0,0"
+                                       Foreground="{StaticResource SecondaryBrush}"
+                                       TextTrimming="CharacterEllipsis" Text="65%" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+
+                <!-- ── Expanded Interactive Surface (420x190) ───────── -->
+                <Grid x:Name="ExpandedPanel" Width="420" Height="190"
+                      HorizontalAlignment="Center" VerticalAlignment="Top">
+                    <Grid Margin="16,13,16,11">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="26" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Strict ClipToBounds container so sub-views can never bleed over the bottom dock -->
+                        <Grid Grid.Row="0" ClipToBounds="True">
+
+                            <!-- 1. Now Playing / Hero Clock / Call Container -->
+                            <Grid x:Name="MediaContainer">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <Grid Grid.Row="0" VerticalAlignment="Center">
+                                    <!-- A. Now Playing Header -->
+                                    <Grid x:Name="ExpandedMediaHeader">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Width="54" Height="54" CornerRadius="12" Background="#16FFFFFF"
+                                                BorderBrush="#1EFFFFFF" BorderThickness="1"
+                                                ClipToBounds="True" VerticalAlignment="Center">
+                                            <Grid>
+                                                <TextBlock x:Name="ExpandedArtFallback" Style="{StaticResource Glyph}"
+                                                           Text="&#xE8D6;" FontSize="20" HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center" Foreground="#86868B" />
+                                                <Image x:Name="ExpandedArtImage" Stretch="UniformToFill" />
+                                            </Grid>
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1" Margin="13,0,10,0" VerticalAlignment="Center">
+                                            <TextBlock x:Name="ExpandedTitle" FontSize="14.5" FontWeight="SemiBold"
+                                                       Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" Text="Not Playing" />
+                                            <TextBlock x:Name="ExpandedArtist" FontSize="12" Margin="0,2,0,0"
+                                                       Foreground="{StaticResource SecondaryBrush}" TextTrimming="CharacterEllipsis" Text="System Audio" />
+                                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                                <Border Background="#14FFFFFF" CornerRadius="5" Padding="6,1.5">
+                                                    <TextBlock x:Name="ExpandedSourceApp" FontSize="9.5" FontWeight="Medium"
+                                                               Foreground="{StaticResource SecondaryBrush}" Text="Media" />
+                                                </Border>
+                                                <TextBlock x:Name="CpuText" Visibility="Collapsed" />
+                                                <TextBlock x:Name="RamText" Visibility="Collapsed" />
+                                            </StackPanel>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                            <TextBlock x:Name="ExpandedMiniClock" Style="{StaticResource Digits}"
+                                                       FontSize="15" FontWeight="SemiBold" Foreground="#F5F5F7"
+                                                       HorizontalAlignment="Right" Text="12:00" />
+                                            <TextBlock x:Name="ExpandedDate" FontSize="10.5" Foreground="{StaticResource SecondaryBrush}"
+                                                       HorizontalAlignment="Right" Margin="0,1,0,0" Text="Mon, Jan 1" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- B. Hero Clock & System Vitals when no media session is active -->
+                                    <Grid x:Name="ExpandedClockHeader" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <TextBlock x:Name="ExpandedBigClock" Style="{StaticResource Digits}"
+                                                       FontSize="28" FontWeight="Light" Foreground="#F5F5F7" Text="12:00" />
+                                            <TextBlock x:Name="ExpandedBigDate" FontSize="11.5" Foreground="{StaticResource SecondaryBrush}"
+                                                       Margin="0,1,0,5" Text="Monday, January 1" />
+                                            <StackPanel Orientation="Horizontal">
+                                                <Border Margin="0,0,5,0" Background="#12FFFFFF" BorderBrush="#16FFFFFF" BorderThickness="1" CornerRadius="5" Padding="6,1.5">
+                                                    <TextBlock x:Name="ClockCpuText" Style="{StaticResource Digits}" FontSize="9.5" FontWeight="Medium" Foreground="#86868B" Text="CPU 0%" />
+                                                </Border>
+                                                <Border Background="#12FFFFFF" BorderBrush="#16FFFFFF" BorderThickness="1" CornerRadius="5" Padding="6,1.5">
+                                                    <TextBlock x:Name="ClockRamText" Style="{StaticResource Digits}" FontSize="9.5" FontWeight="Medium" Foreground="#86868B" Text="RAM 0%" />
+                                                </Border>
+                                            </StackPanel>
+                                        </StackPanel>
+
+                                        <!-- Interactive Stopwatch Capsule -->
+                                        <Border Grid.Column="1" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}"
+                                                BorderThickness="1" CornerRadius="12" Padding="12,7" VerticalAlignment="Center">
+                                            <StackPanel HorizontalAlignment="Right">
+                                                <TextBlock HorizontalAlignment="Right" FontSize="9.5" FontWeight="Medium"
+                                                           Foreground="{StaticResource SecondaryBrush}" Text="Stopwatch" />
+                                                <TextBlock x:Name="ExpandedTimer" Style="{StaticResource Digits}" HorizontalAlignment="Right"
+                                                           FontSize="19" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
+                                                           Margin="0,1,0,4" Text="00:00" />
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                    <Button x:Name="StartPauseButton" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0,0,4,0" ToolTip="Start / Pause Stopwatch (Ctrl+Alt+A)">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock x:Name="StartPauseGlyph" Style="{StaticResource Glyph}" FontSize="9" Text="&#xE768;" />
+                                                            <TextBlock x:Name="StartPauseLabel" Margin="4,0,0,0" FontSize="9.5" FontWeight="SemiBold" Text="Start" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Button x:Name="ResetButton" Style="{StaticResource CircleButton}" Width="22" Height="22" ToolTip="Reset Stopwatch">
+                                                        <TextBlock Style="{StaticResource Glyph}" FontSize="9.5" Text="&#xE72C;" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- C. Active Call Header -->
+                                    <Grid x:Name="ExpandedCallHeader" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Width="48" Height="48" CornerRadius="12" Background="#2230D158" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE717;" FontSize="20" Foreground="#30D158" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                                            <TextBlock x:Name="ExpandedCallTitle" FontSize="14" FontWeight="SemiBold"
+                                                       Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" Text="Active Call" />
+                                            <TextBlock x:Name="ExpandedCallStatus" FontSize="11.5" Margin="0,1,0,0"
+                                                       Foreground="{StaticResource SecondaryBrush}" Text="Audio / Video Session" />
+                                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                <Border x:Name="ExpandedCallMicBadge" Background="#22FF9F0A" CornerRadius="4" Padding="5,1" Margin="0,0,4,0">
+                                                    <TextBlock Text="Mic Active" FontSize="9" FontWeight="SemiBold" Foreground="#FF9F0A" />
+                                                </Border>
+                                                <Border x:Name="ExpandedCallCamBadge" Background="#2230D158" CornerRadius="4" Padding="5,1" Visibility="Collapsed">
+                                                    <TextBlock Text="Camera Active" FontSize="9" FontWeight="SemiBold" Foreground="#30D158" />
+                                                </Border>
+                                            </StackPanel>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                            <TextBlock Text="Duration" FontSize="9.5" FontWeight="Medium" Foreground="{StaticResource SecondaryBrush}" HorizontalAlignment="Right" />
+                                            <TextBlock x:Name="ExpandedCallTimer" Style="{StaticResource Digits}" FontSize="17" FontWeight="SemiBold"
+                                                       Foreground="#30D158" HorizontalAlignment="Right" Text="00:00" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
+
+                                <!-- Scrubber + Transport Controls -->
+                                <Grid Grid.Row="1" Margin="0,8,0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="34" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="34" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock x:Name="PositionText" Grid.Column="0" Style="{StaticResource Digits}" FontSize="10"
+                                               Foreground="{StaticResource SecondaryBrush}" HorizontalAlignment="Left" VerticalAlignment="Center" Text="0:00" />
+                                    <Slider x:Name="TimelineSlider" Grid.Column="1" Style="{StaticResource IslandSlider}"
+                                            Margin="6,0" Minimum="0" Maximum="100" Value="0" />
+                                    <TextBlock x:Name="DurationText" Grid.Column="2" Style="{StaticResource Digits}" FontSize="10"
+                                               Foreground="{StaticResource SecondaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" Text="0:00" />
+
+                                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                                        <Button x:Name="PrevButton" Style="{StaticResource CircleButton}" Width="26" Height="26" ToolTip="Previous Track">
+                                            <TextBlock Style="{StaticResource Glyph}" FontSize="10" Text="&#xE892;" />
+                                        </Button>
+                                        <Button x:Name="PlayPauseButton" Style="{StaticResource CircleButton}" Margin="4,0"
+                                                Width="28" Height="28" Background="#F5F5F7" Foreground="#0A0A0C" ToolTip="Play / Pause (Ctrl+Alt+Space)">
+                                            <TextBlock x:Name="PlayPauseGlyph" Style="{StaticResource Glyph}" FontSize="11.5" Text="&#xE768;" />
+                                        </Button>
+                                        <Button x:Name="NextButton" Style="{StaticResource CircleButton}" Width="26" Height="26" ToolTip="Next Track">
+                                            <TextBlock Style="{StaticResource Glyph}" FontSize="10" Text="&#xE893;" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+
+                            <!-- 2. Drop Shelf Container -->
+                            <Grid x:Name="ShelfContainer" Visibility="Collapsed">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource SectionTitle}" Text="Drop Shelf" />
+                                        <TextBlock x:Name="ShelfCountText" FontSize="11" Foreground="{StaticResource SecondaryBrush}" Margin="8,0,0,0" VerticalAlignment="Center" Text="0 items" />
+                                    </StackPanel>
+                                    <Button x:Name="ClearShelfButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0" ToolTip="Clear Shelf">
+                                        <TextBlock Text="Clear" FontSize="10" FontWeight="Medium" Foreground="#FF453A" />
+                                    </Button>
+                                </DockPanel>
+
+                                <Grid Grid.Row="1">
+                                    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                                  PanningMode="HorizontalOnly" PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel">
+                                        <ItemsControl x:Name="ShelfItemsControl">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Width="120" Height="82" CornerRadius="10"
+                                                            BorderThickness="1" Margin="0,0,8,0"
+                                                            Cursor="Hand" ToolTip="{Binding FullPath}"
+                                                            MouseLeftButtonDown="ShelfItem_MouseLeftButtonDown"
+                                                            MouseMove="ShelfItem_MouseMove">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Background" Value="{StaticResource CardSurfaceBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                                                                <Style.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter Property="Background" Value="#1A1A22" />
+                                                                        <Setter Property="BorderBrush" Value="#38FFFFFF" />
+                                                                    </Trigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <Grid Margin="9,7">
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto" />
+                                                                <RowDefinition Height="*" />
+                                                                <RowDefinition Height="Auto" />
+                                                            </Grid.RowDefinitions>
+                                                            <DockPanel Grid.Row="0">
+                                                                <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                                                                <Button Tag="{Binding FullPath}" Click="RemoveShelfItem_Click" DockPanel.Dock="Right" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="0">
+                                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8.5" Foreground="#86868B" />
+                                                                </Button>
+                                                            </DockPanel>
+                                                            <TextBlock Grid.Row="1" Text="{Binding FileName}" FontSize="11" FontWeight="Medium"
+                                                                       Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                            <DockPanel Grid.Row="2" VerticalAlignment="Bottom">
+                                                                <TextBlock Text="{Binding FileSizeText}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center" />
+                                                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                                                    <Button Tag="{Binding FullPath}" Click="CopyShelfPath_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" ToolTip="Copy File Path">
+                                                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="10" Foreground="#86868B" />
+                                                                    </Button>
+                                                                    <Button Tag="{Binding FullPath}" Click="RevealShelfItem_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="3,0,0,0" ToolTip="Show in Explorer">
+                                                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8DA;" FontSize="10" Foreground="#86868B" />
+                                                                    </Button>
+                                                                </StackPanel>
+                                                            </DockPanel>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+
+                                    <StackPanel x:Name="ShelfEmptyPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="20" Foreground="#515156" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Drop files here to hold for quick drag-out" FontSize="11" Foreground="{StaticResource SecondaryBrush}" Margin="0,4,0,0" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+
+                            <!-- 3. Clipboard History Container -->
+                            <Grid x:Name="ClipboardContainer" Visibility="Collapsed">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource SectionTitle}" Text="Clipboard" />
+                                        <TextBlock x:Name="ClipboardCountText" FontSize="11" Foreground="{StaticResource SecondaryBrush}" Margin="8,0,0,0" VerticalAlignment="Center" Text="0 items" />
+                                    </StackPanel>
+                                    <Button x:Name="ClearClipboardButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0" ToolTip="Clear Clipboard History">
+                                        <TextBlock Text="Clear" FontSize="10" FontWeight="Medium" Foreground="#FF453A" />
+                                    </Button>
+                                </DockPanel>
+
+                                <Grid Grid.Row="1">
+                                    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                                  PanningMode="HorizontalOnly" PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel">
+                                        <ItemsControl x:Name="ClipboardItemsControl">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Width="122" Height="82" CornerRadius="10"
+                                                            BorderThickness="1" Margin="0,0,8,0"
+                                                            Cursor="Hand" ToolTip="Click to copy"
+                                                            MouseLeftButtonDown="ClipboardItem_Click">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Background" Value="{StaticResource CardSurfaceBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                                                                <Style.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter Property="Background" Value="#1A1A22" />
+                                                                        <Setter Property="BorderBrush" Value="#38FFFFFF" />
+                                                                    </Trigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <Grid Margin="9,7">
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto" />
+                                                                <RowDefinition Height="*" />
+                                                                <RowDefinition Height="Auto" />
+                                                            </Grid.RowDefinitions>
+                                                            <DockPanel Grid.Row="0">
+                                                                <Border Width="10" Height="10" CornerRadius="5" Margin="0,0,5,0"
+                                                                        Visibility="{Binding SwatchColor, Converter={StaticResource NullToVisibilityConverter}}"
+                                                                        Background="{Binding SwatchColor, Converter={StaticResource ColorToBrushConverter}}" />
+                                                                <TextBlock Text="{Binding TimeAgo}" Style="{StaticResource Digits}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center" />
+                                                                <Button Tag="{Binding Id}" Click="RemoveClipboardItem_Click" DockPanel.Dock="Right"
+                                                                        Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="3,0,0,0" ToolTip="Remove">
+                                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8.5" Foreground="#86868B" />
+                                                                </Button>
+                                                            </DockPanel>
+                                                            <Grid Grid.Row="1" Margin="0,2,0,0">
+                                                                <Border CornerRadius="5" ClipToBounds="True" MaxHeight="34"
+                                                                        Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}}">
+                                                                    <Image Source="{Binding ImagePreview}" Stretch="UniformToFill" />
+                                                                </Border>
+                                                                <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="Medium"
+                                                                           Foreground="#F5F5F7" TextWrapping="Wrap" MaxHeight="32" TextTrimming="CharacterEllipsis"
+                                                                           VerticalAlignment="Center" />
+                                                            </Grid>
+                                                            <TextBlock Grid.Row="2" Text="{Binding Subtitle}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}"
+                                                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Bottom" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+
+                                    <StackPanel x:Name="ClipboardEmptyPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE77F;" FontSize="20" Foreground="#515156" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Copied text, links, colors, and screenshots appear here" FontSize="11" Foreground="{StaticResource SecondaryBrush}" Margin="0,4,0,0" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+
+                            <!-- 4. Quick Calculator & Unit Converter Container -->
+                            <Grid x:Name="CalcContainer" Visibility="Collapsed">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+                                    <TextBlock Style="{StaticResource SectionTitle}" Text="Calculator &amp; Converter" />
+                                    <TextBlock Text="Enter to copy" FontSize="10" Foreground="{StaticResource SecondaryBrush}" DockPanel.Dock="Right" VerticalAlignment="Center" />
+                                </DockPanel>
+
+                                <Grid Grid.Row="1">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+
+                                    <Border Grid.Row="0" Background="{StaticResource CardSurfaceBrush}" CornerRadius="10" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" Padding="10,6">
+                                        <Grid>
+                                            <TextBox x:Name="CalcInputBox" Background="Transparent" Foreground="#F5F5F7" BorderThickness="0"
+                                                     FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center"
+                                                     CaretBrush="{DynamicResource AccentBrush}" TextChanged="CalcInputBox_TextChanged"
+                                                     KeyDown="CalcInputBox_KeyDown" />
+                                            <TextBlock x:Name="CalcPlaceholder" Text="e.g. 15 * 24, 20% of 450, 100 km in mi, 72 f in c"
+                                                       Foreground="#515156" FontSize="12" VerticalAlignment="Center" IsHitTestVisible="False" Margin="2,0,0,0" />
+                                        </Grid>
+                                    </Border>
+
+                                    <Grid Grid.Row="1" Margin="0,6,0,0">
+                                        <Border x:Name="CalcResultHost" Visibility="Collapsed" Background="{StaticResource CardSurfaceBrush}" CornerRadius="10"
+                                                BorderBrush="#2EFFFFFF" BorderThickness="1" Padding="12,6" Cursor="Hand"
+                                                MouseLeftButtonDown="CalcResult_Click" ToolTip="Click to copy result">
+                                            <DockPanel LastChildFill="False">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="CalcExplanationText" FontSize="11.5" Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                    <TextBlock Text="=" FontSize="12" Foreground="{StaticResource SecondaryBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                                    <TextBlock x:Name="CalcResultText" Style="{StaticResource Digits}" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                                <TextBlock DockPanel.Dock="Right" Text="Copy" FontSize="10" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                                            </DockPanel>
+                                        </Border>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+
+                            <!-- 5. Appearance & Notch Settings Container -->
+                            <Grid x:Name="SettingsContainer" Visibility="Collapsed">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Margin="0,0,0,5" LastChildFill="False">
+                                    <TextBlock Style="{StaticResource SectionTitle}" Text="Appearance &amp; Position" />
+                                    <TextBlock x:Name="SelectedThemeName" Text="Solar Amber" FontSize="10.5" Foreground="{StaticResource SecondaryBrush}" DockPanel.Dock="Right" VerticalAlignment="Center" />
+                                </DockPanel>
+
+                                <Grid Grid.Row="1">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <Border Grid.Row="0" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,4" Margin="0,0,0,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="42" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Top Margin" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                            <Slider x:Name="NotchOffsetSlider" Grid.Column="1" Style="{StaticResource IslandSlider}"
+                                                    Minimum="0" Maximum="45" Value="0" ValueChanged="NotchOffsetSlider_ValueChanged" />
+                                            <TextBlock x:Name="NotchOffsetText" Grid.Column="2" Style="{StaticResource Digits}"
+                                                       FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource SecondaryBrush}"
+                                                       HorizontalAlignment="Right" VerticalAlignment="Center" Text="0 px" />
+                                        </Grid>
+                                    </Border>
+
+                                    <Grid Grid.Row="1" Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Grid.Column="0" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,4">
+                                            <DockPanel LastChildFill="False">
+                                                <TextBlock Text="Align" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                    <Button x:Name="DockLeftBtn" Click="DockButton_Click" Tag="Left" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
+                                                        <TextBlock Text="Left" FontSize="9.5" />
+                                                    </Button>
+                                                    <Button x:Name="DockCenterBtn" Click="DockButton_Click" Tag="Center" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
+                                                        <TextBlock Text="Center" FontSize="9.5" />
+                                                    </Button>
+                                                    <Button x:Name="DockRightBtn" Click="DockButton_Click" Tag="Right" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0">
+                                                        <TextBlock Text="Right" FontSize="9.5" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+
+                                        <Border Grid.Column="2" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,4">
+                                            <DockPanel LastChildFill="False">
+                                                <TextBlock Text="Display" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                    <Button x:Name="MonitorSwitchBtn" Click="MonitorSwitchBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,4,0" ToolTip="Switch Monitor">
+                                                        <TextBlock x:Name="MonitorSwitchText" Text="Screen 1" FontSize="9.5" FontWeight="Medium" Foreground="#F5F5F7" />
+                                                    </Button>
+                                                    <Button x:Name="HaloToggleBtn" Click="HaloToggleBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0" ToolTip="Toggle Ambient Halo">
+                                                        <TextBlock x:Name="HaloToggleText" Text="Glow On" FontSize="9.5" FontWeight="Medium" Foreground="#30D158" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <Border Grid.Row="2" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,5">
+                                        <DockPanel LastChildFill="False">
+                                            <TextBlock Text="Accent Color" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Button Click="ThemeSwatch_Click" Tag="Solar Amber" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#FF9F0A" BorderThickness="0" Cursor="Hand" ToolTip="Solar Amber">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                                <Button Click="ThemeSwatch_Click" Tag="Apple Neon" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#0A84FF" BorderThickness="0" Cursor="Hand" ToolTip="Apple Neon">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                                <Button Click="ThemeSwatch_Click" Tag="Cyberpunk Cyan" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#00F0FF" BorderThickness="0" Cursor="Hand" ToolTip="Cyberpunk Cyan">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                                <Button Click="ThemeSwatch_Click" Tag="Emerald Green" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#30D158" BorderThickness="0" Cursor="Hand" ToolTip="Emerald Green">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                                <Button Click="ThemeSwatch_Click" Tag="Monochrome Frost" Width="15" Height="15" Margin="0,0,6,0" Padding="0" Background="#E5E5EA" BorderThickness="0" Cursor="Hand" ToolTip="Monochrome Frost">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                                <Button Click="ThemeSwatch_Click" Tag="Purple Haze" Width="15" Height="15" Margin="0" Padding="0" Background="#BF5AF2" BorderThickness="0" Cursor="Hand" ToolTip="Purple Haze">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Ellipse Fill="{TemplateBinding Background}" Stroke="#50FFFFFF" StrokeThickness="1" />
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+
+                            <!-- 6. Audio Output Switcher Container -->
+                            <Grid x:Name="AudioContainer" Visibility="Collapsed">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+                                    <TextBlock Style="{StaticResource SectionTitle}" Text="Audio Output" />
+                                    <TextBlock Text="Scroll or click to switch" FontSize="10.5" Foreground="{StaticResource SecondaryBrush}" DockPanel.Dock="Right" VerticalAlignment="Center" />
+                                </DockPanel>
+
+                                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                              PanningMode="HorizontalOnly" PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel">
+                                    <ItemsControl x:Name="AudioEndpointsControl">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Width="154" Height="82" Margin="0,0,8,0" CornerRadius="10"
+                                                        BorderThickness="1" Padding="10,7" Cursor="Hand" MouseLeftButtonDown="AudioEndpointCard_Click">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="{StaticResource CardSurfaceBrush}" />
+                                                            <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                                                            <Style.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter Property="BorderBrush" Value="#38FFFFFF" />
+                                                                    <Setter Property="Background" Value="#1A1A22" />
+                                                                </Trigger>
+                                                                <DataTrigger Binding="{Binding IsDefault}" Value="True">
+                                                                    <Setter Property="BorderBrush" Value="#4830D158" />
+                                                                    <Setter Property="Background" Value="#142219" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <Grid>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="*" />
+                                                            <RowDefinition Height="Auto" />
+                                                        </Grid.RowDefinitions>
+
+                                                        <DockPanel Grid.Row="0" LastChildFill="False">
+                                                            <Border Width="22" Height="22" CornerRadius="11" Background="#1AFFFFFF" VerticalAlignment="Center">
+                                                                <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="11.5" Foreground="#F5F5F7" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            </Border>
+
+                                                            <Border DockPanel.Dock="Right" Visibility="{Binding IsDefault, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                                    Background="#2430D158" CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
+                                                                <TextBlock Text="Active" FontSize="9" FontWeight="SemiBold" Foreground="#30D158" />
+                                                            </Border>
+
+                                                            <Border DockPanel.Dock="Right" Visibility="{Binding BatteryPercent, Converter={StaticResource NullToVisibilityConverter}}"
+                                                                    Background="#18FFFFFF" CornerRadius="4" Padding="4,1" Margin="0,0,4,0" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding BatteryPercent, StringFormat='{}{0}%'}" Style="{StaticResource Digits}" FontSize="9" Foreground="{StaticResource SecondaryBrush}" />
+                                                            </Border>
+                                                        </DockPanel>
+
+                                                        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding DeviceType}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" />
+                                                        </StackPanel>
+
+                                                        <Grid Grid.Row="2">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Slider Style="{StaticResource IslandSlider}" Minimum="0" Maximum="1"
+                                                                    Value="{Binding Volume, Mode=OneWay}"
+                                                                    Tag="{Binding Id}"
+                                                                    ValueChanged="EndpointSlider_ValueChanged"
+                                                                    VerticalAlignment="Center" />
+                                                            <TextBlock Grid.Column="1" Margin="6,0,0,0" Style="{StaticResource Digits}" FontSize="9.5"
+                                                                       Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center"
+                                                                       Text="{Binding Volume, Converter={StaticResource VolumePercentConverter}}" />
+                                                        </Grid>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Grid>
+
+                            <!-- 7. Battery & Power Mode Container -->
+                            <Grid x:Name="BatteryContainer" Visibility="Collapsed">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+                                    <TextBlock Style="{StaticResource SectionTitle}" Text="Battery &amp; Power" />
+                                    <Border x:Name="BatteryHeaderBadge" DockPanel.Dock="Right" Background="#16FFFFFF" CornerRadius="4" Padding="6,1.5" VerticalAlignment="Center">
+                                        <TextBlock x:Name="BatteryHeaderBadgeText" Text="Power Source" FontSize="9.5" FontWeight="Medium" Foreground="{StaticResource SecondaryBrush}" />
+                                    </Border>
+                                </DockPanel>
+
+                                <Grid Grid.Row="1">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <Border Grid.Row="0" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12,8" Margin="0,0,0,6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Border Grid.Column="0" Width="76" Height="30" CornerRadius="8" Background="#0A0A0D" BorderBrush="#28FFFFFF" BorderThickness="1" VerticalAlignment="Center">
+                                                <Grid>
+                                                    <Border x:Name="BatteryLevelFill" HorizontalAlignment="Left" CornerRadius="6" Background="#30D158" Width="68" Margin="2" />
+                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock x:Name="BatteryChargingBolt" Style="{StaticResource Glyph}" Text="&#xE945;" FontSize="10.5" Foreground="#FFFFFF" Margin="0,0,2,0" />
+                                                        <TextBlock x:Name="BatteryHeroPercentText" Style="{StaticResource Digits}" Text="100%" FontSize="11.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+
+                                            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock x:Name="BatteryStatusSubtitle" Text="AC Power" FontSize="11.5" FontWeight="Medium" Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock x:Name="BatteryTimeEstimate" Text="Fully Charged" FontSize="10" Foreground="{StaticResource SecondaryBrush}" Margin="0,1,0,0" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+
+                                    <Grid Grid.Row="1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="6" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="6" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Grid.Column="0" x:Name="PlanSaverCard" Background="{StaticResource CardSurfaceBrush}" CornerRadius="9" Padding="8,6" Cursor="Hand" MouseLeftButtonDown="PlanSaverCard_Click" BorderThickness="1" BorderBrush="{StaticResource CardBorderBrush}">
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="&#xEC0A;" FontSize="11.5" Foreground="#30D158" Margin="0,0,6,0" />
+                                                <TextBlock Text="Low Power" FontSize="10.5" FontWeight="Medium" Foreground="#F5F5F7" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Grid.Column="2" x:Name="PlanBalancedCard" Background="{StaticResource CardSurfaceBrush}" CornerRadius="9" Padding="8,6" Cursor="Hand" MouseLeftButtonDown="PlanBalancedCard_Click" BorderThickness="1" BorderBrush="{StaticResource CardBorderBrush}">
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE74C;" FontSize="11.5" Foreground="#0A84FF" Margin="0,0,6,0" />
+                                                <TextBlock Text="Balanced" FontSize="10.5" FontWeight="Medium" Foreground="#F5F5F7" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Grid.Column="4" x:Name="PlanPerfCard" Background="{StaticResource CardSurfaceBrush}" CornerRadius="9" Padding="8,6" Cursor="Hand" MouseLeftButtonDown="PlanPerfCard_Click" BorderThickness="1" BorderBrush="{StaticResource CardBorderBrush}">
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE945;" FontSize="11.5" Foreground="#FF9F0A" Margin="0,0,6,0" />
+                                                <TextBlock Text="Performance" FontSize="10.5" FontWeight="Medium" Foreground="#F5F5F7" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+
+                            <!-- 8. Voice Memos Container -->
+                            <Grid x:Name="VoiceMemoContainer" Visibility="Collapsed">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+                                    <TextBlock Style="{StaticResource SectionTitle}" Text="Voice Memos" />
+                                    <Button Click="OpenMemosFolder_Click" DockPanel.Dock="Right" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" ToolTip="Open Recordings Folder">
+                                        <TextBlock Text="Open Folder" FontSize="10" Foreground="{StaticResource SecondaryBrush}" />
+                                    </Button>
+                                </DockPanel>
+
+                                <Grid Grid.Row="1" Height="82" VerticalAlignment="Top">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="146" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10,6">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+
+                                            <Grid Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <Border x:Name="RecordHalo" Width="48" Height="48" CornerRadius="24" Opacity="0" IsHitTestVisible="False">
+                                                    <Border.Background>
+                                                        <RadialGradientBrush>
+                                                            <GradientStop Color="#AAFF453A" Offset="0" />
+                                                            <GradientStop Color="#00FF453A" Offset="1" />
+                                                        </RadialGradientBrush>
+                                                    </Border.Background>
+                                                </Border>
+                                                <Button x:Name="HeroRecordBtn" Click="HeroRecordBtn_Click" Style="{StaticResource CircleButton}"
+                                                        Width="34" Height="34" Background="#FF453A" Foreground="#FFFFFF" ToolTip="Start / Stop Recording">
+                                                    <TextBlock x:Name="HeroRecordGlyph" Style="{StaticResource Glyph}" FontSize="13" Text="&#xE7C8;" />
+                                                </Button>
+                                            </Grid>
+
+                                            <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,2,0,1">
+                                                <TextBlock x:Name="HeroRecordTimer" Style="{StaticResource Digits}" Text="00:00"
+                                                           FontSize="11" FontWeight="SemiBold" Foreground="#F5F5F7" HorizontalAlignment="Center" />
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,0" Height="12">
+                                                    <Rectangle x:Name="RecBar0" Width="2.5" Height="5" RadiusX="1.25" RadiusY="1.25" Fill="#FF453A" Margin="1.25,0" VerticalAlignment="Center" />
+                                                    <Rectangle x:Name="RecBar1" Width="2.5" Height="8" RadiusX="1.25" RadiusY="1.25" Fill="#FF453A" Margin="1.25,0" VerticalAlignment="Center" />
+                                                    <Rectangle x:Name="RecBar2" Width="2.5" Height="11" RadiusX="1.25" RadiusY="1.25" Fill="#FF453A" Margin="1.25,0" VerticalAlignment="Center" />
+                                                    <Rectangle x:Name="RecBar3" Width="2.5" Height="8" RadiusX="1.25" RadiusY="1.25" Fill="#FF453A" Margin="1.25,0" VerticalAlignment="Center" />
+                                                    <Rectangle x:Name="RecBar4" Width="2.5" Height="5" RadiusX="1.25" RadiusY="1.25" Fill="#FF453A" Margin="1.25,0" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </StackPanel>
+
+                                            <TextBlock Grid.Row="2" x:Name="HeroRecordStatus" Text="Ready" FontSize="9"
+                                                       Foreground="{StaticResource SecondaryBrush}" HorizontalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Grid.Column="2" Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12,8">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+
+                                            <Grid Grid.Row="0" VerticalAlignment="Center">
+                                                <StackPanel x:Name="LastMemoHost" Visibility="Collapsed">
+                                                    <TextBlock x:Name="LastMemoFileName" Text="Recording.wav" FontSize="11.5" FontWeight="Medium" Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" />
+                                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                        <TextBlock x:Name="LastMemoDuration" Style="{StaticResource Digits}" Text="0:00" FontSize="10" Foreground="{StaticResource SecondaryBrush}" />
+                                                        <TextBlock Text=" · Saved to Shelf" FontSize="10" Foreground="{StaticResource SecondaryBrush}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+
+                                                <StackPanel x:Name="NoMemoPlaceholder" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <TextBlock Text="No recordings yet" FontSize="11" Foreground="{StaticResource SecondaryBrush}" HorizontalAlignment="Center" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <DockPanel Grid.Row="1" VerticalAlignment="Bottom" LastChildFill="False">
+                                                <Button x:Name="MemoPlayPauseBtn" Click="MemoPlayPauseBtn_Click" Style="{StaticResource IslandButton}" Height="24" Padding="10,0">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock x:Name="MemoPlayGlyph" Style="{StaticResource Glyph}" Text="&#xE768;" FontSize="9.5" Foreground="#F5F5F7" />
+                                                        <TextBlock x:Name="MemoPlayLabel" Text="Play" FontSize="10" FontWeight="Medium" Foreground="#F5F5F7" Margin="5,0,0,0" />
+                                                    </StackPanel>
+                                                </Button>
+
+                                                <Button Click="SendMemoToShelf_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="24" Padding="9,0" Margin="0" ToolTip="Pin to Drop Shelf">
+                                                    <TextBlock Text="Pin to Shelf" FontSize="10" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" />
+                                                </Button>
+                                            </DockPanel>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+
+                            <!-- 9. Connected Peripherals & Bluetooth Battery Hub -->
+                            <Grid x:Name="PeripheralsContainer" Visibility="Collapsed">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+                                    <TextBlock Style="{StaticResource SectionTitle}" Text="Connected Devices" />
+                                    <Button x:Name="RefreshPeripheralsBtn" DockPanel.Dock="Right" Click="RefreshPeripheralsBtn_Click" Style="{StaticResource CircleButton}" Width="20" Height="20" ToolTip="Refresh Devices">
+                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE72C;" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" />
+                                    </Button>
+                                </DockPanel>
+
+                                <Grid Grid.Row="1">
+                                    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                                  PanningMode="HorizontalOnly" PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel">
+                                        <ItemsControl x:Name="PeripheralsItemsControl">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Width="154" Height="82" Margin="0,0,8,0" CornerRadius="10"
+                                                            BorderThickness="1" Padding="10,7">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Background" Value="{StaticResource CardSurfaceBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                                                                <Style.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter Property="BorderBrush" Value="#38FFFFFF" />
+                                                                        <Setter Property="Background" Value="#1A1A22" />
+                                                                    </Trigger>
+                                                                    <DataTrigger Binding="{Binding IsLowBattery}" Value="True">
+                                                                        <Setter Property="BorderBrush" Value="#66FF453A" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto" />
+                                                                <RowDefinition Height="*" />
+                                                                <RowDefinition Height="Auto" />
+                                                            </Grid.RowDefinitions>
+
+                                                            <DockPanel Grid.Row="0" LastChildFill="False">
+                                                                <Border Width="22" Height="22" CornerRadius="11" Background="#1AFFFFFF" VerticalAlignment="Center">
+                                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="11.5" Foreground="#F5F5F7" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                </Border>
+
+                                                                <TextBlock DockPanel.Dock="Right" Text="{Binding BatteryPercent, StringFormat='{}{0}%'}"
+                                                                           Style="{StaticResource Digits}" FontSize="11" FontWeight="SemiBold"
+                                                                           Foreground="{Binding BatteryBrush}" VerticalAlignment="Center" />
+                                                            </DockPanel>
+
+                                                            <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7"
+                                                                           TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Text="{Binding BatteryStatusText}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" />
+                                                            </StackPanel>
+
+                                                            <Grid Grid.Row="2">
+                                                                <Border Height="3.5" Background="#20FFFFFF" CornerRadius="1.75" HorizontalAlignment="Stretch" />
+                                                                <Border Height="3.5" Width="{Binding BatteryFillWidth}" HorizontalAlignment="Left"
+                                                                        Background="{Binding BatteryBrush}" CornerRadius="1.75" />
+                                                            </Grid>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+
+                                    <StackPanel x:Name="PeripheralsEmptyPlaceholder" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE702;" FontSize="20" Foreground="#515156" HorizontalAlignment="Center" />
+                                        <TextBlock Text="No wireless Bluetooth or XInput devices connected" FontSize="11" Foreground="{StaticResource SecondaryBrush}" Margin="0,4,0,0" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+
+                        <!-- Subtle 1px Hairline Divider Separating View Content from Bottom Dock -->
+                        <Border Grid.Row="1" Height="1" Background="#14FFFFFF" Margin="0,6,0,5" />
+
+                        <!-- Bottom Row: Symmetrical Apple Segmented Dock (all 10 items + Collapse fit simultaneously with zero scrolling) -->
+                        <DockPanel Grid.Row="2" VerticalAlignment="Center" Height="26" LastChildFill="True">
+                            <!-- Right: Collapse Chevron -->
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Width="1" Height="14" Background="#1CFFFFFF" Margin="4,0,6,0" VerticalAlignment="Center" />
+                                <Button x:Name="CollapseButton" Click="CollapseButton_Click" Style="{StaticResource DockIconButton}"
+                                        ToolTip="Collapse (Esc)">
+                                    <TextBlock Style="{StaticResource Glyph}" FontSize="10" Text="&#xE70E;" />
+                                </Button>
+                            </StackPanel>
+
+                            <!-- Center/Left: Segmented View Switcher Pills -->
+                            <ScrollViewer x:Name="DockScrollViewer"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Disabled"
+                                          PanningMode="HorizontalOnly"
+                                          PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel"
+                                          VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <!-- Now Playing / Home -->
+                                    <Button x:Name="MediaHomeButton" Style="{StaticResource DockIconButton}" ToolTip="Now Playing &amp; Stopwatch">
+                                        <TextBlock Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE8D6;" />
+                                    </Button>
+
+                                    <!-- Drop Shelf -->
+                                    <Button x:Name="ShelfButton" Style="{StaticResource DockToolButton}" ToolTip="Drop Shelf">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE8B7;" />
+                                            <TextBlock x:Name="ShelfBadgeText" Style="{StaticResource Digits}" Margin="4,0,0,0" FontSize="10" FontWeight="SemiBold" Visibility="Collapsed" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- Clipboard -->
+                                    <Button x:Name="ClipboardButton" Style="{StaticResource DockToolButton}" ToolTip="Clipboard (Ctrl+Alt+V)">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE77F;" />
+                                            <TextBlock x:Name="ClipboardBadgeText" Style="{StaticResource Digits}" Margin="4,0,0,0" FontSize="10" FontWeight="SemiBold" Visibility="Collapsed" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- Quick Calculator -->
+                                    <Button x:Name="CalcButton" Style="{StaticResource DockIconButton}" ToolTip="Calculator &amp; Converter (Ctrl+Alt+C)">
+                                        <TextBlock Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE8EF;" />
+                                    </Button>
+
+                                    <!-- Audio Output -->
+                                    <Button x:Name="AudioButton" Style="{StaticResource DockIconButton}" ToolTip="Audio Output (Ctrl+Alt+O)">
+                                        <TextBlock x:Name="AudioButtonGlyph" Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE7F6;" />
+                                    </Button>
+
+                                    <!-- Battery & Power -->
+                                    <Button x:Name="BatteryButton" Style="{StaticResource DockToolButton}" ToolTip="Battery &amp; Power (Ctrl+Alt+P)">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock x:Name="BatteryButtonGlyph" Style="{StaticResource Glyph}" FontSize="10" Text="&#xE945;" />
+                                            <TextBlock x:Name="BatteryBadgeText" Style="{StaticResource Digits}" Margin="4,0,0,0" FontSize="10" FontWeight="Medium" Text="100%" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- Voice Memos -->
+                                    <Button x:Name="RecordButton" Style="{StaticResource DockIconButton}" ToolTip="Voice Memos (Ctrl+Alt+R)">
+                                        <Grid>
+                                            <TextBlock x:Name="RecordButtonGlyph" Style="{StaticResource Glyph}" FontSize="10.5" Foreground="#FF453A" Text="&#xE7C8;" />
+                                            <TextBlock x:Name="RecordBadgeText" Visibility="Collapsed" />
+                                        </Grid>
+                                    </Button>
+
+                                    <!-- Connected Peripherals -->
+                                    <Button x:Name="PeripheralsButton" Style="{StaticResource DockIconButton}" ToolTip="Connected Devices (Ctrl+Alt+D)">
+                                        <TextBlock x:Name="PeripheralsButtonGlyph" Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE702;" />
+                                    </Button>
+
+                                    <!-- Mic Mute -->
+                                    <Button x:Name="MicMuteButton" Style="{StaticResource DockIconButton}" ToolTip="Toggle Microphone Mute">
+                                        <TextBlock x:Name="MicMuteGlyph" Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE720;" />
+                                    </Button>
+
+                                    <!-- Appearance & Settings -->
+                                    <Button x:Name="SettingsButton" Style="{StaticResource DockIconButton}" ToolTip="Appearance &amp; Settings">
+                                        <TextBlock Style="{StaticResource Glyph}" FontSize="10.5" Text="&#xE713;" />
+                                    </Button>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <!-- Concentric Drop Zone Overlay when dragging files over the island -->
+            <Border x:Name="DropOverlay" Visibility="Collapsed" IsHitTestVisible="False" Background="#F2050507" CornerRadius="0,0,14,14">
+                <Border Margin="4" BorderBrush="#40FFFFFF" BorderThickness="1" CornerRadius="0,0,11,11">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="13" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="Drop to Shelf" FontSize="11.5" FontWeight="Medium" Foreground="#F5F5F7" Margin="7,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
