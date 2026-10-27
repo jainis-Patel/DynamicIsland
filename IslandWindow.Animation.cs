@@ -9,8 +9,10 @@ namespace DynamicIsland;
 public partial class IslandWindow
 {
     private static readonly CubicEase SharedCubicOut = CreateFrozenEase(new CubicEase { EasingMode = EasingMode.EaseOut });
-    private static readonly BackEase SharedPanelBackOut = CreateFrozenEase(new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.35 });
-    private static readonly BackEase SharedContainerBackOut = CreateFrozenEase(new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.4 });
+    private static readonly QuinticEase SharedQuinticOut = CreateFrozenEase(new QuinticEase { EasingMode = EasingMode.EaseOut });
+    private static readonly QuarticEase SharedQuarticOut = CreateFrozenEase(new QuarticEase { EasingMode = EasingMode.EaseOut });
+    private static readonly BackEase SharedPanelBackOut = CreateFrozenEase(new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.16 });
+    private static readonly BackEase SharedContainerBackOut = CreateFrozenEase(new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.22 });
 
     private bool _rendering;
     private bool _pointerInside;
@@ -20,6 +22,8 @@ public partial class IslandWindow
     private double _appliedRadius = -1;
     private double _appliedOffset = double.NaN;
     private double _appliedDroplet = -1;
+    private double _smoothDeformX = 1.0;
+    private double _smoothDeformY = 1.0;
 
     private static T CreateFrozenEase<T>(T ease) where T : Freezable
     {
@@ -39,12 +43,13 @@ public partial class IslandWindow
         double speed = Math.Clamp(animationSpeed, 0.5, 1.6);
         double liquid = reducedMotion ? 0.0 : Math.Clamp(liquidIntensity, 0.0, 1.0);
 
-        // Stiffness scales with speed^2 so natural frequency omega_0 scales linearly with speed
-        double stiffness = 320.0 * speed * speed;
+        // Smooth Apple-tuned natural frequency: softer stiffness (210 * speed^2) yields a
+        // graceful, silky ~360ms expansion glide rather than a harsh mechanical snap.
+        double stiffness = 210.0 * speed * speed;
 
-        // Damping ratio zeta ranges from 1.02 (critically damped, zero overshoot) at 0% liquid
-        // down to 0.36 (bouncy, gelatinous liquid droplet oscillation) at 100% liquid.
-        double zeta = 1.02 - (0.66 * liquid);
+        // Damping ratio zeta ranges from 1.00 (critically damped, pure smooth ease-out) at 0% liquid
+        // down to 0.56 (plush, velvety single-cushion liquid settle without jittery multi-ringing) at 100% liquid.
+        double zeta = 1.00 - (0.44 * liquid);
         double damping = 2.0 * zeta * Math.Sqrt(stiffness);
         return (stiffness, damping);
     }
@@ -60,11 +65,11 @@ public partial class IslandWindow
         _width.Stiffness = stiffness;
         _width.Damping = damping;
 
-        _height.Stiffness = stiffness;
-        _height.Damping = damping;
+        // Slightly softer vertical & corner springs so width leads gently and height unfolds smoothly behind it
+        _height.Stiffness = stiffness * 0.88;
+        _height.Damping = damping * 0.96;
 
-        // Slightly softer radius spring creates an organic liquid lag on corner rounding
-        _radius.Stiffness = stiffness * 0.86;
+        _radius.Stiffness = stiffness * 0.80;
         _radius.Damping = damping * 0.92;
 
         _dropletOffset.Stiffness = stiffness * 0.90;
@@ -132,22 +137,22 @@ public partial class IslandWindow
         _pointerInside = inside;
         _machine.SetPointerInside(inside);
 
-        if (_machine.State == IslandState.Idle)
+        // Gentle magnetic pre-hover swell in Idle or Compact before full expansion
+        // (uses pure spring target change with zero velocity jump so it eases in smoothly from rest)
+        if (_machine.State is IslandState.Idle or IslandState.Compact)
         {
+            var baseShape = Shapes[_machine.State];
             if (inside)
             {
-                _width.Target = 136;
-                _height.Target = 30;
-                _radius.Target = 15;
-                TriggerLiquidImpulse(140, 45, 12);
+                _width.Target = baseShape.Width + 18;
+                _height.Target = baseShape.Height + 3;
+                _radius.Target = baseShape.Radius + 1.5;
             }
             else
             {
-                var idle = Shapes[IslandState.Idle];
-                _width.Target = idle.Width;
-                _height.Target = idle.Height;
-                _radius.Target = idle.Radius;
-                TriggerLiquidImpulse(-110, -35, -10);
+                _width.Target = baseShape.Width;
+                _height.Target = baseShape.Height;
+                _radius.Target = baseShape.Radius;
             }
             EnsureRendering();
         }
@@ -172,25 +177,21 @@ public partial class IslandWindow
         }
 
         var shape = GetTargetShape(next);
+        if (next == IslandState.Expanded)
+        {
+            ExpandedPanel.Width = shape.Width;
+            ExpandedPanel.Height = shape.Height;
+        }
+
         _width.Target = shape.Width;
         _height.Target = shape.Height;
         _radius.Target = shape.Radius;
 
-        if (next == IslandState.Expanded)
+        // LetExpanded/Idle transitions ease in naturally from current spring momentum (dx/dt continuous)
+        // instead of injecting a jarring step-velocity jump; only apply a gentle impulse on Toast alerts.
+        if (next == IslandState.Toast)
         {
-            TriggerLiquidImpulse(290, 210, 40);
-        }
-        else if (previous == IslandState.Expanded)
-        {
-            TriggerLiquidImpulse(-240, -170, -30);
-        }
-        else if (next == IslandState.Toast)
-        {
-            TriggerLiquidImpulse(250, 95, 30);
-        }
-        else if (next == IslandState.Compact)
-        {
-            TriggerLiquidImpulse(180, 50, 18);
+            TriggerLiquidImpulse(95, 35, 10);
         }
 
         CrossfadeTo(next);
@@ -259,10 +260,10 @@ public partial class IslandWindow
                 continue;
             }
 
-            var fade = new DoubleAnimation(on ? 1 : 0, TimeSpan.FromMilliseconds(on ? 190 : 90))
+            var fade = new DoubleAnimation(on ? 1 : 0, TimeSpan.FromMilliseconds(on ? 240 : 105))
             {
-                BeginTime = on ? TimeSpan.FromMilliseconds(45) : TimeSpan.Zero,
-                EasingFunction = SharedCubicOut,
+                BeginTime = on ? TimeSpan.FromMilliseconds(28) : TimeSpan.Zero,
+                EasingFunction = on ? SharedQuinticOut : SharedCubicOut,
             };
 
             if (!on)
@@ -279,17 +280,35 @@ public partial class IslandWindow
 
             panel.BeginAnimation(OpacityProperty, fade);
 
-            var scale = (ScaleTransform)panel.RenderTransform;
-            var grow = new DoubleAnimation
+            if (panel.RenderTransform is TransformGroup group &&
+                group.Children.Count >= 2 &&
+                group.Children[0] is ScaleTransform scale &&
+                group.Children[1] is TranslateTransform translate)
             {
-                From = on ? (reduced ? 0.98 : 0.92) : null,
-                To = on ? 1 : 0.96,
-                Duration = TimeSpan.FromMilliseconds(on ? (reduced ? 180 : 320) : 120),
-                BeginTime = fade.BeginTime,
-                EasingFunction = (on && !reduced) ? SharedPanelBackOut : SharedCubicOut,
-            };
-            scale.BeginAnimation(ScaleTransform.ScaleXProperty, grow);
-            scale.BeginAnimation(ScaleTransform.ScaleYProperty, grow);
+                bool isExpandedPanel = panel == ExpandedPanel;
+                var grow = new DoubleAnimation
+                {
+                    From = on ? (reduced ? 0.98 : (isExpandedPanel ? 0.93 : 0.95)) : null,
+                    To = on ? 1.0 : (isExpandedPanel ? 0.95 : 0.97),
+                    Duration = TimeSpan.FromMilliseconds(on ? (reduced ? 180 : 350) : 130),
+                    BeginTime = fade.BeginTime,
+                    EasingFunction = (on && !reduced) ? SharedPanelBackOut : SharedQuarticOut,
+                };
+                scale.BeginAnimation(ScaleTransform.ScaleXProperty, grow);
+                scale.BeginAnimation(ScaleTransform.ScaleYProperty, grow);
+
+                double fromY = on ? (reduced ? 0 : (isExpandedPanel ? -7 : -3)) : translate.Y;
+                double toY = on ? 0 : (reduced ? 0 : -4);
+                var slideY = new DoubleAnimation
+                {
+                    From = on ? fromY : null,
+                    To = toY,
+                    Duration = TimeSpan.FromMilliseconds(on ? (reduced ? 160 : 330) : 115),
+                    BeginTime = fade.BeginTime,
+                    EasingFunction = SharedQuinticOut,
+                };
+                translate.BeginAnimation(TranslateTransform.YProperty, slideY);
+            }
         }
     }
 
@@ -379,11 +398,13 @@ public partial class IslandWindow
         _height.Step(dt);
         _radius.Step(dt);
         _dropletOffset.Step(dt);
-        ApplyGeometry();
+        ApplyGeometry(dt);
         UpdateLiveBars(now.TotalSeconds);
         bool glowSettled = UpdateAmbientHalo();
 
-        if (_width.IsAtRest && _height.IsAtRest && _radius.IsAtRest && _dropletOffset.IsAtRest && !BarsAnimating && glowSettled)
+        if (_width.IsAtRest && _height.IsAtRest && _radius.IsAtRest && _dropletOffset.IsAtRest &&
+            Math.Abs(_smoothDeformX - 1.0) < 0.001 && Math.Abs(_smoothDeformY - 1.0) < 0.001 &&
+            !BarsAnimating && glowSettled)
         {
             StopRendering();
         }
@@ -454,7 +475,7 @@ public partial class IslandWindow
         return settled;
     }
 
-    private void ApplyGeometry()
+    private void ApplyGeometry(double dt = 1.0 / 60.0)
     {
         double w = Math.Max(1, _width.Value);
         double h = Math.Max(1, _height.Value);
@@ -463,12 +484,23 @@ public partial class IslandWindow
         double dropT = _dropletOffset.Value;
         double liquid = IsReducedMotion ? 0.0 : Math.Clamp(_settingsService?.Current.LiquidIntensity ?? 0.65, 0.0, 1.0);
 
-        // Gooey squash-and-stretch velocity deformation (volume-conserving droplet physics)
-        double vx = Math.Clamp(_width.Velocity / 1600.0, -1.0, 1.0);
-        double vy = Math.Clamp(_height.Velocity / 1300.0, -1.0, 1.0);
-        double deformStrength = 0.14 * liquid;
-        double deformX = _width.IsAtRest && _height.IsAtRest ? 1.0 : Math.Clamp(1.0 + deformStrength * (vx - 0.45 * vy), 0.84, 1.20);
-        double deformY = _width.IsAtRest && _height.IsAtRest ? 1.0 : Math.Clamp(1.0 + deformStrength * (vy - 0.50 * vx), 0.84, 1.20);
+        // Smoothly filtered gooey squash-and-stretch velocity deformation (zero first-frame snap)
+        double vx = Math.Clamp(_width.Velocity / 2200.0, -1.0, 1.0);
+        double vy = Math.Clamp(_height.Velocity / 1800.0, -1.0, 1.0);
+        double deformStrength = 0.085 * liquid;
+        double targetDeformX = _width.IsAtRest && _height.IsAtRest ? 1.0 : Math.Clamp(1.0 + deformStrength * (vx - 0.35 * vy), 0.90, 1.12);
+        double targetDeformY = _width.IsAtRest && _height.IsAtRest ? 1.0 : Math.Clamp(1.0 + deformStrength * (vy - 0.35 * vx), 0.90, 1.12);
+
+        double smoothFactor = Math.Clamp(dt * 22.0, 0.08, 1.0);
+        _smoothDeformX += (targetDeformX - _smoothDeformX) * smoothFactor;
+        _smoothDeformY += (targetDeformY - _smoothDeformY) * smoothFactor;
+        if (_width.IsAtRest && _height.IsAtRest && Math.Abs(_smoothDeformX - 1.0) < 0.001 && Math.Abs(_smoothDeformY - 1.0) < 0.001)
+        {
+            _smoothDeformX = 1.0;
+            _smoothDeformY = 1.0;
+        }
+        double deformX = _smoothDeformX;
+        double deformY = _smoothDeformY;
 
         if (Math.Abs(w - _appliedWidth) < 0.005 &&
             Math.Abs(h - _appliedHeight) < 0.005 &&
@@ -516,18 +548,6 @@ public partial class IslandWindow
 
         Pill.Width = w;
         Pill.Height = h;
-
-        // Smoothly expand/contract ExpandedPanel when morphing between normal Expanded (452x190) and Settings (480x336)
-        if (_machine.State == IslandState.Expanded && w >= 360 && h >= 160)
-        {
-            ExpandedPanel.Width = w;
-            ExpandedPanel.Height = h;
-        }
-        else
-        {
-            ExpandedPanel.Width = Math.Max(452, w);
-            ExpandedPanel.Height = Math.Max(190, h);
-        }
 
         var corners = new CornerRadius(topR, topR, effectiveR, effectiveR);
         PillBackground.CornerRadius = corners;

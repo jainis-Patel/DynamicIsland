@@ -34,8 +34,8 @@ public sealed record ToastContent(
 /// </summary>
 public sealed class IslandStateMachine
 {
-    public static readonly TimeSpan HoverEnterDelay = TimeSpan.FromMilliseconds(150);
-    public static readonly TimeSpan HoverLeaveDelay = TimeSpan.FromMilliseconds(280);
+    public static readonly TimeSpan HoverEnterDelay = TimeSpan.FromMilliseconds(110);
+    public static readonly TimeSpan HoverLeaveDelay = TimeSpan.FromMilliseconds(260);
     public const int MaxQueuedToasts = 5;
 
     private readonly DispatcherTimer _enterTimer;

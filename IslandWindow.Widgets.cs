@@ -44,10 +44,12 @@ public partial class IslandWindow
         _recordingHotkeyAction = null;
         SetKeyboardFocusable(view == ExpandedView.Calc);
 
-        // Morph the pill bigger (480x336) when selecting Settings, or back to 420x190 for other views,
-        // accompanied by a gooey liquid droplet velocity impulse.
+        // Morph the pill bigger (480x336) when selecting Settings, or back to 452x190 for other views,
+        // using smooth spring target easing without jarring velocity spikes.
         SyncSpringMotionPreferences();
         var targetShape = GetTargetShape(_machine.State, view);
+        ExpandedPanel.Width = targetShape.Width;
+        ExpandedPanel.Height = targetShape.Height;
         _width.Target = targetShape.Width;
         _height.Target = targetShape.Height;
         _radius.Target = targetShape.Radius;
@@ -58,15 +60,10 @@ public partial class IslandWindow
             UpdateVolumeOsdUI();
             UpdateHotkeysUI();
             UpdateDockVisibilityUI();
-            TriggerLiquidImpulse(260, 320, 42);
         }
-        else if (previousView == ExpandedView.Settings && view != ExpandedView.Settings)
+        else if (previousView != view)
         {
-            TriggerLiquidImpulse(-220, -240, -32);
-        }
-        else
-        {
-            TriggerLiquidImpulse(165, -65, 22);
+            TriggerLiquidImpulse(55, -20, 8);
         }
         EnsureRendering();
 

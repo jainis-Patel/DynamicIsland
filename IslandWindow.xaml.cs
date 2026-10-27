@@ -132,7 +132,10 @@ public partial class IslandWindow : Window
         {
             bool visible = panel == IdlePanel;
             panel.RenderTransformOrigin = new Point(0.5, 0);
-            panel.RenderTransform = new ScaleTransform(1, 1);
+            var group = new TransformGroup();
+            group.Children.Add(new ScaleTransform(1, 1));
+            group.Children.Add(new TranslateTransform(0, 0));
+            panel.RenderTransform = group;
             panel.Opacity = visible ? 1 : 0;
             panel.IsHitTestVisible = visible;
             panel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
