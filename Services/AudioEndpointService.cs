@@ -63,8 +63,18 @@ public sealed class AudioEndpointInfo : INotifyPropertyChanged
     public bool IsMuted
     {
         get => _isMuted;
-        set { if (_isMuted != value) { _isMuted = value; OnPropertyChanged(); } }
+        set
+        {
+            if (_isMuted != value)
+            {
+                _isMuted = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(DisplayGlyph));
+            }
+        }
     }
+
+    public string DisplayGlyph => _isMuted ? "\uE74F" : Glyph;
 
     public int? BatteryPercent
     {

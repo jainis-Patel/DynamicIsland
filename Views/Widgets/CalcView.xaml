@@ -1,0 +1,62 @@
+<UserControl x:Class="DynamicIsland.Views.Widgets.CalcView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:core="clr-namespace:DynamicIsland.Core"
+             mc:Ignorable="d"
+             d:DesignHeight="150" d:DesignWidth="464">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="True">
+            <Button Click="BackToLauncher_Click" DockPanel.Dock="Left" Style="{StaticResource IslandButton}" Height="20" Width="20" Padding="0" Margin="0,0,6,0" ToolTipService.ToolTip="Back to Apps &amp; Widgets">
+                <TextBlock Style="{StaticResource Glyph}" Text="&#xE72B;" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Button>
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Calculator &amp; Converter" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <TextBlock Text="Enter to copy" FontSize="9.5" Foreground="{DynamicResource SecondaryBrush}" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="6,0,0,0" />
+            <ScrollViewer PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel" x:Name="CalcHistoryScrollViewer" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly" VerticalAlignment="Center">
+                <ItemsControl x:Name="CalcHistoryItemsControl">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Click="CalcHistoryChip_Click" Tag="{Binding}" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0,0,4,0" ToolTipService.ToolTip="Click to load expression · Shift+Click to copy result">
+                                <TextBlock Text="{Binding ChipText}" Style="{StaticResource Digits}" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" Background="{DynamicResource CardSurfaceBrush}" CornerRadius="10" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="10,6">
+                <Grid>
+                    <TextBox KeyDown="CalcInputBox_KeyDown" TextChanged="CalcInputBox_TextChanged" x:Name="CalcInputBox" Background="Transparent" Foreground="{DynamicResource PrimaryTextBrush}" BorderThickness="0" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" CaretBrush="{DynamicResource AccentBrush}" />
+                    <TextBlock x:Name="CalcPlaceholder" Text="e.g. 15 * 24, ans * 2, 255 in hex, 100 km in mi" FontSize="12" Foreground="{DynamicResource SecondaryBrush}" Opacity="0.65" VerticalAlignment="Center" IsHitTestVisible="False" Margin="2,0,0,0" />
+                </Grid>
+            </Border>
+            <Grid Grid.Row="1" Margin="0,6,0,0">
+                <Border MouseLeftButtonDown="CalcResult_Click" x:Name="CalcResultHost" Visibility="Collapsed" Background="{DynamicResource CardSurfaceBrush}" CornerRadius="10" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="12,6" Cursor="Hand" ToolTipService.ToolTip="Click to copy result">
+                    <DockPanel LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock x:Name="CalcExplanationText" FontSize="11.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="=" FontSize="12" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="CalcResultText" Style="{StaticResource Digits}" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock DockPanel.Dock="Right" Text="Copy" FontSize="10" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                    </DockPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -4,28 +4,82 @@ using System.Text.RegularExpressions;
 
 namespace DynamicIsland.Services;
 
+internal sealed record CalcHistoryEntry(string Expression, string Result)
+{
+    public string ChipText => $"{Expression} = {Result}";
+}
+
 /// <summary>
 /// Lightweight inline calculator and unit converter for the Dynamic Island.
 /// Parses expressions such as '12 * 85', '2 ^ 10', 'sqrt(144)', '15% of 600',
-/// '150 km in miles', '72 f in c', '16 gb in mb', etc.
+/// '150 km in miles', '72 f in c', '16 gb in mb', '255 in hex', '0xFF in dec', 'ans * 2', etc.
 /// </summary>
 internal static class QuickCalcService
 {
     private static readonly Regex PercentOfRegex = new(@"^([+-]?[\d\.]+)\s*%\s*(?:of)\s*([+-]?[\d\.]+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex BaseConvertRegex = new(@"^(0x[0-9a-fA-F]+|0b[01]+|\d+)\s*(?:in|to)\s*(hex|bin|binary|dec|decimal)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex UnitConvertRegex = new(@"^([+-]?[\d\.]+)\s*([a-zA-Z]+)\s*(?:in|to)\s*([a-zA-Z]+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex PowerRegex = new(@"^([+-]?[\d\.]+)\s*\^\s*([+-]?[\d\.]+)$", RegexOptions.Compiled);
     private static readonly Regex SqrtRegex = new(@"^sqrt\s*\(\s*([\d\.]+)\s*\)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex MultiplyXRegex = new(@"(?<=[\d\)])\s*[xX]\s*(?=[\d\(])", RegexOptions.Compiled);
+    private static readonly Regex AnsTokenRegex = new(@"\bans\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly DataTable SharedTable = new();
     private static readonly object TableLock = new();
+    private static string _lastNumericAnswer = "0";
+
+    public static string LastAnswer => _lastNumericAnswer;
+
+    public static void SetLastAnswer(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return;
+        string clean = value.Trim();
+        if (clean.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            if (long.TryParse(clean[2..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out long hexVal))
+            {
+                _lastNumericAnswer = hexVal.ToString(CultureInfo.InvariantCulture);
+            }
+        }
+        else if (clean.StartsWith("0b", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                long binVal = Convert.ToInt64(clean[2..], 2);
+                _lastNumericAnswer = binVal.ToString(CultureInfo.InvariantCulture);
+            }
+            catch { }
+        }
+        else if (double.TryParse(clean, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+        {
+            _lastNumericAnswer = clean;
+        }
+    }
 
     public static (bool Success, string Result, string Explanation) Evaluate(string input)
     {
         if (string.IsNullOrWhiteSpace(input))
             return (false, "", "");
 
-        string trimmed = input.Trim();
+        string trimmed = AnsTokenRegex.Replace(input.Trim(), _lastNumericAnswer);
+
+        // 0. Programmer Base Conversion: "255 in hex", "0xFF in dec", "42 in bin"
+        var baseMatch = BaseConvertRegex.Match(trimmed);
+        if (baseMatch.Success)
+        {
+            string rawNum = baseMatch.Groups[1].Value;
+            string targetBase = baseMatch.Groups[2].Value.ToLowerInvariant();
+            if (TryParseProgrammerInt(rawNum, out long intVal))
+            {
+                string formatted = targetBase switch
+                {
+                    "hex" => $"0x{intVal:X}",
+                    "bin" or "binary" => $"0b{Convert.ToString(intVal, 2)}",
+                    _ => intVal.ToString(CultureInfo.InvariantCulture)
+                };
+                return (true, formatted, $"{rawNum} → {targetBase.ToUpperInvariant()}");
+            }
+        }
 
         // 1. Percentage check: "15% of 500"
         var pctMatch = PercentOfRegex.Match(trimmed);
@@ -144,7 +198,39 @@ internal static class QuickCalcService
         if (from == "usd" && to == "gbp") return val * 0.79;
         if (from == "gbp" && to == "usd") return val / 0.79;
 
+        // Time
+        if (from is "min" or "mins" or "minute" or "minutes" && to is "hr" or "hrs" or "hour" or "hours" or "h") return val / 60.0;
+        if (from is "hr" or "hrs" or "hour" or "hours" or "h" && to is "min" or "mins" or "minute" or "minutes") return val * 60.0;
+        if (from is "min" or "mins" or "minute" or "minutes" && to is "s" or "sec" or "secs" or "second" or "seconds") return val * 60.0;
+        if (from is "s" or "sec" or "secs" or "second" or "seconds" && to is "min" or "mins" or "minute" or "minutes") return val / 60.0;
+
+        // Speed
+        if (from is "mph" && to is "kmh" or "kph") return val * 1.60934;
+        if (from is "kmh" or "kph" && to is "mph") return val / 1.60934;
+
         return null;
+    }
+
+    private static bool TryParseProgrammerInt(string raw, out long value)
+    {
+        value = 0;
+        if (raw.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            return long.TryParse(raw[2..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out value);
+        }
+        if (raw.StartsWith("0b", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                value = Convert.ToInt64(raw[2..], 2);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        return long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
     }
 
     private static string FormatDouble(double d)

@@ -14,6 +14,11 @@ internal static class AppPaths
     public static string SettingsFile => GetDataFilePath("settings.json");
     public static string ShelfFile => GetDataFilePath("shelf.json");
     public static string ClipboardFile => GetDataFilePath("clipboard.json");
+    public static string NotesFile => GetDataFilePath("notes.json");
+    public static string TasksFile => GetDataFilePath("tasks.json");
+    public static string EventsFile => GetDataFilePath("events.json");
+    public static string LauncherFile => GetDataFilePath("launcher.json");
+    public static string TermiNotchFile => GetDataFilePath("commands.json");
     public static string LogFile => GetDataFilePath("app.log");
     public static string LogArchiveFile => GetDataFilePath("app.1.log");
 

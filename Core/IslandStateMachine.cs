@@ -45,11 +45,13 @@ public sealed class IslandStateMachine
 
     private bool _pointerInside;
     private bool _hovered;
+    private bool _pinned;
     private bool _activity;
     private bool _suppressed;
     private ToastContent? _toast;
 
     public IslandState State { get; private set; } = IslandState.Idle;
+    public bool IsPinned => _pinned;
     public ToastContent? ActiveToast => _toast;
     public int QueuedToastCount => _toastQueue.Count;
 
@@ -72,7 +74,7 @@ public sealed class IslandStateMachine
         _leaveTimer.Tick += (_, _) =>
         {
             _leaveTimer.Stop();
-            if (!_pointerInside) { _hovered = false; Evaluate(); }
+            if (!_pointerInside && !_pinned) { _hovered = false; Evaluate(); }
         };
 
         _toastTimer = new DispatcherTimer();
@@ -92,8 +94,25 @@ public sealed class IslandStateMachine
         else
         {
             _enterTimer.Stop();
-            if (_hovered) _leaveTimer.Start();
+            if (_hovered && !_pinned) _leaveTimer.Start();
         }
+    }
+
+    /// <summary>Locks or unlocks the expanded state so mouse-leave does not auto-collapse the island.</summary>
+    public void SetPinned(bool pinned)
+    {
+        if (_pinned == pinned) return;
+        _pinned = pinned;
+        if (_pinned)
+        {
+            _leaveTimer.Stop();
+            if (!_suppressed) _hovered = true;
+        }
+        else if (!_pointerInside && _hovered)
+        {
+            _leaveTimer.Start();
+        }
+        Evaluate();
     }
 
     /// <summary>Skip the hover debounce (e.g. the user clicked the pill).</summary>
@@ -111,6 +130,7 @@ public sealed class IslandStateMachine
     {
         _enterTimer.Stop();
         _leaveTimer.Stop();
+        _pinned = false;
         _hovered = false;
         Evaluate();
     }

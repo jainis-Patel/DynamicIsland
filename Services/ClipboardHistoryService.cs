@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -19,7 +20,18 @@ public enum ClipboardItemType
     Color,
     Url,
     Image,
-    File
+    File,
+    Code
+}
+
+public enum ClipboardCategoryFilter
+{
+    All,
+    Pinned,
+    Links,
+    Images,
+    Colors,
+    Code
 }
 
 public sealed class ClipboardItem : INotifyPropertyChanged
@@ -35,6 +47,48 @@ public sealed class ClipboardItem : INotifyPropertyChanged
     public ImageSource? ImagePreview { get; init; }
     public DateTime CreatedAt { get; init; } = DateTime.Now;
     public string TimeAgo => CreatedAt.ToString("HH:mm");
+
+    public int LineCount { get; init; } = 1;
+    public int WordCount { get; init; } = 0;
+    public string? CodeLanguage { get; init; }
+
+    public string RgbText => SwatchColor.HasValue
+        ? $"rgb({SwatchColor.Value.R}, {SwatchColor.Value.G}, {SwatchColor.Value.B})"
+        : "";
+
+    public string TypeTag => Type switch
+    {
+        ClipboardItemType.Code => !string.IsNullOrEmpty(CodeLanguage) ? CodeLanguage : "CODE",
+        ClipboardItemType.Url => "URL",
+        ClipboardItemType.Color => "COLOR",
+        ClipboardItemType.Image => "IMG",
+        ClipboardItemType.File => "FILE",
+        _ => "TEXT"
+    };
+
+    private Brush? _cachedSwatchBrush;
+
+    public Brush BadgeColorBrush => Type switch
+    {
+        ClipboardItemType.Code => ThemeBrushes.ClipBadgeCode,
+        ClipboardItemType.Url => ThemeBrushes.ClipBadgeUrl,
+        ClipboardItemType.Color => ThemeBrushes.ClipBadgeColor,
+        ClipboardItemType.Image => ThemeBrushes.ClipBadgeImage,
+        ClipboardItemType.File => ThemeBrushes.ClipBadgeFile,
+        _ => ThemeBrushes.ClipBadgeText
+    };
+
+    public Brush SwatchBrush => SwatchColor.HasValue
+        ? (_cachedSwatchBrush ??= ThemeBrushes.CreateFrozen(SwatchColor.Value))
+        : Brushes.Transparent;
+
+    public bool IsCode => Type == ClipboardItemType.Code;
+    public bool IsUrl => Type == ClipboardItemType.Url;
+    public bool IsColor => Type == ClipboardItemType.Color;
+    public bool IsImage => Type == ClipboardItemType.Image;
+    public bool IsText => Type == ClipboardItemType.Text;
+    public bool HasImage => ImagePreview != null;
+    public bool HasSwatch => SwatchColor.HasValue;
 
     public bool IsPinned
     {
@@ -63,8 +117,8 @@ public sealed class ClipboardItem : INotifyPropertyChanged
 /// Listens to real-time Windows clipboard updates using Win32 AddClipboardFormatListener.
 /// Honors Windows and password-manager privacy exclusion markers (e.g. 1Password, Bitwarden, KeePass)
 /// so sensitive secrets are never captured or persisted to disk.
-/// Categorizes clips into Text, Colors (with swatches), URLs, and Images (with bounded memory footprint),
-/// and atomically persists text/URL/color clips across restarts.
+/// Categorizes clips into Text, Code, Colors (with swatches), URLs, and Images (with bounded memory footprint),
+/// and atomically persists clips across restarts using DPAPI encryption.
 /// </summary>
 internal sealed class ClipboardHistoryService : IDisposable
 {
@@ -75,12 +129,13 @@ internal sealed class ClipboardHistoryService : IDisposable
         string? RawText,
         string? SwatchHex,
         DateTime CreatedAt,
-        bool IsPinned = false);
+        bool IsPinned = false,
+        string? CodeLanguage = null);
 
     private const string DpapiPrefix = "dpapi:";
     private static readonly byte[] DpapiEntropy = Encoding.UTF8.GetBytes("DynamicIsland.ClipboardHistory.v1");
 
-    private static readonly string PersistencePath = AppPaths.ClipboardFile;
+    private readonly string _persistencePath;
     private static readonly object SaveFileLock = new();
 
     /// <summary>
@@ -96,8 +151,19 @@ internal sealed class ClipboardHistoryService : IDisposable
     private bool _listening;
     private string? _lastText;
     private readonly List<ClipboardItem> _items = new();
-    private const int MaxHistory = 15;
-    public const int MaxImagePreviewWidth = 640;
+    private readonly List<ClipboardItem> _pasteQueue = new();
+    private const int MaxHistory = 20;
+    public const int MaxImagePreviewWidth = 300;
+
+    public int PasteQueueCount
+    {
+        get { lock (_pasteQueue) return _pasteQueue.Count; }
+    }
+
+    public IReadOnlyList<ClipboardItem> PasteQueue
+    {
+        get { lock (_pasteQueue) return _pasteQueue.ToList(); }
+    }
 
     public IReadOnlyList<ClipboardItem> Items
     {
@@ -112,10 +178,127 @@ internal sealed class ClipboardHistoryService : IDisposable
     private static readonly Regex HexColorRegex = new(@"^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$", RegexOptions.Compiled);
     private static readonly Regex UrlRegex = new(@"^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    public ClipboardHistoryService(Dispatcher ui)
+    public ClipboardHistoryService(Dispatcher ui, string? persistencePath = null)
     {
         _ui = ui;
+        _persistencePath = persistencePath ?? AppPaths.ClipboardFile;
         LoadPersistedHistory();
+    }
+
+    /// <summary>
+    /// Filters items according to search query and category filter.
+    /// </summary>
+    public IReadOnlyList<ClipboardItem> GetFilteredItems(string? searchQuery, ClipboardCategoryFilter filter)
+    {
+        List<ClipboardItem> snapshot;
+        lock (_items)
+        {
+            snapshot = _items.ToList();
+        }
+
+        IEnumerable<ClipboardItem> query = snapshot;
+
+        query = filter switch
+        {
+            ClipboardCategoryFilter.Pinned => query.Where(i => i.IsPinned),
+            ClipboardCategoryFilter.Links => query.Where(i => i.Type == ClipboardItemType.Url),
+            ClipboardCategoryFilter.Images => query.Where(i => i.Type == ClipboardItemType.Image),
+            ClipboardCategoryFilter.Colors => query.Where(i => i.Type == ClipboardItemType.Color),
+            ClipboardCategoryFilter.Code => query.Where(i => i.Type == ClipboardItemType.Code),
+            _ => query
+        };
+
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            string q = searchQuery.Trim().ToLowerInvariant();
+            query = query.Where(i =>
+                (i.Title != null && i.Title.ToLowerInvariant().Contains(q)) ||
+                (i.Subtitle != null && i.Subtitle.ToLowerInvariant().Contains(q)) ||
+                (i.RawText != null && i.RawText.ToLowerInvariant().Contains(q)) ||
+                (i.CodeLanguage != null && i.CodeLanguage.ToLowerInvariant().Contains(q)));
+        }
+
+        return query.ToList();
+    }
+
+    /// <summary>
+    /// Heuristic analyzer that detects if text is a code snippet and returns a language tag.
+    /// </summary>
+    public static (bool IsCode, string Language) TryDetectCode(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return (false, "");
+
+        string trimmed = text.Trim();
+
+        // 1. JSON check
+        if ((trimmed.StartsWith('{') && trimmed.EndsWith('}')) ||
+            (trimmed.StartsWith('[') && trimmed.EndsWith(']')))
+        {
+            if (trimmed.Contains("\":") || trimmed.Contains("\": ") || trimmed.Contains("null") || trimmed.Contains("true") || trimmed.Contains("false"))
+            {
+                return (true, "JSON");
+            }
+        }
+
+        // 2. HTML / XML check
+        if (trimmed.StartsWith('<') && trimmed.EndsWith('>') &&
+            (trimmed.Contains("</") || trimmed.Contains("/>") || trimmed.Contains("<div") || trimmed.Contains("<span") || trimmed.Contains("<p") || trimmed.Contains("<button") || trimmed.Contains("<Grid") || trimmed.Contains("<Border")))
+        {
+            return (true, "HTML");
+        }
+
+        // 3. SQL check
+        var upper = text.ToUpperInvariant();
+        if (upper.Contains("SELECT ") && (upper.Contains(" FROM ") || upper.Contains(" WHERE ") || upper.Contains(" JOIN ")))
+        {
+            return (true, "SQL");
+        }
+        if (upper.Contains("INSERT INTO ") || (upper.Contains("UPDATE ") && upper.Contains(" SET ")) || upper.Contains("CREATE TABLE "))
+        {
+            return (true, "SQL");
+        }
+
+        // 4. C# / Java / TypeScript / Python checks
+        if (text.Contains("using System") || text.Contains("namespace ") || text.Contains("public class ") || text.Contains("Console.WriteLine") || text.Contains("Task<") || text.Contains("private readonly") || text.Contains("internal sealed"))
+        {
+            return (true, "C#");
+        }
+
+        if (text.Contains("import ") && (text.Contains("from '") || text.Contains("from \"")))
+        {
+            return (true, "JS");
+        }
+        if (text.Contains("export default") || text.Contains("const ") || text.Contains("let ") || text.Contains("console.log") || text.Contains("=>"))
+        {
+            return (true, "JS");
+        }
+
+        if (text.Contains("def ") && text.Contains(":") && (text.Contains("self") || text.Contains("print(")))
+        {
+            return (true, "PY");
+        }
+
+        // General code syntax token heuristics
+        int codeScore = 0;
+        if (text.Contains(" {") || text.Contains("{\n") || text.Contains("{\r\n")) codeScore++;
+        if (text.Contains(" }") || text.Contains("\n}") || text.Contains("\r\n}")) codeScore++;
+        if (text.Contains("();") || text.Contains(");\n") || text.Contains(");\r\n")) codeScore++;
+        if (text.Contains(" = ") && (text.Contains(";") || text.Contains("=="))) codeScore++;
+        if (text.Contains("++") || text.Contains("--") || text.Contains("!=") || text.Contains("===")) codeScore++;
+
+        var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        if (lines.Length >= 2)
+        {
+            int indentedLines = lines.Count(l => l.StartsWith("  ") || l.StartsWith("\t"));
+            if (indentedLines >= 2) codeScore += 2;
+        }
+
+        if (codeScore >= 3)
+        {
+            return (true, "CODE");
+        }
+
+        return (false, "");
     }
 
     /// <summary>
@@ -128,7 +311,6 @@ internal sealed class ClipboardHistoryService : IDisposable
 
         try
         {
-            // 1. Explicit exclusion marker set by password managers and security tools
             if (dataObject.GetDataPresent(FormatExcludeFromMonitoring))
             {
                 var raw = TryGetFormatData(dataObject, FormatExcludeFromMonitoring);
@@ -143,7 +325,6 @@ internal sealed class ClipboardHistoryService : IDisposable
                 return true;
             }
 
-            // 2. Windows 10/11 CanIncludeInClipboardHistory (DWORD == 0 means exclude from history)
             if (dataObject.GetDataPresent(FormatCanIncludeInHistory))
             {
                 var raw = TryGetFormatData(dataObject, FormatCanIncludeInHistory);
@@ -246,22 +427,45 @@ internal sealed class ClipboardHistoryService : IDisposable
         _ui.InvokeAsync(ProcessClipboardContent, DispatcherPriority.Background);
     }
 
-    private void ProcessClipboardContent()
+    public static (BitmapSource? Image, int OrigW, int OrigH) TryExtractBoundedClipboardImage(IDataObject? dataObj, int targetWidth = MaxImagePreviewWidth)
     {
+        if (dataObj is null) return (null, 0, 0);
+
         try
         {
-            IDataObject? dataObj = Clipboard.GetDataObject();
-            if (ShouldExcludeClipboardData(dataObj))
+            // 1. Prefer compressed PNG stream if present (WIC decodes directly at target width, avoiding transient 33+ MB 4K LOH allocations)
+            if (dataObj.GetDataPresent("PNG"))
             {
-                App.Log("[ClipboardHistory] Ignored sensitive clipboard update (privacy exclusion flag present).");
-                return;
+                var raw = dataObj.GetData("PNG");
+                if (raw is MemoryStream ms)
+                {
+                    int origW = targetWidth;
+                    int origH = targetWidth;
+                    try
+                    {
+                        ms.Position = 0;
+                        var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+                        if (decoder.Frames.Count > 0)
+                        {
+                            origW = decoder.Frames[0].PixelWidth;
+                            origH = decoder.Frames[0].PixelHeight;
+                        }
+                    }
+                    catch { }
+
+                    ms.Position = 0;
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.DecodePixelWidth = targetWidth;
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.StreamSource = ms;
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    return (bmp, origW, origH);
+                }
             }
 
-            if (!Clipboard.ContainsText() && !Clipboard.ContainsImage() && !Clipboard.ContainsFileDropList())
-                return;
-
-            ClipboardItem? newItem = null;
-
+            // 2. Fallback to standard Clipboard.GetImage() and downscale to targetWidth immediately
             if (Clipboard.ContainsImage())
             {
                 var img = Clipboard.GetImage();
@@ -269,93 +473,163 @@ internal sealed class ClipboardHistoryService : IDisposable
                 {
                     int origW = img.PixelWidth;
                     int origH = img.PixelHeight;
-                    var bounded = BoundImageSize(img);
-                    newItem = new ClipboardItem
-                    {
-                        Type = ClipboardItemType.Image,
-                        Title = $"Image ({origW} × {origH})",
-                        Subtitle = "Screenshot / Image",
-                        ImagePreview = bounded
-                    };
+                    var bounded = BoundImageSize(img, targetWidth);
+                    return (bounded, origW, origH);
                 }
-            }
-            else if (Clipboard.ContainsText())
-            {
-                string text = Clipboard.GetText().Trim();
-                if (string.IsNullOrWhiteSpace(text) || text == _lastText) return;
-                _lastText = text;
-
-                // 1. Check if it's a Hex Color Code
-                var colorMatch = HexColorRegex.Match(text);
-                if (colorMatch.Success)
-                {
-                    try
-                    {
-                        var color = (Color)ColorConverter.ConvertFromString(text);
-                        newItem = new ClipboardItem
-                        {
-                            Type = ClipboardItemType.Color,
-                            Title = text.ToUpperInvariant(),
-                            Subtitle = $"R:{color.R} G:{color.G} B:{color.B}",
-                            RawText = text,
-                            SwatchColor = color
-                        };
-                    }
-                    catch
-                    {
-                        // Not a valid color string; continue to URL/Text checks
-                    }
-                }
-
-                // 2. Check if it's a Web URL
-                if (newItem == null && (text.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                                       text.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
-                                       UrlRegex.IsMatch(text)))
-                {
-                    string domain = text;
-                    try
-                    {
-                        var uri = new Uri(text.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? text : "https://" + text);
-                        domain = uri.Host;
-                    }
-                    catch
-                    {
-                        // Keep raw text as title fallback
-                    }
-
-                    newItem = new ClipboardItem
-                    {
-                        Type = ClipboardItemType.Url,
-                        Title = domain,
-                        Subtitle = text,
-                        RawText = text
-                    };
-                }
-
-                // 3. Fallback: General Text snippet
-                if (newItem == null)
-                {
-                    string singleLine = text.Replace("\r", " ").Replace("\n", " ");
-                    if (singleLine.Length > 40) singleLine = singleLine[..37] + "...";
-
-                    newItem = new ClipboardItem
-                    {
-                        Type = ClipboardItemType.Text,
-                        Title = singleLine,
-                        Subtitle = $"{text.Length} character{(text.Length == 1 ? "" : "s")}",
-                        RawText = text
-                    };
-                }
-            }
-
-            if (newItem != null)
-            {
-                InsertClipItem(newItem);
             }
         }
         catch (Exception ex)
         {
-            App.Log($"[ClipboardHistory] Error reading clipboard: {ex.Message}");
+            App.Log($"[ClipboardHistory] Error extracting image: {ex.Message}");
+        }
+
+        return (null, 0, 0);
+    }
+
+    private void ProcessClipboardContent()
+    {
+        int retries = 3;
+        while (retries > 0)
+        {
+            try
+            {
+                IDataObject? dataObj = Clipboard.GetDataObject();
+                if (ShouldExcludeClipboardData(dataObj))
+                {
+                    App.Log("[ClipboardHistory] Ignored sensitive clipboard update (privacy exclusion flag present).");
+                    return;
+                }
+
+                if (!Clipboard.ContainsText() && !Clipboard.ContainsImage() && !Clipboard.ContainsFileDropList())
+                    return;
+
+                ClipboardItem? newItem = null;
+
+                if (dataObj != null && (dataObj.GetDataPresent("PNG") || Clipboard.ContainsImage()))
+                {
+                    var (boundedImg, origW, origH) = TryExtractBoundedClipboardImage(dataObj, MaxImagePreviewWidth);
+                    if (boundedImg != null)
+                    {
+                        newItem = new ClipboardItem
+                        {
+                            Type = ClipboardItemType.Image,
+                            Title = $"Image ({origW} × {origH})",
+                            Subtitle = "Screenshot / Image",
+                            ImagePreview = boundedImg
+                        };
+                    }
+                }
+                else if (Clipboard.ContainsText())
+                {
+                    string text = Clipboard.GetText().Trim();
+                    if (string.IsNullOrWhiteSpace(text) || text == _lastText) return;
+                    _lastText = text;
+
+                    // 1. Check if it's a Hex Color Code
+                    var colorMatch = HexColorRegex.Match(text);
+                    if (colorMatch.Success)
+                    {
+                        try
+                        {
+                            var color = (Color)ColorConverter.ConvertFromString(text);
+                            newItem = new ClipboardItem
+                            {
+                                Type = ClipboardItemType.Color,
+                                Title = text.ToUpperInvariant(),
+                                Subtitle = $"R:{color.R} G:{color.G} B:{color.B}",
+                                RawText = text,
+                                SwatchColor = color
+                            };
+                        }
+                        catch
+                        {
+                            // Not a valid color string; continue to URL/Text checks
+                        }
+                    }
+
+                    // 2. Check if it's a Web URL
+                    if (newItem == null && (text.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                                           text.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+                                           UrlRegex.IsMatch(text)))
+                    {
+                        string domain = text;
+                        try
+                        {
+                            var uri = new Uri(text.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? text : "https://" + text);
+                            domain = uri.Host;
+                        }
+                        catch
+                        {
+                            // Keep raw text as title fallback
+                        }
+
+                        newItem = new ClipboardItem
+                        {
+                            Type = ClipboardItemType.Url,
+                            Title = domain,
+                            Subtitle = text,
+                            RawText = text
+                        };
+                    }
+
+                    // 3. Check if it's Code Snippet
+                    if (newItem == null)
+                    {
+                        var (isCode, lang) = TryDetectCode(text);
+                        if (isCode)
+                        {
+                            int lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).Length;
+                            string firstLine = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? text;
+                            if (firstLine.Length > 40) firstLine = firstLine[..37] + "...";
+
+                            newItem = new ClipboardItem
+                            {
+                                Type = ClipboardItemType.Code,
+                                Title = firstLine,
+                                Subtitle = $"{lines} line{(lines == 1 ? "" : "s")} · {lang}",
+                                RawText = text,
+                                LineCount = lines,
+                                CodeLanguage = lang
+                            };
+                        }
+                    }
+
+                    // 4. Fallback: General Text snippet
+                    if (newItem == null)
+                    {
+                        int lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).Length;
+                        int chars = text.Length;
+                        int words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+                        string singleLine = text.Replace("\r", " ").Replace("\n", " ");
+                        if (singleLine.Length > 40) singleLine = singleLine[..37] + "...";
+
+                        newItem = new ClipboardItem
+                        {
+                            Type = ClipboardItemType.Text,
+                            Title = singleLine,
+                            Subtitle = $"{chars} char{(chars == 1 ? "" : "s")} · {words} word{(words == 1 ? "" : "s")}",
+                            RawText = text,
+                            LineCount = lines,
+                            WordCount = words
+                        };
+                    }
+                }
+
+                if (newItem != null)
+                {
+                    InsertClipItem(newItem);
+                }
+                return;
+            }
+            catch (COMException) when (--retries > 0)
+            {
+                Thread.Sleep(25);
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[ClipboardHistory] Error reading clipboard: {ex.Message}");
+                return;
+            }
         }
     }
 
@@ -457,24 +731,102 @@ internal sealed class ClipboardHistoryService : IDisposable
         }
     }
 
-    public void CopyItem(ClipboardItem item)
+    public void CopyItem(ClipboardItem item) => CopyItem(item, plainTextOnly: false);
+
+    public void CopyItem(ClipboardItem item, bool plainTextOnly)
     {
-        try
+        int retries = 3;
+        while (retries > 0)
         {
-            if (item.ImagePreview is BitmapSource bmp)
+            try
             {
-                Clipboard.SetImage(bmp);
+                if (!plainTextOnly && item.ImagePreview is BitmapSource bmp)
+                {
+                    Clipboard.SetImage(bmp);
+                }
+                else if (!string.IsNullOrEmpty(item.RawText))
+                {
+                    string payload = plainTextOnly ? StripFormattingToPlainText(item.RawText) : item.RawText;
+                    var data = new DataObject();
+                    data.SetData(DataFormats.UnicodeText, payload);
+                    data.SetData(DataFormats.Text, payload);
+                    Clipboard.SetDataObject(data, copy: true);
+                    _lastText = payload;
+                }
+                return;
             }
-            else if (!string.IsNullOrEmpty(item.RawText))
+            catch (COMException) when (--retries > 0)
             {
-                Clipboard.SetText(item.RawText);
-                _lastText = item.RawText;
+                Thread.Sleep(25);
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[ClipboardHistory] CopyItem error: {ex.Message}");
+                return;
             }
         }
-        catch (Exception ex)
+    }
+
+    public static string StripFormattingToPlainText(string? input)
+    {
+        if (string.IsNullOrEmpty(input)) return string.Empty;
+        // Normalize line endings and strip zero-width / control formatting characters
+        var sb = new StringBuilder(input.Length);
+        foreach (char c in input)
         {
-            App.Log($"[ClipboardHistory] CopyItem error: {ex.Message}");
+            if (c is '\u200B' or '\u200C' or '\u200D' or '\uFEFF') continue;
+            sb.Append(c);
         }
+        return sb.ToString().Trim();
+    }
+
+    public int EnqueueForSequentialPaste(ClipboardItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        int count;
+        lock (_pasteQueue)
+        {
+            if (!_pasteQueue.Any(x => x.Id == item.Id))
+            {
+                _pasteQueue.Add(item);
+            }
+            count = _pasteQueue.Count;
+        }
+        Changed?.Invoke();
+        return count;
+    }
+
+    public ClipboardItem? DequeueNextPasteItem(bool copyToClipboard = true)
+    {
+        ClipboardItem? next = null;
+        lock (_pasteQueue)
+        {
+            if (_pasteQueue.Count > 0)
+            {
+                next = _pasteQueue[0];
+                _pasteQueue.RemoveAt(0);
+            }
+        }
+
+        if (next != null)
+        {
+            if (copyToClipboard)
+            {
+                CopyItem(next, plainTextOnly: true);
+            }
+            Changed?.Invoke();
+        }
+        return next;
+    }
+
+    public void ClearPasteQueue()
+    {
+        lock (_pasteQueue)
+        {
+            if (_pasteQueue.Count == 0) return;
+            _pasteQueue.Clear();
+        }
+        Changed?.Invoke();
     }
 
     public void Remove(string id)
@@ -504,7 +856,7 @@ internal sealed class ClipboardHistoryService : IDisposable
 
     private void LoadPersistedHistory()
     {
-        var dtos = AtomicJsonStore.Load<List<PersistedClipDto>?>(PersistencePath, () => null);
+        var dtos = AtomicJsonStore.Load<List<PersistedClipDto>?>(_persistencePath, () => null);
         if (dtos == null) return;
 
         lock (_items)
@@ -531,7 +883,9 @@ internal sealed class ClipboardHistoryService : IDisposable
                     RawText = rawText,
                     SwatchColor = swatch,
                     CreatedAt = dto.CreatedAt,
-                    IsPinned = dto.IsPinned
+                    IsPinned = dto.IsPinned,
+                    CodeLanguage = dto.CodeLanguage,
+                    LineCount = rawText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).Length
                 });
             }
 
@@ -556,11 +910,12 @@ internal sealed class ClipboardHistoryService : IDisposable
                     ProtectText(i.RawText),
                     i.SwatchColor?.ToString(),
                     i.CreatedAt,
-                    i.IsPinned))
+                    i.IsPinned,
+                    i.CodeLanguage))
                 .ToList();
         }
 
-        _ = Task.Run(() => AtomicJsonStore.Save(PersistencePath, snapshot, SaveFileLock));
+        _ = Task.Run(() => AtomicJsonStore.Save(_persistencePath, snapshot, SaveFileLock));
     }
 
     public void Dispose()

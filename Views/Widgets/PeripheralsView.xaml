@@ -1,0 +1,101 @@
+<UserControl x:Class="DynamicIsland.Views.Widgets.PeripheralsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:core="clr-namespace:DynamicIsland.Core"
+             mc:Ignorable="d"
+             d:DesignHeight="150" d:DesignWidth="464">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="Bluetooth &amp; Devices" />
+            <Button Click="RefreshPeripheralsBtn_Click" x:Name="RefreshPeripheralsBtn" DockPanel.Dock="Right" Style="{StaticResource CircleButton}" Width="20" Height="20" ToolTipService.ToolTip="Refresh Devices">
+                <TextBlock Style="{StaticResource Glyph}" Text="" FontSize="9.5" Foreground="{DynamicResource SecondaryBrush}" />
+            </Button>
+            <Button Click="OpenBluetoothSettingsBtn_Click" x:Name="OpenBluetoothSettingsBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,5,0" ToolTipService.ToolTip="Open Windows Bluetooth Pairing Settings">
+                <TextBlock Text="+ Pair Device" FontSize="9.5" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" />
+            </Button>
+            <Button Click="PeripheralsFilterBtn_Click" x:Name="PeripheralsFilterBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,5,0" ToolTipService.ToolTip="Toggle between Connected Only and All Paired Bluetooth devices">
+                <TextBlock x:Name="PeripheralsFilterText" Text="All Paired" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
+            </Button>
+        </DockPanel>
+        <Grid Grid.Row="1">
+            <ScrollViewer PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel" MouseUp="ScrollViewer_MouseUp" x:Name="PeripheralsScrollViewer" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly">
+                <ItemsControl x:Name="PeripheralsItemsControl">
+
+
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Width="154" Height="82" Margin="0,0,8,0" CornerRadius="10"
+                                                            BorderThickness="1" Padding="10,7" Cursor="Hand"
+                                                            Opacity="{Binding CardOpacity}"
+                                                            MouseLeftButtonDown="PeripheralCard_Click"
+                                                            ToolTip="Click to connect or switch audio output">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Background" Value="{StaticResource CardSurfaceBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                                                                <Style.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter Property="BorderBrush" Value="#38FFFFFF" />
+                                                                        <Setter Property="Background" Value="#1A1A22" />
+                                                                    </Trigger>
+                                                                    <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                                                        <Setter Property="BorderBrush" Value="#3830D158" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsLowBattery}" Value="True">
+                                                                        <Setter Property="BorderBrush" Value="#66FF453A" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto" />
+                                                                <RowDefinition Height="*" />
+                                                                <RowDefinition Height="Auto" />
+                                                            </Grid.RowDefinitions>
+
+                                                            <DockPanel Grid.Row="0" LastChildFill="False">
+                                                                <Border Width="22" Height="22" CornerRadius="11" Background="#1AFFFFFF" VerticalAlignment="Center">
+                                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="11.5" Foreground="#F5F5F7" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                </Border>
+
+                                                                <TextBlock DockPanel.Dock="Right" Text="{Binding RightHeaderText}"
+                                                                           Style="{StaticResource Digits}" FontSize="10.5" FontWeight="SemiBold"
+                                                                           Foreground="{Binding BatteryBrush}" VerticalAlignment="Center" />
+                                                            </DockPanel>
+
+                                                            <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7"
+                                                                           TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Text="{Binding BatteryStatusText}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" />
+                                                            </StackPanel>
+
+                                                            <Grid Grid.Row="2">
+                                                                <Border Height="3.5" Background="#20FFFFFF" CornerRadius="1.75" HorizontalAlignment="Stretch" />
+                                                                <Border Height="3.5" Width="{Binding BatteryFillWidth}" HorizontalAlignment="Left"
+                                                                        Background="{Binding BatteryBrush}" CornerRadius="1.75" />
+                                                            </Grid>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+            <StackPanel x:Name="PeripheralsEmptyPlaceholder" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource Glyph}" Text="" FontSize="20" HorizontalAlignment="Center" />
+                <TextBlock Text="No wireless Bluetooth or XInput devices connected" FontSize="11" Foreground="{DynamicResource SecondaryBrush}" Margin="0,4,0,0" HorizontalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

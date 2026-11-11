@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using Microsoft.Win32;
+using DynamicIsland.Services;
 
 namespace DynamicIsland.Core;
 
@@ -11,8 +12,8 @@ namespace DynamicIsland.Core;
 internal static class InstallerService
 {
     public const string AppDisplayName = "Dynamic Island";
-    public const string AppPublisher = "DynamicIsland";
-    public const string AppVersion = "0.3.0";
+    public const string AppPublisher = "Jainis Patel";
+    public const string AppVersion = "0.4.0";
 
     public static string GetDefaultInstallDir()
     {
@@ -37,6 +38,50 @@ internal static class InstallerService
         return Path.Combine(desktopFolder, "Dynamic Island.lnk");
     }
 
+    public static (bool IsInstalled, string? Version, string? Location) GetExistingInstallation()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\DynamicIsland", writable: false);
+            if (key != null)
+            {
+                string? version = key.GetValue("DisplayVersion") as string;
+                string? location = key.GetValue("InstallLocation") as string;
+                if (!string.IsNullOrEmpty(location) && Directory.Exists(location))
+                {
+                    return (true, version ?? AppVersion, location);
+                }
+            }
+        }
+        catch { }
+
+        // Fallback: check default install directory
+        string defaultDir = GetDefaultInstallDir();
+        string defaultExe = GetInstalledExePath(defaultDir);
+        if (File.Exists(defaultExe))
+        {
+            return (true, AppVersion, defaultDir);
+        }
+
+        return (false, null, null);
+    }
+
+    public static string GetDriveFreeSpace(string path)
+    {
+        try
+        {
+            string root = Path.GetPathRoot(Path.GetFullPath(path)) ?? "C:\\";
+            var drive = new DriveInfo(root);
+            if (drive.IsReady)
+            {
+                double gb = drive.AvailableFreeSpace / (1024.0 * 1024.0 * 1024.0);
+                return $"{gb:0.0} GB free on {drive.Name.TrimEnd('\\')}";
+            }
+        }
+        catch { }
+        return "Sufficient space available";
+    }
+
     public static bool IsRunningFromInstallDir(string? exePath = null)
     {
         string? currentExe = exePath ?? Environment.ProcessPath;
@@ -59,6 +104,8 @@ internal static class InstallerService
     public static bool IsInstallerMode(string[] args, string? exePath = null)
     {
         if (args.Any(a => string.Equals(a, "--install", StringComparison.OrdinalIgnoreCase) ||
+                          string.Equals(a, "--setup", StringComparison.OrdinalIgnoreCase) ||
+                          string.Equals(a, "/setup", StringComparison.OrdinalIgnoreCase) ||
                           string.Equals(a, "/install", StringComparison.OrdinalIgnoreCase) ||
                           string.Equals(a, "-i", StringComparison.OrdinalIgnoreCase)))
         {
@@ -153,11 +200,14 @@ internal static class InstallerService
         bool createDesktopShortcut,
         bool createStartMenuShortcut,
         bool autoStartOnBoot,
-        out string? errorMessage)
+        out string? errorMessage,
+        IProgress<(int Percent, string StepMessage)>? progress = null,
+        AppSettings? initialSettings = null)
     {
         errorMessage = null;
         try
         {
+            progress?.Report((15, "Closing any running Dynamic Island processes..."));
             string resolvedDir = targetDir ?? GetDefaultInstallDir();
             Directory.CreateDirectory(resolvedDir);
 
@@ -166,8 +216,9 @@ internal static class InstallerService
 
             // Stop any existing running instance
             Program.SignalStopOnDefaultDesktop();
-            Thread.Sleep(800);
+            Thread.Sleep(600);
 
+            progress?.Report((40, "Copying application binaries and companion assets..."));
             // Copy executable if not already in target location
             if (!string.IsNullOrEmpty(currentExe) &&
                 !string.Equals(Path.GetFullPath(currentExe), Path.GetFullPath(targetExe), StringComparison.OrdinalIgnoreCase))
@@ -188,6 +239,11 @@ internal static class InstallerService
                 }
             }
 
+            progress?.Report((65, "Configuring DirectX GPU power efficiency..."));
+            // Configure DirectX Power-Saving iGPU preference (avoids loading discrete NVIDIA driver compiler tables)
+            ConfigurePowerSavingGpuPreference(targetExe);
+
+            progress?.Report((80, "Creating Start Menu & Desktop shortcuts..."));
             // Create Start Menu Shortcut
             if (createStartMenuShortcut)
             {
@@ -200,12 +256,27 @@ internal static class InstallerService
                 CreateShortcut(GetDesktopShortcutPath(), targetExe, "Dynamic Island for Windows");
             }
 
+            progress?.Report((90, "Applying custom settings and Windows integration..."));
             // Configure Windows Startup
             SetAutoStart(autoStartOnBoot, targetExe);
 
             // Register in Windows Settings -> Apps & Features
             RegisterUninstallInfo(resolvedDir, targetExe);
 
+            // Provision initial user settings if customized during setup
+            if (initialSettings != null)
+            {
+                try
+                {
+                    AtomicJsonStore.Save(AppPaths.SettingsFile, initialSettings);
+                }
+                catch (Exception ex)
+                {
+                    App.Log($"[InstallerService] Initial settings save notice: {ex.Message}");
+                }
+            }
+
+            progress?.Report((100, "Dynamic Island installed successfully!"));
             return true;
         }
         catch (Exception ex)
@@ -242,6 +313,8 @@ internal static class InstallerService
 
             // Remove startup registration
             SetAutoStart(false, "");
+            string targetExe = Path.Combine(GetDefaultInstallDir(), "DynamicIsland.exe");
+            RemovePowerSavingGpuPreference(targetExe);
 
             // Remove Add/Remove Programs registry entry
             UnregisterUninstallInfo();
@@ -303,6 +376,32 @@ internal static class InstallerService
         {
             App.Log($"[InstallerService] SetAutoStart failed: {ex.Message}");
         }
+    }
+
+    public static void ConfigurePowerSavingGpuPreference(string exePath)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(exePath)) return;
+            using var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\DirectX\UserGpuPreferences");
+            key?.SetValue(exePath, "GpuPreference=1;");
+            App.Log($"[InstallerService] Pinned {exePath} to iGPU (GpuPreference=1)");
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[InstallerService] ConfigurePowerSavingGpuPreference notice: {ex.Message}");
+        }
+    }
+
+    public static void RemovePowerSavingGpuPreference(string exePath)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(exePath)) return;
+            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\DirectX\UserGpuPreferences", writable: true);
+            key?.DeleteValue(exePath, throwOnMissingValue: false);
+        }
+        catch { }
     }
 
     public static bool GetAutoStart()

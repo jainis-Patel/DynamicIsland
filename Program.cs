@@ -9,14 +9,116 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        App.EnsurePowerSavingGpuPreference();
+
+        if (args.Any(a => string.Equals(a, "--diagnose-memory", StringComparison.OrdinalIgnoreCase)))
+        {
+            var p = System.Diagnostics.Process.GetCurrentProcess();
+            var gc = GC.GetGCMemoryInfo();
+            Console.WriteLine($"[Process] WorkingSet={p.WorkingSet64 / 1024 / 1024} MB, PrivateBytes={p.PrivateMemorySize64 / 1024 / 1024} MB, PagedMemory={p.PagedMemorySize64 / 1024 / 1024} MB");
+            Console.WriteLine($"[GC] IsServerGC={System.Runtime.GCSettings.IsServerGC}, LatencyMode={System.Runtime.GCSettings.LatencyMode}, ConserveMemory={AppContext.GetData("System.GC.ConserveMemory")}");
+            Console.WriteLine($"[GC Heap] HeapSize={gc.HeapSizeBytes / 1024 / 1024} MB, Committed={gc.TotalCommittedBytes / 1024 / 1024} MB, TotalManaged={GC.GetTotalMemory(false) / 1024 / 1024} MB");
+            for (int i = 0; i < gc.GenerationInfo.Length; i++)
+            {
+                var gen = gc.GenerationInfo[i];
+                Console.WriteLine($"  Gen {i}: Size={gen.SizeAfterBytes / 1024 / 1024} MB, Frag={gen.FragmentationAfterBytes / 1024 / 1024} MB");
+            }
+            return 0;
+        }
+
+        if (args.Any(a => string.Equals(a, "--diagnose-window", StringComparison.OrdinalIgnoreCase)))
+        {
+            App.IsDiagnosticMode = true;
+            var app = new App();
+            app.InitializeComponent();
+            var win = new IslandWindow();
+            win.Loaded += async (_, _) =>
+            {
+                await Task.Delay(4000);
+                Core.IslandMemoryManager.ExecuteConservativeTrim();
+                var p = System.Diagnostics.Process.GetCurrentProcess();
+                var gc = GC.GetGCMemoryInfo();
+                Console.WriteLine($"[Window Loaded Process] WorkingSet={p.WorkingSet64 / 1024 / 1024} MB, PrivateBytes={p.PrivateMemorySize64 / 1024 / 1024} MB, PagedMemory={p.PagedMemorySize64 / 1024 / 1024} MB");
+                Console.WriteLine($"[Window Loaded GC] HeapSize={gc.HeapSizeBytes / 1024 / 1024} MB, Committed={gc.TotalCommittedBytes / 1024 / 1024} MB, TotalManaged={GC.GetTotalMemory(false) / 1024 / 1024} MB");
+                Environment.Exit(0);
+            };
+            app.Run(win);
+            return 0;
+        }
+
+        if (args.Any(a => string.Equals(a, "--diagnose-software", StringComparison.OrdinalIgnoreCase)))
+        {
+            App.IsDiagnosticMode = true;
+            System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+            var app = new App();
+            app.InitializeComponent();
+            var win = new IslandWindow();
+            win.Loaded += async (_, _) =>
+            {
+                await Task.Delay(4000);
+                var p = System.Diagnostics.Process.GetCurrentProcess();
+                var gc = GC.GetGCMemoryInfo();
+                Console.WriteLine($"[Software Render Process] WorkingSet={p.WorkingSet64 / 1024 / 1024} MB, PrivateBytes={p.PrivateMemorySize64 / 1024 / 1024} MB, PagedMemory={p.PagedMemorySize64 / 1024 / 1024} MB");
+                Console.WriteLine($"[Software Render GC] HeapSize={gc.HeapSizeBytes / 1024 / 1024} MB, Committed={gc.TotalCommittedBytes / 1024 / 1024} MB, TotalManaged={GC.GetTotalMemory(false) / 1024 / 1024} MB");
+                Console.WriteLine("--- Graphics Modules ---");
+                foreach (System.Diagnostics.ProcessModule mod in p.Modules)
+                {
+                    if (mod.ModuleName.Contains("nv") || mod.ModuleName.Contains("AMD") || mod.ModuleName.Contains("d3d") || mod.ModuleName.Contains("Skia"))
+                    {
+                        Console.WriteLine($"  {mod.ModuleName}: {mod.ModuleMemorySize / 1024 / 1024} MB");
+                    }
+                }
+                Environment.Exit(0);
+            };
+            app.Run(win);
+            return 0;
+        }
+
         if (args.Any(a => string.Equals(a, "--self-test", StringComparison.OrdinalIgnoreCase)))
         {
             return Core.SelfTestRunner.RunAll();
         }
 
+        if (args.Any(a => string.Equals(a, "--render-golden-glass", StringComparison.OrdinalIgnoreCase)))
+        {
+            return LiquidGlass.GoldenImageGenerator.GenerateGoldenImages();
+        }
+
+        if (args.Any(a => string.Equals(a, "--playground", StringComparison.OrdinalIgnoreCase) ||
+                          string.Equals(a, "--glass-playground", StringComparison.OrdinalIgnoreCase)))
+        {
+            var app = new App();
+            app.InitializeComponent();
+            var playground = new Views.GlassPlayground();
+            app.Run(playground);
+            return 0;
+        }
+
+        if (args.Length > 0 && (string.Equals(args[0], "activity", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(args[0], "--activity", StringComparison.OrdinalIgnoreCase)))
+        {
+            return Services.LiveActivityIpcService.RunCliAsync(args).GetAwaiter().GetResult();
+        }
+
         if (args.Any(a => string.Equals(a, "--stop", StringComparison.OrdinalIgnoreCase)))
         {
             SignalStopOnDefaultDesktop();
+            return 0;
+        }
+
+        if (args.Any(a => string.Equals(a, "--replace", StringComparison.OrdinalIgnoreCase)))
+        {
+            SignalStopOnDefaultDesktop();
+            Thread.Sleep(300);
+        }
+
+        if (args.Any(a => string.Equals(a, "--render-installer-previews", StringComparison.OrdinalIgnoreCase)))
+        {
+            string? specifiedDir = args.Skip(1).FirstOrDefault(a => !a.StartsWith("-"));
+            string outDir = specifiedDir ?? System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installer_previews");
+            var app = new App();
+            Views.SetupWindow.RenderPreviews(outDir);
+            Console.WriteLine($"[OK] Installer previews rendered to: {outDir}");
             return 0;
         }
 

@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Windows.Foundation.Metadata;
@@ -10,11 +11,85 @@ using static DynamicIsland.Interop.NativeMethods;
 namespace DynamicIsland.Services;
 
 /// <summary>
-/// Provides screen pixel color eyedropper sampling (<c>#RRGGBB</c>) and built-in Windows 10/11
-/// <see cref="OcrEngine"/> optical character recognition for clipboard screenshots and images.
+/// Provides screen pixel color eyedropper sampling (<c>#RRGGBB</c>), physical screen region capture,
+/// and built-in Windows 10/11 <see cref="OcrEngine"/> optical character recognition for screenshots and shelf images.
 /// </summary>
 internal static class ScreenToolsService
 {
+    /// <summary>
+    /// Captures a physical screen rectangle using GDI <c>BitBlt</c> and returns a detached, frozen <see cref="BitmapSource"/>.
+    /// </summary>
+    public static BitmapSource? CaptureScreenRegion(int x, int y, int width, int height)
+    {
+        if (width <= 0 || height <= 0) return null;
+
+        IntPtr screenDc = GetDC(IntPtr.Zero);
+        if (screenDc == IntPtr.Zero) return null;
+
+        IntPtr memDc = IntPtr.Zero;
+        IntPtr hBitmap = IntPtr.Zero;
+        IntPtr oldObj = IntPtr.Zero;
+
+        try
+        {
+            memDc = CreateCompatibleDC(screenDc);
+            if (memDc == IntPtr.Zero) return null;
+
+            hBitmap = CreateCompatibleBitmap(screenDc, width, height);
+            if (hBitmap == IntPtr.Zero) return null;
+
+            oldObj = SelectObject(memDc, hBitmap);
+            if (!BitBlt(memDc, 0, 0, width, height, screenDc, x, y, SRCCOPY))
+            {
+                return null;
+            }
+
+            var bmp = Imaging.CreateBitmapSourceFromHBitmap(
+                hBitmap,
+                IntPtr.Zero,
+                Int32Rect.Empty,
+                BitmapSizeOptions.FromEmptyOptions());
+            bmp.Freeze();
+            return bmp;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[ScreenToolsService] CaptureScreenRegion failed: {ex.Message}");
+            return null;
+        }
+        finally
+        {
+            if (oldObj != IntPtr.Zero && memDc != IntPtr.Zero) SelectObject(memDc, oldObj);
+            if (hBitmap != IntPtr.Zero) DeleteObject(hBitmap);
+            if (memDc != IntPtr.Zero) DeleteDC(memDc);
+            ReleaseDC(IntPtr.Zero, screenDc);
+        }
+    }
+
+    /// <summary>
+    /// Runs Windows 10/11 local <see cref="OcrEngine"/> on an image file on disk.
+    /// </summary>
+    public static async Task<string?> ExtractTextFromFileAsync(string? filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return null;
+        try
+        {
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var decoder = System.Windows.Media.Imaging.BitmapDecoder.Create(
+                fs,
+                BitmapCreateOptions.IgnoreColorProfile,
+                BitmapCacheOption.OnLoad);
+            if (decoder.Frames.Count == 0) return null;
+            var frame = decoder.Frames[0];
+            frame.Freeze();
+            return await ExtractTextFromBitmapAsync(frame);
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[ScreenToolsService] ExtractTextFromFileAsync failed: {ex.Message}");
+            return null;
+        }
+    }
     /// <summary>
     /// Samples the physical screen pixel color at the current cursor position.
     /// </summary>

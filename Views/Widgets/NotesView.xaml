@@ -1,0 +1,194 @@
+<UserControl x:Class="DynamicIsland.Views.Widgets.NotesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:core="clr-namespace:DynamicIsland.Core"
+             mc:Ignorable="d"
+             d:DesignHeight="150" d:DesignWidth="464">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="154" />
+            <ColumnDefinition Width="1" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Left Column: Notes List & Quick Search -->
+        <Grid Grid.Column="0" Margin="0,0,8,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Search Box & Back -->
+            <Grid Grid.Row="0" Margin="0,0,0,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Click="BackToLauncher_Click" Style="{StaticResource IslandButton}" Height="22" Width="22" Padding="0" Margin="0,0,5,0" ToolTipService.ToolTip="Back to Apps &amp; Widgets">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE72B;" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+                <Border Grid.Column="1" Background="{DynamicResource ElevatedSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Height="22" Padding="6,0">
+                    <DockPanel VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE721;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                        <TextBox x:Name="NotesSearchBox" TextChanged="SearchBox_TextChanged" Background="Transparent" Foreground="{DynamicResource PrimaryTextBrush}" BorderThickness="0" FontSize="9" VerticalAlignment="Center" CaretBrush="{DynamicResource AccentBrush}" />
+                    </DockPanel>
+                </Border>
+            </Grid>
+
+            <!-- Notes Cards List -->
+            <ScrollViewer x:Name="NotesScrollViewer" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="NotesListControl">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{DynamicResource ElevatedSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="6,4" Margin="0,0,0,3"
+                                    Cursor="Hand" MouseLeftButtonDown="NoteRow_Click" ToolTip="{Binding FormattedDate, StringFormat='{}Updated {0} · Click to edit'}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource DockActiveBgBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource DockActiveBorderBrush}" />
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <!-- Color Accent Pill -->
+                                    <Border Grid.Column="0" Width="3" CornerRadius="1.5" Margin="0,1,5,1" Background="{Binding ColorTag}" />
+
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <DockPanel LastChildFill="False">
+                                            <TextBlock Text="{Binding Title}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" MaxWidth="110" />
+                                            <TextBlock Visibility="{Binding IsPinned, Converter={StaticResource BoolToVisibilityConverter}}" Text="📌" FontSize="6.5" Margin="3,0,0,0" VerticalAlignment="Center" />
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding PreviewSnippet}" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- Divider -->
+        <Border Grid.Column="1" Background="{DynamicResource CardBorderBrush}" Margin="0,2,0,2" />
+
+        <!-- Right Column: Note Editor Surface -->
+        <Grid Grid.Column="2" Margin="8,0,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Editor Header & Tools -->
+            <DockPanel Grid.Row="0" Margin="0,0,0,5" LastChildFill="False">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="ActiveNoteTitleText" Text="Untitled Note" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="120" />
+                    <!-- Color Swatches -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                        <Button Tag="#FF9F0A" Click="ColorSwatch_Click" Width="10" Height="10" Margin="0,0,3,0" ToolTip="Amber" Background="#FF9F0A" BorderThickness="0" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" CornerRadius="5" />
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <Button Tag="#64D2FF" Click="ColorSwatch_Click" Width="10" Height="10" Margin="0,0,3,0" ToolTip="Cyan" Background="#64D2FF" BorderThickness="0" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" CornerRadius="5" />
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <Button Tag="#30D158" Click="ColorSwatch_Click" Width="10" Height="10" Margin="0,0,3,0" ToolTip="Green" Background="#30D158" BorderThickness="0" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" CornerRadius="5" />
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <Button Tag="#BF5AF2" Click="ColorSwatch_Click" Width="10" Height="10" Margin="0,0,3,0" ToolTip="Purple" Background="#BF5AF2" BorderThickness="0" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" CornerRadius="5" />
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <Button Tag="#FF453A" Click="ColorSwatch_Click" Width="10" Height="10" Margin="0" ToolTip="Red" Background="#FF453A" BorderThickness="0" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}" CornerRadius="5" />
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Action Buttons -->
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Click="NewNoteBtn_Click" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0,0,3,0" ToolTip="New Note">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE710;" FontSize="7.5" Foreground="#30D158" Margin="0,0,3,0" VerticalAlignment="Center" />
+                            <TextBlock Text="New" FontSize="8" FontWeight="SemiBold" Foreground="#30D158" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Click="ExportShelfBtn_Click" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0,0,3,0" ToolTip="Export .md file to Drop Shelf">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE8F4;" FontSize="7.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
+                            <TextBlock Text="Shelf" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Click="CopyNoteBtn_Click" Style="{StaticResource IslandButton}" Height="19" Width="19" Padding="0" Margin="0,0,3,0" ToolTip="Copy Markdown">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                    <Button Click="TogglePinBtn_Click" Style="{StaticResource IslandButton}" Height="19" Width="19" Padding="0" Margin="0,0,3,0" ToolTip="Pin Note">
+                        <TextBlock x:Name="PinIconText" Style="{StaticResource Glyph}" Text="&#xE718;" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                    <Button Click="DeleteNoteBtn_Click" Style="{StaticResource IslandButton}" Height="19" Width="19" Padding="0" ToolTip="Delete Note">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE74D;" FontSize="7.5" Foreground="#FF453A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Text Editor -->
+            <Border Grid.Row="1" Background="{DynamicResource ElevatedSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
+                <Grid>
+                    <TextBox x:Name="NoteEditorBox"
+                             TextChanged="NoteEditorBox_TextChanged"
+                             Background="Transparent"
+                             Foreground="{DynamicResource PrimaryTextBrush}"
+                             BorderThickness="0"
+                             FontSize="10"
+                             FontFamily="Consolas, Cascadia Code, Segoe UI"
+                             AcceptsReturn="True"
+                             AcceptsTab="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             CaretBrush="{DynamicResource AccentBrush}" />
+                    <TextBlock x:Name="EditorPlaceholder"
+                               Text="# Note Title&#x0a;Jot down ideas, markdown, or snippets...&#x0a;• First line becomes the title automatically"
+                               FontSize="9.5"
+                               Foreground="{DynamicResource TertiaryBrush}"
+                               IsHitTestVisible="False"
+                               Margin="2,2,0,0"
+                               Visibility="Visible" />
+                </Grid>
+            </Border>
+
+            <!-- Footer Status -->
+            <DockPanel Grid.Row="2" Margin="0,4,0,0" LastChildFill="False">
+                <TextBlock x:Name="NoteStatusText" Text="Auto-saved locally" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                <TextBlock DockPanel.Dock="Right" Text="Markdown ready" FontSize="7" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+            </DockPanel>
+        </Grid>
+    </Grid>
+</UserControl>

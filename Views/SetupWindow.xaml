@@ -2,292 +2,439 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Dynamic Island Setup"
-        Width="520" Height="510"
+        Icon="pack://application:,,,/Assets/app.ico"
+        Width="480" Height="360"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
         ResizeMode="NoResize"
-        FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system, sans-serif">
+        FontFamily="{DynamicResource InstallerFontFamily}"
+        KeyDown="Window_KeyDown">
 
     <Window.Resources>
-        <FontFamily x:Key="SetupIconFont">Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol</FontFamily>
-
-        <!-- Premium Dark-Mode Squircle CheckBox Style -->
-        <Style x:Key="IslandCheckBox" TargetType="CheckBox">
-            <Setter Property="Foreground" Value="#DCDFEA" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="CheckBox">
-                        <Grid Margin="0,5">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="22" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Border x:Name="Box" Grid.Column="0" Width="18" Height="18"
-                                    Background="#151722" BorderBrush="#2C2F42" BorderThickness="1.5"
-                                    CornerRadius="5" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                <Path x:Name="CheckMark" Data="M 3.5,9.5 L 7,13 L 14.5,5"
-                                      Stroke="#000000" StrokeThickness="2" StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                                      Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <ContentPresenter Grid.Column="1" Margin="9,0,0,0"
-                                              VerticalAlignment="Center" HorizontalAlignment="Left"
-                                              RecognizesAccessKey="False" />
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Box" Property="Background" Value="#FF9F0A" />
-                                <Setter TargetName="Box" Property="BorderBrush" Value="#FF9F0A" />
-                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Box" Property="BorderBrush" Value="#FFB340" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.45" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Resources/InstallerTokens.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </Window.Resources>
 
-    <!-- Main Window Frame -->
-    <Border Background="#0C0D12"
-            BorderBrush="#242636"
+    <!-- Main Window Frame (Fixed 480x360 px, 12px radius, solid #121214 with 1px #FFFFFF14 outline) -->
+    <Border x:Name="SetupWindowFrame"
+            Width="480" Height="360"
+            Background="{StaticResource BrushSurface}"
+            BorderBrush="{StaticResource BrushOutline}"
             BorderThickness="1"
-            CornerRadius="20">
+            CornerRadius="{StaticResource RadiusWindow}"
+            SnapsToDevicePixels="True"
+            UseLayoutRounding="True">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="48" Color="#000000" Opacity="0.88" ShadowDepth="12" />
+            <DropShadowEffect x:Name="SetupShadow"
+                              BlurRadius="32"
+                              Color="#000000"
+                              Opacity="0.6"
+                              ShadowDepth="8"
+                              Direction="270" />
         </Border.Effect>
 
-        <Grid Margin="28,24,28,26">
+        <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" /> <!-- Header -->
-                <RowDefinition Height="Auto" /> <!-- Subtitle & Feature chips -->
-                <RowDefinition Height="*" />    <!-- Configuration Card -->
-                <RowDefinition Height="Auto" /> <!-- Status / Progress / Success Card -->
-                <RowDefinition Height="Auto" /> <!-- Bottom Action Buttons -->
+                <RowDefinition Height="40" /> <!-- Custom draggable titlebar -->
+                <RowDefinition Height="*" />  <!-- Vertically centered content area -->
             </Grid.RowDefinitions>
 
-            <!-- 1. Header with Miniature Dynamic Island & Window Controls -->
-            <Grid Grid.Row="0" MouseLeftButtonDown="Header_MouseLeftButtonDown" Background="Transparent" Margin="0,0,0,16">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Miniature Dynamic Island Pill Preview -->
-                    <Border Background="#000000" BorderBrush="#2A2C3C" BorderThickness="1.2"
-                            CornerRadius="13" Height="26" Padding="8,0" Margin="0,0,12,0" VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <!-- Camera Punch-Hole -->
-                            <Ellipse Width="7" Height="7" Fill="#141620" Stroke="#2E3144" StrokeThickness="1" Margin="0,0,6,0" />
-                            <!-- Active Status Amber Dot -->
-                            <Ellipse Width="6" Height="6" Fill="#FF9F0A" Margin="0,0,7,0" />
-                            <!-- Audio Spectrum Waves -->
-                            <Rectangle Width="2" Height="7" Fill="#30D158" RadiusX="1" RadiusY="1" Margin="0,0,2,0" />
-                            <Rectangle Width="2" Height="12" Fill="#30D158" RadiusX="1" RadiusY="1" Margin="0,0,2,0" />
-                            <Rectangle Width="2" Height="5" Fill="#30D158" RadiusX="1" RadiusY="1" />
-                        </StackPanel>
-                    </Border>
-
-                    <TextBlock Text="Dynamic Island" FontSize="19" FontWeight="SemiBold" Foreground="#FFFFFF" VerticalAlignment="Center" />
-
-                    <!-- Version Pill Tag -->
-                    <Border Background="#161722" BorderBrush="#282A3A" BorderThickness="1" CornerRadius="8" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="v0.3.0" FontSize="11" FontWeight="Medium" Foreground="#8E92A8" />
-                    </Border>
-                </StackPanel>
-
-                <!-- Modern Close Button -->
-                <Button x:Name="CloseBtn" Click="CloseBtn_Click"
-                        HorizontalAlignment="Right" VerticalAlignment="Center"
-                        Width="30" Height="30" Background="Transparent" BorderThickness="0"
-                        Foreground="#8A8D9F" FontSize="12" Cursor="Hand">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border x:Name="cbd" Background="{TemplateBinding Background}" CornerRadius="15">
-                                            <TextBlock Text="✕" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{TemplateBinding Foreground}" FontSize="12" />
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="cbd" Property="Background" Value="#1E202C" />
-                                                <Setter Property="Foreground" Value="#FFFFFF" />
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </Button.Style>
+            <!-- 1. Top 40px Draggable Title Bar Area -->
+            <Grid Grid.Row="0"
+                  Background="Transparent"
+                  MouseLeftButtonDown="TitleBar_MouseDown">
+                <!-- Back Button (shown only when in Options sub-pane) -->
+                <Button x:Name="OptionsBackBtn"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        Margin="12,0,0,0"
+                        Style="{StaticResource InstallerLinkButton}"
+                        Click="BackToMain_Click"
+                        Visibility="Collapsed"
+                        ToolTip="Back">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Path Data="M 10,4 L 4,10 L 10,16"
+                              Stroke="{StaticResource BrushTextSecondary}"
+                              StrokeThickness="1.5"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              VerticalAlignment="Center"
+                              Margin="0,0,6,0" />
+                        <TextBlock Text="Back" FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center" />
+                    </StackPanel>
                 </Button>
+
+                <!-- Window Close Button (top-right) -->
+                <Button x:Name="CloseWindowBtn"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Margin="0,0,10,0"
+                        Style="{StaticResource InstallerCloseButton}"
+                        Click="CloseBtn_Click"
+                        ToolTip="Close"
+                        Focusable="False" />
             </Grid>
 
-            <!-- 2. Subtitle & Feature Highlights -->
-            <StackPanel Grid.Row="1" Margin="0,0,0,16">
-                <TextBlock Text="Fluid macOS-style notch overlay for Windows 10 &amp; 11 with 60–240Hz spring physics."
-                           Foreground="#9E9EA8" FontSize="12.5" LineHeight="18" TextWrapping="Wrap" Margin="0,0,0,10" />
+            <!-- 2. Main Work Area (Outer padding: 32px, vertically centered) -->
+            <Grid Grid.Row="1" Margin="32,0,32,24" VerticalAlignment="Center">
 
-                <!-- Feature badges row -->
-                <WrapPanel Margin="0,0,0,2">
-                    <Border Background="#13141E" BorderBrush="#222434" BorderThickness="1" CornerRadius="7" Padding="8,4" Margin="0,0,6,6">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="♫" Foreground="#FF9F0A" FontSize="11" Margin="0,0,5,0" />
-                            <TextBlock Text="Media &amp; Live FFT" FontSize="11" Foreground="#A4A8BC" />
-                        </StackPanel>
-                    </Border>
-                    <Border Background="#13141E" BorderBrush="#222434" BorderThickness="1" CornerRadius="7" Padding="8,4" Margin="0,0,6,6">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="📶" Foreground="#0A84FF" FontSize="11" Margin="0,0,5,0" />
-                            <TextBlock Text="Wi-Fi SSID Scanner" FontSize="11" Foreground="#A4A8BC" />
-                        </StackPanel>
-                    </Border>
-                    <Border Background="#13141E" BorderBrush="#222434" BorderThickness="1" CornerRadius="7" Padding="8,4" Margin="0,0,6,6">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="⚡" Foreground="#30D158" FontSize="11" Margin="0,0,5,0" />
-                            <TextBlock Text="1-Click Bluetooth" FontSize="11" Foreground="#A4A8BC" />
-                        </StackPanel>
-                    </Border>
-                </WrapPanel>
-            </StackPanel>
+                <!-- ════════════════════════════════════════════════════════════ -->
+                <!--  MAIN VIEW CONTAINER (Ready / Progress / Done / Error)       -->
+                <!-- ════════════════════════════════════════════════════════════ -->
+                <Grid x:Name="MainViewContainer" VerticalAlignment="Center">
 
-            <!-- 3. Configuration & Options Card -->
-            <Border Grid.Row="2" Background="#12131C" BorderBrush="#222434" BorderThickness="1" CornerRadius="14" Padding="16,14" Margin="0,0,0,14">
-                <StackPanel>
-                    <TextBlock Text="INSTALLATION LOCATION" FontSize="10" FontWeight="Bold" Foreground="#65697D" Margin="0,0,0,6" />
+                    <!-- STATE 1: READY (Upgrade or Fresh Install) -->
+                    <StackPanel x:Name="ReadyStatePanel"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <!-- Centered 64px App Icon -->
+                        <Border Width="64" Height="64"
+                                CornerRadius="16"
+                                ClipToBounds="True"
+                                HorizontalAlignment="Center"
+                                Background="{StaticResource BrushElevated}"
+                                Margin="0,0,0,16">
+                            <Image Source="pack://application:,,,/Assets/app_256.png"
+                                   Width="64" Height="64"
+                                   Stretch="Uniform"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
 
-                    <!-- Destination Folder Display -->
-                    <Border Background="#090A0E" BorderBrush="#1C1E2B" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,14">
-                        <Grid>
+                        <!-- Headline (Title 22px semibold #F5F5F7) -->
+                        <TextBlock x:Name="ReadyTitleText"
+                                   Text="Install Dynamic Island"
+                                   FontSize="{StaticResource FontSizeTitle}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushTextPrimary}"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   Margin="0,0,0,6" />
+
+                        <!-- Subtitle (Body 14px regular #A1A1A6) -->
+                        <TextBlock x:Name="ReadySubtitleText"
+                                   Text="A fluid, responsive island on your desktop."
+                                   FontSize="{StaticResource FontSizeBody}"
+                                   Foreground="{StaticResource BrushTextSecondary}"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="380"
+                                   LineHeight="20"
+                                   Margin="0,0,0,24" />
+
+                        <!-- Action Buttons (Single primary action + secondary text button) -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
+                            <Button x:Name="CancelBtn"
+                                    Content="Cancel"
+                                    Style="{StaticResource InstallerSecondaryButton}"
+                                    Click="Cancel_Click"
+                                    IsCancel="True"
+                                    Margin="0,0,12,0" />
+                            <Button x:Name="ActionBtn"
+                                    Content="Install"
+                                    Style="{StaticResource InstallerPrimaryButton}"
+                                    Click="ActionBtn_Click"
+                                    IsDefault="True" />
+                        </StackPanel>
+
+                        <!-- Progressive Disclosure Link: Options -->
+                        <Button x:Name="OptionsLinkBtn"
+                                Content="Options"
+                                Style="{StaticResource InstallerLinkButton}"
+                                Click="OpenOptions_Click"
+                                HorizontalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- STATE 2: UPDATING / INSTALLING -->
+                    <StackPanel x:Name="ProgressStatePanel"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="Collapsed">
+                        <!-- App Icon -->
+                        <Border Width="64" Height="64"
+                                CornerRadius="16"
+                                ClipToBounds="True"
+                                HorizontalAlignment="Center"
+                                Background="{StaticResource BrushElevated}"
+                                Margin="0,0,0,16">
+                            <Image Source="pack://application:,,,/Assets/app_256.png"
+                                   Width="64" Height="64"
+                                   Stretch="Uniform"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+
+                        <!-- Progress Title (Title 22px semibold) -->
+                        <TextBlock x:Name="ProgressTitleText"
+                                   Text="Installing Dynamic Island…"
+                                   FontSize="{StaticResource FontSizeTitle}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushTextPrimary}"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   Margin="0,0,0,6" />
+
+                        <!-- Progress Status line (Body 14px regular #A1A1A6) -->
+                        <TextBlock x:Name="ProgressStatusText"
+                                   Text="Almost done…"
+                                   FontSize="{StaticResource FontSizeBody}"
+                                   Foreground="{StaticResource BrushTextSecondary}"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   Margin="0,0,0,20" />
+
+                        <!-- 4px Thin Rounded Amber Progress Bar -->
+                        <ProgressBar x:Name="InstallProgressBar"
+                                     Style="{StaticResource InstallerProgressBar}"
+                                     Width="280"
+                                     HorizontalAlignment="Center"
+                                     Margin="0,0,0,24" />
+
+                        <!-- Cancel text button -->
+                        <Button x:Name="ProgressCancelBtn"
+                                Content="Cancel"
+                                Style="{StaticResource InstallerSecondaryButton}"
+                                Click="Cancel_Click"
+                                HorizontalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- STATE 3: DONE (You're all set.) -->
+                    <StackPanel x:Name="DoneStatePanel"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="Collapsed">
+                        <!-- Neutral Checkmark Badge (Primary text color #F5F5F7, NOT green) -->
+                        <Border Width="56" Height="56"
+                                CornerRadius="28"
+                                Background="{StaticResource BrushElevated}"
+                                HorizontalAlignment="Center"
+                                Margin="0,0,0,16">
+                            <Path x:Name="DoneCheckPath"
+                                  Data="M 17,28 L 24,35 L 39,19"
+                                  Stroke="{StaticResource BrushTextPrimary}"
+                                  StrokeThickness="2.5"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center" />
+                        </Border>
+
+                        <!-- Done Title (Title 22px semibold) -->
+                        <TextBlock x:Name="DoneTitleText"
+                                   Text="You're all set."
+                                   FontSize="{StaticResource FontSizeTitle}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushTextPrimary}"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   Margin="0,0,0,6" />
+
+                        <!-- Done Subtitle (Body 14px regular) -->
+                        <TextBlock x:Name="DoneSubtitleText"
+                                   Text="Dynamic Island is up to date."
+                                   FontSize="{StaticResource FontSizeBody}"
+                                   Foreground="{StaticResource BrushTextSecondary}"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   Margin="0,0,0,24" />
+
+                        <!-- Buttons: Open Dynamic Island / Close -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Button Content="Close"
+                                    Style="{StaticResource InstallerSecondaryButton}"
+                                    Click="CloseBtn_Click"
+                                    Margin="0,0,12,0" />
+                            <Button x:Name="LaunchBtn"
+                                    Content="Open Dynamic Island"
+                                    Style="{StaticResource InstallerPrimaryButton}"
+                                    Click="Launch_Click"
+                                    IsDefault="True" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- STATE 4: ERROR (Failure recovery) -->
+                    <StackPanel x:Name="ErrorStatePanel"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="Collapsed">
+                        <!-- Error Icon (#FF453A) -->
+                        <Border Width="56" Height="56"
+                                CornerRadius="28"
+                                Background="{StaticResource BrushElevated}"
+                                HorizontalAlignment="Center"
+                                Margin="0,0,0,16">
+                            <Path Data="M 28,16 L 28,28 M 28,34 L 28,36"
+                                  Stroke="{StaticResource BrushError}"
+                                  StrokeThickness="2.5"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center" />
+                        </Border>
+
+                        <!-- Error Title -->
+                        <TextBlock x:Name="ErrorTitleText"
+                                   Text="Couldn't finish the update."
+                                   FontSize="{StaticResource FontSizeTitle}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushTextPrimary}"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   Margin="0,0,0,6" />
+
+                        <!-- Error Reason (One sentence, plain English) -->
+                        <TextBlock x:Name="ErrorMessageText"
+                                   Text="Close any running instances of Dynamic Island and try again."
+                                   FontSize="{StaticResource FontSizeBody}"
+                                   Foreground="{StaticResource BrushTextSecondary}"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="380"
+                                   LineHeight="20"
+                                   Margin="0,0,0,20" />
+
+                        <!-- Buttons: Try again / Close -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10">
+                            <Button Content="Close"
+                                    Style="{StaticResource InstallerSecondaryButton}"
+                                    Click="CloseBtn_Click"
+                                    Margin="0,0,12,0" />
+                            <Button Content="Try again"
+                                    Style="{StaticResource InstallerPrimaryButton}"
+                                    Click="Retry_Click"
+                                    IsDefault="True" />
+                        </StackPanel>
+
+                        <!-- Copy technical details link -->
+                        <Button x:Name="CopyDetailsBtn"
+                                Content="Copy details"
+                                Style="{StaticResource InstallerLinkButton}"
+                                Click="CopyDetails_Click"
+                                HorizontalAlignment="Center" />
+                    </StackPanel>
+
+                </Grid>
+
+                <!-- ════════════════════════════════════════════════════════════ -->
+                <!--  OPTIONS VIEW CONTAINER (Progressive disclosure sub-pane)     -->
+                <!-- ════════════════════════════════════════════════════════════ -->
+                <Grid x:Name="OptionsViewContainer"
+                      Visibility="Collapsed"
+                      VerticalAlignment="Center"
+                      MaxWidth="416">
+                    <StackPanel>
+                        <!-- Options Title -->
+                        <TextBlock Text="Options"
+                                   FontSize="{StaticResource FontSizeTitle}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource BrushTextPrimary}"
+                                   Margin="0,0,0,18" />
+
+                        <!-- Install Location Section -->
+                        <Grid Margin="0,0,0,4">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="&#xE8B7;" FontFamily="{StaticResource SetupIconFont}" Foreground="#65697D" FontSize="12.5" VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <TextBlock x:Name="InstallPathText" Grid.Column="1"
-                                       Text="%LocalAppData%\Programs\DynamicIsland"
-                                       FontSize="11.5" Foreground="#A0A5BA"
-                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="Install location"
+                                           FontSize="{StaticResource FontSizeBody}"
+                                           Foreground="{StaticResource BrushTextPrimary}" />
+                                <TextBlock x:Name="InstallPathText"
+                                           Text="%LocalAppData%\Programs\DynamicIsland"
+                                           FontSize="{StaticResource FontSizeCaption}"
+                                           Foreground="{StaticResource BrushTextSecondary}"
+                                           TextTrimming="CharacterEllipsis"
+                                           Margin="0,2,0,0" />
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    Content="Change…"
+                                    Style="{StaticResource InstallerSecondaryButton}"
+                                    Height="28" MinWidth="68" Padding="10,0"
+                                    FontSize="{StaticResource FontSizeCaption}"
+                                    VerticalAlignment="Center"
+                                    Click="BrowseFolderBtn_Click" />
                         </Grid>
-                    </Border>
 
-                    <TextBlock Text="PREFERENCES" FontSize="10" FontWeight="Bold" Foreground="#65697D" Margin="0,0,0,6" />
-                    <CheckBox x:Name="AutoStartCheck" Content="Start Dynamic Island when Windows starts" IsChecked="True" Style="{StaticResource IslandCheckBox}" />
-                    <CheckBox x:Name="StartMenuCheck" Content="Create Start Menu shortcut" IsChecked="True" Style="{StaticResource IslandCheckBox}" />
-                    <CheckBox x:Name="DesktopCheck" Content="Create Desktop shortcut" IsChecked="True" Style="{StaticResource IslandCheckBox}" />
-                </StackPanel>
-            </Border>
+                        <!-- Drive Free Space line (Caption 12px) -->
+                        <TextBlock x:Name="DriveSpaceText"
+                                   Text="24.2 GB free on C:"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Foreground="{StaticResource BrushTextDisabled}"
+                                   Margin="0,0,0,16" />
 
-            <!-- 4. Dynamic Status, Progress & Completion Area -->
-            <StackPanel Grid.Row="3" Margin="0,0,0,14">
-                <!-- Status text and mini pulse indicator (during install or idle) -->
-                <Grid x:Name="StatusContainer" Margin="0,0,0,6">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Ellipse x:Name="StatusDot" Width="6" Height="6" Fill="#FF9F0A" Margin="0,0,8,0" Visibility="Collapsed" />
-                        <TextBlock x:Name="StatusText" Text="Ready to install" FontSize="12" Foreground="#85889C" />
+                        <!-- Subtle 1px Divider -->
+                        <Border Height="1" Background="{StaticResource BrushDivider}" Margin="0,0,0,16" />
+
+                        <!-- Toggle 1: Autostart -->
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Start when I sign in to Windows"
+                                       FontSize="{StaticResource FontSizeBody}"
+                                       Foreground="{StaticResource BrushTextPrimary}"
+                                       VerticalAlignment="Center" />
+                            <CheckBox x:Name="AutoStartToggle"
+                                      Grid.Column="1"
+                                      Style="{StaticResource InstallerToggleSwitch}"
+                                      IsChecked="True"
+                                      VerticalAlignment="Center" />
+                        </Grid>
+
+                        <!-- Toggle 2: Desktop Shortcut -->
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Add a desktop shortcut"
+                                       FontSize="{StaticResource FontSizeBody}"
+                                       Foreground="{StaticResource BrushTextPrimary}"
+                                       VerticalAlignment="Center" />
+                            <CheckBox x:Name="DesktopShortcutToggle"
+                                      Grid.Column="1"
+                                      Style="{StaticResource InstallerToggleSwitch}"
+                                      IsChecked="False"
+                                      VerticalAlignment="Center" />
+                        </Grid>
+
+                        <!-- Toggle 3: Start Menu Shortcut -->
+                        <Grid Margin="0,0,0,20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Add to Start menu"
+                                       FontSize="{StaticResource FontSizeBody}"
+                                       Foreground="{StaticResource BrushTextPrimary}"
+                                       VerticalAlignment="Center" />
+                            <CheckBox x:Name="StartMenuToggle"
+                                      Grid.Column="1"
+                                      Style="{StaticResource InstallerToggleSwitch}"
+                                      IsChecked="True"
+                                      VerticalAlignment="Center" />
+                        </Grid>
+
+                        <!-- Done Button (Returns to Main Screen) -->
+                        <Button Content="Done"
+                                Style="{StaticResource InstallerPrimaryButton}"
+                                Height="34" MinWidth="88"
+                                HorizontalAlignment="Right"
+                                Click="BackToMain_Click" />
                     </StackPanel>
                 </Grid>
 
-                <!-- Modern Rounded Progress Bar -->
-                <Border x:Name="ProgressBarContainer" Visibility="Collapsed" Height="5" Background="#181A26" CornerRadius="2.5" Margin="0,0,0,2">
-                    <ProgressBar x:Name="InstallProgressBar" Height="5" Background="Transparent" Foreground="#FF9F0A" BorderThickness="0">
-                        <ProgressBar.Clip>
-                            <RectangleGeometry RadiusX="2.5" RadiusY="2.5" Rect="0,0,464,5" />
-                        </ProgressBar.Clip>
-                    </ProgressBar>
-                </Border>
-
-                <!-- Premium Success Badge (shown ONLY when install succeeds, replacing raw bar) -->
-                <Border x:Name="SuccessCard" Visibility="Collapsed"
-                        Background="#0F2218" BorderBrush="#1C452C" BorderThickness="1"
-                        CornerRadius="10" Padding="14,10">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Border Grid.Column="0" Width="24" Height="24" CornerRadius="12" Background="#30D158" Margin="0,0,12,0" VerticalAlignment="Center">
-                            <Path Data="M 6.5,12.5 L 10,16 L 17.5,8" Stroke="#000000" StrokeThickness="2.2"
-                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="Installation Successful!" FontWeight="SemiBold" FontSize="13" Foreground="#30D158" />
-                            <TextBlock Text="Dynamic Island is configured and ready to run on your desktop." FontSize="11.5" Foreground="#8AE2A2" Margin="0,2,0,0" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
-            </StackPanel>
-
-            <!-- 5. Bottom Action Buttons -->
-            <Grid Grid.Row="4">
-                <Button x:Name="CancelBtn" Content="Cancel" Click="CancelBtn_Click"
-                        HorizontalAlignment="Left" VerticalAlignment="Center"
-                        Height="40" Padding="16,0" Background="Transparent" BorderThickness="0"
-                        Foreground="#85889C" FontSize="13" Cursor="Hand">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border x:Name="cbd" Background="Transparent" CornerRadius="10" Padding="{TemplateBinding Padding}">
-                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="cbd" Property="Background" Value="#1A1C28" />
-                                                <Setter Property="Foreground" Value="#FFFFFF" />
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </Button.Style>
-                </Button>
-
-                <!-- Primary Action Button (Install / Launch) -->
-                <Button x:Name="ActionBtn" Click="ActionBtn_Click"
-                        HorizontalAlignment="Right" VerticalAlignment="Center"
-                        Height="40" MinWidth="180" Padding="20,0"
-                        Background="#FF9F0A" BorderThickness="0"
-                        Foreground="#000000" FontWeight="SemiBold" FontSize="13.5" Cursor="Hand">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="12" Padding="{TemplateBinding Padding}">
-                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="False" />
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="bd" Property="Opacity" Value="0.92" />
-                                            </Trigger>
-                                            <Trigger Property="IsPressed" Value="True">
-                                                <Setter TargetName="bd" Property="Opacity" Value="0.80" />
-                                            </Trigger>
-                                            <Trigger Property="IsEnabled" Value="False">
-                                                <Setter TargetName="bd" Property="Opacity" Value="0.45" />
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </Button.Style>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock x:Name="ActionBtnIcon" Text="&#xE768;" FontFamily="{StaticResource SetupIconFont}"
-                                   FontSize="13.5" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="Collapsed" />
-                        <TextBlock x:Name="ActionBtnText" Text="Install Dynamic Island" FontSize="13.5" FontWeight="SemiBold" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
             </Grid>
         </Grid>
     </Border>

@@ -1,0 +1,143 @@
+<UserControl x:Class="DynamicIsland.Views.Widgets.MechSoundsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:core="clr-namespace:DynamicIsland.Core"
+             mc:Ignorable="d" 
+             d:DesignHeight="210" d:DesignWidth="470">
+    <Grid Margin="0,2,0,2">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Top Header & Master Toggle -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Click="BackToLauncher_Click" Style="{StaticResource IslandButton}" Height="20" Width="20" Padding="0" Margin="0,0,6,0" ToolTipService.ToolTip="Back to Apps &amp; Widgets">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE72B;" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+                <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" Margin="0,0,7,0">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE765;" FontSize="11" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="Mechanical Keyboard Acoustics" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="MechStatusBadge" Text="Low-Latency WASAPI · Procedural Synth" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
+                </Border>
+            </StackPanel>
+
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Click="ToggleSoundActive_Click" x:Name="MasterToggleBtn" Style="{StaticResource IslandButton}" Height="21" Padding="7,0" Margin="0,0,4,0" ToolTipService.ToolTip="Toggle background keyboard sound synthesis">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="MasterToggleGlyph" Style="{StaticResource Glyph}" Text="&#xE767;" FontSize="8.5" Foreground="{DynamicResource GreenBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="MasterToggleText" Text="Active" FontSize="8" FontWeight="Medium" />
+                    </StackPanel>
+                </Button>
+                <Button Click="TestClickBtn_Click" Style="{StaticResource IslandButton}" Height="21" Width="22" Padding="0" ToolTipService.ToolTip="Play acoustic click sample">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE768;" FontSize="9" Foreground="{DynamicResource PrimaryTextBrush}" />
+                </Button>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Main Body: Profiles Selector + Controls & Interactive Pad -->
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Profiles Grid (3 Switch Cards) -->
+            <Grid Grid.Row="0" Margin="0,0,0,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="6" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="6" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Profile 1: Cherry MX Blue -->
+                <Border Grid.Column="0" x:Name="CherryCard" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5" CornerRadius="8" Padding="7,6" Cursor="Hand" MouseLeftButtonDown="SelectCherry_Click">
+                    <StackPanel>
+                        <DockPanel LastChildFill="False">
+                            <TextBlock Text="Cherry Blue" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <Border DockPanel.Dock="Right" Width="7" Height="7" CornerRadius="3.5" Background="#007ACC" />
+                        </DockPanel>
+                        <TextBlock Text="Clicky &amp; Sharp" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" Margin="0,1,0,0" />
+                        <TextBlock Text="2900 Hz click + 420 Hz thock" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,1,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Profile 2: Tactile Brown -->
+                <Border Grid.Column="2" x:Name="BrownCard" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5" CornerRadius="8" Padding="7,6" Cursor="Hand" MouseLeftButtonDown="SelectBrown_Click">
+                    <StackPanel>
+                        <DockPanel LastChildFill="False">
+                            <TextBlock Text="Tactile Brown" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <Border DockPanel.Dock="Right" Width="7" Height="7" CornerRadius="3.5" Background="#A0522D" />
+                        </DockPanel>
+                        <TextBlock Text="Deep &amp; Thocky" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource AmberBrush}" Margin="0,1,0,0" />
+                        <TextBlock Text="1100 Hz bump + 240 Hz base" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,1,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Profile 3: Retro Typewriter -->
+                <Border Grid.Column="4" x:Name="TypewriterCard" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5" CornerRadius="8" Padding="7,6" Cursor="Hand" MouseLeftButtonDown="SelectTypewriter_Click">
+                    <StackPanel>
+                        <DockPanel LastChildFill="False">
+                            <TextBlock Text="Typewriter" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <Border DockPanel.Dock="Right" Width="7" Height="7" CornerRadius="3.5" Background="#708090" />
+                        </DockPanel>
+                        <TextBlock Text="Vintage Clack" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource GreenBrush}" Margin="0,1,0,0" />
+                        <TextBlock Text="3600 Hz striker + resonance" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,1,0,0" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Bottom Controls & Interactive Typing Pad -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="190" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Left: Volume Slider & Acoustics Info -->
+                <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="8,6">
+                    <StackPanel VerticalAlignment="Center">
+                        <DockPanel LastChildFill="False" Margin="0,0,0,2">
+                            <TextBlock Text="Acoustic Volume" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock DockPanel.Dock="Right" x:Name="VolumeValueText" Text="50%" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                        </DockPanel>
+                        <Slider x:Name="VolumeSlider" Minimum="0" Maximum="100" Value="50" Height="18" ValueChanged="VolumeSlider_ValueChanged" Style="{DynamicResource IslandSlider}" Margin="0,0,0,4" />
+
+                        <DockPanel LastChildFill="False">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE7BA;" FontSize="8.5" Foreground="{DynamicResource GreenBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Organic Pitch Jitter" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
+                            </StackPanel>
+                            <Border DockPanel.Dock="Right" Background="{DynamicResource ChipBgBrush}" CornerRadius="4" Padding="4,1">
+                                <TextBlock Text="±3.5%" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" />
+                            </Border>
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Right: Interactive Typing Preview Pad -->
+                <Border Grid.Column="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="8,6">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,3">
+                            <TextBlock Text="Live Typing Sound Pad" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock DockPanel.Dock="Right" x:Name="KeyCounterText" Text="Type keys to test" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
+                        </DockPanel>
+                        <TextBox Grid.Row="1" x:Name="TestTypingBox" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="9" Padding="6,4" VerticalScrollBarVisibility="Disabled" AcceptsReturn="False" PreviewKeyDown="TestTypingBox_PreviewKeyDown" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,151 @@
+<UserControl x:Class="DynamicIsland.Views.Widgets.BatteryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:core="clr-namespace:DynamicIsland.Core"
+             mc:Ignorable="d"
+             d:DesignHeight="150" d:DesignWidth="464">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <DockPanel Grid.Row="0" Margin="0,0,0,5" LastChildFill="False">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Click="BackToLauncher_Click" Style="{StaticResource IslandButton}" Height="20" Width="20" Padding="0" Margin="0,0,6,0" ToolTipService.ToolTip="Back to Apps &amp; Widgets">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE72B;" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+                <TextBlock Style="{StaticResource SectionTitle}" Text="Battery &amp; Display" VerticalAlignment="Center" />
+            </StackPanel>
+            <Border x:Name="BatteryHeaderBadge" DockPanel.Dock="Right" BorderThickness="1" CornerRadius="9" Padding="7,2" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse x:Name="BatteryHeaderDot" Width="5.5" Height="5.5" Margin="0,0,5,0" VerticalAlignment="Center" />
+                    <TextBlock x:Name="BatteryHeaderBadgeText" Text="Connected to AC" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                </StackPanel>
+            </Border>
+        </DockPanel>
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="5" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="234" />
+                    <ColumnDefinition Width="6" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="11" Padding="10,6">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <DockPanel Grid.Row="0" LastChildFill="False">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Grid VerticalAlignment="Center" Margin="0,0,7,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Width="26" Height="13" CornerRadius="3.5" BorderThickness="1.25" VerticalAlignment="Center">
+                                        <Border x:Name="BatteryLevelFill" HorizontalAlignment="Left" CornerRadius="2" Width="18" Margin="1.5" />
+                                    </Border>
+                                    <Border Grid.Column="1" Width="2" Height="5.5" CornerRadius="0,1.5,1.5,0" VerticalAlignment="Center" Margin="1,0,0,0" />
+                                </Grid>
+                                <TextBlock x:Name="BatteryChargingBolt" Style="{StaticResource Glyph}" Text="" FontSize="12.5" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="BatteryHeroPercentText" Style="{StaticResource Digits}" Text="100%" FontSize="17" FontWeight="Bold" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <Border x:Name="BatteryWattageBadge" DockPanel.Dock="Right" BorderThickness="1" CornerRadius="7" Padding="5,1.5" VerticalAlignment="Center">
+                                <TextBlock x:Name="BatteryWattageText" Text="+65.0W Fast Charge" FontSize="8" FontWeight="SemiBold" />
+                            </Border>
+                        </DockPanel>
+                        <TextBlock x:Name="BatteryStatusSubtitle" Grid.Row="1" Text="Connected to AC • Fast Charging" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,1" />
+                        <DockPanel Grid.Row="2" LastChildFill="False">
+                            <TextBlock x:Name="BatteryTimeEstimate" Text="Fully Charged" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            <TextBlock x:Name="BatteryHealthText" DockPanel.Dock="Right" Text="Health: 98%" FontSize="8" VerticalAlignment="Center" />
+                        </DockPanel>
+                    </Grid>
+                </Border>
+                <Border Grid.Column="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="11" Padding="10,6">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <DockPanel Grid.Row="0" LastChildFill="False">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="" FontSize="10" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Display" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border x:Name="DisplayRefreshBadge" CornerRadius="5" Padding="4,1" Margin="0,0,5,0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="DisplayRefreshText" Text="144 Hz" FontSize="8" FontWeight="SemiBold" />
+                                </Border>
+                                <TextBlock x:Name="BrightnessValueText" Style="{StaticResource Digits}" FontSize="12" FontWeight="Bold" Text="80%" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </DockPanel>
+                        <Slider ValueChanged="BrightnessSlider_ValueChanged" x:Name="BrightnessSlider" Grid.Row="1" Style="{StaticResource AppleBrightnessSlider}" Minimum="5" Maximum="100" Value="80" ToolTipService.ToolTip="Adjust Display Brightness (or use Alt + Scroll on collapsed pill)" Margin="0,2,0,3" />
+                        <DockPanel Grid.Row="2" LastChildFill="False">
+                            <Button Click="NightLightQuickBtn_Click" x:Name="NightLightQuickBtn" Style="{StaticResource IslandButton}" Height="18" Padding="6,0" Margin="0,0,4,0" VerticalAlignment="Center" ToolTipService.ToolTip="Toggle Night Light (Eye Comfort Warmth)">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock x:Name="NightLightQuickIcon" Text="🌙" FontSize="8.5" Margin="0,0,3,0" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="NightLightQuickText" Text="Night Light" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="CaffeineQuickBtn_Click" MouseRightButtonUp="CaffeineQuickBtn_RightClick" x:Name="CaffeineQuickBtn" Style="{StaticResource IslandButton}" Height="18" Padding="6,0" VerticalAlignment="Center" ToolTipService.ToolTip="Keep Awake (Caffeine Pro): Click to cycle modes (15m • 1h • ∞ • AC Only • Off), or Right-Click for menu">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="☕" FontSize="8.5" Margin="0,0,3,0" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="CaffeineQuickText" Text="Awake" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <TextBlock x:Name="DisplayResolutionText" DockPanel.Dock="Right" Text="Primary Display" FontSize="8" VerticalAlignment="Center" />
+                        </DockPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+            <Border Grid.Row="2" BorderThickness="1" CornerRadius="9" Padding="2.5" Height="36">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="3" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="3" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border MouseLeftButtonDown="PlanSaverCard_Click" x:Name="PlanSaverCard" Grid.Column="0" CornerRadius="7" Cursor="Hand" BorderThickness="1">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock x:Name="PlanSaverIcon" Style="{StaticResource Glyph}" Text="" FontSize="10.5" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="PlanSaverTitle" Text="Low Power" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock x:Name="PlanSaverSub" Text="+2.5h Battery" FontSize="7.5" HorizontalAlignment="Center" Margin="0,1,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border MouseLeftButtonDown="PlanBalancedCard_Click" x:Name="PlanBalancedCard" Grid.Column="2" CornerRadius="7" Cursor="Hand" BorderThickness="1">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock x:Name="PlanBalancedIcon" Style="{StaticResource Glyph}" Text="" FontSize="10.5" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="PlanBalancedTitle" Text="Balanced" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock x:Name="PlanBalancedSub" Text="Recommended" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,1,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border MouseLeftButtonDown="PlanPerfCard_Click" x:Name="PlanPerfCard" Grid.Column="4" CornerRadius="7" Cursor="Hand" BorderThickness="1">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock x:Name="PlanPerfIcon" Style="{StaticResource Glyph}" Text="" FontSize="10.5" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="PlanPerfTitle" Text="Performance" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock x:Name="PlanPerfSub" Text="Maximum Power" FontSize="7.5" HorizontalAlignment="Center" Margin="0,1,0,0" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

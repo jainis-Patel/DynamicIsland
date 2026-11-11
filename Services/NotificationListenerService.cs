@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Text.RegularExpressions;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Windows.Foundation.Metadata;
@@ -14,6 +16,8 @@ namespace DynamicIsland.Services;
 public sealed class NotificationHistoryItem
 {
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
+    public uint UserNotificationId { get; init; }
+    public string AppUserModelId { get; init; } = "";
     public string AppName { get; init; } = "";
     public string Title { get; init; } = "";
     public string Body { get; init; } = "";
@@ -22,7 +26,17 @@ public sealed class NotificationHistoryItem
     public Brush AccentBrush { get; init; } = ThemeBrushes.Blue;
     public Brush IconBgBrush { get; init; } = ThemeBrushes.DockActiveBg;
     public DateTime ReceivedAt { get; init; } = DateTime.Now;
-    public string TimeText => ReceivedAt.ToString("HH:mm");
+    public string TimeText
+    {
+        get
+        {
+            var diff = DateTime.Now - ReceivedAt;
+            if (diff.TotalSeconds < 60) return "Just now";
+            if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
+            if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h ago";
+            return ReceivedAt.ToString("HH:mm");
+        }
+    }
 }
 
 /// <summary>
@@ -237,6 +251,7 @@ internal sealed class NotificationListenerService : IDisposable
         try
         {
             string appName = SafeAppName(notif);
+            string aumid = SafeAumid(notif);
             var settings = _getSettings?.Invoke();
             if (ShouldSuppressNotification(appName, settings, IsWindowsFocusAssistActive()))
             {
@@ -250,9 +265,9 @@ internal sealed class NotificationListenerService : IDisposable
             string glyph = GlyphForAppName(appName);
             Color accent = AccentForAppName(appName);
 
-            RecordNotification(appName, title, body, glyph, accent);
+            RecordNotification(appName, title, body, glyph, accent, aumid, notif.Id);
 
-            App.Log($"[NotificationListener] Showing notification from '{appName}'.");
+            App.Log($"[NotificationListener] Showing notification from '{appName}' (AUMID: '{aumid}').");
             NotificationReceived?.Invoke(new ToastContent(
                 glyph,
                 string.IsNullOrWhiteSpace(title) ? appName : $"{appName} · {title}",
@@ -276,13 +291,22 @@ internal sealed class NotificationListenerService : IDisposable
         }
     }
 
-    public NotificationHistoryItem RecordNotification(string appName, string title, string body, string? glyphOverride = null, Color? accentOverride = null)
+    public NotificationHistoryItem RecordNotification(
+        string appName,
+        string title,
+        string body,
+        string? glyphOverride = null,
+        Color? accentOverride = null,
+        string? aumid = null,
+        uint userNotificationId = 0)
     {
         string glyph = glyphOverride ?? GlyphForAppName(appName);
         Color accent = accentOverride ?? AccentForAppName(appName);
         var item = new NotificationHistoryItem
         {
             AppName = string.IsNullOrWhiteSpace(appName) ? "Notification" : appName.Trim(),
+            AppUserModelId = aumid ?? "",
+            UserNotificationId = userNotificationId,
             Title = string.IsNullOrWhiteSpace(title) ? appName : title.Trim(),
             Body = string.IsNullOrWhiteSpace(body) ? title.Trim() : body.Trim(),
             Glyph = glyph,
@@ -308,15 +332,261 @@ internal sealed class NotificationListenerService : IDisposable
     public bool RemoveHistoryItem(string id)
     {
         bool removed;
+        uint userNotifId = 0;
         lock (_history)
         {
-            removed = _history.RemoveAll(i => i.Id == id) > 0;
+            var item = _history.FirstOrDefault(i => i.Id == id);
+            if (item != null)
+            {
+                userNotifId = item.UserNotificationId;
+                removed = _history.Remove(item);
+            }
+            else
+            {
+                removed = false;
+            }
         }
         if (removed)
         {
+            if (userNotifId > 0)
+            {
+                RemoveNativeNotification(userNotifId);
+            }
             HistoryChanged?.Invoke();
         }
         return removed;
+    }
+
+    public void RemoveNativeNotification(uint userNotificationId)
+    {
+        if (userNotificationId == 0 || _listener == null) return;
+        try
+        {
+            _listener.RemoveNotification(userNotificationId);
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[NotificationListener] Could not dismiss native notification {userNotificationId}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Activates the action that would occur when clicking a Windows notification banner:
+    /// Brings the sending application to the foreground, opens URLs, or launches the app via AUMID.
+    /// </summary>
+    public static bool ActivateNotification(NotificationHistoryItem item)
+    {
+        if (item == null) return false;
+
+        // 1. If notification body contains a URL, open the URL in default browser
+        if (!string.IsNullOrWhiteSpace(item.Body))
+        {
+            var match = Regex.Match(item.Body, @"https?://[^\s]+");
+            if (match.Success && Uri.TryCreate(match.Value, UriKind.Absolute, out var uri))
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+                    return true;
+                }
+                catch { }
+            }
+        }
+
+        // 2. Try to find and focus an existing running window for this application
+        bool focused = TryFocusAppWindow(item.AppName, item.AppUserModelId);
+        if (focused) return true;
+
+        // 3. If not already focused, activate via Windows AUMID (shell:AppsFolder\<AppUserModelId>)
+        if (!string.IsNullOrWhiteSpace(item.AppUserModelId))
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo("explorer.exe", $@"shell:AppsFolder\{item.AppUserModelId}")
+                {
+                    UseShellExecute = true
+                });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[NotificationListener] Could not launch via AUMID '{item.AppUserModelId}': {ex.Message}");
+            }
+        }
+
+        // 4. Fallback: try launching or focusing by known application name
+        return TryLaunchKnownApp(item.AppName);
+    }
+
+    private static void BringWindowToForeground(IntPtr hWnd)
+    {
+        if (hWnd == IntPtr.Zero) return;
+        try
+        {
+            AllowSetForegroundWindow(ASFW_ANY);
+            if (IsIconic(hWnd))
+            {
+                ShowWindow(hWnd, SW_RESTORE);
+            }
+            else
+            {
+                ShowWindow(hWnd, SW_SHOW);
+            }
+            SetForegroundWindow(hWnd);
+        }
+        catch { }
+    }
+
+    private static bool TryFocusAppWindow(string appName, string aumid)
+    {
+        if (string.IsNullOrWhiteSpace(appName) && string.IsNullOrWhiteSpace(aumid))
+            return false;
+
+        string cleanName = appName.Trim().ToLowerInvariant();
+
+        // Check common process aliases
+        List<string> candidateNames = new();
+        if (cleanName.Contains("visual studio code") || cleanName.Contains("code"))
+            candidateNames.Add("code");
+        if (cleanName.Contains("chatgpt"))
+            candidateNames.Add("ChatGPT");
+        if (cleanName.Contains("slack"))
+            candidateNames.Add("slack");
+        if (cleanName.Contains("discord"))
+            candidateNames.Add("Discord");
+        if (cleanName.Contains("telegram"))
+            candidateNames.Add("Telegram");
+        if (cleanName.Contains("whatsapp"))
+            candidateNames.Add("WhatsApp");
+        if (cleanName.Contains("spotify"))
+            candidateNames.Add("Spotify");
+        if (cleanName.Contains("chrome"))
+            candidateNames.Add("chrome");
+        if (cleanName.Contains("edge"))
+            candidateNames.Add("msedge");
+        if (cleanName.Contains("outlook"))
+        {
+            candidateNames.Add("OUTLOOK");
+            candidateNames.Add("olk");
+        }
+        if (cleanName.Contains("terminal"))
+            candidateNames.Add("WindowsTerminal");
+
+        candidateNames.Add(cleanName.Replace(" ", ""));
+
+        try
+        {
+            foreach (var candidate in candidateNames)
+            {
+                var procs = Process.GetProcessesByName(candidate);
+                try
+                {
+                    foreach (var p in procs)
+                    {
+                        if (p.MainWindowHandle != IntPtr.Zero)
+                        {
+                            BringWindowToForeground(p.MainWindowHandle);
+                            return true;
+                        }
+                    }
+                }
+                finally
+                {
+                    foreach (var p in procs) p.Dispose();
+                }
+            }
+
+            // Also search by MainWindowTitle containing appName
+            if (cleanName.Length > 2)
+            {
+                var allProcs = Process.GetProcesses();
+                try
+                {
+                    foreach (var p in allProcs)
+                    {
+                        try
+                        {
+                            if (p.MainWindowHandle != IntPtr.Zero &&
+                                !string.IsNullOrWhiteSpace(p.MainWindowTitle) &&
+                                p.MainWindowTitle.ToLowerInvariant().Contains(cleanName))
+                            {
+                                BringWindowToForeground(p.MainWindowHandle);
+                                return true;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                finally
+                {
+                    foreach (var p in allProcs) p.Dispose();
+                }
+            }
+        }
+        catch { }
+
+        return false;
+    }
+
+    private static bool TryLaunchKnownApp(string appName)
+    {
+        if (string.IsNullOrWhiteSpace(appName)) return false;
+        string clean = appName.ToLowerInvariant();
+
+        try
+        {
+            if (clean.Contains("spotify"))
+            {
+                Process.Start(new ProcessStartInfo("spotify:") { UseShellExecute = true });
+                return true;
+            }
+            if (clean.Contains("discord"))
+            {
+                Process.Start(new ProcessStartInfo("discord:") { UseShellExecute = true });
+                return true;
+            }
+            if (clean.Contains("telegram"))
+            {
+                Process.Start(new ProcessStartInfo("tg:") { UseShellExecute = true });
+                return true;
+            }
+            if (clean.Contains("whatsapp"))
+            {
+                Process.Start(new ProcessStartInfo("whatsapp:") { UseShellExecute = true });
+                return true;
+            }
+            if (clean.Contains("mail") || clean.Contains("outlook"))
+            {
+                Process.Start(new ProcessStartInfo("mailto:") { UseShellExecute = true });
+                return true;
+            }
+            if (clean.Contains("visual studio code") || clean.Contains("code"))
+            {
+                Process.Start(new ProcessStartInfo("code") { UseShellExecute = true });
+                return true;
+            }
+            if (clean.Contains("chatgpt"))
+            {
+                Process.Start(new ProcessStartInfo("chatgpt") { UseShellExecute = true });
+                return true;
+            }
+        }
+        catch { }
+
+        return false;
+    }
+
+    private static string SafeAumid(UserNotification notif)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(notif.AppInfo?.AppUserModelId))
+                return notif.AppInfo.AppUserModelId;
+            if (!string.IsNullOrWhiteSpace(notif.AppInfo?.Id))
+                return notif.AppInfo.Id;
+        }
+        catch { }
+        return "";
     }
 
     public void ClearHistory()

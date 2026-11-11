@@ -35,6 +35,36 @@ internal sealed class DownloadTrackerService : IDisposable
         get { lock (_activeDownloads) return _activeDownloads.Values.LastOrDefault()?.FileName; }
     }
 
+    public string? LatestDownloadStatusText
+    {
+        get
+        {
+            lock (_activeDownloads)
+            {
+                var latest = _activeDownloads.Values.LastOrDefault();
+                if (latest == null) return null;
+                return FormatDownloadStatus(latest.FileName, latest.BytesReceived);
+            }
+        }
+    }
+
+    public static string FormatBytes(long bytes)
+    {
+        if (bytes <= 0) return "0 KB";
+        if (bytes < 1024 * 1024)
+            return $"{Math.Max(1, bytes / 1024)} KB";
+        if (bytes < 1024L * 1024 * 1024)
+            return $"{bytes / (1024.0 * 1024.0):0.0} MB";
+        return $"{bytes / (1024.0 * 1024.0 * 1024.0):0.00} GB";
+    }
+
+    public static string FormatDownloadStatus(string fileName, long bytesReceived)
+    {
+        string clean = string.IsNullOrWhiteSpace(fileName) ? "Downloading" : fileName.Trim();
+        if (bytesReceived <= 0) return clean;
+        return $"{FormatBytes(bytesReceived)} \u00B7 {clean}";
+    }
+
     public event Action? ActiveDownloadsChanged;
     public event Action<string, string>? DownloadCompleted;
 
@@ -157,6 +187,7 @@ internal sealed class DownloadTrackerService : IDisposable
     private void PollDownloads()
     {
         List<string>? keysToRemove = null;
+        bool bytesChanged = false;
         lock (_activeDownloads)
         {
             foreach (var kvp in _activeDownloads)
@@ -171,7 +202,12 @@ internal sealed class DownloadTrackerService : IDisposable
                         continue;
                     }
 
-                    kvp.Value.BytesReceived = file.Length;
+                    long len = file.Length;
+                    if (len != kvp.Value.BytesReceived)
+                    {
+                        kvp.Value.BytesReceived = len;
+                        bytesChanged = true;
+                    }
                 }
                 catch
                 {
@@ -191,6 +227,10 @@ internal sealed class DownloadTrackerService : IDisposable
         if (keysToRemove is { Count: > 0 })
         {
             UpdateTimerState();
+            ActiveDownloadsChanged?.Invoke();
+        }
+        else if (bytesChanged)
+        {
             ActiveDownloadsChanged?.Invoke();
         }
     }

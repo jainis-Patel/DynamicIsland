@@ -1,0 +1,213 @@
+<Window x:Class="DynamicIsland.Views.GlassPlayground"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Liquid Glass Optics &amp; Refraction Playground"
+        Width="1260" Height="840" MinWidth="1000" MinHeight="700"
+        WindowStartupLocation="CenterScreen"
+        Background="#0D0D12" Foreground="#F5F5F7"
+        FontFamily="Segoe UI Variable Display, Segoe UI">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="380" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ── Left: Interactive Optical Viewport ───────────────────── -->
+        <Grid Grid.Column="0" Margin="16" ClipToBounds="True">
+            <Border CornerRadius="16" Background="#14141B" BorderBrush="#26FFFFFF" BorderThickness="1" ClipToBounds="True">
+                <Grid x:Name="ViewportGrid"
+                      MouseLeftButtonDown="Viewport_MouseLeftButtonDown"
+                      MouseRightButtonDown="Viewport_MouseRightButtonDown"
+                      MouseMove="Viewport_MouseMove"
+                      MouseLeftButtonUp="Viewport_MouseLeftButtonUp"
+                      MouseRightButtonUp="Viewport_MouseRightButtonUp">
+
+                    <!-- Rendered GPU Frame Image -->
+                    <Image x:Name="RenderOutputImage" Stretch="Uniform" />
+
+                    <!-- Top Telemetry & HUD Overlay -->
+                    <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14"
+                            Padding="12,8" CornerRadius="10" Background="#900B0B10" BorderBrush="#30FFFFFF" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="TxtMetrics" Text="GPU: 0.00 ms · 60 FPS · 1280x720"
+                                       Foreground="#4CD964" FontWeight="SemiBold" FontSize="12" />
+                            <TextBlock Text=" · Physically-Based Refraction (D3D11/ps_5_0)"
+                                       Foreground="#8E8E93" FontSize="12" Margin="6,0,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Bottom Gesture Instructions -->
+                    <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,14"
+                            Padding="14,8" CornerRadius="10" Background="#900B0B10" BorderBrush="#20FFFFFF" BorderThickness="1">
+                        <TextBlock Text="Left-Drag: Move Main Glass Body · Right-Drag: Move Secondary Satellite Droplet ($s\min$ liquid merge)"
+                                   Foreground="#AEAEB2" FontSize="11" />
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ── Right: Real-Time Glass Settings Inspector ───────────── -->
+        <Border Grid.Column="1" Margin="0,16,16,16" CornerRadius="16" Background="#161620" BorderBrush="#26FFFFFF" BorderThickness="1">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="18">
+                <StackPanel>
+                    <!-- Header -->
+                    <TextBlock Text="Liquid Glass Inspector" FontSize="20" FontWeight="Bold" Foreground="#FFFFFF" />
+                    <TextBlock Text="Live GPU-accelerated refraction, SDF curvature, and Snell's law optics."
+                               FontSize="11.5" Foreground="#8E8E93" TextWrapping="Wrap" Margin="0,2,0,16" />
+
+                    <!-- Preset Selector -->
+                    <TextBlock Text="PRESET" FontSize="11" FontWeight="SemiBold" Foreground="#8E8E93" Margin="0,0,0,6" />
+                    <ComboBox x:Name="CmbPreset" SelectionChanged="CmbPreset_SelectionChanged"
+                              Background="#20202C" Foreground="#FFFFFF" BorderBrush="#35FFFFFF" Padding="8,6" Margin="0,0,0,16" />
+
+                    <!-- Backdrop Source -->
+                    <TextBlock Text="BACKDROP SOURCE" FontSize="11" FontWeight="SemiBold" Foreground="#8E8E93" Margin="0,0,0,6" />
+                    <ComboBox x:Name="CmbBackdrop" SelectionChanged="CmbBackdrop_SelectionChanged"
+                              Background="#20202C" Foreground="#FFFFFF" BorderBrush="#35FFFFFF" Padding="8,6" Margin="0,0,0,16">
+                        <ComboBoxItem Content="High-Contrast Test Grid (Grid, Stripes, Typography, Spectrum)" IsSelected="True" />
+                        <ComboBoxItem Content="Synthetic Sunset Wallpaper" />
+                    </ComboBox>
+
+                    <!-- Geometry & Shape -->
+                    <TextBlock Text="GEOMETRY &amp; SHAPE" FontSize="11" FontWeight="SemiBold" Foreground="#8E8E93" Margin="0,4,0,6" />
+
+                    <DockPanel Margin="0,0,0,4">
+                        <TextBlock Text="Shape Type" Foreground="#D1D1D6" FontSize="12" />
+                    </DockPanel>
+                    <ComboBox x:Name="CmbShape" SelectionChanged="OnSettingChanged"
+                              Background="#20202C" Foreground="#FFFFFF" BorderBrush="#35FFFFFF" Padding="8,5" Margin="0,0,0,10">
+                        <ComboBoxItem Content="Rounded Rectangle" IsSelected="True" />
+                        <ComboBoxItem Content="Squircle (Continuous Curvature)" />
+                        <ComboBoxItem Content="Capsule / Pill" />
+                        <ComboBoxItem Content="Circle" />
+                    </ComboBox>
+
+                    <!-- Corner Radius -->
+                    <DockPanel Margin="0,4,0,2">
+                        <TextBlock Text="Corner Radius" Foreground="#D1D1D6" FontSize="12" />
+                        <TextBlock x:Name="LblCornerRadius" Text="20" HorizontalAlignment="Right" Foreground="#0A84FF" FontSize="12" />
+                    </DockPanel>
+                    <Slider x:Name="SldCornerRadius" Minimum="0" Maximum="80" Value="20" ValueChanged="OnSettingChanged" Margin="0,0,0,10" />
+
+                    <!-- Corner Smoothing -->
+                    <DockPanel Margin="0,4,0,2">
+                        <TextBlock Text="Corner Smoothing (iOS Squircle)" Foreground="#D1D1D6" FontSize="12" />
+                        <TextBlock x:Name="LblCornerSmoothing" Text="0.80" HorizontalAlignment="Right" Foreground="#0A84FF" FontSize="12" />
+                    </DockPanel>
+                    <Slider x:Name="SldCornerSmoothing" Minimum="0" Maximum="1" Value="0.80" ValueChanged="OnSettingChanged" Margin="0,0,0,10" />
+
+                    <!-- Multi-Body Fluid Merge -->
+                    <CheckBox x:Name="ChkSecondaryDroplet" Content="Enable Satellite Droplet (Liquid Merge)"
+                              Foreground="#FFFFFF" FontSize="12" Margin="0,4,0,6" Checked="OnSettingChanged" Unchecked="OnSettingChanged" />
+
+                    <DockPanel Margin="0,2,0,2">
+                        <TextBlock Text="Liquid Merge Smoothness (smin)" Foreground="#D1D1D6" FontSize="12" />
+                        <TextBlock x:Name="LblMergeSmoothness" Text="18.0" HorizontalAlignment="Right" Foreground="#0A84FF" FontSize="12" />
+                    </DockPanel>
+                    <Slider x:Name="SldMergeSmoothness" Minimum="0" Maximum="50" Value="18" ValueChanged="OnSettingChanged" Margin="0,0,0,16" />
+
+                    <Separator Background="#26FFFFFF" Margin="0,4,0,14" />
+
+                    <!-- Physical Optics -->
+                    <TextBlock Text="PHYSICAL OPTICS &amp; REFRACTION" FontSize="11" FontWeight="SemiBold" Foreground="#8E8E93" Margin="0,0,0,6" />
+
+                    <!-- Refraction Thickness -->
+                    <DockPanel Margin="0,4,0,2">
+                        <TextBlock Text="Refraction Thickness" Foreground="#D1D1D6" FontSize="12" />
+                        <TextBlock x:Name="LblThickness" Text="18.0" HorizontalAlignment="Right" Foreground="#0A84FF" FontSize="12" />
+                    </DockPanel>
+                    <Slider x:Name="SldThickness" Minimum="0" Maximum="60" Value="18" ValueChanged="OnSettingChanged" Margin="0,0,0,10" />
+
+                    <!-- Bevel Lens Width -->
+                    <DockPanel Margin="0,4,0,2">
+                        <TextBlock Text="Bevel Lens Width" Foreground="#D1D1D6" FontSize="12" />
+                        <TextBlock x:Name="LblBevelWidth" Text="22.0" HorizontalAlignment="Right" Foreground="#0A84FF" FontSize="12" />
+                    </DockPanel>
+                    <Slider x:Name="SldBevelWidth" Minimum="1" Maximum="60" Value="22" ValueChanged="OnSettingChanged" Margin="0,0,0,10" />
+
+                    <!-- Index of Refraction -->
+                    <DockPanel Margin="0,4,0,2">
+                        <TextBlock Text="Index of Refraction (IOR)" Foreground="#D1D1D6" FontSize="12" />
+                        <TextBlock x:Name="LblIor" Text="1.50" HorizontalAlignment="Right" Foreground="#0A84FF" FontSize="12" />
+                    </DockPanel>
+                    <Slider x:Name="SldIor" Minimum="1.001" Maximum="2.50" Value="1.50" ValueChanged="OnSettingChanged" Margin="0,0,0,10" />
+
+                    <!-- Blur Radius -->
+                    <DockPanel Margin="0,4,0,2">
+                        <TextBlock Text="Backdrop Blur Radius" Foreground="#D1D1D6" FontSize="12" />
+                        <TextBlock x:Name="LblBlurRadius" Text="20.0" HorizontalAlignment="Right" Foreground="#0A84FF" FontSize="12" />
+                    </DockPanel>
+                    <Slider x:Name="SldBlurRadius" Minimum="0" Maximum="50" Value="20" ValueChanged="OnSettingChanged" Margin="0,0,0,10" />
+
+                    <!-- Chromatic Dispersion -->
+                    <DockPanel Margin="0,4,0,2">
+                        <TextBlock Text="Chromatic Dispersion" Foreground="#D1D1D6" FontSize="12" />
+                        <TextBlock x:Name="LblDispersion" Text="0.00" HorizontalAlignment="Right" Foreground="#0A84FF" FontSize="12" />
+                    </DockPanel>
+                    <Slider x:Name="SldDispersion" Minimum="0" Maximum="1.0" Value="0.00" ValueChanged="OnSettingChanged" Margin="0,0,0,16" />
+
+                    <Separator Background="#26FFFFFF" Margin="0,4,0,14" />
+
+                    <!-- Lighting & Specular -->
+                    <TextBlock Text="LIGHTING &amp; COLOR VIBRANCY" FontSize="11" FontWeight="SemiBold" Foreground="#8E8E93" Margin="0,0,0,6" />
+
+                    <!-- Specular Strength -->
+                    <DockPanel Margin="0,4,0,2">
+                        <TextBlock Text="Specular Strength" Foreground="#D1D1D6" FontSize="12" />
+                        <TextBlock x:Name="LblSpecular" Text="0.85" HorizontalAlignment="Right" Foreground="#0A84FF" FontSize="12" />
+                    </DockPanel>
+                    <Slider x:Name="SldSpecular" Minimum="0" Maximum="3.0" Value="0.85" ValueChanged="OnSettingChanged" Margin="0,0,0,10" />
+
+                    <!-- Rim Power -->
+                    <DockPanel Margin="0,4,0,2">
+                        <TextBlock Text="Rim Falloff Power" Foreground="#D1D1D6" FontSize="12" />
+                        <TextBlock x:Name="LblRimPower" Text="2.50" HorizontalAlignment="Right" Foreground="#0A84FF" FontSize="12" />
+                    </DockPanel>
+                    <Slider x:Name="SldRimPower" Minimum="0.5" Maximum="6.0" Value="2.50" ValueChanged="OnSettingChanged" Margin="0,0,0,10" />
+
+                    <!-- Saturation -->
+                    <DockPanel Margin="0,4,0,2">
+                        <TextBlock Text="Saturation" Foreground="#D1D1D6" FontSize="12" />
+                        <TextBlock x:Name="LblSaturation" Text="1.20" HorizontalAlignment="Right" Foreground="#0A84FF" FontSize="12" />
+                    </DockPanel>
+                    <Slider x:Name="SldSaturation" Minimum="0" Maximum="2.5" Value="1.20" ValueChanged="OnSettingChanged" Margin="0,0,0,10" />
+
+                    <!-- Brightness -->
+                    <DockPanel Margin="0,4,0,2">
+                        <TextBlock Text="Brightness" Foreground="#D1D1D6" FontSize="12" />
+                        <TextBlock x:Name="LblBrightness" Text="1.05" HorizontalAlignment="Right" Foreground="#0A84FF" FontSize="12" />
+                    </DockPanel>
+                    <Slider x:Name="SldBrightness" Minimum="0.5" Maximum="2.0" Value="1.05" ValueChanged="OnSettingChanged" Margin="0,0,0,10" />
+
+                    <!-- Tint Opacity -->
+                    <DockPanel Margin="0,4,0,2">
+                        <TextBlock Text="Tint Opacity" Foreground="#D1D1D6" FontSize="12" />
+                        <TextBlock x:Name="LblTintOpacity" Text="0.40" HorizontalAlignment="Right" Foreground="#0A84FF" FontSize="12" />
+                    </DockPanel>
+                    <Slider x:Name="SldTintOpacity" Minimum="0" Maximum="1.0" Value="0.40" ValueChanged="OnSettingChanged" Margin="0,0,0,16" />
+
+                    <!-- Actions -->
+                    <Button Content="Capture Golden Frame to Disk" Click="BtnGoldenFrame_Click"
+                            Padding="12,8" Margin="0,0,0,8" Background="#0A84FF" Foreground="#FFFFFF" FontWeight="SemiBold" BorderThickness="0">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="8" />
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+
+                    <Button Content="Reset All to Defaults" Click="BtnReset_Click"
+                            Padding="12,6" Margin="0,0,0,20" Background="#2C2C36" Foreground="#D1D1D6" BorderThickness="0">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="8" />
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</Window>

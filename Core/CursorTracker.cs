@@ -19,8 +19,12 @@ internal sealed class CursorTracker : IDisposable
     private readonly Func<RECT?> _getZone;
     private bool _inside;
     private bool _fastMode = true;
+    private IntPtr _lastMonitor;
+    private IntPtr _candidateMonitor;
+    private long _candidateSinceTick;
 
     public event Action<bool>? InsideChanged;
+    public event Action<IntPtr>? MonitorChanged;
 
     public CursorTracker(Func<RECT?> getZone)
     {
@@ -30,6 +34,23 @@ internal sealed class CursorTracker : IDisposable
     }
 
     public void Start() => _timer.Start();
+
+    public void SetSuspended(bool suspended)
+    {
+        if (suspended)
+        {
+            _timer.Stop();
+            if (_inside)
+            {
+                _inside = false;
+                InsideChanged?.Invoke(false);
+            }
+        }
+        else if (!_timer.IsEnabled)
+        {
+            _timer.Start();
+        }
+    }
 
     private void OnTick(object? sender, EventArgs e)
     {
@@ -52,6 +73,37 @@ internal sealed class CursorTracker : IDisposable
         {
             _fastMode = near;
             _timer.Interval = near ? FastInterval : SlowInterval;
+        }
+
+        IntPtr currentMon = MonitorFromPoint(p, MONITOR_DEFAULTTONEAREST);
+        if (currentMon != IntPtr.Zero)
+        {
+            long now = Environment.TickCount64;
+            if (_lastMonitor == IntPtr.Zero)
+            {
+                _lastMonitor = currentMon;
+                _candidateMonitor = currentMon;
+                _candidateSinceTick = now;
+            }
+            else if (currentMon != _lastMonitor)
+            {
+                if (currentMon != _candidateMonitor)
+                {
+                    _candidateMonitor = currentMon;
+                    _candidateSinceTick = now;
+                }
+                else if (now - _candidateSinceTick > 300)
+                {
+                    _lastMonitor = currentMon;
+                    _candidateSinceTick = now;
+                    MonitorChanged?.Invoke(currentMon);
+                }
+            }
+            else
+            {
+                _candidateMonitor = currentMon;
+                _candidateSinceTick = now;
+            }
         }
 
         if (inside == _inside) return;

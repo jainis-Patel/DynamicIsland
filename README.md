@@ -1,5 +1,7 @@
 # Dynamic Island for Windows
 
+Created with ❤️ by **Jainis Patel**
+
 An interactive, Apple-inspired **Dynamic Island** desktop overlay for Windows 10 & 11 built with **WPF (.NET 8)**, closed-form analytical spring physics, WASAPI real-time audio spectrum analysis, and WinRT system integrations.
 
 ---
@@ -40,13 +42,19 @@ All hotkeys use `Ctrl + Alt + <Key>` by default and can be customized or disable
 | Shortcut | Action |
 |---|---|
 | `Ctrl + Alt + Space` | Play / Pause active media session |
+| `Ctrl + Alt + I` | Toggle Expand / Collapse Dynamic Island |
 | `Ctrl + Alt + A` | Start / Pause Stopwatch or Pomodoro timer |
 | `Ctrl + Alt + V` | Open Clipboard History |
 | `Ctrl + Alt + C` | Open Quick Calculator & Unit Converter |
 | `Ctrl + Alt + O` | Open Audio Output Switcher |
 | `Ctrl + Alt + P` | Open Battery & Power Mode widget |
+| `Ctrl + Alt + H` | Open System Performance & Activity HUD |
 | `Ctrl + Alt + R` | Start / Stop Voice Memo recording |
 | `Ctrl + Alt + D` | Open Connected Peripherals Battery Hub |
+| `Ctrl + Alt + W` | Open Wi-Fi & Network Hub |
+| `Ctrl + Alt + N` | Open Notification History Center |
+| `Ctrl + Alt + S` | Open Appearance & Settings |
+| `Ctrl + Alt + M` | Switch Target Monitor |
 | `Ctrl + Alt + Q` | Exit Dynamic Island |
 
 ---
@@ -72,6 +80,35 @@ dotnet run -c Release -- --self-test
 ```powershell
 dotnet publish -c Release -p:PublishProfile=WinX64
 ```
+
+---
+
+## Installation & Setup
+
+Dynamic Island provides multiple zero-configuration installation options with no administrator UAC elevation required:
+
+### Option 1: Native Dark-Mode Setup Wizard (Recommended)
+Double-click `installer\DynamicIsland-Setup.exe` (or `publish\DynamicIsland-Setup.exe`).
+- Custom dark-mode installation wizard with squircle controls.
+- Configurable install directory (defaults to `%LocalAppData%\Programs\DynamicIsland`).
+- Automatic Start Menu & Desktop shortcut creation.
+- Seamless Windows Startup autostart configuration.
+- Full Windows **Installed Apps** (Add/Remove Programs) registration.
+- Silent command-line install: `DynamicIsland-Setup.exe --install --silent`.
+
+### Option 2: 1-Click Batch / PowerShell Script
+- Double-click `installer\Install.bat` to launch the automated script installer.
+- Or run PowerShell directly:
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\installer\Install.ps1
+  ```
+
+### Option 3: Inno Setup
+- Compile `installer\DynamicIsland.iss` using Inno Setup 6 (`iscc.exe DynamicIsland.iss`).
+
+### Uninstallation
+- Open Windows **Settings › Apps › Installed apps**, search for **Dynamic Island**, and click **Uninstall** (launches the custom uninstallation wizard).
+- Or run `installer\Uninstall.bat` / `powershell -ExecutionPolicy Bypass -File .\installer\Uninstall.ps1`.
 
 ---
 

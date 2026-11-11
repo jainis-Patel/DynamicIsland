@@ -3,8 +3,8 @@
 ; Compile via command line: iscc.exe DynamicIsland.iss
 
 #define MyAppName "Dynamic Island"
-#define MyAppVersion "0.3.0"
-#define MyAppPublisher "DynamicIsland"
+#define MyAppVersion "0.4.0"
+#define MyAppPublisher "Jainis Patel"
 #define MyAppURL "https://github.com"
 #define MyAppExeName "DynamicIsland.exe"
 
@@ -21,6 +21,7 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=..\publish\installer
 OutputBaseFilename=DynamicIsland-Setup-Inno
+SetupIconFile=app.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -40,6 +41,8 @@ Name: "autostart"; Description: "Launch Dynamic Island when Windows starts"; Gro
 
 [Files]
 Source: "..\publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\AllowPhoneBridgeFirewall.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\Assets\app.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

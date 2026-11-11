@@ -1,11 +1,25 @@
+using System.Diagnostics;
 using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Windows.Media.Control;
 using Windows.Storage.Streams;
+using static DynamicIsland.Interop.NativeMethods;
 
 namespace DynamicIsland.Services;
+
+/// <summary>Represents an active media session from any application running on Windows.</summary>
+public sealed class ActiveMediaSessionItem
+{
+    public string Aumid { get; init; } = "";
+    public string AppName { get; init; } = "";
+    public string Title { get; init; } = "";
+    public string Artist { get; init; } = "";
+    public bool IsPlaying { get; init; }
+    public BitmapSource? Artwork { get; init; }
+    public bool IsCurrent { get; init; }
+}
 
 /// <summary>Snapshot of the current media session. Mutated only on the UI thread.</summary>
 internal sealed class MediaInfo
@@ -23,6 +37,14 @@ internal sealed class MediaInfo
     public bool CanPrevious { get; set; }
     public bool CanNext { get; set; }
     public bool CanSeek { get; set; }
+    public bool CanShuffle { get; set; }
+    public bool CanRepeat { get; set; }
+    public bool? IsShuffleActive { get; set; }
+    public Windows.Media.MediaPlaybackAutoRepeatMode? AutoRepeatMode { get; set; }
+    public string AlbumTitle { get; set; } = "";
+    public int TrackNumber { get; set; }
+    public int AlbumTrackCount { get; set; }
+    public string SourceAppUserModelId { get; set; } = "";
 
     public TimeSpan StartTime { get; set; }
     public TimeSpan Duration { get; set; }
@@ -91,6 +113,40 @@ internal sealed class MediaSessionService : IDisposable
     public void Next() => _ = NextAsync();
     public void Previous() => _ = PreviousAsync();
     public void Seek(TimeSpan position) => _ = SeekAsync(position);
+    public void ToggleShuffle() => _ = ToggleShuffleAsync();
+    public void CycleRepeatMode() => _ = CycleRepeatModeAsync();
+
+    public async Task ToggleShuffleAsync()
+    {
+        try
+        {
+            if (_session is not null)
+            {
+                bool target = !(Current?.IsShuffleActive ?? false);
+                await _session.TryChangeShuffleActiveAsync(target);
+            }
+        }
+        catch (Exception ex) { App.Log($"[Media] Shuffle toggle failed: {ex.Message}"); }
+    }
+
+    public async Task CycleRepeatModeAsync()
+    {
+        try
+        {
+            if (_session is not null)
+            {
+                var cur = Current?.AutoRepeatMode ?? Windows.Media.MediaPlaybackAutoRepeatMode.None;
+                var target = cur switch
+                {
+                    Windows.Media.MediaPlaybackAutoRepeatMode.None => Windows.Media.MediaPlaybackAutoRepeatMode.List,
+                    Windows.Media.MediaPlaybackAutoRepeatMode.List => Windows.Media.MediaPlaybackAutoRepeatMode.Track,
+                    _ => Windows.Media.MediaPlaybackAutoRepeatMode.None
+                };
+                await _session.TryChangeAutoRepeatModeAsync(target);
+            }
+        }
+        catch (Exception ex) { App.Log($"[Media] Repeat cycle failed: {ex.Message}"); }
+    }
 
     public async Task TogglePlayPauseAsync()
     {
@@ -122,6 +178,94 @@ internal sealed class MediaSessionService : IDisposable
 
         try { await _session.TryChangePlaybackPositionAsync((media.StartTime + position).Ticks); }
         catch (Exception ex) { App.Log($"[Media] Seek failed: {ex.Message}"); }
+    }
+
+    public bool SwitchToSession(string aumid)
+    {
+        if (_manager is null || string.IsNullOrWhiteSpace(aumid)) return false;
+        try
+        {
+            var sessions = _manager.GetSessions();
+            if (sessions is null) return false;
+            var target = sessions.FirstOrDefault(s => string.Equals(s.SourceAppUserModelId, aumid, StringComparison.OrdinalIgnoreCase));
+            if (target is null) return false;
+
+            _preferredSessionAumid = target.SourceAppUserModelId;
+            AttachSessionCore(target, sessions.Count);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Media] SwitchToSession failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    public async Task<IReadOnlyList<ActiveMediaSessionItem>> GetActiveSessionsAsync()
+    {
+        var list = new List<ActiveMediaSessionItem>();
+        if (_manager is null) return list;
+
+        try
+        {
+            var sessions = _manager.GetSessions();
+            if (sessions is null || sessions.Count == 0) return list;
+
+            string currentAumid = _session?.SourceAppUserModelId ?? "";
+
+            foreach (var sess in sessions)
+            {
+                try
+                {
+                    string aumid = sess.SourceAppUserModelId ?? "";
+                    string name = FriendlyAppName(aumid);
+                    bool isPlaying = false;
+                    try
+                    {
+                        var pb = sess.GetPlaybackInfo();
+                        isPlaying = pb?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+                    }
+                    catch { }
+
+                    string title = "";
+                    string artist = "";
+                    BitmapSource? art = null;
+                    try
+                    {
+                        var props = await sess.TryGetMediaPropertiesAsync();
+                        if (props != null)
+                        {
+                            title = props.Title ?? "";
+                            artist = string.IsNullOrWhiteSpace(props.Artist) ? (props.AlbumArtist ?? "") : props.Artist;
+                            if (props.Thumbnail != null)
+                            {
+                                var (loadedArt, _, _) = await Task.Run(() => LoadThumbnailAndAccentAsync(props.Thumbnail));
+                                art = loadedArt;
+                            }
+                        }
+                    }
+                    catch { }
+
+                    list.Add(new ActiveMediaSessionItem
+                    {
+                        Aumid = aumid,
+                        AppName = string.IsNullOrWhiteSpace(name) ? "Player" : name,
+                        Title = string.IsNullOrWhiteSpace(title) ? "Audio Playing" : title,
+                        Artist = string.IsNullOrWhiteSpace(artist) ? name : artist,
+                        IsPlaying = isPlaying,
+                        Artwork = art,
+                        IsCurrent = string.Equals(aumid, currentAumid, StringComparison.OrdinalIgnoreCase)
+                    });
+                }
+                catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Media] GetActiveSessions failed: {ex.Message}");
+        }
+
+        return list;
     }
 
     /// <summary>
@@ -159,6 +303,70 @@ internal sealed class MediaSessionService : IDisposable
         _preferredSessionAumid = nextSession.SourceAppUserModelId;
         AttachSessionCore(nextSession, sessions.Count);
         return Current?.Source;
+    }
+
+    public bool FocusActivePlayerWindow()
+    {
+        string? source = Current?.Source;
+        string? aumid = _session?.SourceAppUserModelId;
+        if (string.IsNullOrWhiteSpace(source) && string.IsNullOrWhiteSpace(aumid))
+            return false;
+
+        try
+        {
+            string searchKey = ResolveProcessSearchKey(source, aumid);
+            foreach (var p in Process.GetProcesses())
+            {
+                try
+                {
+                    if (p.MainWindowHandle == IntPtr.Zero) continue;
+                    string procName = p.ProcessName;
+                    string title = p.MainWindowTitle ?? "";
+
+                    bool matched = (!string.IsNullOrEmpty(searchKey) &&
+                                    (procName.Contains(searchKey, StringComparison.OrdinalIgnoreCase) ||
+                                     title.Contains(searchKey, StringComparison.OrdinalIgnoreCase))) ||
+                                   (!string.IsNullOrEmpty(source) &&
+                                    (procName.Contains(source, StringComparison.OrdinalIgnoreCase) ||
+                                     title.Contains(source, StringComparison.OrdinalIgnoreCase)));
+
+                    if (matched)
+                    {
+                        IntPtr hwnd = p.MainWindowHandle;
+                        if (IsIconic(hwnd))
+                        {
+                            ShowWindow(hwnd, SW_RESTORE);
+                        }
+                        SetForegroundWindow(hwnd);
+                        return true;
+                    }
+                }
+                catch { }
+                finally
+                {
+                    p.Dispose();
+                }
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    internal static string ResolveProcessSearchKey(string? source, string? aumid)
+    {
+        string combined = $"{source} {aumid}".ToLowerInvariant();
+        if (combined.Contains("spotify")) return "Spotify";
+        if (combined.Contains("msedge") || combined.Contains("edge")) return "msedge";
+        if (combined.Contains("chrome")) return "chrome";
+        if (combined.Contains("firefox") || combined.Contains("308046b0af4a39cb")) return "firefox";
+        if (combined.Contains("brave")) return "brave";
+        if (combined.Contains("opera")) return "opera";
+        if (combined.Contains("vlc")) return "vlc";
+        if (combined.Contains("itunes")) return "iTunes";
+        if (combined.Contains("applemusic")) return "AppleMusic";
+        if (combined.Contains("tidal")) return "TIDAL";
+        if (combined.Contains("foobar")) return "foobar2000";
+        return source ?? "";
     }
 
     // ── Session tracking ─────────────────────────────────────────────
@@ -215,6 +423,7 @@ internal sealed class MediaSessionService : IDisposable
         Current = new MediaInfo
         {
             Source = FriendlyAppName(newId),
+            SourceAppUserModelId = newId ?? "",
             ActiveSessionCount = sessionCount
         };
         session.MediaPropertiesChanged += OnMediaPropertiesChanged;
@@ -269,6 +478,10 @@ internal sealed class MediaSessionService : IDisposable
         media.CanPrevious = controls.IsPreviousEnabled;
         media.CanNext = controls.IsNextEnabled;
         media.CanSeek = controls.IsPlaybackPositionEnabled;
+        media.CanShuffle = controls.IsShuffleEnabled;
+        media.CanRepeat = controls.IsRepeatEnabled;
+        media.IsShuffleActive = info.IsShuffleActive;
+        media.AutoRepeatMode = info.AutoRepeatMode;
         Changed?.Invoke();
     }
 
@@ -303,10 +516,14 @@ internal sealed class MediaSessionService : IDisposable
 
         string title = properties.Title ?? "";
         string artist = string.IsNullOrWhiteSpace(properties.Artist) ? properties.AlbumArtist ?? "" : properties.Artist;
+        string album = properties.AlbumTitle ?? "";
         bool trackChanged = title != media.Title || artist != media.Artist;
 
         media.Title = title;
         media.Artist = artist;
+        media.AlbumTitle = album;
+        media.TrackNumber = properties.TrackNumber;
+        media.AlbumTrackCount = properties.AlbumTrackCount;
         if (trackChanged && properties.Thumbnail is null)
         {
             media.Artwork = null;
@@ -340,6 +557,7 @@ internal sealed class MediaSessionService : IDisposable
             var image = new BitmapImage();
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
+            image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
             image.DecodePixelWidth = 160;
             image.StreamSource = buffer;
             image.EndInit();

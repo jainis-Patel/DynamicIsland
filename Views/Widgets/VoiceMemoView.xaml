@@ -1,0 +1,121 @@
+<UserControl x:Class="DynamicIsland.Views.Widgets.VoiceMemoView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:core="clr-namespace:DynamicIsland.Core"
+             mc:Ignorable="d"
+             d:DesignHeight="150" d:DesignWidth="464">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Click="BackToLauncher_Click" Style="{StaticResource IslandButton}" Height="20" Width="20" Padding="0" Margin="0,0,6,0" ToolTipService.ToolTip="Back to Apps &amp; Widgets">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE72B;" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+                <TextBlock Style="{StaticResource SectionTitle}" Text="Voice Memos" VerticalAlignment="Center" />
+            </StackPanel>
+            <Button Click="OpenMemosFolder_Click" DockPanel.Dock="Right" BorderThickness="0" Cursor="Hand" Padding="2" ToolTipService.ToolTip="Open Recordings Folder">
+                <TextBlock Text="Open Folder" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" />
+            </Button>
+        </DockPanel>
+        <Grid Grid.Row="1" Height="82" VerticalAlignment="Top">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="146" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10,6">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Border x:Name="RecordHalo" Width="48" Height="48" CornerRadius="24" Opacity="0" IsHitTestVisible="False">
+                            <Border.Background>
+                                <RadialGradientBrush>
+                                    <RadialGradientBrush.GradientStops>
+                                        <GradientStop Color="#AAFF453A" Offset="0" />
+                                        <GradientStop Color="#00FF453A" Offset="1" />
+                                    </RadialGradientBrush.GradientStops>
+                                </RadialGradientBrush>
+                            </Border.Background>
+                        </Border>
+                        <Button Click="HeroRecordBtn_Click" x:Name="HeroRecordBtn" Style="{StaticResource CircleButton}" Width="34" Height="34" ToolTipService.ToolTip="Start / Stop Recording">
+                            <TextBlock x:Name="HeroRecordGlyph" Style="{StaticResource Glyph}" FontSize="13" Text="" />
+                        </Button>
+                    </Grid>
+                    <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,2,0,1">
+                        <TextBlock x:Name="HeroRecordTimer" Style="{StaticResource Digits}" Text="00:00" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,0" Height="12">
+                            <Rectangle x:Name="RecBar0" Width="2.5" Height="5" RadiusX="1.25" RadiusY="1.25" Margin="1.25,0" VerticalAlignment="Center" />
+                            <Rectangle x:Name="RecBar1" Width="2.5" Height="8" RadiusX="1.25" RadiusY="1.25" Margin="1.25,0" VerticalAlignment="Center" />
+                            <Rectangle x:Name="RecBar2" Width="2.5" Height="11" RadiusX="1.25" RadiusY="1.25" Margin="1.25,0" VerticalAlignment="Center" />
+                            <Rectangle x:Name="RecBar3" Width="2.5" Height="8" RadiusX="1.25" RadiusY="1.25" Margin="1.25,0" VerticalAlignment="Center" />
+                            <Rectangle x:Name="RecBar4" Width="2.5" Height="5" RadiusX="1.25" RadiusY="1.25" Margin="1.25,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+                    <TextBlock x:Name="HeroRecordStatus" Grid.Row="2" Text="Ready" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" />
+                </Grid>
+            </Border>
+            <Border Grid.Column="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="8,6">
+                <Grid>
+                    <StackPanel x:Name="LastMemoHost" Visibility="Collapsed">
+                        <TextBlock x:Name="LastMemoFileName" />
+                        <TextBlock x:Name="LastMemoDuration" />
+                        <Button Click="MemoPlayPauseBtn_Click" x:Name="MemoPlayPauseBtn">
+                            <StackPanel>
+                                <TextBlock x:Name="MemoPlayGlyph" />
+                                <TextBlock x:Name="MemoPlayLabel" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <ScrollViewer x:Name="VoiceMemosScrollViewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+                        <ItemsControl x:Name="VoiceMemosItemsControl">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource ButtonSubtleBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,0,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Button Grid.Column="0" Click="PlayMemoItem_Click" Tag="{Binding FilePath}" Style="{StaticResource CircleButton}" Width="22" Height="22" Margin="0,0,7,0" ToolTipService.ToolTip="Play / Stop Recording">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="" FontSize="9" Foreground="{DynamicResource AccentBrush}" />
+                                            </Button>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding FileName}" FontSize="10.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding MetaText}" Style="{StaticResource Digits}" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                                                <Button Click="CopyMemoItem_Click" Tag="{Binding FilePath}" Style="{StaticResource CircleButton}" Width="20" Height="20" Margin="0,0,3,0" ToolTipService.ToolTip="Copy .wav File to Clipboard">
+                                                    <TextBlock Style="{StaticResource Glyph}" Text="" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
+                                                </Button>
+                                                <Button Click="SendMemoItemToShelf_Click" Tag="{Binding FilePath}" Style="{StaticResource CircleButton}" Width="20" Height="20" Margin="0,0,3,0" ToolTipService.ToolTip="Pin to Drop Shelf">
+                                                    <TextBlock Style="{StaticResource Glyph}" Text="" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" />
+                                                </Button>
+                                                <Button Click="DeleteMemoItem_Click" Tag="{Binding FilePath}" Style="{StaticResource CircleButton}" Width="20" Height="20" ToolTipService.ToolTip="Delete Recording">
+                                                    <TextBlock Style="{StaticResource Glyph}" Text="" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <StackPanel x:Name="NoMemoPlaceholder" Visibility="Visible" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="No recordings yet" FontSize="11" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" />
+                        <TextBlock Text="Click the mic button to record a voice note" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" Opacity="0.7" Margin="0,2,0,0" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

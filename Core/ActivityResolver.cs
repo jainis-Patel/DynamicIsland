@@ -11,7 +11,8 @@ public enum CompactActivityKind
     Call,
     Countdown,
     Download,
-    Stopwatch
+    Stopwatch,
+    LiveActivity
 }
 
 /// <summary>
@@ -43,14 +44,30 @@ public static class ActivityResolver
         bool callActive,
         bool countdownRunning,
         bool downloading,
-        bool stopwatchActive)
+        bool stopwatchActive) =>
+        ResolveWithSecondary(recording, mediaPlaying, callActive, countdownRunning, downloading, stopwatchActive, false);
+
+    /// <summary>
+    /// Resolves both the primary Compact capsule activity and an optional secondary activity
+    /// for the iOS-style detached split-droplet bubble when two live activities run concurrently.
+    /// Priority: Recording &gt; LiveActivity &gt; Call &gt; Media &gt; Countdown &gt; Download &gt; Stopwatch.
+    /// </summary>
+    public static (bool HasActivity, CompactActivityKind PrimaryHost, CompactActivityKind SecondaryHost) ResolveWithSecondary(
+        bool recording,
+        bool mediaPlaying,
+        bool callActive,
+        bool countdownRunning,
+        bool downloading,
+        bool stopwatchActive,
+        bool liveActivityActive)
     {
-        Span<CompactActivityKind> active = stackalloc CompactActivityKind[6];
+        Span<CompactActivityKind> active = stackalloc CompactActivityKind[7];
         int count = 0;
 
         if (recording) active[count++] = CompactActivityKind.Recording;
-        if (mediaPlaying) active[count++] = CompactActivityKind.Media;
+        if (liveActivityActive) active[count++] = CompactActivityKind.LiveActivity;
         if (callActive) active[count++] = CompactActivityKind.Call;
+        if (mediaPlaying) active[count++] = CompactActivityKind.Media;
         if (countdownRunning) active[count++] = CompactActivityKind.Countdown;
         if (downloading) active[count++] = CompactActivityKind.Download;
         if (!countdownRunning && stopwatchActive) active[count++] = CompactActivityKind.Stopwatch;
@@ -74,6 +91,7 @@ public static class ActivityResolver
         CompactActivityKind.Countdown => "\uE916",
         CompactActivityKind.Download => "\uE896",
         CompactActivityKind.Stopwatch => "\uE916",
+        CompactActivityKind.LiveActivity => "\uE7C3",
         _ => "\uE7E7"
     };
 
@@ -84,6 +102,22 @@ public static class ActivityResolver
     {
         CompactActivityKind.Recording => ExpandedView.VoiceMemo,
         CompactActivityKind.Download => ExpandedView.Shelf,
+        CompactActivityKind.LiveActivity => ExpandedView.Shelf,
         _ => ExpandedView.Media
+    };
+
+    /// <summary>
+    /// Returns a contextual tooltip describing the secondary droplet's live activity and click/middle-click actions.
+    /// </summary>
+    public static string DescribeSecondaryDroplet(CompactActivityKind kind) => kind switch
+    {
+        CompactActivityKind.Recording => "Voice Memo Recording \u00B7 Click to expand \u00B7 Middle-click to stop",
+        CompactActivityKind.Media => "Now Playing \u00B7 Click to expand \u00B7 Middle-click to play/pause",
+        CompactActivityKind.Call => "Active Call \u00B7 Click to expand \u00B7 Middle-click to mute/unmute mic",
+        CompactActivityKind.Countdown => "Countdown Timer \u00B7 Click to expand \u00B7 Middle-click to pause/resume",
+        CompactActivityKind.Stopwatch => "Stopwatch \u00B7 Click to expand \u00B7 Middle-click to pause/resume",
+        CompactActivityKind.Download => "Active Download \u00B7 Click to open Drop Shelf",
+        CompactActivityKind.LiveActivity => "Live Activity \u00B7 Click to swap \u00B7 Middle-click to inspect",
+        _ => "Secondary Live Activity \u00B7 Click to expand"
     };
 }

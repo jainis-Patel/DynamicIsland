@@ -1,0 +1,375 @@
+using System.Diagnostics;
+using System.IO;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using DynamicIsland.Core;
+using DynamicIsland.Services;
+using static DynamicIsland.Interop.NativeMethods;
+
+namespace DynamicIsland;
+
+public partial class IslandWindow
+{
+    // =================================================================
+    //  Media, Stopwatch, Pomodoro Countdown & Telemetry
+    // =================================================================
+
+    private void CommitSeek()
+    {
+        var media = _mediaService.Current;
+        if (media is null || media.Duration <= TimeSpan.Zero) return;
+        double targetSec = (TimelineSlider.Value / 100.0) * media.Duration.TotalSeconds;
+        _mediaService.Seek(TimeSpan.FromSeconds(targetSec));
+    }
+
+    internal void MediaSourceBadge_Click(object sender, MouseButtonEventArgs e)
+    {
+        string? switchedTo = _mediaService.CycleNextSession();
+        if (!string.IsNullOrEmpty(switchedTo))
+        {
+            _machine.PushToast(new ToastContent(
+                "\uE8D6",
+                "Media Source Switched",
+                $"Active player: {switchedTo}",
+                ThemeBrushes.BlueColor,
+                TimeSpan.FromSeconds(2.0),
+                TargetView: "media",
+                Priority: ToastPriority.Feedback,
+                Category: "mediasource"));
+        }
+        e.Handled = true;
+    }
+
+    internal void FocusMediaPlayer_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (_mediaService.FocusActivePlayerWindow())
+        {
+            _machine.CollapseNow();
+        }
+        e.Handled = true;
+    }
+
+    internal void ClockSystemHudBadge_Click(object sender, MouseButtonEventArgs e)
+    {
+        SwitchExpandedView(ExpandedView.SystemHud);
+        e.Handled = true;
+    }
+
+    private void OnTrackChanged()
+    {
+        var media = _mediaService.Current;
+        if (media is null || string.IsNullOrWhiteSpace(media.Title)) return;
+
+        _lyricsService?.LoadLyricsForTrack(media.Title, media.Artist, media.Duration);
+
+        if (_machine.State != IslandState.Expanded)
+        {
+            var accent = media.Accent ?? ThemeBrushes.AmberColor;
+            _machine.PushToast(new ToastContent(
+                "\uE8D6",
+                media.Title,
+                media.Artist,
+                accent,
+                TimeSpan.FromSeconds(2.8),
+                TargetView: "media",
+                Priority: ToastPriority.System,
+                Category: "track"));
+        }
+    }
+
+    private bool _preferClockHeaderInMedia;
+    private Color? _lastAppliedMediaAccent;
+
+    internal void ToggleClockMediaHeader_Click(object sender, MouseButtonEventArgs e)
+    {
+        var media = _mediaService.Current;
+        bool hasMedia = media is not null && !string.IsNullOrWhiteSpace(media.Title);
+        if (!hasMedia) return;
+
+        _preferClockHeaderInMedia = !_preferClockHeaderInMedia;
+        ExpandedMediaHeader.Visibility = _preferClockHeaderInMedia ? Visibility.Collapsed : Visibility.Visible;
+        ExpandedClockHeader.Visibility = _preferClockHeaderInMedia ? Visibility.Visible : Visibility.Collapsed;
+        RefreshTargetGeometry();
+        e.Handled = true;
+    }
+
+    private void OnMediaChanged()
+    {
+        var media = _mediaService.Current;
+        bool hasMedia = media is not null && !string.IsNullOrWhiteSpace(media.Title);
+        bool callActive = !string.IsNullOrWhiteSpace(_privacyService.ActiveCallApp);
+
+        if (hasMedia && media is not null)
+        {
+            _lyricsService?.LoadLyricsForTrack(media.Title, media.Artist, media.Duration);
+
+            if (!callActive)
+            {
+                ExpandedMediaHeader.Visibility = _preferClockHeaderInMedia ? Visibility.Collapsed : Visibility.Visible;
+                ExpandedClockHeader.Visibility = _preferClockHeaderInMedia ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (MediaTransportControlsGrid != null) MediaTransportControlsGrid.Visibility = Visibility.Visible;
+
+            ExpandedTitle.Text = media.Title;
+            ExpandedArtist.Text = string.IsNullOrWhiteSpace(media.Artist) ? "Unknown Artist" : media.Artist;
+            string sourceLabel = string.IsNullOrWhiteSpace(media.Source) ? "Media" : media.Source;
+            ExpandedSourceApp.Text = media.ActiveSessionCount > 1
+                ? $"{sourceLabel} \u00B7 1/{media.ActiveSessionCount}"
+                : sourceLabel;
+
+            PlayPauseGlyph.Text = media.IsPlaying ? "\uE769" : "\uE768";
+            PrevButton.IsEnabled = media.CanPrevious;
+            NextButton.IsEnabled = media.CanNext;
+
+            if (media.Artwork is not null)
+            {
+                if (!ReferenceEquals(CompactArtImage.Source, media.Artwork))
+                {
+                    CompactArtImage.Source = media.Artwork;
+                    ExpandedArtImage.Source = media.Artwork;
+                }
+                CompactArtImage.Visibility = Visibility.Visible;
+                ExpandedArtImage.Visibility = Visibility.Visible;
+                CompactArtFallback.Visibility = Visibility.Collapsed;
+                ExpandedArtFallback.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                CompactArtImage.Source = null;
+                ExpandedArtImage.Source = null;
+                CompactArtImage.Visibility = Visibility.Collapsed;
+                ExpandedArtImage.Visibility = Visibility.Collapsed;
+                CompactArtFallback.Visibility = Visibility.Visible;
+                ExpandedArtFallback.Visibility = Visibility.Visible;
+            }
+
+            if (media.Accent.HasValue)
+            {
+                if (_lastAppliedMediaAccent != media.Accent.Value)
+                {
+                    _lastAppliedMediaAccent = media.Accent.Value;
+                    Resources["AccentBrush"] = ThemeBrushes.CreateFrozen(media.Accent.Value);
+                }
+                PillGlowColor.Color = media.Accent.Value;
+                PillGlowSecondaryColor.Color = media.SecondaryAccent ?? media.Accent.Value;
+            }
+
+            CompactTrackText.Text = media.Title;
+        }
+        else
+        {
+            _preferClockHeaderInMedia = false;
+            _lastAppliedMediaAccent = null;
+            CompactArtImage.Source = null;
+            ExpandedArtImage.Source = null;
+            _lyricsService?.Reset();
+            if (!callActive)
+            {
+                ExpandedMediaHeader.Visibility = Visibility.Collapsed;
+                ExpandedClockHeader.Visibility = Visibility.Visible;
+            }
+            if (MediaTransportControlsGrid != null) MediaTransportControlsGrid.Visibility = Visibility.Collapsed;
+            if (KaraokeLyricsHost != null) KaraokeLyricsHost.Visibility = Visibility.Collapsed;
+
+            PlayPauseGlyph.Text = "\uE768";
+        }
+
+        EvaluateActivity();
+        UpdateMediaTimelineUI();
+        EnsureRendering();
+    }
+
+    private void ToggleStopwatch()
+    {
+        if (_countdownService.IsActive)
+        {
+            _countdownService.TogglePause();
+            return;
+        }
+
+        if (_stopwatch.IsRunning) _stopwatch.Stop();
+        else _stopwatch.Start();
+        RefreshStopwatchUI();
+    }
+
+    private static readonly int[] PomodoroPresetMinutes = [15, 25, 45, 60];
+    private int _pomodoroMinutes = 25;
+
+    internal void PomodoroButton_RightClick(object sender, MouseButtonEventArgs e)
+    {
+        CyclePomodoroPreset();
+        e.Handled = true;
+    }
+
+    private void CyclePomodoroPreset()
+    {
+        int idx = Array.IndexOf(PomodoroPresetMinutes, _pomodoroMinutes);
+        _pomodoroMinutes = PomodoroPresetMinutes[(idx + 1) % PomodoroPresetMinutes.Length];
+        if (PomodoroButtonText != null)
+        {
+            PomodoroButtonText.Text = $"{_pomodoroMinutes}m";
+        }
+        _machine.PushToast(new ToastContent(
+            "\uE916",
+            "Pomodoro Preset",
+            $"Duration set to {_pomodoroMinutes} minutes",
+            ThemeBrushes.AmberColor,
+            TimeSpan.FromSeconds(1.6),
+            TargetView: "media",
+            Priority: ToastPriority.Feedback,
+            Category: "timer"));
+    }
+
+    private void StartPomodoroTimer()
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+        {
+            CyclePomodoroPreset();
+            return;
+        }
+
+        _stopwatch.Reset();
+        _lastTimerText = null;
+        if (_countdownService.IsRunning)
+        {
+            _countdownService.TogglePause();
+        }
+        else
+        {
+            _countdownService.StartCountdown(TimeSpan.FromMinutes(_pomodoroMinutes), $"Pomodoro {_pomodoroMinutes}m");
+            _machine.PushToast(new ToastContent(
+                "\uE916",
+                "Pomodoro Started",
+                $"{_pomodoroMinutes}:00 focus countdown active",
+                ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(2.2),
+                TargetView: "media",
+                Priority: ToastPriority.Feedback,
+                Category: "timer"));
+        }
+    }
+
+    private void ResetStopwatch()
+    {
+        _stopwatch.Reset();
+        _countdownService.Reset();
+        _lastTimerText = null;
+        RefreshStopwatchUI();
+    }
+
+    private void OnCountdownCompleted(string label)
+    {
+        _lastTimerText = null;
+        RefreshStopwatchUI();
+        _machine.PushToast(new ToastContent(
+            "\uE916",
+            $"{label} Complete!",
+            "Countdown finished \u00B7 Time for a break",
+            ThemeBrushes.GreenColor,
+            TimeSpan.FromSeconds(4.5),
+            TargetView: "media",
+            Priority: ToastPriority.Critical));
+    }
+
+    private void RefreshStopwatchUI()
+    {
+        bool isCountdown = _countdownService.IsActive;
+        bool running = isCountdown ? _countdownService.IsRunning : _stopwatch.IsRunning;
+        bool hasProgress = isCountdown ? _countdownService.Remaining < _countdownService.TargetDuration : _stopwatch.Elapsed > TimeSpan.Zero;
+
+        ExpandedTimerModeLabel.Text = isCountdown ? _countdownService.Label : "Stopwatch";
+        StartPauseGlyph.Text = running ? "\uE769" : "\uE768";
+        StartPauseLabel.Text = running ? "Pause" : hasProgress ? "Resume" : "Start";
+
+        EvaluateActivity();
+        UpdateClockAndTimeline();
+        EnsureRendering();
+    }
+
+    private void ShowNextDemoToast()
+    {
+        _machine.PushToast(DemoToasts[_demoToastIndex]);
+        _demoToastIndex = (_demoToastIndex + 1) % DemoToasts.Length;
+    }
+
+    private void Pill_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_machine.State == IslandState.Expanded || e.ChangedButton != MouseButton.Middle)
+            return;
+
+        TriggerLiquidImpulse(110, -40, 14);
+        if (!string.IsNullOrWhiteSpace(_privacyService.ActiveCallApp))
+        {
+            ToggleMicMute();
+        }
+        else if (_mediaService.Current != null && !string.IsNullOrWhiteSpace(_mediaService.Current.Title))
+        {
+            _mediaService.TogglePlayPause();
+        }
+        else if (_countdownService.IsActive || _stopwatch.IsRunning || _stopwatch.Elapsed > TimeSpan.Zero)
+        {
+            ToggleStopwatch();
+        }
+        e.Handled = true;
+    }
+
+    private void Pill_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (_machine.State == IslandState.Expanded) return;
+
+        // Shift + Scroll skips tracks horizontally; Alt + Scroll adjusts display brightness; standard Scroll adjusts system master volume
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+        {
+            if (e.Delta > 0) _mediaService.Next();
+            else if (e.Delta < 0) _mediaService.Previous();
+            e.Handled = true;
+            return;
+        }
+
+        if ((Keyboard.Modifiers & ModifierKeys.Alt) != 0)
+        {
+            int pct = _brightnessService.StepBrightness(e.Delta > 0 ? 5 : -5);
+            _machine.PushToast(new ToastContent(
+                "\uE706",
+                "Brightness",
+                $"{pct}%",
+                ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(1.8),
+                TargetView: "battery",
+                Priority: ToastPriority.Feedback,
+                Category: "brightness"));
+            e.Handled = true;
+            return;
+        }
+
+        float delta = e.Delta > 0 ? 0.02f : -0.02f;
+        _volumeService.StepVolume(delta);
+        e.Handled = true;
+    }
+
+    private void OnVolumeChanged(float vol, bool isMuted)
+    {
+        if (_machine.State == IslandState.Expanded) return;
+
+        string glyph = isMuted ? "\uE74F" : (vol > 0.66f ? "\uE767" : vol > 0.33f ? "\uE994" : "\uE993");
+        string title = isMuted ? "Volume Muted" : "Volume";
+        string subtitle = isMuted ? "0%" : $"{Math.Round(vol * 100)}%";
+        Color accent = isMuted ? ThemeBrushes.RedColor : ThemeBrushes.BlueColor;
+
+        _machine.PushToast(new ToastContent(
+            glyph,
+            title,
+            subtitle,
+            accent,
+            TimeSpan.FromSeconds(1.8),
+            TargetView: "audio",
+            Priority: ToastPriority.Feedback,
+            Category: "volume"));
+    }
+
+}

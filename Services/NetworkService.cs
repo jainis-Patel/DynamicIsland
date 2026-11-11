@@ -45,7 +45,10 @@ public sealed record NetworkStatusSnapshot(
     string DownloadSpeedText,
     string UploadSpeedText,
     bool IsWifiRadioOn,
-    bool IsBluetoothRadioOn);
+    bool IsBluetoothRadioOn,
+    int PingMs = -1,
+    string PingText = "—",
+    string ShortSpeedText = "0K");
 
 /// <summary>
 /// Monitors Wi-Fi SSID, signal strength, Ethernet state, real-time download/upload throughput,
@@ -80,7 +83,13 @@ internal sealed class NetworkService : IDisposable
         DownloadSpeedText: "0 KB/s",
         UploadSpeedText: "0 KB/s",
         IsWifiRadioOn: true,
-        IsBluetoothRadioOn: true);
+        IsBluetoothRadioOn: true,
+        PingMs: -1,
+        PingText: "—",
+        ShortSpeedText: "0K");
+
+    private int _lastPingMs = -1;
+    private DateTime _lastPingTime = DateTime.MinValue;
 
     public event Action<NetworkStatusSnapshot>? Updated;
     public event Action<ToastContent>? ConnectivityAlert;
@@ -88,17 +97,47 @@ internal sealed class NetworkService : IDisposable
 
     private List<WifiNetworkInfo> _wifiNetworks = new();
     private int _scanningWifi;
+    private volatile bool _isExpanded;
+    private readonly Func<AppSettings>? _getSettings;
 
     public IReadOnlyList<WifiNetworkInfo> WifiNetworks => _wifiNetworks;
 
-    public NetworkService(Dispatcher ui)
+    public NetworkService(Dispatcher ui, Func<AppSettings>? getSettings = null)
     {
         _ui = ui;
+        _getSettings = getSettings;
         _sampleTimer = new DispatcherTimer(DispatcherPriority.Background, _ui)
         {
-            Interval = TimeSpan.FromSeconds(1.2)
+            Interval = TimeSpan.FromSeconds(5.0)
         };
         _sampleTimer.Tick += (_, _) => Sample();
+    }
+
+    public void SetExpanded(bool isExpanded)
+    {
+        _isExpanded = isExpanded;
+        if (isExpanded)
+        {
+            _sampleTimer.Interval = TimeSpan.FromSeconds(1.2);
+            Sample();
+        }
+        else
+        {
+            bool showSpeedInIdle = _getSettings?.Invoke()?.ShowNetworkSpeedInIdle ?? false;
+            _sampleTimer.Interval = showSpeedInIdle ? TimeSpan.FromSeconds(1.5) : TimeSpan.FromSeconds(5.0);
+        }
+    }
+
+    public void SetSuspended(bool suspended)
+    {
+        if (suspended)
+        {
+            _sampleTimer.Stop();
+        }
+        else if (!_sampleTimer.IsEnabled)
+        {
+            _sampleTimer.Start();
+        }
     }
 
     public void Start()
@@ -557,7 +596,13 @@ internal sealed class NetworkService : IDisposable
                 signalBars = 4;
             }
 
+            if (connected && _isExpanded)
+            {
+                _ = UpdatePingAsync();
+            }
+
             string glyph = ResolveGlyph(connected, isWifi, isEthernet, signalBars);
+            string pingText = _lastPingMs >= 0 ? $"{_lastPingMs} ms" : "—";
             var snapshot = new NetworkStatusSnapshot(
                 IsConnected: connected,
                 IsWifi: isWifi,
@@ -573,7 +618,10 @@ internal sealed class NetworkService : IDisposable
                 DownloadSpeedText: FormatBandwidth(rxRate),
                 UploadSpeedText: FormatBandwidth(txRate),
                 IsWifiRadioOn: _isWifiRadioOn,
-                IsBluetoothRadioOn: _isBluetoothRadioOn);
+                IsBluetoothRadioOn: _isBluetoothRadioOn,
+                PingMs: _lastPingMs,
+                PingText: pingText,
+                ShortSpeedText: FormatShortBandwidth(Math.Max(rxRate, txRate)));
 
             Current = snapshot;
             Updated?.Invoke(snapshot);
@@ -635,6 +683,30 @@ internal sealed class NetworkService : IDisposable
         };
     }
 
+    private async Task UpdatePingAsync()
+    {
+        if ((DateTime.UtcNow - _lastPingTime).TotalSeconds < 4.0) return;
+        _lastPingTime = DateTime.UtcNow;
+
+        try
+        {
+            using var ping = new Ping();
+            var reply = await ping.SendPingAsync("1.1.1.1", 1200);
+            if (reply.Status == IPStatus.Success)
+            {
+                _lastPingMs = (int)reply.RoundtripTime;
+            }
+            else
+            {
+                _lastPingMs = -1;
+            }
+        }
+        catch
+        {
+            _lastPingMs = -1;
+        }
+    }
+
     internal static string FormatBandwidth(double bytesPerSec)
     {
         if (bytesPerSec < 1024)
@@ -644,6 +716,15 @@ internal sealed class NetworkService : IDisposable
             return $"{kb:0} KB/s";
         double mb = kb / 1024.0;
         return $"{mb:0.0} MB/s";
+    }
+
+    internal static string FormatShortBandwidth(double bytesPerSec)
+    {
+        if (bytesPerSec < 1024) return "0K";
+        double kb = bytesPerSec / 1024.0;
+        if (kb < 1000) return $"{kb:0}K";
+        double mb = kb / 1024.0;
+        return $"{mb:0.0}M";
     }
 
     public void Dispose()

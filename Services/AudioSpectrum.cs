@@ -15,6 +15,7 @@ namespace DynamicIsland.Services;
 internal sealed class AudioSpectrum : IDisposable
 {
     public const int BandCount = 4;
+    public const int ExpandedBandCount = 16;
 
     private const int FftLog2 = 10;
     private const int FftSize = 1 << FftLog2;   // 1024 samples ≈ 21 ms @ 48 kHz
@@ -32,11 +33,33 @@ internal sealed class AudioSpectrum : IDisposable
         (5000, 14000, 15),
     };
 
+    // 16 Log-spaced studio frequency bands (25 Hz - 20 kHz) with ISO perceptual equal-loudness tilt.
+    private static readonly (double LowHz, double HighHz, double TiltDb)[] Bands16 =
+    {
+        (25, 60, 0.0),       // 0: Sub-bass
+        (60, 110, 0.5),      // 1: Bass punch / Kick
+        (110, 180, 1.0),     // 2: Upper bass
+        (180, 280, 2.0),     // 3: Warmth
+        (280, 440, 3.0),     // 4: Low-mid body
+        (440, 680, 4.0),     // 5: Vocal fundamental
+        (680, 1000, 5.0),    // 6: Vocal midrange
+        (1000, 1500, 6.5),   // 7: Mid clarity
+        (1500, 2200, 8.0),   // 8: Snare / vocal bite
+        (2200, 3300, 9.5),   // 9: Acoustic presence
+        (3300, 4800, 11.0),  // 10: Crispness
+        (4800, 7000, 12.5),  // 11: Treble edge
+        (7000, 9800, 14.0),  // 12: High sparkle
+        (9800, 13000, 15.5), // 13: Cymbals
+        (13000, 16500, 17.0),// 14: Top sheen
+        (16500, 20000, 18.0) // 15: Ultra air
+    };
+
     private readonly object _gate = new();
     private readonly float[] _ring = new float[FftSize];
     private readonly float[] _window = new float[FftSize];
     private readonly Complex[] _fft = new Complex[FftSize];
     private readonly float[] _bands = new float[BandCount];
+    private readonly float[] _bands16 = new float[ExpandedBandCount];
 
     private WasapiLoopbackCapture? _capture;
     private WaveFormat? _format;
@@ -82,6 +105,8 @@ internal sealed class AudioSpectrum : IDisposable
         }
         for (int i = 0; i < BandCount; i++)
             Volatile.Write(ref _bands[i], 0f);
+        for (int i = 0; i < ExpandedBandCount; i++)
+            Volatile.Write(ref _bands16[i], 0f);
     }
 
     /// <summary>Notifies the spectrum analyzer that the default render endpoint changed so it can rebind.</summary>
@@ -93,13 +118,27 @@ internal sealed class AudioSpectrum : IDisposable
     /// <summary>Copies the latest band levels (0..1) lock-free. Returns zeros when audio has gone silent.</summary>
     public void ReadBands(float[] destination)
     {
+        if (destination == null || destination.Length < BandCount) return;
         if (!Volatile.Read(ref _wanted) || Environment.TickCount64 - Interlocked.Read(ref _lastDataTick) > StaleAfterMs)
         {
-            Array.Clear(destination);
+            Array.Clear(destination, 0, Math.Min(destination.Length, BandCount));
             return;
         }
         for (int i = 0; i < BandCount; i++)
             destination[i] = Volatile.Read(ref _bands[i]);
+    }
+
+    /// <summary>Copies the latest 16 studio band levels (0..1) lock-free. Returns zeros when audio has gone silent.</summary>
+    public void ReadBands16(float[] destination)
+    {
+        if (destination == null || destination.Length < ExpandedBandCount) return;
+        if (!Volatile.Read(ref _wanted) || Environment.TickCount64 - Interlocked.Read(ref _lastDataTick) > StaleAfterMs)
+        {
+            Array.Clear(destination, 0, Math.Min(destination.Length, ExpandedBandCount));
+            return;
+        }
+        for (int i = 0; i < ExpandedBandCount; i++)
+            destination[i] = Volatile.Read(ref _bands16[i]);
     }
 
     private void StartCaptureLocked()
@@ -222,6 +261,8 @@ internal sealed class AudioSpectrum : IDisposable
         FastFourierTransform.FFT(true, FftLog2, _fft);
 
         double binHz = (double)sampleRate / FftSize;
+
+        // 4-Band compact levels
         for (int band = 0; band < BandCount; band++)
         {
             var (low, high, tilt) = Bands[band];
@@ -239,6 +280,26 @@ internal sealed class AudioSpectrum : IDisposable
             double db = 20 * Math.Log10(peak + 1e-9) + tilt;
             float level = (float)Math.Clamp((db - FloorDb) / (CeilingDb - FloorDb), 0, 1);
             Volatile.Write(ref _bands[band], level);
+        }
+
+        // 16-Band studio expanded spectrum
+        for (int band = 0; band < ExpandedBandCount; band++)
+        {
+            var (low, high, tilt) = Bands16[band];
+            int first = Math.Max(1, (int)(low / binHz));
+            int last = Math.Min(FftSize / 2 - 1, (int)(high / binHz));
+
+            double peakSq = 0;
+            for (int k = first; k <= last; k++)
+            {
+                double magSq = _fft[k].X * _fft[k].X + _fft[k].Y * _fft[k].Y;
+                if (magSq > peakSq) peakSq = magSq;
+            }
+
+            double peak = Math.Sqrt(peakSq);
+            double db = 20 * Math.Log10(peak + 1e-9) + tilt;
+            float level = (float)Math.Clamp((db - FloorDb) / (CeilingDb - FloorDb), 0, 1);
+            Volatile.Write(ref _bands16[band], level);
         }
     }
 

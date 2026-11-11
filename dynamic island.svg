@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 760" width="100%" height="100%">
+  <defs>
+    <!-- Container Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1C1C1F" />
+      <stop offset="100%" stop-color="#121214" />
+    </linearGradient>
+
+    <!-- Rim Bevel Highlight -->
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3A3A3F" stop-opacity="0.85" />
+      <stop offset="50%" stop-color="#222226" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#28282C" stop-opacity="0.7" />
+    </linearGradient>
+
+    <!-- White Pill Gradient -->
+    <linearGradient id="pillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F5F5F7" />
+      <stop offset="100%" stop-color="#E2E2E5" />
+    </linearGradient>
+
+    <!-- Grey Circle Gradient -->
+    <linearGradient id="circleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8C8C91" />
+      <stop offset="100%" stop-color="#76767B" />
+    </linearGradient>
+
+    <!-- Soft Drop Shadow for Inner Elements -->
+    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#000000" flood-opacity="0.6" />
+    </filter>
+  </defs>
+
+  <!-- Rounded Squircle Container -->
+  <rect x="4" y="4" width="752" height="752" rx="176" fill="url(#bgGrad)" stroke="url(#borderGrad)" stroke-width="4" />
+
+  <!-- Toggle Glyph -->
+  <g filter="url(#dropShadow)">
+    <!-- Left Pill -->
+    <rect x="130" y="293" width="346" height="174" rx="87" fill="url(#pillGrad)" />
+    <!-- Right Circle -->
+    <circle cx="569" cy="380" r="71" fill="url(#circleGrad)" />
+  </g>
+</svg>

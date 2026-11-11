@@ -5,7 +5,14 @@ using NAudio.Wave;
 
 namespace DynamicIsland.Services;
 
-public sealed record VoiceMemoInfo(string FilePath, string FileName, TimeSpan Duration, DateTime CreatedAt);
+public sealed record VoiceMemoInfo(string FilePath, string FileName, TimeSpan Duration, DateTime CreatedAt)
+{
+    public string DurationText => Duration.TotalHours >= 1
+        ? Duration.ToString(@"h\:mm\:ss")
+        : Duration.ToString(@"m\:ss");
+
+    public string MetaText => $"{DurationText} \u00B7 {CreatedAt:HH:mm}";
+}
 
 /// <summary>
 /// 1-Click voice memo audio recorder using WASAPI Capture.
@@ -21,6 +28,7 @@ internal sealed class VoiceMemoService : IDisposable
     private readonly Dispatcher _ui;
     private readonly DispatcherTimer _recordTimer;
     private readonly object _writerLock = new();
+    private readonly List<VoiceMemoInfo> _recentMemos = new();
     private WasapiCapture? _capture;
     private WaveFileWriter? _writer;
     private WasapiOut? _player;
@@ -32,14 +40,17 @@ internal sealed class VoiceMemoService : IDisposable
 
     public bool IsRecording { get; private set; }
     public bool IsPlaying { get; private set; }
+    public string? PlayingFilePath { get; private set; }
     public TimeSpan Elapsed { get; private set; }
     public float PeakLevel => _currentPeak;
     public string? LastSavedFilePath => _currentFilePath;
     public VoiceMemoInfo? LastSavedMemo { get; private set; }
+    public IReadOnlyList<VoiceMemoInfo> RecentMemos => _recentMemos;
 
     public event Action<float, TimeSpan>? RecordingTick;
     public event Action<VoiceMemoInfo>? RecordingCompleted;
     public event Action<bool>? PlaybackStateChanged;
+    public event Action? MemosChanged;
 
     public VoiceMemoService(Dispatcher ui)
     {
@@ -64,17 +75,25 @@ internal sealed class VoiceMemoService : IDisposable
     {
         try
         {
-            var latest = new DirectoryInfo(MemoDirectory)
+            _recentMemos.Clear();
+            var files = new DirectoryInfo(MemoDirectory)
                 .GetFiles("*.wav")
+                .Where(f => f.Exists && f.Length > 44)
                 .OrderByDescending(f => f.LastWriteTimeUtc)
-                .FirstOrDefault();
+                .Take(10);
 
-            if (latest is { Exists: true, Length: > 44 })
+            foreach (var file in files)
             {
-                _currentFilePath = latest.FullName;
-                using var reader = new WaveFileReader(latest.FullName);
-                LastSavedMemo = new VoiceMemoInfo(latest.FullName, latest.Name, reader.TotalTime, latest.CreationTime);
+                try
+                {
+                    using var reader = new WaveFileReader(file.FullName);
+                    _recentMemos.Add(new VoiceMemoInfo(file.FullName, file.Name, reader.TotalTime, file.CreationTime));
+                }
+                catch { }
             }
+
+            LastSavedMemo = _recentMemos.FirstOrDefault();
+            _currentFilePath = LastSavedMemo?.FilePath;
         }
         catch { }
     }
@@ -162,12 +181,14 @@ internal sealed class VoiceMemoService : IDisposable
             _player.PlaybackStopped += (_, _) =>
             {
                 IsPlaying = false;
+                PlayingFilePath = null;
                 _ui.InvokeAsync(() => PlaybackStateChanged?.Invoke(false));
                 CleanupPlayer();
             };
 
             _player.Play();
             IsPlaying = true;
+            PlayingFilePath = filePath;
             PlaybackStateChanged?.Invoke(true);
         }
         catch (Exception ex)
@@ -189,7 +210,37 @@ internal sealed class VoiceMemoService : IDisposable
         {
             CleanupPlayer();
             IsPlaying = false;
+            PlayingFilePath = null;
             PlaybackStateChanged?.Invoke(false);
+        }
+    }
+
+    public bool DeleteMemo(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath)) return false;
+
+        try
+        {
+            if (IsPlaying && string.Equals(PlayingFilePath, filePath, StringComparison.OrdinalIgnoreCase))
+            {
+                StopPlayback();
+            }
+
+            _recentMemos.RemoveAll(m => string.Equals(m.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+
+            LastSavedMemo = _recentMemos.FirstOrDefault();
+            _currentFilePath = LastSavedMemo?.FilePath;
+            MemosChanged?.Invoke();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[VoiceMemoService] DeleteMemo error: {ex.Message}");
+            return false;
         }
     }
 
@@ -244,7 +295,14 @@ internal sealed class VoiceMemoService : IDisposable
             if (!string.IsNullOrEmpty(savedPath) && File.Exists(savedPath) && dur > TimeSpan.FromMilliseconds(500))
             {
                 var info = new VoiceMemoInfo(savedPath, Path.GetFileName(savedPath), dur, DateTime.Now);
+                _recentMemos.RemoveAll(m => string.Equals(m.FilePath, savedPath, StringComparison.OrdinalIgnoreCase));
+                _recentMemos.Insert(0, info);
+                if (_recentMemos.Count > 10)
+                {
+                    _recentMemos.RemoveRange(10, _recentMemos.Count - 10);
+                }
                 LastSavedMemo = info;
+                MemosChanged?.Invoke();
                 RecordingCompleted?.Invoke(info);
             }
         });

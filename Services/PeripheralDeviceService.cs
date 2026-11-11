@@ -103,6 +103,15 @@ internal sealed class PeripheralDeviceService : IDisposable
         _pollTimer.Stop();
     }
 
+    public void SetSuspended(bool suspended)
+    {
+        if (_disposed) return;
+        if (suspended)
+            _pollTimer.Stop();
+        else if (!_pollTimer.IsEnabled)
+            _pollTimer.Start();
+    }
+
     public void ToggleSimulatedFallback()
     {
         _useSimulatedFallback = !_useSimulatedFallback;

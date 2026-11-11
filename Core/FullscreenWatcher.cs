@@ -40,15 +40,6 @@ internal sealed class FullscreenWatcher : IDisposable
 
     private bool IsFullscreenActive()
     {
-        // 1. Check exclusive D3D fullscreen or presentation mode via Shell notification state
-        if (SHQueryUserNotificationState(out var state) == 0 &&
-            state is QUERY_USER_NOTIFICATION_STATE.QUNS_RUNNING_D3D_FULL_SCREEN
-                  or QUERY_USER_NOTIFICATION_STATE.QUNS_PRESENTATION_MODE)
-        {
-            return true;
-        }
-
-        // 2. Check if the foreground window is borderless-fullscreen on our target monitor
         var (islandHwnd, targetMonitor) = _getContext();
         if (targetMonitor == IntPtr.Zero) return false;
 
@@ -60,6 +51,7 @@ internal sealed class FullscreenWatcher : IDisposable
         long exStyle = GetExStyle(fg);
         if ((exStyle & WS_EX_TOOLWINDOW) != 0) return false;
 
+        // Foreground window MUST be on the island's target monitor (prevents secondary monitor apps/games from hiding this island)
         if (MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST) != targetMonitor)
             return false;
 
@@ -69,7 +61,30 @@ internal sealed class FullscreenWatcher : IDisposable
         if (!GetWindowRect(fg, out var winRect)) return false;
 
         long winStyle = GetStyle(fg);
-        return IsWindowBorderlessFullscreen(winRect, monInfo, winStyle);
+
+        // 1. Check if the foreground window is borderless-fullscreen on our target monitor
+        if (IsWindowBorderlessFullscreen(winRect, monInfo, winStyle))
+            return true;
+
+        // 2. Secondary check: Direct3D exclusive fullscreen or presentation mode via Shell notification state.
+        // Gated strictly to when the foreground window on OUR monitor covers >= 90% of screen dimensions,
+        // preventing background DirectX overlays (e.g. Discord, Game Bar) from falsely suppressing the island.
+        if (SHQueryUserNotificationState(out var state) == 0 &&
+            state is QUERY_USER_NOTIFICATION_STATE.QUNS_RUNNING_D3D_FULL_SCREEN
+                  or QUERY_USER_NOTIFICATION_STATE.QUNS_PRESENTATION_MODE)
+        {
+            int fgWidth = winRect.Right - winRect.Left;
+            int fgHeight = winRect.Bottom - winRect.Top;
+            int monWidth = monInfo.rcMonitor.Right - monInfo.rcMonitor.Left;
+            int monHeight = monInfo.rcMonitor.Bottom - monInfo.rcMonitor.Top;
+
+            if (fgWidth >= monWidth * 0.9 && fgHeight >= monHeight * 0.9)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

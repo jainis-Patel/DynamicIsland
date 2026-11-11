@@ -17,6 +17,7 @@ public enum InstallerStartupMode
 public partial class App : Application
 {
     public static InstallerStartupMode StartupMode { get; set; } = InstallerStartupMode.Normal;
+    public static bool IsDiagnosticMode { get; set; } = false;
 
     private static readonly string LogFile = AppPaths.LogFile;
     private const long MaxLogSizeBytes = 512 * 1024; // Cap log file at 512 KB
@@ -44,6 +45,42 @@ public partial class App : Application
     public static void Log(string msg)
     {
         LogChannel.Writer.TryWrite($"[{DateTime.Now:HH:mm:ss.fff}] {msg}");
+    }
+
+    public static void LogMemorySnapshot(string tag)
+    {
+        try
+        {
+            var p = System.Diagnostics.Process.GetCurrentProcess();
+            var gc = GC.GetGCMemoryInfo();
+            long totalMem = GC.GetTotalMemory(false);
+            Log($"[Memory Snapshot: {tag}] WorkingSet={p.WorkingSet64 / 1024 / 1024} MB, PrivateBytes={p.PrivateMemorySize64 / 1024 / 1024} MB, GCHeap={gc.HeapSizeBytes / 1024 / 1024} MB, GCCommitted={gc.TotalCommittedBytes / 1024 / 1024} MB, TotalManaged={totalMem / 1024 / 1024} MB, IsServerGC={System.Runtime.GCSettings.IsServerGC}");
+        }
+        catch { }
+    }
+
+    internal static void EnsurePowerSavingGpuPreference()
+    {
+        try
+        {
+            string? exePath = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(exePath) || !File.Exists(exePath)) return;
+
+            using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\DirectX\UserGpuPreferences");
+            if (key != null)
+            {
+                object? existing = key.GetValue(exePath);
+                if (existing == null || !existing.ToString()!.Contains("GpuPreference=1;"))
+                {
+                    key.SetValue(exePath, "GpuPreference=1;");
+                    Log($"[GPU] Set UserGpuPreferences to GpuPreference=1 for {exePath}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"[GPU] EnsurePowerSavingGpuPreference notice: {ex.Message}");
+        }
     }
 
     public static void FlushLogs()
@@ -113,6 +150,27 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         Log("=== App OnStartup ===");
+        EnsurePowerSavingGpuPreference();
+
+        try
+        {
+            var settings = AtomicJsonStore.Load<Services.AppSettings?>(AppPaths.SettingsFile, () => null);
+            if (settings?.LowMemoryMode == true)
+            {
+                System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+                Log("[Rendering] Software-only rendering enabled (LowMemoryMode = true).");
+            }
+
+            ThemeManager.Initialize(settings?.ThemeMode, settings?.ThemeStyle);
+            Log($"[Theme] Initialized theme mode: {ThemeManager.CurrentMode}, style: {ThemeManager.CurrentStyle} -> Active: {ThemeManager.CurrentTheme}");
+        }
+        catch (Exception ex)
+        {
+            ThemeManager.Initialize();
+            Log($"[Theme] Notice during theme init: {ex.Message}");
+        }
+
+        LogMemorySnapshot("Pre-Startup");
 
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
@@ -146,45 +204,56 @@ public partial class App : Application
             return;
         }
 
-        _singleInstance = new Mutex(true, @"Local\DynamicIsland.SingleInstance", out _ownsMutex);
-        if (!_ownsMutex)
+        if (!IsDiagnosticMode)
         {
-            Log("Another instance is already running. Signaling existing instance to shut down and replacing it.");
-            Program.SignalStopOnDefaultDesktop();
-            try
-            {
-                _ownsMutex = _singleInstance.WaitOne(TimeSpan.FromMilliseconds(2500));
-            }
-            catch (AbandonedMutexException)
-            {
-                _ownsMutex = true;
-            }
-
+            _singleInstance = new Mutex(true, @"Local\DynamicIsland.SingleInstance", out _ownsMutex);
             if (!_ownsMutex)
             {
-                Log("Existing instance did not release mutex in time. Expanding existing instance.");
-                uint expandMsg = RegisterWindowMessage("DYNAMIC_ISLAND_EXPAND");
-                PostMessage(HWND_BROADCAST, expandMsg, IntPtr.Zero, IntPtr.Zero);
-                Shutdown();
-                return;
+                bool replace = e.Args.Any(a => string.Equals(a, "--replace", StringComparison.OrdinalIgnoreCase));
+                if (replace)
+                {
+                    Log("Another instance is already running with --replace flag. Signaling existing instance to shut down.");
+                    Program.SignalStopOnDefaultDesktop();
+                    try
+                    {
+                        _ownsMutex = _singleInstance.WaitOne(TimeSpan.FromMilliseconds(2500));
+                    }
+                    catch (AbandonedMutexException)
+                    {
+                        _ownsMutex = true;
+                    }
+                }
+
+                if (!_ownsMutex)
+                {
+                    Log("Another instance is already running. Signaling existing instance to expand and exiting.");
+                    uint expandMsg = RegisterWindowMessage("DYNAMIC_ISLAND_EXPAND");
+                    PostMessage(HWND_BROADCAST, expandMsg, IntPtr.Zero, IntPtr.Zero);
+                    Shutdown();
+                    return;
+                }
             }
         }
 
         base.OnStartup(e);
 
-        try
+        if (MainWindow == null)
         {
-            Log("Creating IslandWindow...");
-            var island = new IslandWindow();
-            MainWindow = island;
-            Log("Showing IslandWindow...");
-            island.Show();
-            Log("IslandWindow shown successfully.");
-        }
-        catch (Exception ex)
-        {
-            Log($"Exception during window creation/show: {ex}");
-            throw;
+            try
+            {
+                Log("Creating IslandWindow...");
+                var island = new IslandWindow();
+                MainWindow = island;
+                Log("Showing IslandWindow...");
+                island.Show();
+                Log("IslandWindow shown successfully.");
+                LogMemorySnapshot("Post-Show");
+            }
+            catch (Exception ex)
+            {
+                Log($"Exception during window creation/show: {ex}");
+                throw;
+            }
         }
     }
 

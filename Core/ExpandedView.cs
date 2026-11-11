@@ -10,22 +10,33 @@ public enum ExpandedView
     Shelf,
     Clipboard,
     Calc,
+    Notes,
     Settings,
     Audio,
     Battery,
     VoiceMemo,
     Peripherals,
     Network,
-    Notifications
+    Notifications,
+    SystemHud,
+    Converter,
+    Launcher,
+    Termi,
+    PhoneBridge,
+    MechSounds,
+    CaptureStudio,
+    Calendar
 }
 
 public static class ExpandedViewExtensions
 {
     public static string ToKey(this ExpandedView view) => view switch
     {
+        ExpandedView.Calendar => "calendar",
         ExpandedView.Shelf => "shelf",
         ExpandedView.Clipboard => "clipboard",
         ExpandedView.Calc => "calc",
+        ExpandedView.Notes => "notes",
         ExpandedView.Settings => "settings",
         ExpandedView.Audio => "audio",
         ExpandedView.Battery => "battery",
@@ -33,6 +44,13 @@ public static class ExpandedViewExtensions
         ExpandedView.Peripherals => "peripherals",
         ExpandedView.Network => "network",
         ExpandedView.Notifications => "notifications",
+        ExpandedView.SystemHud => "systemhud",
+        ExpandedView.Converter => "converter",
+        ExpandedView.Launcher => "launcher",
+        ExpandedView.Termi => "termi",
+        ExpandedView.PhoneBridge => "phonebridge",
+        ExpandedView.MechSounds => "mechsounds",
+        ExpandedView.CaptureStudio => "capturestudio",
         _ => "media"
     };
 
@@ -46,6 +64,11 @@ public static class ExpandedViewExtensions
 
         switch (key.Trim().ToLowerInvariant())
         {
+            case "calendar":
+            case "tasks":
+            case "schedule":
+                view = ExpandedView.Calendar;
+                return true;
             case "media":
                 view = ExpandedView.Media;
                 return true;
@@ -57,6 +80,11 @@ public static class ExpandedViewExtensions
                 return true;
             case "calc":
                 view = ExpandedView.Calc;
+                return true;
+            case "notes":
+            case "scratchpad":
+            case "note":
+                view = ExpandedView.Notes;
                 return true;
             case "settings":
                 view = ExpandedView.Settings;
@@ -80,6 +108,45 @@ public static class ExpandedViewExtensions
             case "notifications":
             case "notifs":
                 view = ExpandedView.Notifications;
+                return true;
+            case "systemhud":
+            case "hud":
+            case "cpu":
+            case "performance":
+            case "activity":
+                view = ExpandedView.SystemHud;
+                return true;
+            case "converter":
+            case "convert":
+            case "pdf":
+                view = ExpandedView.Converter;
+                return true;
+            case "launcher":
+            case "launch":
+            case "apps":
+                view = ExpandedView.Launcher;
+                return true;
+            case "termi":
+            case "terminal":
+            case "terminotch":
+                view = ExpandedView.Termi;
+                return true;
+            case "phonebridge":
+            case "lan":
+            case "phone":
+            case "quickshare":
+                view = ExpandedView.PhoneBridge;
+                return true;
+            case "mechsounds":
+            case "mech":
+            case "keyboard":
+                view = ExpandedView.MechSounds;
+                return true;
+            case "capturestudio":
+            case "capture":
+            case "ocr":
+            case "screenshot":
+                view = ExpandedView.CaptureStudio;
                 return true;
             default:
                 view = ExpandedView.Media;

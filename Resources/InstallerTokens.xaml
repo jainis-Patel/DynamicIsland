@@ -1,0 +1,336 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- ========================================================================= -->
+    <!--  Dynamic Island Installer Design Tokens                                   -->
+    <!--  First-party calm, quiet, confident aesthetic. Exactly ONE accent color.  -->
+    <!-- ========================================================================= -->
+
+    <!-- Surfaces & Neutrals -->
+    <Color x:Key="ColorSurface">#121214</Color>
+    <SolidColorBrush x:Key="BrushSurface" Color="{StaticResource ColorSurface}" />
+
+    <Color x:Key="ColorElevated">#1A1A1D</Color>
+    <SolidColorBrush x:Key="BrushElevated" Color="{StaticResource ColorElevated}" />
+
+    <Color x:Key="ColorOutline">#14FFFFFF</Color> <!-- #FFFFFF14 subtle window outline -->
+    <SolidColorBrush x:Key="BrushOutline" Color="{StaticResource ColorOutline}" />
+
+    <Color x:Key="ColorDivider">#12FFFFFF</Color> <!-- #FFFFFF12 subtle separator -->
+    <SolidColorBrush x:Key="BrushDivider" Color="{StaticResource ColorDivider}" />
+
+    <Color x:Key="ColorHoverSubtle">#0DFFFFFF</Color> <!-- #FFFFFF0D hover fill -->
+    <SolidColorBrush x:Key="BrushHoverSubtle" Color="{StaticResource ColorHoverSubtle}" />
+
+    <!-- Typography Colors (Strictly 2 text colors on surface, min 4.5:1 contrast) -->
+    <Color x:Key="ColorTextPrimary">#F5F5F7</Color>
+    <SolidColorBrush x:Key="BrushTextPrimary" Color="{StaticResource ColorTextPrimary}" />
+
+    <Color x:Key="ColorTextSecondary">#A1A1A6</Color>
+    <SolidColorBrush x:Key="BrushTextSecondary" Color="{StaticResource ColorTextSecondary}" />
+
+    <Color x:Key="ColorTextDisabled">#636366</Color>
+    <SolidColorBrush x:Key="BrushTextDisabled" Color="{StaticResource ColorTextDisabled}" />
+
+    <!-- Exactly ONE Accent Color: Amber (#FF9F0A) -->
+    <!-- Used ONLY for: Primary button, Progress bar fill, Checked switch, Focus ring -->
+    <Color x:Key="ColorAccent">#FF9F0A</Color>
+    <SolidColorBrush x:Key="BrushAccent" Color="{StaticResource ColorAccent}" />
+
+    <Color x:Key="ColorAccentHover">#FFB340</Color>
+    <SolidColorBrush x:Key="BrushAccentHover" Color="{StaticResource ColorAccentHover}" />
+
+    <Color x:Key="ColorAccentPressed">#E08800</Color>
+    <SolidColorBrush x:Key="BrushAccentPressed" Color="{StaticResource ColorAccentPressed}" />
+
+    <Color x:Key="ColorTextOnAccent">#1A1200</Color>
+    <SolidColorBrush x:Key="BrushTextOnAccent" Color="{StaticResource ColorTextOnAccent}" />
+
+    <!-- Switch Track Neutral State -->
+    <Color x:Key="ColorSwitchOff">#3A3A3C</Color>
+    <SolidColorBrush x:Key="BrushSwitchOff" Color="{StaticResource ColorSwitchOff}" />
+
+    <!-- Alert / Failure Color (Used ONLY when installation actually fails) -->
+    <Color x:Key="ColorError">#FF453A</Color>
+    <SolidColorBrush x:Key="BrushError" Color="{StaticResource ColorError}" />
+
+    <!-- Typography (Only 3 font sizes: Title 22, Body 14, Caption 12) -->
+    <FontFamily x:Key="InstallerFontFamily">Segoe UI Variable Text, Segoe UI Variable Display, Segoe UI, -apple-system, sans-serif</FontFamily>
+    <sys:Double x:Key="FontSizeTitle">22</sys:Double>
+    <sys:Double x:Key="FontSizeBody">14</sys:Double>
+    <sys:Double x:Key="FontSizeCaption">12</sys:Double>
+
+    <!-- Radii -->
+    <CornerRadius x:Key="RadiusWindow">12</CornerRadius>
+    <CornerRadius x:Key="RadiusButton">8</CornerRadius>
+    <CornerRadius x:Key="RadiusSwitch">10</CornerRadius>
+    <CornerRadius x:Key="RadiusProgress">2</CornerRadius>
+
+    <!-- Focus Ring (2px solid amber with 2px offset, visible only on keyboard focus) -->
+    <Style x:Key="InstallerFocusVisual">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border BorderBrush="{StaticResource BrushAccent}"
+                            BorderThickness="2"
+                            CornerRadius="10"
+                            Margin="-3" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Primary Button (Filled Amber, 36px height, 8px radius) -->
+    <Style x:Key="InstallerPrimaryButton" TargetType="Button">
+        <Setter Property="Height" Value="36" />
+        <Setter Property="MinWidth" Value="100" />
+        <Setter Property="Padding" Value="20,0" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontFamily" Value="{StaticResource InstallerFontFamily}" />
+        <Setter Property="Foreground" Value="{StaticResource BrushTextOnAccent}" />
+        <Setter Property="Background" Value="{StaticResource BrushAccent}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource InstallerFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="RootBorder"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{StaticResource RadiusButton}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="RootBorder" Property="Background" Value="{StaticResource BrushAccentHover}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="RootBorder" Property="Background" Value="{StaticResource BrushAccentPressed}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="RootBorder" Property="Background" Value="{StaticResource BrushSwitchOff}" />
+                            <Setter Property="Foreground" Value="{StaticResource BrushTextDisabled}" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Secondary Button (Text-only, subtle hover fill, no border) -->
+    <Style x:Key="InstallerSecondaryButton" TargetType="Button">
+        <Setter Property="Height" Value="36" />
+        <Setter Property="MinWidth" Value="72" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="FontFamily" Value="{StaticResource InstallerFontFamily}" />
+        <Setter Property="Foreground" Value="{StaticResource BrushTextSecondary}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource InstallerFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="RootBorder"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{StaticResource RadiusButton}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="RootBorder" Property="Background" Value="{StaticResource BrushHoverSubtle}" />
+                            <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="RootBorder" Property="Background" Value="#1AFFFFFF" />
+                            <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource BrushTextDisabled}" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Link / Caption Text Button -->
+    <Style x:Key="InstallerLinkButton" TargetType="Button">
+        <Setter Property="Height" Value="Auto" />
+        <Setter Property="Padding" Value="6,4" />
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="FontFamily" Value="{StaticResource InstallerFontFamily}" />
+        <Setter Property="Foreground" Value="{StaticResource BrushTextSecondary}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource InstallerFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="RootBorder"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="4"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="RootBorder" Property="Background" Value="{StaticResource BrushHoverSubtle}" />
+                            <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource BrushTextDisabled}" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Custom Title Bar Close Button -->
+    <Style x:Key="InstallerCloseButton" TargetType="Button">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource BrushTextSecondary}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource InstallerFocusVisual}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6">
+                        <Path Data="M 9,9 L 19,19 M 19,9 L 9,19"
+                              Stroke="{TemplateBinding Foreground}"
+                              StrokeThickness="1.5"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="{StaticResource BrushHoverSubtle}" />
+                            <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="#1AFFFFFF" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 36x20 Modern Switch Toggle (Amber when ON, #3A3A3C when OFF) -->
+    <Style x:Key="InstallerToggleSwitch" TargetType="CheckBox">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource InstallerFocusVisual}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Grid Width="36" Height="20" Background="Transparent">
+                        <Border x:Name="Track"
+                                Width="36" Height="20"
+                                CornerRadius="{StaticResource RadiusSwitch}"
+                                Background="{StaticResource BrushSwitchOff}"
+                                BorderBrush="{StaticResource BrushOutline}"
+                                BorderThickness="1" />
+                        <Border x:Name="Thumb"
+                                Width="14" Height="14"
+                                CornerRadius="7"
+                                Background="#FFFFFF"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Margin="3,0,0,0">
+                            <Border.RenderTransform>
+                                <TranslateTransform x:Name="ThumbTranslate" X="0" />
+                            </Border.RenderTransform>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Track" Property="Background" Value="{StaticResource BrushAccent}" />
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource BrushAccent}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ThumbTranslate"
+                                                         Storyboard.TargetProperty="X"
+                                                         To="16" Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ThumbTranslate"
+                                                         Storyboard.TargetProperty="X"
+                                                         To="0" Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True" />
+                                <Condition Property="IsChecked" Value="False" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Track" Property="Background" Value="#48484A" />
+                        </MultiTrigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Track" Property="Opacity" Value="0.4" />
+                            <Setter TargetName="Thumb" Property="Opacity" Value="0.6" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 4px Thin Progress Bar (Amber fill, rounded track) -->
+    <Style x:Key="InstallerProgressBar" TargetType="ProgressBar">
+        <Setter Property="Height" Value="4" />
+        <Setter Property="Background" Value="{StaticResource BrushElevated}" />
+        <Setter Property="Foreground" Value="{StaticResource BrushAccent}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="{StaticResource RadiusProgress}"
+                            ClipToBounds="True">
+                        <Grid x:Name="PART_Track">
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="{StaticResource RadiusProgress}" />
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

@@ -1,9 +1,33 @@
+# Build and output directories
 bin/
 obj/
 .vs/
 *.user
+*.suo
+*.userosv
 publish/
+publish_new/
+publish_*/
+dist/
+release/
+old/
+scratch/
 DynamicIsland_Memos/
-*.png
+
+# Compiled binaries and build outputs in root or subdirectories
+*.dll
+*.deps.json
+*.runtimeconfig.json
+*.pdb
+*.exe
 *.log
 *.tmp
+*.lnk
+*.cache
+
+# Media & captured assets (ignore screenshots, but keep project assets)
+*.png
+!Assets/**/*.png
+!Assets/*.png
+
+# Keep installer executables if built into dist/release, but ignore loose executables
