@@ -3,7 +3,7 @@
 ; Compile via command line: iscc.exe DynamicIsland.iss
 
 #define MyAppName "Dynamic Island"
-#define MyAppVersion "0.4.0"
+#define MyAppVersion "0.4.2"
 #define MyAppPublisher "Jainis Patel"
 #define MyAppURL "https://github.com"
 #define MyAppExeName "DynamicIsland.exe"
@@ -51,14 +51,20 @@ Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Name: "{userstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: autostart
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall
 
 [Code]
 // Gracefully signal any running Dynamic Island process to close before upgrading
-function InitializeSetup(): Boolean;
+function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
+  AppPath: String;
 begin
-  Result := True;
-  Exec(ExpandConstant('{app}\{#MyAppExeName}'), '--stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Result := '';
+  AppPath := ExpandConstant('{app}\{#MyAppExeName}');
+  if FileExists(AppPath) then
+  begin
+    Exec(AppPath, '--stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Sleep(250);
+  end;
 end;

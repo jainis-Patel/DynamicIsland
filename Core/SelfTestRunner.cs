@@ -929,7 +929,7 @@ SSID 3 : Home_Router
         Assert(installDir.Contains("DynamicIsland", StringComparison.OrdinalIgnoreCase), "Install dir must contain DynamicIsland");
         string exePath = InstallerService.GetInstalledExePath();
         Assert(exePath.EndsWith("DynamicIsland.exe", StringComparison.OrdinalIgnoreCase), "Installed exe path must end with DynamicIsland.exe");
-        Assert(InstallerService.AppVersion == "0.4.0", "InstallerService.AppVersion must be 0.4.0");
+        Assert(SemVersion.TryParse(InstallerService.AppVersion, out _), "InstallerService.AppVersion must be valid SemVer");
 
         // Existing installation detection & Drive space evaluation
         var (isInstalled, ver, loc) = InstallerService.GetExistingInstallation();

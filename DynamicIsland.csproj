@@ -13,7 +13,7 @@
     <AssemblyName>DynamicIsland</AssemblyName>
     <!-- Per-Monitor V2 DPI awareness so GetCursorPos/GetWindowRect return physical pixels. -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.4.0</Version>
+    <Version>0.4.2</Version>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Authors>Jainis Patel</Authors>
     <Company>Jainis Patel</Company>
