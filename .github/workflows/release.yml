@@ -45,7 +45,7 @@ jobs:
           choco install innosetup --no-progress --yes
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore -r win-x64
 
       - name: Build Release
         run: dotnet build -c Release --no-restore -p:Version=${{ env.VERSION }}

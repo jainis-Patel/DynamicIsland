@@ -20,13 +20,13 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore -r win-x64
 
       - name: Build Release
-        run: dotnet build -c Release --no-restore
+        run: dotnet build -c Release
 
       - name: Run Deterministic Self-Test Suite
         run: dotnet run -c Release --no-build -- --self-test
 
       - name: Publish Single-File Release
-        run: dotnet publish -c Release -p:PublishProfile=WinX64 --no-restore
+        run: dotnet publish -c Release -p:PublishProfile=WinX64
