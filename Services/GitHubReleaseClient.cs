@@ -14,6 +14,7 @@ namespace DynamicIsland.Services;
 internal sealed class GitHubReleaseClient : IDisposable
 {
     private readonly HttpClient _http;
+    private readonly HttpClient _downloadHttp;
     private string? _lastETag;
     private bool _disposed;
 
@@ -23,8 +24,12 @@ internal sealed class GitHubReleaseClient : IDisposable
     public GitHubReleaseClient(HttpClient? client = null)
     {
         _http = client ?? new HttpClient();
-        _http.Timeout = TimeSpan.FromSeconds(12);
+        _http.Timeout = TimeSpan.FromSeconds(15);
         _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("DynamicIsland", "0.4.0"));
+
+        _downloadHttp = new HttpClient();
+        _downloadHttp.Timeout = TimeSpan.FromMinutes(10);
+        _downloadHttp.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("DynamicIsland", "0.4.0"));
     }
 
     /// <summary>
@@ -282,7 +287,7 @@ internal sealed class GitHubReleaseClient : IDisposable
 
         try
         {
-            using var response = await _http.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            using var response = await _downloadHttp.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             long totalBytes = response.Content.Headers.ContentLength ?? -1L;
@@ -330,5 +335,6 @@ internal sealed class GitHubReleaseClient : IDisposable
         if (_disposed) return;
         _disposed = true;
         _http.Dispose();
+        _downloadHttp.Dispose();
     }
 }

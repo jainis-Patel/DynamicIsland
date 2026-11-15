@@ -198,7 +198,7 @@ internal sealed class UpdateManagerService : IDisposable
             return false;
         }
 
-        string tempDir = Path.Combine(Path.GetTempPath(), "DynamicIsland", "Updates");
+        string tempDir = ResolveDownloadDirectory(asset.SizeBytes);
         Directory.CreateDirectory(tempDir);
 
         string ext = Path.GetExtension(asset.Url);
@@ -317,6 +317,45 @@ internal sealed class UpdateManagerService : IDisposable
         {
             action();
         }
+    }
+
+    /// <summary>
+    /// Resolves the destination directory for update downloads.
+    /// Checks available disk space and automatically falls back to secondary fixed drives (e.g. D:, E:)
+    /// if the system %TEMP% drive (typically C:) is constrained.
+    /// </summary>
+    private static string ResolveDownloadDirectory(long estimatedBytes)
+    {
+        long requiredSpace = (estimatedBytes > 0 ? estimatedBytes : 75L * 1024 * 1024) + (50L * 1024 * 1024);
+        string preferredTemp = Path.Combine(Path.GetTempPath(), "DynamicIsland", "Updates");
+
+        try
+        {
+            string? driveRoot = Path.GetPathRoot(preferredTemp);
+            if (!string.IsNullOrEmpty(driveRoot))
+            {
+                var drive = new DriveInfo(driveRoot);
+                if (drive.IsReady && drive.AvailableFreeSpace >= requiredSpace)
+                {
+                    return preferredTemp;
+                }
+            }
+
+            // Fallback: search for any fixed drive with plenty of space (e.g. D:, E:)
+            foreach (var d in DriveInfo.GetDrives())
+            {
+                if (d.IsReady && d.DriveType == DriveType.Fixed && d.AvailableFreeSpace >= requiredSpace)
+                {
+                    return Path.Combine(d.RootDirectory.FullName, "DynamicIsland", "Updates");
+                }
+            }
+        }
+        catch
+        {
+            // Fallback to preferred temp on query failure
+        }
+
+        return preferredTemp;
     }
 
     public void Dispose()
