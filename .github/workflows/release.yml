@@ -116,11 +116,7 @@ jobs:
           $singleHash = (Get-FileHash -Path $singleExe -Algorithm SHA256).Hash.ToLowerInvariant()
 
           # Output checksums.sha256 file
-          $checksumsContent = @"
-$setupHash  DynamicIsland-Setup.exe
-$portableHash  DynamicIsland-Portable.zip
-$singleHash  DynamicIsland.exe
-"@
+          $checksumsContent = "$setupHash  DynamicIsland-Setup.exe`n$portableHash  DynamicIsland-Portable.zip`n$singleHash  DynamicIsland.exe"
           Set-Content -Path "publish/checksums.sha256" -Value $checksumsContent -Encoding utf8
 
           # Build Canonical release-manifest.json
