@@ -120,13 +120,26 @@ public sealed class GlassRenderer : IDisposable
             FeatureLevel.Level_11_0
         };
 
-        D3D11.D3D11CreateDevice(
+        var hr = D3D11.D3D11CreateDevice(
             null,
             DriverType.Hardware,
             creationFlags,
             featureLevels,
             out _device,
-            out _context).CheckError();
+            out _context);
+
+        if (hr.Failure)
+        {
+            // Fallback to WARP software rasterizer (essential for CI runners, headless VMs, or basic display adapters)
+            hr = D3D11.D3D11CreateDevice(
+                null,
+                DriverType.Warp,
+                creationFlags,
+                featureLevels,
+                out _device,
+                out _context);
+            hr.CheckError();
+        }
 
         // 2. Load compiled shader bytecode
         byte[] vsBytecode = LoadShaderBytecode("GlassVertexShader.cso");

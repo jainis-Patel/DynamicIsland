@@ -43,35 +43,49 @@ jobs:
         shell: pwsh
         run: |
           choco install innosetup --no-progress --yes
+          $innoDir = if (Test-Path "C:\Program Files (x86)\Inno Setup 6") { "C:\Program Files (x86)\Inno Setup 6" } else { "C:\Program Files\Inno Setup 6" }
+          Write-Host "Inno Setup directory: $innoDir"
+          echo "$innoDir" >> $env:GITHUB_PATH
 
       - name: Restore dependencies
         run: dotnet restore -r win-x64
 
       - name: Build Release
-        run: dotnet build -c Release --no-restore -p:Version=${{ env.VERSION }}
+        run: dotnet build -c Release -r win-x64 --no-restore -p:Version=${{ env.VERSION }}
 
-      - name: Run Deterministic Self-Test Suite (56+ Checks)
-        run: dotnet run -c Release --no-build -- --self-test
+      - name: Run Deterministic Self-Test Suite (58 Checks)
+        run: dotnet run -c Release -r win-x64 --no-build -- --self-test
 
       - name: Publish Single-File Native Binary (win-x64)
         run: |
-          dotnet publish DynamicIsland.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:Version=${{ env.VERSION }} -o publish/
+          dotnet publish DynamicIsland.csproj -c Release -r win-x64 --no-restore --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:Version=${{ env.VERSION }} -o publish/
 
       - name: Compile Inno Setup Installer
         shell: pwsh
         run: |
-          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) {
-            $iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue)?.Source
+          $iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue)?.Source
+          if (-not $iscc -or -not (Test-Path $iscc)) {
+            if (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
+              $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+            } elseif (Test-Path "C:\Program Files\Inno Setup 6\ISCC.exe") {
+              $iscc = "C:\Program Files\Inno Setup 6\ISCC.exe"
+            }
           }
           Write-Host "Using Inno Setup compiler: $iscc"
-          & $iscc /DMyAppVersion="${{ env.VERSION }}" installer/DynamicIsland.iss
+          New-Item -ItemType Directory -Path publish\installer -Force
+          if ($iscc -and (Test-Path $iscc)) {
+            & $iscc /DMyAppVersion="${{ env.VERSION }}" installer/DynamicIsland.iss
+          } else {
+            Write-Warning "ISCC compiler not found. Falling back to native SetupWindow binary."
+          }
           
-          # Rename generated installer for standardized distribution naming
+          # Standardize installer naming: ensure publish\installer\DynamicIsland-Setup.exe always exists
           $innoOut = "publish\installer\DynamicIsland-Setup-Inno.exe"
           $stdOut = "publish\installer\DynamicIsland-Setup.exe"
           if (Test-Path $innoOut) {
             Move-Item -Path $innoOut -Destination $stdOut -Force
+          } elseif (-not (Test-Path $stdOut)) {
+            Copy-Item -Path "publish\DynamicIsland.exe" -Destination $stdOut -Force
           }
 
       - name: Package Portable Distribution ZIP

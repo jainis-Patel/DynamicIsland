@@ -23,9 +23,16 @@ internal sealed class GitHubReleaseClient : IDisposable
     public GitHubReleaseClient(HttpClient? client = null)
     {
         _http = client ?? new HttpClient();
-        _http.Timeout = TimeSpan.FromSeconds(25);
+        _http.Timeout = TimeSpan.FromSeconds(12);
         _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("DynamicIsland", "0.4.0"));
-        _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
+    }
+
+    /// <summary>
+    /// Clears the cached ETag so the next update check forces a fresh query.
+    /// </summary>
+    public void ClearETagCache()
+    {
+        _lastETag = null;
     }
 
     /// <summary>
@@ -43,6 +50,7 @@ internal sealed class GitHubReleaseClient : IDisposable
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, rawManifestUrl);
+            request.Headers.Accept.ParseAdd("application/json, text/plain, */*");
             if (!string.IsNullOrEmpty(_lastETag))
             {
                 request.Headers.IfNoneMatch.Add(new EntityTagHeaderValue(_lastETag));
@@ -86,6 +94,7 @@ internal sealed class GitHubReleaseClient : IDisposable
 
     /// <summary>
     /// Queries the GitHub Releases REST API for the latest release.
+    /// Falls back to the latest release in /releases if /releases/latest returns 404 (e.g. pre-releases).
     /// </summary>
     private async Task<UpdateManifest?> FetchManifestFromReleasesApiAsync(string owner, string repo, CancellationToken ct)
     {
@@ -93,11 +102,32 @@ internal sealed class GitHubReleaseClient : IDisposable
 
         try
         {
-            using var response = await _http.GetAsync(apiUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            using var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
+            request.Headers.Accept.ParseAdd("application/vnd.github.v3+json");
+
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
 
             if (response.StatusCode == HttpStatusCode.Forbidden)
             {
                 App.Log("[GitHubClient] GitHub API rate limit reached (60 req/hr).");
+                return null;
+            }
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                // Fallback to /releases?per_page=1 in case all releases are pre-releases
+                using var fallbackReq = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{owner}/{repo}/releases?per_page=1");
+                fallbackReq.Headers.Accept.ParseAdd("application/vnd.github.v3+json");
+                using var fallbackResp = await _http.SendAsync(fallbackReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                if (fallbackResp.IsSuccessStatusCode)
+                {
+                    using var fStream = await fallbackResp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                    using var fDoc = await JsonDocument.ParseAsync(fStream, cancellationToken: ct).ConfigureAwait(false);
+                    if (fDoc.RootElement.ValueKind == JsonValueKind.Array && fDoc.RootElement.GetArrayLength() > 0)
+                    {
+                        return ParseReleaseElement(fDoc.RootElement[0]);
+                    }
+                }
                 return null;
             }
 
@@ -109,61 +139,63 @@ internal sealed class GitHubReleaseClient : IDisposable
 
             using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);
-            var root = doc.RootElement;
-
-            string tagName = root.TryGetProperty("tag_name", out var tagProp) ? tagProp.GetString() ?? "" : "";
-            string body = root.TryGetProperty("body", out var bodyProp) ? bodyProp.GetString() ?? "" : "";
-            string htmlUrl = root.TryGetProperty("html_url", out var urlProp) ? urlProp.GetString() ?? "" : "";
-            DateTime publishedAt = root.TryGetProperty("published_at", out var pubProp) && pubProp.TryGetDateTime(out var dt) ? dt : DateTime.UtcNow;
-
-            string cleanVersion = tagName.TrimStart('v', 'V');
-            var manifest = new UpdateManifest
-            {
-                Version = cleanVersion,
-                ReleaseTag = tagName,
-                Channel = tagName.Contains("beta", StringComparison.OrdinalIgnoreCase) ? "beta" : "stable",
-                ReleaseDate = publishedAt,
-                Summary = string.IsNullOrWhiteSpace(body) ? $"Dynamic Island {tagName}" : body,
-                ChangelogUrl = htmlUrl,
-                Downloads = new UpdateDownloads()
-            };
-
-            // Inspect attached release assets for installer (.exe) or portable (.zip)
-            if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var asset in assets.EnumerateArray())
-                {
-                    string name = asset.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
-                    string downloadUrl = asset.TryGetProperty("browser_download_url", out var dl) ? dl.GetString() ?? "" : "";
-                    long size = asset.TryGetProperty("size", out var s) ? s.GetInt64() : 0;
-
-                    if (name.EndsWith("-Setup.exe", StringComparison.OrdinalIgnoreCase) ||
-                        name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                    {
-                        manifest.Downloads.Installer = new UpdateDownloadAsset
-                        {
-                            Url = downloadUrl,
-                            SizeBytes = size
-                        };
-                    }
-                    else if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-                    {
-                        manifest.Downloads.Portable = new UpdateDownloadAsset
-                        {
-                            Url = downloadUrl,
-                            SizeBytes = size
-                        };
-                    }
-                }
-            }
-
-            return manifest;
+            return ParseReleaseElement(doc.RootElement);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             App.Log($"[GitHubClient] GitHub Releases API query failed: {ex.Message}");
             return null;
         }
+    }
+
+    private static UpdateManifest ParseReleaseElement(JsonElement root)
+    {
+        string tagName = root.TryGetProperty("tag_name", out var tagProp) ? tagProp.GetString() ?? "" : "";
+        string body = root.TryGetProperty("body", out var bodyProp) ? bodyProp.GetString() ?? "" : "";
+        string htmlUrl = root.TryGetProperty("html_url", out var urlProp) ? urlProp.GetString() ?? "" : "";
+        DateTime publishedAt = root.TryGetProperty("published_at", out var pubProp) && pubProp.TryGetDateTime(out var dt) ? dt : DateTime.UtcNow;
+
+        string cleanVersion = tagName.TrimStart('v', 'V');
+        var manifest = new UpdateManifest
+        {
+            Version = cleanVersion,
+            ReleaseTag = tagName,
+            Channel = tagName.Contains("beta", StringComparison.OrdinalIgnoreCase) ? "beta" : "stable",
+            ReleaseDate = publishedAt,
+            Summary = string.IsNullOrWhiteSpace(body) ? $"Dynamic Island {tagName}" : body,
+            ChangelogUrl = htmlUrl,
+            Downloads = new UpdateDownloads()
+        };
+
+        if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var asset in assets.EnumerateArray())
+            {
+                string name = asset.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+                string downloadUrl = asset.TryGetProperty("browser_download_url", out var dl) ? dl.GetString() ?? "" : "";
+                long size = asset.TryGetProperty("size", out var s) ? s.GetInt64() : 0;
+
+                if (name.EndsWith("-Setup.exe", StringComparison.OrdinalIgnoreCase) ||
+                    name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    manifest.Downloads.Installer = new UpdateDownloadAsset
+                    {
+                        Url = downloadUrl,
+                        SizeBytes = size
+                    };
+                }
+                else if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    manifest.Downloads.Portable = new UpdateDownloadAsset
+                    {
+                        Url = downloadUrl,
+                        SizeBytes = size
+                    };
+                }
+            }
+        }
+
+        return manifest;
     }
 
     /// <summary>

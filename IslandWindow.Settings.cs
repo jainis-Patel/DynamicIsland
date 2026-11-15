@@ -119,6 +119,12 @@ public partial class IslandWindow
 
     private void OnSettingsPropertyChanged(string? propertyName)
     {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.InvokeAsync(() => OnSettingsPropertyChanged(propertyName));
+            return;
+        }
+
         var cur = _settingsService.Current;
         switch (propertyName)
         {
@@ -2467,6 +2473,12 @@ public partial class IslandWindow
 
     internal void UpdateSettingsVersionAndStatusUI()
     {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.InvokeAsync(UpdateSettingsVersionAndStatusUI);
+            return;
+        }
+
         if (AppVersionText != null)
         {
             AppVersionText.Text = _updateService.CurrentVersionString;
@@ -2548,7 +2560,7 @@ public partial class IslandWindow
         if (CheckUpdatesBtnText != null) CheckUpdatesBtnText.Text = "Checking...";
         try
         {
-            var manifest = await _updateService.CheckForUpdatesAsync(silent: false);
+            var manifest = await _updateService.CheckForUpdatesAsync(silent: false, force: true);
             if (manifest == null && _updateService.Status == UpdateStatus.UpToDate)
             {
                 _machine.PushToast(new ToastContent(
@@ -2557,6 +2569,18 @@ public partial class IslandWindow
                     $"Dynamic Island v{_updateService.CurrentVersionString} is the latest version",
                     ThemeBrushes.GreenColor,
                     TimeSpan.FromSeconds(2.5),
+                    TargetView: "settings",
+                    Priority: ToastPriority.Feedback
+                ));
+            }
+            else if (_updateService.Status == UpdateStatus.Failed)
+            {
+                _machine.PushToast(new ToastContent(
+                    "\uE783",
+                    "Update Check Failed",
+                    _updateService.LastErrorMessage ?? "Could not connect to GitHub.",
+                    ThemeBrushes.AmberColor,
+                    TimeSpan.FromSeconds(3.5),
                     TargetView: "settings",
                     Priority: ToastPriority.Feedback
                 ));

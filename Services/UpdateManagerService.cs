@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Reflection;
 using System.Windows.Threading;
 using DynamicIsland.Core;
@@ -90,22 +91,37 @@ internal sealed class UpdateManagerService : IDisposable
     /// <summary>
     /// Queries GitHub for updates, applies channel filtering (Stable vs Beta), and compares SemVer.
     /// </summary>
-    public async Task<UpdateManifest?> CheckForUpdatesAsync(bool silent = false, CancellationToken ct = default)
+    public async Task<UpdateManifest?> CheckForUpdatesAsync(bool silent = false, bool force = false, CancellationToken ct = default)
     {
         SetStatus(UpdateStatus.Checking, "Checking GitHub for updates...");
         LastErrorMessage = null;
 
         try
         {
+            if (force)
+            {
+                _client.ClearETagCache();
+            }
+
             var manifest = await _client.FetchManifestAsync(ct: ct).ConfigureAwait(false);
 
-            _settingsService.Update(s => s.LastUpdateCheckTime = DateTime.UtcNow, nameof(AppSettings.LastUpdateCheckTime));
+            Dispatch(() =>
+            {
+                _settingsService.Update(s => s.LastUpdateCheckTime = DateTime.UtcNow, nameof(AppSettings.LastUpdateCheckTime));
+            });
 
             if (manifest == null)
             {
                 // Manifest unchanged (304 Not Modified) or up to date
-                SetStatus(UpdateStatus.UpToDate, "Dynamic Island is up to date.");
-                return null;
+                if (LatestManifest != null && LatestManifest.ParsedVersion > CurrentVersion)
+                {
+                    manifest = LatestManifest;
+                }
+                else
+                {
+                    SetStatus(UpdateStatus.UpToDate, $"Dynamic Island {CurrentVersionString} is up to date.");
+                    return null;
+                }
             }
 
             LatestManifest = manifest;
@@ -221,6 +237,14 @@ internal sealed class UpdateManagerService : IDisposable
 
             SetStatus(UpdateStatus.ReadyToInstall, $"Dynamic Island {LatestManifest.Version} is ready to install.");
             return true;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            UpdateIntegrityVerifier.TryCleanFile(targetFile);
+            LastErrorMessage = "Release package has not been published to GitHub yet (404 Not Found).";
+            SetStatus(UpdateStatus.Failed, LastErrorMessage);
+            App.Log($"[UpdateManager] Download 404: {asset.Url}");
+            return false;
         }
         catch (Exception ex)
         {

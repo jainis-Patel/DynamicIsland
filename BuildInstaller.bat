@@ -15,7 +15,7 @@ if %ERRORLEVEL% neq 0 (
     exit /b %ERRORLEVEL%
 )
 
-echo [2/4] Running 52-test automated verification suite...
+echo [2/4] Running 58-test automated verification suite...
 call dotnet run -c Release -- --self-test
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Self-tests failed.
@@ -24,7 +24,7 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo [3/4] Publishing single-file native executable (win-x64)...
-call dotnet publish DynamicIsland.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish\
+call dotnet publish DynamicIsland.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish\
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Publish failed.
     pause
@@ -39,7 +39,7 @@ copy /y "publish\DynamicIsland.exe" "installer\DynamicIsland-Setup.exe" >nul
 echo.
 echo ========================================================
 echo   [SUCCESS] Setup executable created successfully!
-echo   Location: %~dp0DynamicIsland-Setup.exe
+echo   Location: "%~dp0DynamicIsland-Setup.exe"
 echo ========================================================
 echo.
 exit /b 0
