@@ -69,6 +69,9 @@ public partial class IslandWindow
             }
 
             UpdateDockButtonsUI();
+            UpdateExpandTriggerUI();
+            UpdateGhostModifierUI();
+            UpdateQuickTuckUI();
             UpdateHaloUI();
             UpdateDndUI();
             UpdateBannerModeUI();
@@ -98,12 +101,14 @@ public partial class IslandWindow
             UpdateThemeModeUI();
             UpdateThemeStyleUI();
             UpdateIslandThemeUI();
+            UpdateIslandNatureSettingsUI();
             ApplyThemeStyleVisuals();
             ApplyEdgeBorder(cur.ShowEdgeBorder);
             UpdateEdgeBorderUI();
             UpdateSecondaryDropletUI();
             SyncSpringMotionPreferences();
             UpdateSpectrumActivity();
+            UpdateSettingsVersionAndStatusUI();
             PositionWindow();
         }
         finally
@@ -135,6 +140,12 @@ public partial class IslandWindow
                 UpdateLyricsSettingsUI();
                 UpdateClockTimerInterval();
                 OnLyricsLoaded();
+                break;
+
+            case nameof(AppSettings.AutoCheckUpdates):
+            case nameof(AppSettings.UpdateChannel):
+            case nameof(AppSettings.LastUpdateCheckTime):
+                UpdateSettingsVersionAndStatusUI();
                 break;
 
             case nameof(AppSettings.HardwareNotchMode):
@@ -228,6 +239,23 @@ public partial class IslandWindow
                 PositionWindow();
                 break;
 
+            case nameof(AppSettings.ExpandTrigger):
+                ApplyExpandTrigger(cur.ExpandTrigger);
+                UpdateExpandTriggerUI();
+                break;
+
+            case nameof(AppSettings.GhostModifierKey):
+                UpdateGhostModifierUI();
+                break;
+
+            case nameof(AppSettings.EnableFastSwipeGuard):
+                if (_cursor != null) _cursor.EnableFastSwipeGuard = cur.EnableFastSwipeGuard;
+                break;
+
+            case nameof(AppSettings.EnableQuickTuck):
+                UpdateQuickTuckUI();
+                break;
+
             case nameof(AppSettings.EnableAmbientGlow):
                 UpdateHaloUI();
                 UpdateSpectrumActivity();
@@ -267,6 +295,17 @@ public partial class IslandWindow
             case nameof(AppSettings.IslandTheme):
                 ApplyIslandTheme(cur.IslandTheme);
                 UpdateIslandThemeUI();
+                UpdateIslandNatureSettingsUI();
+                break;
+
+            case nameof(AppSettings.NatureDensity):
+            case nameof(AppSettings.NatureScale):
+            case nameof(AppSettings.NatureDropLength):
+            case nameof(AppSettings.NatureButterflyCount):
+            case nameof(AppSettings.NatureBloomDensity):
+            case nameof(AppSettings.NaturePollenEnabled):
+            case nameof(AppSettings.NaturePollenCount):
+                UpdateIslandNatureSettingsUI();
                 break;
 
             case nameof(AppSettings.MonitorIndex):
@@ -358,6 +397,9 @@ public partial class IslandWindow
         }
 
         UpdateDockButtonsUI();
+        UpdateExpandTriggerUI();
+        UpdateGhostModifierUI();
+        UpdateQuickTuckUI();
         UpdateThemeModeUI();
         UpdateThemeStyleUI();
         ApplyThemeStyleVisuals();
@@ -390,6 +432,143 @@ public partial class IslandWindow
         StyleDockBtn(DockLeftBtn, dock == "Left");
         StyleDockBtn(DockCenterBtn, dock == "Center");
         StyleDockBtn(DockRightBtn, dock == "Right");
+    }
+
+    private void UpdateExpandTriggerUI()
+    {
+        if (ExpandTriggerClickBtn == null || ExpandTriggerSnappyBtn == null || ExpandTriggerRelaxedBtn == null) return;
+        string trigger = _settingsService.Current.ExpandTrigger ?? "HoverSnappy";
+        var accent = (Brush)Resources["AccentBrush"];
+        var defaultBorder = (Brush)FindResource("CardBorderBrush");
+        var defaultBg = (Brush)FindResource("CardSurfaceBrush");
+
+        void StyleBtn(Button btn, bool active)
+        {
+            btn.Background = active ? accent : defaultBg;
+            btn.Foreground = active ? ThemeBrushes.DarkInk : ThemeBrushes.PrimaryText;
+            btn.BorderBrush = active ? accent : defaultBorder;
+        }
+
+        StyleBtn(ExpandTriggerClickBtn, trigger == "ClickOnly");
+        StyleBtn(ExpandTriggerSnappyBtn, trigger == "HoverSnappy");
+        StyleBtn(ExpandTriggerRelaxedBtn, trigger == "HoverRelaxed");
+    }
+
+    private void UpdateGhostModifierUI()
+    {
+        if (GhostModCtrlBtn == null || GhostModAltBtn == null || GhostModNoneBtn == null) return;
+        string mod = _settingsService.Current.GhostModifierKey ?? "Ctrl";
+        var accent = (Brush)Resources["AccentBrush"];
+        var defaultBorder = (Brush)FindResource("CardBorderBrush");
+        var defaultBg = (Brush)FindResource("CardSurfaceBrush");
+
+        void StyleBtn(Button btn, bool active)
+        {
+            btn.Background = active ? accent : defaultBg;
+            btn.Foreground = active ? ThemeBrushes.DarkInk : ThemeBrushes.PrimaryText;
+            btn.BorderBrush = active ? accent : defaultBorder;
+        }
+
+        StyleBtn(GhostModCtrlBtn, string.Equals(mod, "Ctrl", StringComparison.OrdinalIgnoreCase));
+        StyleBtn(GhostModAltBtn, string.Equals(mod, "Alt", StringComparison.OrdinalIgnoreCase));
+        StyleBtn(GhostModNoneBtn, string.Equals(mod, "None", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void UpdateQuickTuckUI()
+    {
+        if (QuickTuckToggleBtn == null || QuickTuckToggleText == null) return;
+        bool enabled = _settingsService.Current.EnableQuickTuck;
+        var accent = (Brush)Resources["AccentBrush"];
+        var defaultBorder = (Brush)FindResource("CardBorderBrush");
+        var defaultBg = (Brush)FindResource("CardSurfaceBrush");
+
+        QuickTuckToggleBtn.Background = enabled ? accent : defaultBg;
+        QuickTuckToggleBtn.Foreground = enabled ? ThemeBrushes.DarkInk : ThemeBrushes.PrimaryText;
+        QuickTuckToggleBtn.BorderBrush = enabled ? accent : defaultBorder;
+        QuickTuckToggleText.Text = enabled ? "Tuck Enabled" : "Tuck Disabled";
+        QuickTuckToggleText.Foreground = enabled ? ThemeBrushes.DarkInk : ThemeBrushes.SecondaryText;
+    }
+
+    internal void ExpandTriggerBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string mode })
+        {
+            _settingsService.Update(s => s.ExpandTrigger = mode, nameof(AppSettings.ExpandTrigger));
+            ApplyExpandTrigger(mode);
+            UpdateExpandTriggerUI();
+            _machine.PushToast(new ToastContent(
+                "\uE713",
+                "Expand Trigger",
+                mode switch
+                {
+                    "ClickOnly" => "Click Only (Tabs Safe)",
+                    "HoverRelaxed" => "Hover Relaxed (260ms)",
+                    "HoverDwell" => "Hover Dwell (380ms)",
+                    _ => "Hover Snappy (150ms)"
+                },
+                ThemeBrushes.BlueColor,
+                TimeSpan.FromSeconds(1.5),
+                TargetView: "settings",
+                Priority: ToastPriority.Feedback,
+                Category: "expand_trigger"));
+        }
+    }
+
+    internal void GhostModifierBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string key })
+        {
+            _settingsService.Update(s => s.GhostModifierKey = key, nameof(AppSettings.GhostModifierKey));
+            UpdateGhostModifierUI();
+            _machine.PushToast(new ToastContent(
+                "\uE713",
+                "Ghost Click-Through",
+                key == "None" ? "Disabled" : $"Hold {key} to click through",
+                ThemeBrushes.BlueColor,
+                TimeSpan.FromSeconds(1.5),
+                TargetView: "settings",
+                Priority: ToastPriority.Feedback,
+                Category: "ghost_key"));
+        }
+    }
+
+    internal void QuickTuckToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        bool next = !_settingsService.Current.EnableQuickTuck;
+        _settingsService.Update(s => s.EnableQuickTuck = next, nameof(AppSettings.EnableQuickTuck));
+        UpdateQuickTuckUI();
+        _machine.PushToast(new ToastContent(
+            "\uE713",
+            "Quick Tuck Gesture",
+            next ? "Enabled (Double-click or Ctrl+Alt+Down)" : "Disabled",
+            ThemeBrushes.BlueColor,
+            TimeSpan.FromSeconds(1.5),
+            TargetView: "settings",
+            Priority: ToastPriority.Feedback,
+            Category: "quick_tuck"));
+    }
+
+    private void ApplyExpandTrigger(string? trigger)
+    {
+        if (_machine == null) return;
+        switch (trigger)
+        {
+            case "ClickOnly":
+                _machine.ClickOnlyMode = true;
+                break;
+            case "HoverRelaxed":
+                _machine.ClickOnlyMode = false;
+                _machine.CustomHoverEnterDelay = TimeSpan.FromMilliseconds(260);
+                break;
+            case "HoverDwell":
+                _machine.ClickOnlyMode = false;
+                _machine.CustomHoverEnterDelay = TimeSpan.FromMilliseconds(380);
+                break;
+            default: // "HoverSnappy"
+                _machine.ClickOnlyMode = false;
+                _machine.CustomHoverEnterDelay = TimeSpan.FromMilliseconds(150);
+                break;
+        }
     }
 
     internal void ClockStyleBtn_Click(object sender, RoutedEventArgs e)
@@ -766,6 +945,11 @@ public partial class IslandWindow
 
         AnimationSpeedText.Text = $"{pct}%";
         _settingsService.Update(s => s.AnimationSpeed = normalized, nameof(AppSettings.AnimationSpeed));
+
+        if (AnimationSpeedSlider.IsMouseCaptureWithin && Math.Abs(_width.Velocity) < 80)
+        {
+            TriggerLiquidImpulse(70, -25, 8);
+        }
     }
 
     internal void IslandScaleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -777,6 +961,11 @@ public partial class IslandWindow
 
         IslandScaleText.Text = $"{pct}%";
         _settingsService.Update(s => s.IslandScale = normalized, nameof(AppSettings.IslandScale));
+
+        if (IslandScaleSlider.IsMouseCaptureWithin && Math.Abs(_width.Velocity) < 80)
+        {
+            TriggerLiquidImpulse(90, -35, 10);
+        }
     }
 
     internal void BackdropOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -856,6 +1045,8 @@ public partial class IslandWindow
             return;
 
         SettingsAppearanceTab.Visibility = tab == "Appearance" ? Visibility.Visible : Visibility.Collapsed;
+        if (SettingsThemesTab != null)
+            SettingsThemesTab.Visibility = tab == "Themes" ? Visibility.Visible : Visibility.Collapsed;
         if (SettingsDropletsTab != null)
             SettingsDropletsTab.Visibility = tab == "Droplets" ? Visibility.Visible : Visibility.Collapsed;
         if (SettingsDockTab != null)
@@ -871,6 +1062,12 @@ public partial class IslandWindow
         {
             UpdateDisplayAndBatterySettingsUI();
             UpdateNotifSettingsUI();
+        }
+        else if (tab == "Themes")
+        {
+            UpdateIslandThemeUI();
+            UpdateIslandNatureSettingsUI();
+            UpdateIslandNatureSettingsUI();
         }
         else if (tab == "Droplets")
         {
@@ -902,6 +1099,7 @@ public partial class IslandWindow
         }
 
         UpdateTab(SettingsTabAppearanceBtn, SettingsTabAppearanceText, tab == "Appearance");
+        UpdateTab(SettingsTabThemesBtn, SettingsTabThemesText, tab == "Themes");
         UpdateTab(SettingsTabDropletsBtn, SettingsTabDropletsText, tab == "Droplets");
         UpdateTab(SettingsTabDockBtn, SettingsTabDockText, tab == "Dock");
         UpdateTab(SettingsTabClockBtn, SettingsTabClockText, tab == "Clock");
@@ -1932,15 +2130,26 @@ public partial class IslandWindow
 
         StyleThemeBtn(IslandThemeNoneBtn, IslandThemeNoneText, current == "None");
         StyleThemeBtn(IslandThemeIvyBtn, IslandThemeIvyText, current == "Ivy & Blooms");
-        StyleThemeBtn(IslandThemeSakuraBtn, IslandThemeSakuraText, current == "Sakura Branch");
-        StyleThemeBtn(IslandThemeTreeBtn, IslandThemeTreeText, current == "Blossom Tree");
         StyleThemeBtn(IslandThemeMeadowBtn, IslandThemeMeadowText, current == "Meadow");
+
+        StyleThemeBtn(ThemesTabNoneBtn, ThemesTabNoneText, current == "None");
+        StyleThemeBtn(ThemesTabIvyBtn, ThemesTabIvyText, current == "Ivy & Blooms");
+        StyleThemeBtn(ThemesTabMeadowBtn, ThemesTabMeadowText, current == "Meadow");
+
+        if (NatureActiveThemeBadge != null) NatureActiveThemeBadge.Text = current;
+        if (NatureThemeSubtext != null)
+        {
+            NatureThemeSubtext.Text = current switch
+            {
+                "Ivy & Blooms" => "Climbing leaves, morning glories, wild roses & butterflies",
+                "Meadow" => "Wild meadow grass, daisies, poppies & lavender",
+                _ => "Clean island capsule without decorations"
+            };
+        }
 
         IslandThemeSubtext.Text = current switch
         {
-            "Ivy & Blooms" => "Ivy & Blooms · Climbing vines, morning glories & butterflies",
-            "Sakura Branch" => "Sakura Branch · Cherry blossoms & tumbling petals",
-            "Blossom Tree" => "Blossom Tree · Branching trunk with organic sway",
+            "Ivy & Blooms" => "Leaves & Blooms · Climbing vines, leaves & butterflies",
             "Meadow" => "Meadow · Daisies, poppies, lavender & drifting monarch",
             _ => "Clean · No nature decorations"
         };
@@ -1961,6 +2170,578 @@ public partial class IslandWindow
                 TargetView: "settings",
                 Priority: ToastPriority.Feedback,
                 Category: "islandtheme"));
+        }
+    }
+
+    private void UpdateIslandNatureSettingsUI()
+    {
+        if (_settingsService?.Current == null) return;
+        var cur = _settingsService.Current;
+        var accentBrush = TryFindResource("AccentBrush") as Brush ?? (Resources["AccentBrush"] as Brush) ?? ThemeBrushes.Blue;
+        var defaultBorder = (Brush)FindResource("CardBorderBrush");
+        var defaultBg = (Brush)FindResource("IslandButtonBgBrush");
+
+        // 1. Sliders & Text Readouts
+        if (NatureDensitySlider != null)
+        {
+            NatureDensitySlider.Value = cur.NatureDensity * 100.0;
+        }
+        if (NatureDensityText != null)
+        {
+            int pct = (int)Math.Round(cur.NatureDensity * 100.0);
+            string desc = pct <= 40 ? "Minimal" : (pct <= 80 ? "Balanced" : "Lush");
+            NatureDensityText.Text = $"{pct}% · {desc}";
+        }
+
+        if (NatureBloomSlider != null)
+        {
+            NatureBloomSlider.Value = cur.NatureBloomDensity * 100.0;
+        }
+        if (NatureBloomText != null)
+        {
+            int pct = (int)Math.Round(cur.NatureBloomDensity * 100.0);
+            string desc = pct <= 40 ? "Accents" : (pct <= 85 ? "Balanced" : "Full Bloom");
+            NatureBloomText.Text = $"{pct}% · {desc}";
+        }
+
+        if (NatureScaleSlider != null)
+        {
+            NatureScaleSlider.Value = cur.NatureScale * 100.0;
+        }
+        if (NatureScaleText != null)
+        {
+            int pct = (int)Math.Round(cur.NatureScale * 100.0);
+            string desc = pct <= 65 ? "Delicate" : (pct <= 95 ? "Standard" : "Bold");
+            NatureScaleText.Text = $"{pct}% · {desc}";
+        }
+
+        if (NatureDropSlider != null)
+        {
+            NatureDropSlider.Value = cur.NatureDropLength;
+        }
+        if (NatureDropText != null)
+        {
+            int drop = (int)Math.Round(cur.NatureDropLength);
+            string desc = drop <= 35 ? "Rim Hugger" : (drop <= 70 ? "Moderate" : "Deep Cascade");
+            NatureDropText.Text = $"{drop} px · {desc}";
+        }
+
+        // 2. Butterfly Count
+        void StyleCountBtn(Button? btn, TextBlock? text, bool active)
+        {
+            if (btn == null) return;
+            btn.Background = active ? accentBrush : defaultBg;
+            btn.BorderBrush = active ? accentBrush : defaultBorder;
+            if (text != null)
+            {
+                text.Foreground = active ? ThemeBrushes.DarkInk : (Brush)FindResource("PrimaryTextBrush");
+                text.FontWeight = active ? FontWeights.Bold : FontWeights.SemiBold;
+            }
+        }
+
+        StyleCountBtn(NatureButterfly0Btn, NatureButterfly0Text, cur.NatureButterflyCount == 0);
+        StyleCountBtn(NatureButterfly1Btn, NatureButterfly1Text, cur.NatureButterflyCount == 1);
+        StyleCountBtn(NatureButterfly2Btn, NatureButterfly2Text, cur.NatureButterflyCount == 2);
+        StyleCountBtn(NatureButterfly3Btn, NatureButterfly3Text, cur.NatureButterflyCount == 3);
+        StyleCountBtn(NatureButterfly4Btn, NatureButterfly4Text, cur.NatureButterflyCount >= 4);
+
+        if (NatureButterflySubtext != null)
+        {
+            NatureButterflySubtext.Text = cur.NatureButterflyCount switch
+            {
+                0 => "0 Butterflies · No motion distraction",
+                1 => "1 Butterfly · Monarch solo flight",
+                2 => "2 Butterflies · Monarch & Blue Morpho pair",
+                3 => "3 Butterflies · Monarch, Blue Morpho & White Swallowtail",
+                _ => $"{cur.NatureButterflyCount} Butterflies · Swarm companions"
+            };
+        }
+
+        // 3. Drifting Pollen
+        if (NaturePollenToggleText != null)
+        {
+            NaturePollenToggleText.Text = cur.NaturePollenEnabled ? "Active" : "Disabled";
+            NaturePollenToggleText.Foreground = cur.NaturePollenEnabled ? ThemeBrushes.Green : (Brush)FindResource("SecondaryBrush");
+        }
+        if (NaturePollenSlider != null)
+        {
+            NaturePollenSlider.Value = cur.NaturePollenCount;
+            NaturePollenSlider.IsEnabled = cur.NaturePollenEnabled;
+        }
+        if (NaturePollenText != null)
+        {
+            NaturePollenText.Text = cur.NaturePollenEnabled ? $"{cur.NaturePollenCount} motes" : "Off";
+        }
+    }
+
+    internal void NatureDensitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_isApplyingSettings || _settingsService?.Current == null) return;
+        double val = Math.Clamp(e.NewValue / 100.0, 0.20, 1.50);
+        if (Math.Abs(_settingsService.Current.NatureDensity - val) < 0.01) return;
+        _settingsService.Update(s => s.NatureDensity = val, nameof(AppSettings.NatureDensity));
+    }
+
+    internal void NatureBloomSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_isApplyingSettings || _settingsService?.Current == null) return;
+        double val = Math.Clamp(e.NewValue / 100.0, 0.20, 1.50);
+        if (Math.Abs(_settingsService.Current.NatureBloomDensity - val) < 0.01) return;
+        _settingsService.Update(s => s.NatureBloomDensity = val, nameof(AppSettings.NatureBloomDensity));
+    }
+
+    internal void NatureScaleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_isApplyingSettings || _settingsService?.Current == null) return;
+        double val = Math.Clamp(e.NewValue / 100.0, 0.40, 1.40);
+        if (Math.Abs(_settingsService.Current.NatureScale - val) < 0.01) return;
+        _settingsService.Update(s => s.NatureScale = val, nameof(AppSettings.NatureScale));
+    }
+
+    internal void NatureDropSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_isApplyingSettings || _settingsService?.Current == null) return;
+        double val = Math.Clamp(e.NewValue, 20.0, 120.0);
+        if (Math.Abs(_settingsService.Current.NatureDropLength - val) < 0.5) return;
+        _settingsService.Update(s => s.NatureDropLength = val, nameof(AppSettings.NatureDropLength));
+    }
+
+    internal void NatureButterflyBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_settingsService?.Current == null) return;
+        if (sender is FrameworkElement { Tag: string tagStr } && int.TryParse(tagStr, out int count))
+        {
+            _settingsService.Update(s => s.NatureButterflyCount = Math.Clamp(count, 0, 4), nameof(AppSettings.NatureButterflyCount));
+        }
+    }
+
+    internal void NaturePollenSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_isApplyingSettings || _settingsService?.Current == null) return;
+        int val = (int)Math.Round(e.NewValue);
+        if (_settingsService.Current.NaturePollenCount == val) return;
+        _settingsService.Update(s => s.NaturePollenCount = val, nameof(AppSettings.NaturePollenCount));
+    }
+
+    internal void NaturePollenToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_settingsService?.Current == null) return;
+        _settingsService.Update(s => s.NaturePollenEnabled = !s.NaturePollenEnabled, nameof(AppSettings.NaturePollenEnabled));
+    }
+
+    internal void NaturePresetBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_settingsService?.Current == null) return;
+        if (sender is FrameworkElement { Tag: string preset })
+        {
+            switch (preset)
+            {
+                case "Minimalist":
+                    _settingsService.Update(s =>
+                    {
+                        s.NatureDensity = 0.35;
+                        s.NatureScale = 0.70;
+                        s.NatureDropLength = 25.0;
+                        s.NatureButterflyCount = 0;
+                        s.NatureBloomDensity = 0.30;
+                        s.NaturePollenEnabled = false;
+                        s.NaturePollenCount = 0;
+                    }, nameof(AppSettings.NatureDensity));
+                    break;
+
+                case "Subtle":
+                    _settingsService.Update(s =>
+                    {
+                        s.NatureDensity = 0.55;
+                        s.NatureScale = 0.80;
+                        s.NatureDropLength = 40.0;
+                        s.NatureButterflyCount = 1;
+                        s.NatureBloomDensity = 0.50;
+                        s.NaturePollenEnabled = true;
+                        s.NaturePollenCount = 8;
+                    }, nameof(AppSettings.NatureDensity));
+                    break;
+
+                case "Balanced":
+                    _settingsService.Update(s =>
+                    {
+                        s.NatureDensity = 0.70;
+                        s.NatureScale = 0.85;
+                        s.NatureDropLength = 60.0;
+                        s.NatureButterflyCount = 2;
+                        s.NatureBloomDensity = 0.75;
+                        s.NaturePollenEnabled = true;
+                        s.NaturePollenCount = 14;
+                    }, nameof(AppSettings.NatureDensity));
+                    break;
+
+                case "Lush":
+                    _settingsService.Update(s =>
+                    {
+                        s.NatureDensity = 1.05;
+                        s.NatureScale = 1.00;
+                        s.NatureDropLength = 90.0;
+                        s.NatureButterflyCount = 3;
+                        s.NatureBloomDensity = 1.10;
+                        s.NaturePollenEnabled = true;
+                        s.NaturePollenCount = 22;
+                    }, nameof(AppSettings.NatureDensity));
+                    break;
+            }
+
+            _machine.PushToast(new ToastContent(
+                "\uE790",
+                "Preset Applied",
+                preset,
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(2.0),
+                TargetView: "settings",
+                Priority: ToastPriority.Feedback,
+                Category: "naturepreset"));
+        }
+    }
+
+    internal void GoToThemesTabBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_settingsService == null) return;
+        SwitchSettingsTab("Themes", impulse: true);
+    }
+
+    // =================================================================
+    //  GitHub Releases & Version Control Manager
+    // =================================================================
+
+    private void CheckPostUpdateLaunchStatus()
+    {
+        if (App.IsPostUpdateLaunch)
+        {
+            Dispatcher.InvokeAsync(async () =>
+            {
+                await Task.Delay(1200);
+                _machine.PushToast(new ToastContent(
+                    Glyph: "\uE73E",
+                    Title: "Updated to v" + _updateService.CurrentVersionString,
+                    Subtitle: "Dynamic Island has been successfully upgraded.",
+                    Accent: ThemeBrushes.GreenColor,
+                    Duration: TimeSpan.FromSeconds(4.5),
+                    Priority: ToastPriority.Feedback
+                ));
+            });
+        }
+    }
+
+    private void OnUpdateAvailable(UpdateManifest manifest)
+    {
+        _machine.PushToast(new ToastContent(
+            Glyph: "\uE896",
+            Title: $"Dynamic Island v{manifest.Version} Available",
+            Subtitle: string.IsNullOrWhiteSpace(manifest.Summary) ? "Click to open settings and install" : manifest.Summary,
+            Accent: Color.FromRgb(0x0A, 0x84, 0xFF),
+            Duration: TimeSpan.FromSeconds(6.0),
+            TargetView: "settings",
+            Priority: ToastPriority.Feedback
+        ));
+
+        UpdateSettingsVersionAndStatusUI();
+    }
+
+    private void OnUpdateStatusChanged(UpdateStatus status, string? message)
+    {
+        UpdateSettingsVersionAndStatusUI();
+    }
+
+    private void OnUpdateDownloadProgressChanged(UpdateProgressInfo info)
+    {
+        if (UpdateProgressBar != null)
+        {
+            UpdateProgressBar.Visibility = Visibility.Visible;
+            UpdateProgressBar.Value = info.Percent;
+        }
+
+        if (UpdateProgressText != null)
+        {
+            UpdateProgressText.Visibility = Visibility.Visible;
+            UpdateProgressText.Text = info.StatusMessage;
+        }
+    }
+
+    internal void UpdateSettingsVersionAndStatusUI()
+    {
+        if (AppVersionText != null)
+        {
+            AppVersionText.Text = _updateService.CurrentVersionString;
+        }
+
+        if (UpdateChannelText != null)
+        {
+            UpdateChannelText.Text = _settingsService.Current.UpdateChannel;
+        }
+
+        if (AutoCheckToggleText != null)
+        {
+            bool auto = _settingsService.Current.AutoCheckUpdates;
+            AutoCheckToggleText.Text = auto ? "On" : "Off";
+            AutoCheckToggleText.Foreground = auto ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
+        }
+
+        if (LastCheckTimestampText != null)
+        {
+            var last = _settingsService.Current.LastUpdateCheckTime;
+            LastCheckTimestampText.Text = last.HasValue
+                ? $"Last checked: {last.Value.ToLocalTime():g}"
+                : "Last checked: Never";
+        }
+
+        if (UpdateStatusSubtitleText != null)
+        {
+            UpdateStatusSubtitleText.Text = _updateService.Status switch
+            {
+                UpdateStatus.Checking => "Connecting to GitHub...",
+                UpdateStatus.Downloading => "Downloading update package...",
+                UpdateStatus.Verifying => "Verifying package integrity (SHA-256)...",
+                UpdateStatus.ReadyToInstall => "Update package verified and ready to install.",
+                UpdateStatus.Installing => "Restarting Dynamic Island...",
+                UpdateStatus.Failed => _updateService.LastErrorMessage ?? "Update check failed.",
+                UpdateStatus.UpToDate => $"Dynamic Island {_updateService.CurrentVersionString} is up to date.",
+                _ => "Check releases, switch channels, or rollback"
+            };
+        }
+
+        if (UpdateAvailableBanner != null)
+        {
+            bool hasUpdate = _updateService.LatestManifest != null &&
+                             _updateService.LatestManifest.ParsedVersion > _updateService.CurrentVersion;
+
+            UpdateAvailableBanner.Visibility = hasUpdate ? Visibility.Visible : Visibility.Collapsed;
+
+            if (hasUpdate && _updateService.LatestManifest != null)
+            {
+                if (UpdateVersionTitleText != null)
+                {
+                    UpdateVersionTitleText.Text = $"v{_updateService.LatestManifest.Version} Available";
+                }
+
+                if (UpdateSummaryText != null)
+                {
+                    UpdateSummaryText.Text = string.IsNullOrWhiteSpace(_updateService.LatestManifest.Summary)
+                        ? "New release published on GitHub."
+                        : _updateService.LatestManifest.Summary;
+                }
+
+                if (InstallUpdateBtnText != null)
+                {
+                    InstallUpdateBtnText.Text = _updateService.Status switch
+                    {
+                        UpdateStatus.Downloading => "Downloading...",
+                        UpdateStatus.Verifying => "Verifying...",
+                        UpdateStatus.ReadyToInstall => "Restart & Update",
+                        UpdateStatus.Installing => "Updating...",
+                        _ => "Install & Restart"
+                    };
+                }
+            }
+        }
+    }
+
+    internal async void CheckUpdatesBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (CheckUpdatesBtnText != null) CheckUpdatesBtnText.Text = "Checking...";
+        try
+        {
+            var manifest = await _updateService.CheckForUpdatesAsync(silent: false);
+            if (manifest == null && _updateService.Status == UpdateStatus.UpToDate)
+            {
+                _machine.PushToast(new ToastContent(
+                    "\uE73E",
+                    "Up to Date",
+                    $"Dynamic Island v{_updateService.CurrentVersionString} is the latest version",
+                    ThemeBrushes.GreenColor,
+                    TimeSpan.FromSeconds(2.5),
+                    TargetView: "settings",
+                    Priority: ToastPriority.Feedback
+                ));
+            }
+        }
+        finally
+        {
+            if (CheckUpdatesBtnText != null) CheckUpdatesBtnText.Text = "Check";
+            UpdateSettingsVersionAndStatusUI();
+        }
+    }
+
+    internal void UpdateChannelBtn_Click(object sender, RoutedEventArgs e)
+    {
+        string next = string.Equals(_settingsService.Current.UpdateChannel, "Stable", StringComparison.OrdinalIgnoreCase) ? "Beta" : "Stable";
+        _settingsService.Update(s => s.UpdateChannel = next, nameof(AppSettings.UpdateChannel));
+        UpdateSettingsVersionAndStatusUI();
+        _machine.PushToast(new ToastContent(
+            "\uE713",
+            "Update Channel Changed",
+            $"Switched to {next} release channel",
+            ThemeBrushes.BlueColor,
+            TimeSpan.FromSeconds(2.0),
+            TargetView: "settings",
+            Priority: ToastPriority.Feedback
+        ));
+    }
+
+    internal async void InstallUpdateBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_updateService.Status == UpdateStatus.ReadyToInstall)
+        {
+            _updateService.ApplyUpdateAndRestart();
+            return;
+        }
+
+        if (_updateService.Status == UpdateStatus.UpdateAvailable || _updateService.Status == UpdateStatus.Failed)
+        {
+            if (InstallUpdateBtnText != null) InstallUpdateBtnText.Text = "Downloading...";
+            if (UpdateProgressBar != null) UpdateProgressBar.Visibility = Visibility.Visible;
+            if (UpdateProgressText != null) UpdateProgressText.Visibility = Visibility.Visible;
+
+            bool ok = await _updateService.DownloadUpdateAsync();
+            if (ok)
+            {
+                if (InstallUpdateBtnText != null) InstallUpdateBtnText.Text = "Restart Now";
+                if (UpdateProgressText != null) UpdateProgressText.Text = "Verified & ready to install";
+                _machine.PushToast(new ToastContent(
+                    "\uE896",
+                    "Ready to Install",
+                    "Click 'Restart Now' to finish upgrading Dynamic Island",
+                    ThemeBrushes.GreenColor,
+                    TimeSpan.FromSeconds(4.0),
+                    TargetView: "settings",
+                    Priority: ToastPriority.Feedback
+                ));
+            }
+            else
+            {
+                if (InstallUpdateBtnText != null) InstallUpdateBtnText.Text = "Retry Download";
+                if (UpdateProgressText != null) UpdateProgressText.Text = _updateService.LastErrorMessage ?? "Download failed";
+            }
+        }
+    }
+
+    internal void AutoCheckToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        bool next = !_settingsService.Current.AutoCheckUpdates;
+        _settingsService.Update(s => s.AutoCheckUpdates = next, nameof(AppSettings.AutoCheckUpdates));
+        UpdateSettingsVersionAndStatusUI();
+    }
+
+    internal async void ToggleVersionHistoryBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (VersionHistoryContainer == null) return;
+        bool isVisible = VersionHistoryContainer.Visibility == Visibility.Visible;
+        VersionHistoryContainer.Visibility = isVisible ? Visibility.Collapsed : Visibility.Visible;
+        if (ToggleVersionHistoryText != null)
+        {
+            ToggleVersionHistoryText.Text = isVisible ? "View Releases" : "Hide Releases";
+        }
+
+        if (!isVisible && VersionHistoryList != null && _updateService.ReleaseHistory.Count == 0)
+        {
+            await PopulateVersionHistoryUIAsync();
+        }
+    }
+
+    private async Task PopulateVersionHistoryUIAsync()
+    {
+        if (VersionHistoryList == null) return;
+
+        VersionHistoryList.Children.Clear();
+        var loadingText = new TextBlock
+        {
+            Text = "Fetching release history from GitHub...",
+            FontSize = 7.5,
+            Foreground = ThemeBrushes.SecondaryText,
+            Margin = new Thickness(4, 2, 4, 2)
+        };
+        VersionHistoryList.Children.Add(loadingText);
+
+        var history = await _updateService.FetchVersionHistoryAsync();
+        VersionHistoryList.Children.Clear();
+
+        if (history.Count == 0)
+        {
+            VersionHistoryList.Children.Add(new TextBlock
+            {
+                Text = "No previous releases found or GitHub rate limit reached.",
+                FontSize = 7.5,
+                Foreground = ThemeBrushes.SecondaryText,
+                Margin = new Thickness(4, 2, 4, 2)
+            });
+            return;
+        }
+
+        foreach (var item in history)
+        {
+            var dock = new DockPanel { Margin = new Thickness(2, 3, 2, 3), LastChildFill = false };
+            var textStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+
+            bool isCurrent = string.Equals(item.Version, _updateService.CurrentVersionString, StringComparison.OrdinalIgnoreCase);
+
+            var titleBlock = new TextBlock
+            {
+                Text = $"{item.ReleaseTag}{(isCurrent ? " (Installed)" : "")}",
+                FontSize = 8.5,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = isCurrent ? ThemeBrushes.Green : ThemeBrushes.PrimaryText
+            };
+            var dateBlock = new TextBlock
+            {
+                Text = $"{item.ReleaseDate.ToLocalTime():yyyy-MM-dd} • {(item.IsPreRelease ? "Beta" : "Stable")}",
+                FontSize = 7,
+                Foreground = ThemeBrushes.SecondaryText
+            };
+
+            textStack.Children.Add(titleBlock);
+            textStack.Children.Add(dateBlock);
+            dock.Children.Add(textStack);
+
+            if (!isCurrent && !string.IsNullOrEmpty(item.InstallerUrl))
+            {
+                var rollbackBtn = new Button
+                {
+                    Content = new TextBlock
+                    {
+                        Text = SemVersion.TryParse(item.Version, out var v) && v > _updateService.CurrentVersion ? "Upgrade" : "Rollback",
+                        FontSize = 7.5,
+                        FontWeight = FontWeights.Medium
+                    },
+                    Height = 18,
+                    Padding = new Thickness(6, 0, 6, 0),
+                    Style = (Style)FindResource("IslandButton"),
+                    Tag = item
+                };
+                DockPanel.SetDock(rollbackBtn, Dock.Right);
+                rollbackBtn.Click += async (s, e) =>
+                {
+                    if (s is Button { Tag: ReleaseHistoryItem targetRelease } && !string.IsNullOrEmpty(targetRelease.InstallerUrl))
+                    {
+                        _machine.PushToast(new ToastContent(
+                            "\uE896",
+                            "Downloading Release",
+                            $"Fetching {targetRelease.ReleaseTag} from GitHub...",
+                            ThemeBrushes.BlueColor,
+                            TimeSpan.FromSeconds(3.0),
+                            TargetView: "settings",
+                            Priority: ToastPriority.Feedback
+                        ));
+
+                        string tempDir = Path.Combine(Path.GetTempPath(), "DynamicIsland", "Updates");
+                        string ext = Path.GetExtension(targetRelease.InstallerUrl) ?? ".exe";
+                        string dest = Path.Combine(tempDir, $"DynamicIsland-{targetRelease.Version}{ext}");
+
+                        using var client = new GitHubReleaseClient();
+                        await client.DownloadFileWithProgressAsync(targetRelease.InstallerUrl, dest);
+                        UpdateHandoffEngine.ExecuteHandoff(dest, isInstaller: true);
+                    }
+                };
+                dock.Children.Add(rollbackBtn);
+            }
+
+            VersionHistoryList.Children.Add(dock);
         }
     }
 }

@@ -1,5 +1,6 @@
 using System.Windows.Media;
 using System.Windows.Threading;
+using DynamicIsland.Services;
 
 namespace DynamicIsland.Core;
 
@@ -22,7 +23,9 @@ public sealed record ToastContent(
     TimeSpan Duration,
     string? TargetView = null,
     ToastPriority Priority = ToastPriority.System,
-    string? Category = null);
+    string? Category = null,
+    bool CanReply = false,
+    NotificationHistoryItem? HistoryItem = null);
 
 /// <summary>
 /// Resolves the visible state from independent inputs, by priority:
@@ -49,6 +52,9 @@ public sealed class IslandStateMachine
     private bool _activity;
     private bool _suppressed;
     private ToastContent? _toast;
+
+    public bool ClickOnlyMode { get; set; }
+    public TimeSpan CustomHoverEnterDelay { get; set; } = HoverEnterDelay;
 
     public IslandState State { get; private set; } = IslandState.Idle;
     public bool IsPinned => _pinned;
@@ -89,7 +95,14 @@ public sealed class IslandStateMachine
         if (inside)
         {
             _leaveTimer.Stop();
-            if (!_hovered) _enterTimer.Start();
+            if (!_hovered && !ClickOnlyMode)
+            {
+                if (_enterTimer.Interval != CustomHoverEnterDelay)
+                {
+                    _enterTimer.Interval = CustomHoverEnterDelay;
+                }
+                _enterTimer.Start();
+            }
         }
         else
         {

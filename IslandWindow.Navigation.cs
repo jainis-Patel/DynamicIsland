@@ -81,7 +81,8 @@ public partial class IslandWindow
                                  or ExpandedView.Calendar
                                  or ExpandedView.Launcher
                                  or ExpandedView.Termi
-                                 or ExpandedView.Converter);
+                                 or ExpandedView.Converter
+                                 or ExpandedView.QuickReply);
 
         // Morph the pill smoothly to target shape (496x338 for Settings, 496x192 for Media/Clock, etc.)
         // using smooth spring target easing without jarring velocity spikes.
@@ -339,7 +340,11 @@ public partial class IslandWindow
     private void SmoothScrollVertical(ScrollViewer sv, double delta)
     {
         if (sv == null) return;
-        double target = Math.Clamp(sv.VerticalOffset + delta, 0, sv.ScrollableHeight);
+        if (sv.ScrollableHeight <= 0 && sv.ExtentHeight <= 0)
+        {
+            sv.UpdateLayout();
+        }
+        double target = Math.Clamp(sv.VerticalOffset + delta, 0, Math.Max(0, sv.ScrollableHeight));
         sv.ScrollToVerticalOffset(target);
     }
 
@@ -410,11 +415,14 @@ public partial class IslandWindow
         {
             ScrollViewer? activeSettingsSv = _currentSettingsTab switch
             {
+                "Themes" => SettingsThemesTab,
                 "Droplets" => SettingsDropletsTab,
+                "Dock" => SettingsDockTab,
                 "Clock" => SettingsClockAudioTab,
                 "Screen" => SettingsScreenTab,
                 "Pet" => SettingsPetTab,
                 "Shortcuts" => SettingsShortcutsTab,
+                "Notifications" => SettingsNotifTab,
                 _ => SettingsAppearanceTab
             };
             if (activeSettingsSv != null)
@@ -650,6 +658,13 @@ public partial class IslandWindow
 
         if (e.Key == Key.Escape && _machine.State == IslandState.Expanded)
         {
+            if (_currentExpandedView == ExpandedView.QuickReply)
+            {
+                CancelQuickReply();
+                e.Handled = true;
+                return;
+            }
+
             if (_currentExpandedView != ExpandedView.Media)
             {
                 SwitchExpandedView(ExpandedView.Media);
@@ -667,15 +682,21 @@ public partial class IslandWindow
         if (_machine.State == IslandState.Expanded && (Keyboard.Modifiers & ModifierKeys.Control) != 0 &&
             e.Key is >= Key.D1 and <= Key.D9)
         {
-            int idx = e.Key - Key.D1;
-            var visibleViews = _orderedViews
-                .Where(v => _viewRegistry.TryGetValue(v, out var entry) && entry.DockButton?.Visibility == Visibility.Visible)
-                .ToList();
-            if (idx >= 0 && idx < visibleViews.Count)
+            int targetIdx = e.Key - Key.D1;
+            int currentVisibleIdx = 0;
+            for (int i = 0; i < _orderedViews.Count; i++)
             {
-                SwitchExpandedView(visibleViews[idx]);
-                e.Handled = true;
-                return;
+                var v = _orderedViews[i];
+                if (_viewRegistry.TryGetValue(v, out var entry) && entry.DockButton?.Visibility == Visibility.Visible)
+                {
+                    if (currentVisibleIdx == targetIdx)
+                    {
+                        SwitchExpandedView(v);
+                        e.Handled = true;
+                        return;
+                    }
+                    currentVisibleIdx++;
+                }
             }
         }
 
@@ -712,6 +733,37 @@ public partial class IslandWindow
                 if (e.Key == Key.Down)
                 {
                     SmoothScrollVertical(NotificationsScrollViewer, 58);
+                    e.Handled = true;
+                    return;
+                }
+            }
+        }
+
+        if (_machine.State == IslandState.Expanded && _currentExpandedView == ExpandedView.Settings)
+        {
+            ScrollViewer? activeSettingsSv = _currentSettingsTab switch
+            {
+                "Themes" => SettingsThemesTab,
+                "Droplets" => SettingsDropletsTab,
+                "Dock" => SettingsDockTab,
+                "Clock" => SettingsClockAudioTab,
+                "Screen" => SettingsScreenTab,
+                "Pet" => SettingsPetTab,
+                "Shortcuts" => SettingsShortcutsTab,
+                "Notifications" => SettingsNotifTab,
+                _ => SettingsAppearanceTab
+            };
+            if (activeSettingsSv != null)
+            {
+                if (e.Key == Key.Up || e.Key == Key.PageUp)
+                {
+                    SmoothScrollVertical(activeSettingsSv, e.Key == Key.PageUp ? -180 : -58);
+                    e.Handled = true;
+                    return;
+                }
+                if (e.Key == Key.Down || e.Key == Key.PageDown)
+                {
+                    SmoothScrollVertical(activeSettingsSv, e.Key == Key.PageDown ? 180 : 58);
                     e.Handled = true;
                     return;
                 }

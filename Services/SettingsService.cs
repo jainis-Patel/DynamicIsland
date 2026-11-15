@@ -14,6 +14,20 @@ public sealed class AppSettings
     public string ThemeStyle { get; set; } = "Default"; // "Default", "Liquid Glass"
     /// <summary>Living island nature overlay theme: "None", "Ivy &amp; Blooms", "Sakura Branch", "Blossom Tree", "Meadow".</summary>
     public string IslandTheme { get; set; } = "Ivy & Blooms";
+    /// <summary>Living nature botanical growth density from 0.20 (sparse/minimal) to 1.50 (lush). Default 0.70.</summary>
+    public double NatureDensity { get; set; } = 0.70;
+    /// <summary>Living nature botanical scale multiplier from 0.40 (small) to 1.40 (large). Default 0.85.</summary>
+    public double NatureScale { get; set; } = 0.85;
+    /// <summary>Living nature cascading drop length in DIPs from 20 (tight rim hugger) to 120 (deep curtain). Default 60.0.</summary>
+    public double NatureDropLength { get; set; } = 60.0;
+    /// <summary>Number of fluttering butterflies from 0 (none) to 4. Default 2.</summary>
+    public int NatureButterflyCount { get; set; } = 2;
+    /// <summary>Living nature flower blossom frequency from 0.20 (accents only) to 1.50 (full bloom). Default 0.75.</summary>
+    public double NatureBloomDensity { get; set; } = 0.75;
+    /// <summary>Whether shimmering golden pollen and firefly particles are enabled.</summary>
+    public bool NaturePollenEnabled { get; set; } = true;
+    /// <summary>Number of drifting golden pollen motes from 0 to 30. Default 14.</summary>
+    public int NaturePollenCount { get; set; } = 14;
     public string ClockStyle { get; set; } = "Minimal"; // "Minimal", "Seconds", "DateBadge", "Analog", "Neon", "Flip"
     public bool EnableAmbientGlow { get; set; } = true;
     public int MonitorIndex { get; set; } = 0;
@@ -72,6 +86,14 @@ public sealed class AppSettings
     public Dictionary<string, uint> CustomHotkeys { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public List<string>? EnabledDroplets { get; set; }
     public List<string> PinnedShelfFiles { get; set; } = new();
+    public string ExpandTrigger { get; set; } = "HoverSnappy";
+    public string GhostModifierKey { get; set; } = "Ctrl";
+    public bool EnableFastSwipeGuard { get; set; } = true;
+    public bool EnableQuickTuck { get; set; } = true;
+    public bool AutoCheckUpdates { get; set; } = true;
+    public string UpdateChannel { get; set; } = "Stable";
+    public DateTime? LastUpdateCheckTime { get; set; }
+    public string? SkippedVersion { get; set; }
 }
 
 public sealed record ThemePalette(string Name, Color Accent, Color Glow, Color? LightAccent = null, Color? LightGlow = null)
@@ -227,8 +249,6 @@ internal sealed class SettingsService
     {
         "None",
         "Ivy & Blooms",
-        "Sakura Branch",
-        "Blossom Tree",
         "Meadow",
     };
 
@@ -241,28 +261,13 @@ internal sealed class SettingsService
             string.Equals(trimmed, "Disabled", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(trimmed, "Clean", StringComparison.OrdinalIgnoreCase))
             return "None";
-        if (string.Equals(trimmed, "Ivy", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(trimmed, "Ivy & Blooms", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(trimmed, "Ivy&Blooms", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(trimmed, "Ivy and Blooms", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(trimmed, "Ivy Blooms", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(trimmed, "Bloom", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(trimmed, "Blooms", StringComparison.OrdinalIgnoreCase))
-            return "Ivy & Blooms";
-        if (string.Equals(trimmed, "Sakura", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(trimmed, "Sakura Branch", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(trimmed, "Cherry Blossom", StringComparison.OrdinalIgnoreCase))
-            return "Sakura Branch";
-        if (string.Equals(trimmed, "Tree", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(trimmed, "Blossom Tree", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(trimmed, "Blossom", StringComparison.OrdinalIgnoreCase))
-            return "Blossom Tree";
         if (string.Equals(trimmed, "Meadow", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(trimmed, "Flower Meadow", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(trimmed, "Grass", StringComparison.OrdinalIgnoreCase))
             return "Meadow";
 
-        return AvailableIslandThemes.FirstOrDefault(t => string.Equals(t, trimmed, StringComparison.OrdinalIgnoreCase)) ?? "Ivy & Blooms";
+        // "Ivy & Blooms", "Leaves", "Leaves & Blooms", or legacy "Sakura" / "Tree" all map to the refined botanical leaves theme
+        return "Ivy & Blooms";
     }
 
     public static readonly IReadOnlyList<string> AvailablePetSpecies = new[]
@@ -291,6 +296,12 @@ internal sealed class SettingsService
 
     public static string NormalizePetAccessory(string? accessory) =>
         AvailablePetAccessories.FirstOrDefault(a => string.Equals(a, accessory?.Trim(), StringComparison.OrdinalIgnoreCase)) ?? "None";
+
+    public static string NormalizeUpdateChannel(string? channel) =>
+        string.Equals(channel?.Trim(), "Beta", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(channel?.Trim(), "Canary", StringComparison.OrdinalIgnoreCase)
+            ? "Beta"
+            : "Stable";
 
     private CancellationTokenSource? _saveDebounceCts;
     private readonly object _saveLock = new();
@@ -360,6 +371,7 @@ internal sealed class SettingsService
         settings.IslandTheme = NormalizeIslandTheme(settings.IslandTheme);
         settings.PetSpecies = NormalizePetSpecies(settings.PetSpecies);
         settings.PetAccessory = NormalizePetAccessory(settings.PetAccessory);
+        settings.UpdateChannel = NormalizeUpdateChannel(settings.UpdateChannel);
         if (settings.SchemaVersion < 3)
         {
             settings.SchemaVersion = 3;

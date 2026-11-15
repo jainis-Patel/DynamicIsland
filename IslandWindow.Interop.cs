@@ -33,6 +33,8 @@ public partial class IslandWindow
     private const int HotkeyQuickPaste = 16;
     private const int HotkeyCapture = 17;
     private const int HotkeyNotes = 18;
+    private const int HotkeyTuck = 19;
+    private const int HotkeyDock = 20;
 
     private static readonly (int Id, string KeyName, uint DefaultVk)[] HotKeyBindings =
     {
@@ -54,6 +56,8 @@ public partial class IslandWindow
         (HotkeyQuickPaste, "QuickPaste", 0x42),       // VK_B (Ctrl+Alt+B)
         (HotkeyCapture, "ElementCapture", 0x58),      // VK_X (Ctrl+Alt+X)
         (HotkeyNotes, "QuickNotes", 0x4A),           // VK_J (Ctrl+Alt+J)
+        (HotkeyTuck, "TuckIsland", 0x28),             // VK_DOWN (Ctrl+Alt+Down)
+        (HotkeyDock, "CycleDock", 0x5A),              // VK_Z (Ctrl+Alt+Z)
     };
 
     private readonly Dictionary<string, bool> _hotkeyRegistrationStatus = new(StringComparer.OrdinalIgnoreCase);
@@ -100,7 +104,10 @@ public partial class IslandWindow
             DynamicIsland.LiquidGlass.GlassManager.Instance.InitializeDefaultBackdrop(_hwnd);
             DynamicIsland.LiquidGlass.GlassManager.Instance.FrameReady += (_, _) =>
             {
-                if (ThemeManager.IsLiquidGlass && _machine.State != IslandState.Hidden)
+                // P0 perf: Only re-render glass while springs are animating (_rendering).
+                // When the pill is at rest the glass bitmap is already up-to-date;
+                // dispatching here every capture frame (30-60 fps) was the #1 idle-CPU offender.
+                if (ThemeManager.IsLiquidGlass && _machine.State != IslandState.Hidden && _rendering)
                 {
                     Dispatcher.InvokeAsync(() =>
                     {
@@ -258,6 +265,7 @@ public partial class IslandWindow
                                               or ExpandedView.Termi
                                               or ExpandedView.Converter
                                               or ExpandedView.Calendar
+                                              or ExpandedView.QuickReply
                                            || _recordingHotkeyAction != null;
                 return new IntPtr(isInteractiveInput && _machine.State == IslandState.Expanded
                     ? MA_ACTIVATE
@@ -267,12 +275,28 @@ public partial class IslandWindow
             {
                 short screenX = unchecked((short)(lParam.ToInt64() & 0xFFFF));
                 short screenY = unchecked((short)((lParam.ToInt64() >> 16) & 0xFFFF));
-                var hot = GetHotZone();
                 handled = true;
-                if (hot.HasValue && hot.Value.Contains(new POINT { X = screenX, Y = screenY }))
+
+                if (_machine.State == IslandState.Hidden || _isSessionLocked || _isTucked)
+                {
+                    return new IntPtr(HTTRANSPARENT);
+                }
+
+                if (IsGhostModifierDown())
+                {
+                    NotifyGhostPassthroughHover(true);
+                    return new IntPtr(HTTRANSPARENT);
+                }
+                else if (_isGhostVisualActive)
+                {
+                    NotifyGhostPassthroughHover(false);
+                }
+
+                if (IsPointInIslandGeometry(screenX, screenY))
                 {
                     return new IntPtr(HTCLIENT);
                 }
+
                 return new IntPtr(HTTRANSPARENT);
             }
 
@@ -512,9 +536,255 @@ public partial class IslandWindow
         }
     }
 
+    private bool _isGhostVisualActive;
+    private bool _isTucked;
+    private DispatcherTimer? _tuckRestoreTimer;
+
+    internal bool IsTucked => _isTucked;
+
+    internal bool IsGhostModifierDown()
+    {
+        string? mod = _settingsService?.Current.GhostModifierKey;
+        if (string.Equals(mod, "Ctrl", StringComparison.OrdinalIgnoreCase))
+            return (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+        if (string.Equals(mod, "Alt", StringComparison.OrdinalIgnoreCase))
+            return (GetKeyState(VK_MENU) & 0x8000) != 0;
+        if (string.Equals(mod, "Shift", StringComparison.OrdinalIgnoreCase))
+            return (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+        return false;
+    }
+
+    internal void NotifyGhostPassthroughHover(bool ghost)
+    {
+        if (ghost == _isGhostVisualActive) return;
+        _isGhostVisualActive = ghost;
+        Dispatcher.InvokeAsync(() =>
+        {
+            if (Root != null)
+            {
+                var anim = new System.Windows.Media.Animation.DoubleAnimation(
+                    ghost ? 0.18 : 1.0,
+                    TimeSpan.FromMilliseconds(ghost ? 80 : 180))
+                {
+                    EasingFunction = ghost ? SharedQuarticOut : SharedCubicOut
+                };
+                Root.BeginAnimation(OpacityProperty, anim);
+            }
+        });
+    }
+
+    internal void TuckIsland(TimeSpan? duration = null)
+    {
+        if (_isTucked || _hwnd == IntPtr.Zero) return;
+        _isTucked = true;
+
+        if (_machine.State == IslandState.Expanded)
+        {
+            _machine.CollapseNow();
+        }
+
+        var slideUp = new System.Windows.Media.Animation.DoubleAnimation(-36.0, TimeSpan.FromMilliseconds(220))
+        {
+            EasingFunction = SharedPanelBackOut
+        };
+        RootTranslateTransform?.BeginAnimation(TranslateTransform.YProperty, slideUp);
+
+        var fade = new System.Windows.Media.Animation.DoubleAnimation(0.2, TimeSpan.FromMilliseconds(180));
+        Root?.BeginAnimation(OpacityProperty, fade);
+
+        _tuckRestoreTimer?.Stop();
+        _tuckRestoreTimer = new DispatcherTimer { Interval = duration ?? TimeSpan.FromSeconds(5) };
+        _tuckRestoreTimer.Tick += (_, _) =>
+        {
+            _tuckRestoreTimer.Stop();
+            UntuckIsland();
+        };
+        _tuckRestoreTimer.Start();
+    }
+
+    internal void UntuckIsland()
+    {
+        if (!_isTucked) return;
+        _isTucked = false;
+        _tuckRestoreTimer?.Stop();
+
+        var slideDown = new System.Windows.Media.Animation.DoubleAnimation(0.0, TimeSpan.FromMilliseconds(280))
+        {
+            EasingFunction = SharedPanelBackOut
+        };
+        RootTranslateTransform?.BeginAnimation(TranslateTransform.YProperty, slideDown);
+
+        var fade = new System.Windows.Media.Animation.DoubleAnimation(1.0, TimeSpan.FromMilliseconds(240));
+        Root?.BeginAnimation(OpacityProperty, fade);
+
+        TriggerLiquidImpulse(180, 70, 15);
+    }
+
+    internal void ToggleTuck()
+    {
+        if (_isTucked) UntuckIsland();
+        else TuckIsland();
+    }
+
+    internal void CycleDockPosition()
+    {
+        string current = _settingsService?.Current.DockPosition ?? "Center";
+        string next = current switch
+        {
+            "Center" => "Right",
+            "Right" => "Left",
+            _ => "Center"
+        };
+        _settingsService?.Update(s => s.DockPosition = next, nameof(AppSettings.DockPosition));
+        PositionWindow();
+        TriggerLiquidImpulse(240, 120, 20);
+
+        _machine.PushToast(new ToastContent(
+            "\uE7F4",
+            "Dock Position",
+            $"Aligned to {next}",
+            ThemeBrushes.BlueColor,
+            TimeSpan.FromSeconds(1.8),
+            TargetView: "settings",
+            Priority: ToastPriority.Feedback,
+            Category: "dock_position"));
+    }
+
+    internal bool IsPointInIslandGeometry(int screenX, int screenY)
+    {
+        if (_hwnd == IntPtr.Zero || _machine.State == IslandState.Hidden || _isSessionLocked || _isTucked)
+            return false;
+
+        if (_windowRectPx.Width <= 0 && GetWindowRect(_hwnd, out var currentRect) && currentRect.Width > 0)
+        {
+            _windowRectPx = currentRect;
+        }
+
+        if (_windowRectPx.Width <= 0) return false;
+
+        double relX = (screenX - _windowRectPx.Left) / _dpiScale;
+        double relY = (screenY - _windowRectPx.Top) / _dpiScale;
+
+        double scaleFactor = _settingsService?.Current.IslandScale ?? 1.0;
+        if (Math.Abs(scaleFactor - 1.0) > 0.001 && scaleFactor > 0.1)
+        {
+            relX = (CanvasWidthDip * 0.5) + (relX - (CanvasWidthDip * 0.5)) / scaleFactor;
+            relY = relY / scaleFactor;
+        }
+
+        var shape = GetTargetShape(_machine.State);
+        double w = _machine.State == IslandState.Expanded
+            ? Math.Max(shape.Width, 484.0)
+            : (Pill != null && Pill.ActualWidth > 0 ? Pill.ActualWidth : Math.Max(shape.Width, _width.Value));
+        double h = Pill != null && Pill.ActualHeight > 0 ? Pill.ActualHeight : Math.Max(shape.Height, _height.Value);
+
+        double radius = _appliedRadius > 0 ? _appliedRadius : Math.Clamp(_radius.Value, 0, Math.Min(w, h) / 2.0);
+        if (radius <= 0) radius = Math.Min(w, h) / 2.0;
+
+        double pillLeft = (CanvasWidthDip - w) / 2.0;
+        double pillRight = pillLeft + w;
+        double pillTop = 0.0;
+        double pillBottom = h;
+
+        // 1. Primary pill capsule
+        if (IsPointInRoundedRect(relX, relY, pillLeft, pillTop, pillRight, pillBottom, radius))
+        {
+            return true;
+        }
+
+        // 2. Secondary split droplet (if active)
+        if (_dropletOffset.Value > 0.05 && SecondaryDroplet != null && SecondaryDroplet.Visibility == Visibility.Visible)
+        {
+            double dropletDiameter = SecondaryDroplet.Width > 0 ? SecondaryDroplet.Width : 30.0;
+            double dropR = dropletDiameter / 2.0;
+            double dropCenterX = (CanvasWidthDip / 2.0) + (SecondaryDropletTranslate?.X ?? 0.0);
+            double dropCenterY = (SecondaryDropletTranslate?.Y ?? 0.0) + dropR;
+
+            double ddx = relX - dropCenterX;
+            double ddy = relY - dropCenterY;
+            if ((ddx * ddx + ddy * ddy) <= (dropR * dropR))
+            {
+                return true;
+            }
+        }
+
+        // 3. Floating dock host in Expanded state
+        if (_machine.State == IslandState.Expanded && FloatingDockHost != null && FloatingDockHost.Visibility == Visibility.Visible)
+        {
+            double dockW = FloatingDockHost.ActualWidth > 0 ? FloatingDockHost.ActualWidth : 320.0;
+            double dockH = FloatingDockHost.ActualHeight > 0 ? FloatingDockHost.ActualHeight : 40.0;
+            double dockLeft = (CanvasWidthDip - dockW) / 2.0;
+            double dockRight = dockLeft + dockW;
+            double dockTop = FloatingDockTranslate?.Y ?? (h + 4.0);
+            double dockBottom = dockTop + dockH;
+            double dockRadius = FloatingDockHost.CornerRadius.TopLeft > 0 ? FloatingDockHost.CornerRadius.TopLeft : 20.0;
+
+            if (IsPointInRoundedRect(relX, relY, dockLeft, dockTop, dockRight, dockBottom, dockRadius))
+            {
+                return true;
+            }
+        }
+
+        // 4. Scampering pet
+        if (_isPetScampering)
+        {
+            var pet = _machine.State == IslandState.Idle ? IdlePetCompanion : CompactPetCompanion;
+            if (pet != null && pet.Visibility == Visibility.Visible)
+            {
+                double petW = pet.ActualWidth > 0 ? pet.ActualWidth : 28.0;
+                double petH = pet.ActualHeight > 0 ? pet.ActualHeight : 24.0;
+                double petLeft = pillLeft - petW - 2.0;
+                double petTop = (h - petH) / 2.0;
+                if (relX >= petLeft && relX <= pillLeft && relY >= petTop && relY <= petTop + petH)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    internal static bool IsPointInRoundedRect(double x, double y, double left, double top, double right, double bottom, double radius)
+    {
+        if (x < left || x > right || y < top || y > bottom)
+            return false;
+
+        double maxR = Math.Min((right - left) / 2.0, (bottom - top) / 2.0);
+        radius = Math.Clamp(radius, 0, maxR);
+        if (radius <= 0.5) return true;
+
+        if (x < left + radius && y < top + radius)
+        {
+            double dx = x - (left + radius);
+            double dy = y - (top + radius);
+            return (dx * dx + dy * dy) <= (radius * radius);
+        }
+        if (x > right - radius && y < top + radius)
+        {
+            double dx = x - (right - radius);
+            double dy = y - (top + radius);
+            return (dx * dx + dy * dy) <= (radius * radius);
+        }
+        if (x < left + radius && y > bottom - radius)
+        {
+            double dx = x - (left + radius);
+            double dy = y - (bottom - radius);
+            return (dx * dx + dy * dy) <= (radius * radius);
+        }
+        if (x > right - radius && y > bottom - radius)
+        {
+            double dx = x - (right - radius);
+            double dy = y - (bottom - radius);
+            return (dx * dx + dy * dy) <= (radius * radius);
+        }
+
+        return true;
+    }
+
     private RECT? GetHotZone()
     {
-        if (_hwnd == IntPtr.Zero || _machine.State == IslandState.Hidden || _isSessionLocked) return null;
+        if (_hwnd == IntPtr.Zero || _machine.State == IslandState.Hidden || _isSessionLocked || _isTucked) return null;
 
         if (_windowRectPx.Width <= 0 && GetWindowRect(_hwnd, out var currentRect) && currentRect.Width > 0)
         {
@@ -533,7 +803,7 @@ public partial class IslandWindow
             effectiveW = Math.Max(effectiveW, 484.0 * scaleFactor);
         }
 
-        int halfWidth = (int)Math.Round((effectiveW / 2 + HoverSlopDip + 16) * _dpiScale);
+        int halfWidth = (int)Math.Round((effectiveW / 2 + HoverSlopDip) * _dpiScale);
         int centerX = _windowRectPx.Left + _windowRectPx.Width / 2;
         int dropletExtraRight = _dropletOffset.Value > 0.05
             ? (int)Math.Round(48 * scaleFactor * _dpiScale)
@@ -769,6 +1039,8 @@ public partial class IslandWindow
                 if (_dropletRegistry.IsEnabled("notes"))
                     SwitchExpandedView(ExpandedView.Notes);
                 break;
+            case HotkeyTuck: ToggleTuck(); break;
+            case HotkeyDock: CycleDockPosition(); break;
             case HotkeyMonitor: SwitchToNextMonitor(); break;
             case HotkeyQuit: Application.Current.Shutdown(); break;
         }

@@ -5,107 +5,259 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:core="clr-namespace:DynamicIsland.Core"
              mc:Ignorable="d"
-             d:DesignHeight="150" d:DesignWidth="464">
+             d:DesignHeight="150" d:DesignWidth="464"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Ideal"
+             TextOptions.TextRenderingMode="ClearType">
+
+    <UserControl.Resources>
+        <!-- Subtle Icon Action Button inside Clipboard Cards -->
+        <Style x:Key="CardMicroActionBtn" TargetType="Button">
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="1,0,0,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBg" Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBg" Property="Background" Value="#1EFFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="BtnBg" Property="Background" Value="#2DFFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Compact Pill Badge Button for Card Bottom-Right Context Actions (Open, RGB, OCR) -->
+        <Style x:Key="CardBadgeActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="16" />
+            <Setter Property="Padding" Value="5,0" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+            <Setter Property="Background" Value="#14FFFFFF" />
+            <Setter Property="BorderBrush" Value="#22FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BadgeBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BadgeBorder" Property="Background" Value="#24FFFFFF" />
+                                <Setter TargetName="BadgeBorder" Property="BorderBrush" Value="#40FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Vertical Toolbar Divider -->
+        <Style x:Key="ToolbarSeparator" TargetType="Border">
+            <Setter Property="Width" Value="1" />
+            <Setter Property="Height" Value="12" />
+            <Setter Property="Background" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="Margin" Value="4,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <DockPanel Grid.Row="0" Margin="0,0,0,4" LastChildFill="False">
+
+        <!-- ═════════════════════════════════════════════════════════════════ -->
+        <!-- ROW 0: MODE SWITCHER & STUDIO CAPTURE ACTIONS                     -->
+        <!-- ═════════════════════════════════════════════════════════════════ -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,5" LastChildFill="False">
+            <!-- Left: Segmented View Switcher (Files | Clipboard) + Item Counter -->
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="2" Margin="0,0,8,0">
+                <Border Background="#0AFFFFFF" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="2" Margin="0,0,7,0">
                     <StackPanel Orientation="Horizontal">
                         <Button Click="SwitchToShelf_Click" Style="{StaticResource IslandButton}" Height="18" Padding="7,0" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Switch to Drop Shelf">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8F4;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Files" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" Opacity="0.8" />
+                                <TextBlock Text="Shelf" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
-                        <Border Background="{DynamicResource CardSurfaceBrush}" CornerRadius="6" Padding="7,2">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="9" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Clipboard" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="5" Padding="7,1.5">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE77F;" FontSize="8" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Clips" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                             </StackPanel>
                         </Border>
                     </StackPanel>
                 </Border>
-                <TextBlock x:Name="ClipboardCountText" FontSize="11" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,8,0" VerticalAlignment="Center" Text="0 items" />
-                <Button Click="ClipboardScrollLeft_Click" x:Name="ClipboardScrollLeftBtn" Style="{StaticResource IslandButton}" Height="20" Width="20" Padding="0" Margin="0,0,3,0" ToolTipService.ToolTip="Scroll Left (Previous Items)" Visibility="Collapsed">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE76B;" FontSize="8.5" />
+
+                <!-- Subtle Monospace Counter Pill -->
+                <Border Background="{DynamicResource ChipBgBrush}" CornerRadius="4.5" Padding="5,1.5" Margin="0,0,5,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="ClipboardCountText" Style="{StaticResource Digits}" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Text="0 items" />
+                </Border>
+
+                <!-- Scroll Pager Arrows -->
+                <Button Click="ClipboardScrollLeft_Click" x:Name="ClipboardScrollLeftBtn" Style="{StaticResource IslandButton}" Height="19" Width="19" Padding="0" Margin="0,0,2,0" ToolTipService.ToolTip="Scroll Left" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE76B;" FontSize="7.5" />
                 </Button>
-                <Button Click="ClipboardScrollRight_Click" x:Name="ClipboardScrollRightBtn" Style="{StaticResource IslandButton}" Height="20" Width="20" Padding="0" Margin="0" ToolTipService.ToolTip="Scroll Right (Next Items)" Visibility="Collapsed">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE76C;" FontSize="8.5" />
+                <Button Click="ClipboardScrollRight_Click" x:Name="ClipboardScrollRightBtn" Style="{StaticResource IslandButton}" Height="19" Width="19" Padding="0" Margin="0" ToolTipService.ToolTip="Scroll Right" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE76C;" FontSize="7.5" />
                 </Button>
             </StackPanel>
-            <Button Click="ClearClipboardButton_Click" x:Name="ClearClipboardButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="22" Padding="7,0" Margin="4,0,0,0" ToolTipService.ToolTip="Clear Unpinned Clipboard History">
-                <TextBlock Text="Clear" FontSize="9.5" FontWeight="Medium" />
-            </Button>
-            <Button Click="ClipboardQuickPickerButton_Click" x:Name="ClipboardQuickPickerButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="22" Padding="7,0" Margin="4,0,0,0" ToolTipService.ToolTip="Open Quick Paste Picker &amp; Sequential Paste Queue (or press Ctrl+Alt+B)">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE762;" FontSize="9" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
-                    <TextBlock x:Name="ClipboardQueueBtnText" Text="Queue" FontSize="9.5" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-                </StackPanel>
-            </Button>
-            <Button Click="OcrClipboardButton_Click" x:Name="OcrClipboardButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="22" Padding="7,0" Margin="4,0,0,0" ToolTipService.ToolTip="Extract Text (OCR) from Clipboard Screenshot / Image">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="9" Margin="0,0,3,0" VerticalAlignment="Center" />
-                    <TextBlock Text="OCR" FontSize="9.5" FontWeight="Medium" VerticalAlignment="Center" />
-                </StackPanel>
-            </Button>
-            <Button Click="CaptureRegionButton_Click" x:Name="CaptureRegionButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="22" Padding="7,0" Margin="4,0,0,0" ToolTipService.ToolTip="Element Capture: Snip screen region, annotate, OCR text, or Pin floating screenshot on top (Ctrl+Alt+X)">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE722;" FontSize="9" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
-                    <TextBlock Text="Snip &amp; Pin" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                </StackPanel>
-            </Button>
-            <Button Click="EyedropperButton_Click" x:Name="EyedropperButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="22" Padding="7,0" Margin="0" ToolTipService.ToolTip="Sample Screen Pixel Color Under Cursor (1.2s delay)">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xEF3C;" FontSize="9" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
-                    <TextBlock Text="Color" FontSize="9.5" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-                </StackPanel>
-            </Button>
-        </DockPanel>
-        <DockPanel Grid.Row="1" Margin="0,0,0,6" LastChildFill="True">
-            <Border DockPanel.Dock="Right" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Height="22" Width="116" Padding="5,0" Margin="4,0,0,0">
-                <Grid VerticalAlignment="Center">
+
+            <!-- Right: Grouped Utility & Capture Strip -->
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Click="EyedropperButton_Click" x:Name="EyedropperButton" Style="{StaticResource IslandButton}" Height="20" Padding="6.5,0" Margin="0,0,3,0" ToolTipService.ToolTip="Sample Screen Pixel Color Under Cursor (1.2s delay)">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE721;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
-                        <TextBox KeyDown="ClipboardSearchBox_KeyDown" TextChanged="ClipboardSearchBox_TextChanged" x:Name="ClipboardSearchBox" Background="Transparent" Foreground="{DynamicResource PrimaryTextBrush}" BorderThickness="0" FontSize="9.5" Width="78" VerticalAlignment="Center" CaretBrush="{DynamicResource AccentBrush}" ToolTipService.ToolTip="Search clipboard history" />
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xEF3C;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Color" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                     </StackPanel>
-                    <Button Click="ClearClipboardSearch_Click" x:Name="ClearClipboardSearchBtn" Visibility="Collapsed" HorizontalAlignment="Right" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" ToolTipService.ToolTip="Clear Search">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                </Button>
+
+                <Button Click="CaptureRegionButton_Click" x:Name="CaptureRegionButton" Style="{StaticResource IslandButton}" Height="20" Padding="6.5,0" Margin="0,0,3,0" ToolTipService.ToolTip="Snip screen region, annotate, OCR, or pin floating screenshot (Ctrl+Alt+X)">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE924;" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Snip" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <Button Click="OcrClipboardButton_Click" x:Name="OcrClipboardButton" Style="{StaticResource IslandButton}" Height="20" Padding="6.5,0" Margin="0" ToolTipService.ToolTip="Extract Text (OCR) from Clipboard Image">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8E2;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                        <TextBlock Text="OCR" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <Border Style="{StaticResource ToolbarSeparator}" />
+
+                <Button Click="ClipboardQuickPickerButton_Click" x:Name="ClipboardQuickPickerButton" Style="{StaticResource IslandButton}" Height="20" Padding="6.5,0" Margin="0,0,3,0" ToolTipService.ToolTip="Open Sequential Paste Queue (Ctrl+Alt+B)">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE762;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="ClipboardQueueBtnText" Text="Queue" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <Button Click="ClearClipboardButton_Click" x:Name="ClearClipboardButton" Style="{StaticResource IslandButton}" Height="20" Padding="6.5,0" Margin="0" ToolTipService.ToolTip="Clear Unpinned Clipboard History">
+                    <TextBlock Text="Clear" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
+                </Button>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- ═════════════════════════════════════════════════════════════════ -->
+        <!-- ROW 1: RECESSED FILTER BAR & WATERMARKED SEARCH                   -->
+        <!-- ═════════════════════════════════════════════════════════════════ -->
+        <DockPanel Grid.Row="1" Margin="0,0,0,6" LastChildFill="True">
+            <!-- Right: Search Input with Placeholder Watermark -->
+            <Border DockPanel.Dock="Right" Background="#0AFFFFFF" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Height="21" Width="126" Padding="6,0" Margin="6,0,0,0">
+                <Grid VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE721;" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center" Opacity="0.75" />
+
+                    <Grid Grid.Column="1" VerticalAlignment="Center">
+                        <TextBox KeyDown="ClipboardSearchBox_KeyDown"
+                                 TextChanged="ClipboardSearchBox_TextChanged"
+                                 x:Name="ClipboardSearchBox"
+                                 Background="Transparent"
+                                 Foreground="{DynamicResource PrimaryTextBrush}"
+                                 BorderThickness="0"
+                                 FontSize="8.5"
+                                 VerticalAlignment="Center"
+                                 CaretBrush="{DynamicResource AccentBrush}"
+                                 ToolTipService.ToolTip="Search clipboard history" />
+
+                        <!-- Automated Placeholder Watermark -->
+                        <TextBlock Text="Filter clips..."
+                                   FontSize="8.5"
+                                   Foreground="{DynamicResource SecondaryBrush}"
+                                   Opacity="0.5"
+                                   IsHitTestVisible="False"
+                                   VerticalAlignment="Center"
+                                   Margin="2,0,0,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Text, ElementName=ClipboardSearchBox}" Value="">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+
+                    <Button Grid.Column="2" Click="ClearClipboardSearch_Click" x:Name="ClearClipboardSearchBtn" Visibility="Collapsed" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTipService.ToolTip="Clear Search">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="7" Foreground="{DynamicResource SecondaryBrush}" />
                     </Button>
                 </Grid>
             </Border>
-            <ScrollViewer PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Click="ClipFilter_Click" x:Name="ClipFilterAllBtn" Tag="All" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
-                        <TextBlock Text="All" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                    </Button>
-                    <Button Click="ClipFilter_Click" x:Name="ClipFilterPinnedBtn" Tag="Pinned" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE840;" FontSize="7.5" Margin="0,0,2,0" VerticalAlignment="Center" />
-                            <TextBlock Text="Pinned" FontSize="8.5" />
-                        </StackPanel>
-                    </Button>
-                    <Button Click="ClipFilter_Click" x:Name="ClipFilterLinksBtn" Tag="Links" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
-                        <TextBlock Text="Links" FontSize="8.5" />
-                    </Button>
-                    <Button Click="ClipFilter_Click" x:Name="ClipFilterImagesBtn" Tag="Images" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
-                        <TextBlock Text="Images" FontSize="8.5" />
-                    </Button>
-                    <Button Click="ClipFilter_Click" x:Name="ClipFilterColorsBtn" Tag="Colors" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
-                        <TextBlock Text="Colors" FontSize="8.5" />
-                    </Button>
-                    <Button Click="ClipFilter_Click" x:Name="ClipFilterCodeBtn" Tag="Code" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0">
-                        <TextBlock Text="Code" FontSize="8.5" />
-                    </Button>
-                </StackPanel>
-            </ScrollViewer>
+
+            <!-- Left: Recessed Filter Pill Strip -->
+            <Border Background="#08FFFFFF" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="1.5" HorizontalAlignment="Left">
+                <ScrollViewer PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Click="ClipFilter_Click" x:Name="ClipFilterAllBtn" Tag="All" Style="{StaticResource IslandButton}" Height="18" Padding="7,0" Margin="0,0,2,0">
+                            <TextBlock Text="All" FontSize="8" FontWeight="SemiBold" />
+                        </Button>
+                        <Button Click="ClipFilter_Click" x:Name="ClipFilterPinnedBtn" Tag="Pinned" Style="{StaticResource IslandButton}" Height="18" Padding="7,0" Margin="0,0,2,0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE840;" FontSize="7" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.8" />
+                                <TextBlock Text="Pinned" FontSize="8" FontWeight="Medium" />
+                            </StackPanel>
+                        </Button>
+                        <Button Click="ClipFilter_Click" x:Name="ClipFilterLinksBtn" Tag="Links" Style="{StaticResource IslandButton}" Height="18" Padding="7,0" Margin="0,0,2,0">
+                            <TextBlock Text="Links" FontSize="8" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="ClipFilter_Click" x:Name="ClipFilterImagesBtn" Tag="Images" Style="{StaticResource IslandButton}" Height="18" Padding="7,0" Margin="0,0,2,0">
+                            <TextBlock Text="Images" FontSize="8" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="ClipFilter_Click" x:Name="ClipFilterColorsBtn" Tag="Colors" Style="{StaticResource IslandButton}" Height="18" Padding="7,0" Margin="0,0,2,0">
+                            <TextBlock Text="Colors" FontSize="8" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="ClipFilter_Click" x:Name="ClipFilterCodeBtn" Tag="Code" Style="{StaticResource IslandButton}" Height="18" Padding="7,0" Margin="0">
+                            <TextBlock Text="Code" FontSize="8" FontWeight="Medium" />
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
         </DockPanel>
+
+        <!-- ═════════════════════════════════════════════════════════════════ -->
+        <!-- ROW 2: HORIZONTAL CLIPBOARD DECK & EMPTY STATE                    -->
+        <!-- ═════════════════════════════════════════════════════════════════ -->
         <Grid Grid.Row="2">
-            <ScrollViewer PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel" MouseUp="ScrollViewer_MouseUp" x:Name="ClipboardScrollViewer" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly">
+            <ScrollViewer PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel"
+                          MouseUp="ScrollViewer_MouseUp"
+                          x:Name="ClipboardScrollViewer"
+                          HorizontalScrollBarVisibility="Hidden"
+                          VerticalScrollBarVisibility="Disabled"
+                          PanningMode="HorizontalOnly">
                 <ItemsControl x:Name="ClipboardItemsControl">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -114,77 +266,143 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Width="128" Height="82" CornerRadius="10"
-                                    BorderThickness="1" Margin="0,0,8,0"
-                                    Cursor="Hand" ToolTip="Click to copy · Shift+Click to copy as Plain Text"
+                            <Border x:Name="ClipCardBorder"
+                                    Width="136" Height="82"
+                                    CornerRadius="9"
+                                    BorderThickness="1"
+                                    Margin="0,0,7,0"
+                                    Cursor="Hand"
+                                    ToolTip="Click to copy · Shift+Click for Plain Text"
                                     MouseLeftButtonDown="ClipboardItem_Click">
                                 <Border.Style>
                                     <Style TargetType="Border">
-                                        <Setter Property="Background" Value="{StaticResource CardSurfaceBrush}" />
-                                        <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                                        <Setter Property="Background" Value="{DynamicResource CardSurfaceBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
                                         <Style.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#1A1A22" />
-                                                <Setter Property="BorderBrush" Value="#38FFFFFF" />
+                                                <Setter Property="Background" Value="{DynamicResource ChipBgBrush}" />
+                                                <Setter Property="BorderBrush" Value="#42FFFFFF" />
                                             </Trigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
-                                <Grid Margin="9,7">
+
+                                <Grid Margin="8,6">
                                     <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="18" />
                                         <RowDefinition Height="*" />
-                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="16" />
                                     </Grid.RowDefinitions>
-                                    <DockPanel Grid.Row="0">
-                                        <Border Width="10" Height="10" CornerRadius="5" Margin="0,0,5,0"
-                                                Visibility="{Binding SwatchColor, Converter={StaticResource NullToVisibilityConverter}}"
-                                                Background="{Binding SwatchColor, Converter={StaticResource ColorToBrushConverter}}" />
-                                        <TextBlock Text="{Binding TimeAgo}" Style="{StaticResource Digits}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center" />
-                                        <Button Tag="{Binding Id}" Click="RemoveClipboardItem_Click" DockPanel.Dock="Right"
-                                                Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Remove">
-                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8.5" Foreground="#86868B" />
-                                        </Button>
-                                        <Button Tag="{Binding Id}" Click="PinClipboardItem_Click" DockPanel.Dock="Right"
-                                                Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Pin / Unpin Snippet">
-                                            <TextBlock Style="{StaticResource Glyph}" Text="{Binding PinGlyph}" FontSize="9" Foreground="{Binding PinForeground}" />
-                                        </Button>
-                                        <Button Tag="{Binding Id}" Click="SendClipboardItemToShelf_Click" DockPanel.Dock="Right"
-                                                Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Save to Drop Shelf">
-                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="9" Foreground="#86868B" />
-                                        </Button>
-                                        <Button Tag="{Binding Id}" Click="EnqueueClipboardItem_Click" DockPanel.Dock="Right"
-                                                Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Add to Sequential Paste Queue">
-                                            <TextBlock Text="+Q" FontSize="8" FontWeight="Bold" Foreground="#0A84FF" />
-                                        </Button>
+
+                                    <!-- Card Top Bar: Swatch + Timestamp + Hover Action Strip -->
+                                    <DockPanel Grid.Row="0" LastChildFill="False">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <!-- Color Swatch Pill -->
+                                            <Border Width="9" Height="9" CornerRadius="4.5" Margin="0,0,4.5,0"
+                                                    BorderBrush="#40FFFFFF" BorderThickness="1"
+                                                    Visibility="{Binding SwatchColor, Converter={StaticResource NullToVisibilityConverter}}"
+                                                    Background="{Binding SwatchColor, Converter={StaticResource ColorToBrushConverter}}" />
+
+                                            <TextBlock Text="{Binding TimeAgo}"
+                                                       Style="{StaticResource Digits}"
+                                                       FontSize="8"
+                                                       FontWeight="Medium"
+                                                       Foreground="{DynamicResource SecondaryBrush}"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+
+                                        <!-- Micro-Action Strip: Quiet by default, crisp on card hover -->
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal">
+                                                <StackPanel.Style>
+                                                    <Style TargetType="StackPanel">
+                                                        <Setter Property="Opacity" Value="0.22" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsMouseOver, ElementName=ClipCardBorder}" Value="True">
+                                                                <Setter Property="Opacity" Value="1.0" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </StackPanel.Style>
+
+                                                <Button Tag="{Binding Id}" Click="EnqueueClipboardItem_Click" Style="{StaticResource CardMicroActionBtn}" ToolTip="Add to Sequential Paste Queue">
+                                                    <TextBlock Text="+Q" Style="{StaticResource Digits}" FontSize="7.5" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" />
+                                                </Button>
+
+                                                <Button Tag="{Binding Id}" Click="SendClipboardItemToShelf_Click" Style="{StaticResource CardMicroActionBtn}" ToolTip="Stage in Drop Shelf">
+                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
+                                                </Button>
+
+                                                <Button Tag="{Binding Id}" Click="RemoveClipboardItem_Click" Style="{StaticResource CardMicroActionBtn}" ToolTip="Delete Clip">
+                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                                                </Button>
+                                            </StackPanel>
+
+                                            <!-- Pin Button stays clearly visible if pinned -->
+                                            <Button Tag="{Binding Id}" Click="PinClipboardItem_Click" Style="{StaticResource CardMicroActionBtn}" ToolTip="Pin / Unpin Snippet">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="{Binding PinGlyph}" FontSize="8" Foreground="{Binding PinForeground}" />
+                                            </Button>
+                                        </StackPanel>
                                     </DockPanel>
-                                    <Grid Grid.Row="1" Margin="0,2,0,0">
-                                        <Border CornerRadius="5" ClipToBounds="True" MaxHeight="34"
+
+                                    <!-- Card Body: Mutually Exclusive Image Thumbnail OR Clean Text Snippet -->
+                                    <Grid Grid.Row="1" Margin="0,2,0,2">
+                                        <!-- Image Preview Container -->
+                                        <Border CornerRadius="4.5" ClipToBounds="True" Background="#0A000000" BorderBrush="#18FFFFFF" BorderThickness="1"
                                                 Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}}">
-                                            <Image Source="{Binding ImagePreview}" Stretch="UniformToFill" />
+                                            <Image Source="{Binding ImagePreview}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
                                         </Border>
-                                        <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="Medium"
-                                                   Foreground="#F5F5F7" TextWrapping="Wrap" MaxHeight="32" TextTrimming="CharacterEllipsis"
-                                                   VerticalAlignment="Center" />
+
+                                        <!-- Text / Code / Hex Snippet (Automatically hidden when card is an Image) -->
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontSize="10"
+                                                   FontWeight="Medium"
+                                                   LineHeight="13"
+                                                   LineStackingStrategy="BlockLineHeight"
+                                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                                   TextWrapping="Wrap"
+                                                   MaxHeight="28"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsImage}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                     </Grid>
+
+                                    <!-- Card Footer: Metadata Subtitle + Context Action Chip -->
                                     <DockPanel Grid.Row="2" VerticalAlignment="Bottom" LastChildFill="True">
                                         <Button DockPanel.Dock="Right" Tag="{Binding RawText}" Click="OpenUrlClipboardItem_Click"
                                                 Visibility="{Binding IsUrl, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                Style="{StaticResource IslandButton}" Height="16" Padding="5,0" Margin="4,0,0,0" ToolTip="Open Link in Browser">
-                                            <TextBlock Text="Open" FontSize="8" FontWeight="SemiBold" Foreground="#0A84FF" />
+                                                Style="{StaticResource CardBadgeActionBtn}" ToolTip="Open Link in Browser">
+                                            <TextBlock Text="Open" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
                                         </Button>
+
                                         <Button DockPanel.Dock="Right" Tag="{Binding RgbText}" Click="CopyColorAsRgb_Click"
                                                 Visibility="{Binding IsColor, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                Style="{StaticResource IslandButton}" Height="16" Padding="5,0" Margin="4,0,0,0" ToolTip="Copy as rgb(r, g, b)">
-                                            <TextBlock Text="RGB" FontSize="8" FontWeight="SemiBold" Foreground="#FF9F0A" />
+                                                Style="{StaticResource CardBadgeActionBtn}" ToolTip="Copy as rgb(r, g, b)">
+                                            <TextBlock Text="RGB" Style="{StaticResource Digits}" FontSize="7.5" FontWeight="SemiBold" Foreground="#FF9F0A" />
                                         </Button>
+
                                         <Button DockPanel.Dock="Right" Tag="{Binding Id}" Click="OcrCardItem_Click"
                                                 Visibility="{Binding IsImage, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                Style="{StaticResource IslandButton}" Height="16" Padding="5,0" Margin="4,0,0,0" ToolTip="Extract Text (OCR)">
-                                            <TextBlock Text="OCR" FontSize="8" FontWeight="SemiBold" Foreground="#AF52DE" />
+                                                Style="{StaticResource CardBadgeActionBtn}" ToolTip="Extract Text (OCR)">
+                                            <TextBlock Text="OCR" FontSize="7.5" FontWeight="SemiBold" Foreground="#C084FC" />
                                         </Button>
-                                        <TextBlock Text="{Binding Subtitle}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}"
-                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+
+                                        <TextBlock Text="{Binding Subtitle}"
+                                                   FontSize="8"
+                                                   Foreground="{DynamicResource SecondaryBrush}"
+                                                   Opacity="0.8"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" />
                                     </DockPanel>
                                 </Grid>
                             </Border>
@@ -192,28 +410,42 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
-            <Border x:Name="ClipboardEmptyPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center" BorderThickness="1" CornerRadius="16" Padding="20,12">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Border Width="36" Height="36" CornerRadius="18" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,5">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE77F;" FontSize="15" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <TextBlock Text="Clipboard is Empty" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
-                    <TextBlock Text="Copied text, links, code, colors, and screenshots appear here" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" Margin="0,2,0,8" HorizontalAlignment="Center" />
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button Click="EyedropperButton_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0,0,6,0" ToolTipService.ToolTip="Pick Screen Color (Eyedropper)">
+
+            <!-- Refined Minimalist Empty State Card -->
+            <Border x:Name="ClipboardEmptyPlaceholder"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    Background="{DynamicResource CardSurfaceBrush}"
+                    BorderBrush="{DynamicResource CardBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="9"
+                    Padding="16,8">
+                <DockPanel LastChildFill="False" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="32" Height="32" CornerRadius="8" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Margin="0,0,10,0" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE77F;" FontSize="13" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Clipboard History is Empty" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Copied text, code, links, hex colors, and snips appear here automatically" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,1,0,0" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Click="EyedropperButton_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0,0,4,0" ToolTipService.ToolTip="Sample Screen Pixel Color">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xEF3C;" FontSize="9" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Pick Color" FontSize="9.5" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xEF3C;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Sample Color" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
                         <Button Click="OcrClipboardButton_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" ToolTipService.ToolTip="Extract Text from Clipboard Image">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="9" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                <TextBlock Text="OCR Image" FontSize="9.5" FontWeight="Medium" VerticalAlignment="Center" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8E2;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                <TextBlock Text="OCR Image" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
                     </StackPanel>
-                </StackPanel>
+                </DockPanel>
             </Border>
         </Grid>
     </Grid>

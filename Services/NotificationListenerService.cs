@@ -26,6 +26,7 @@ public sealed class NotificationHistoryItem
     public Brush AccentBrush { get; init; } = ThemeBrushes.Blue;
     public Brush IconBgBrush { get; init; } = ThemeBrushes.DockActiveBg;
     public DateTime ReceivedAt { get; init; } = DateTime.Now;
+    public bool IsMessagingApp { get; init; }
     public string TimeText
     {
         get
@@ -264,8 +265,9 @@ internal sealed class NotificationListenerService : IDisposable
 
             string glyph = GlyphForAppName(appName);
             Color accent = AccentForAppName(appName);
+            bool isMessaging = IsMessagingApp(appName);
 
-            RecordNotification(appName, title, body, glyph, accent, aumid, notif.Id);
+            var item = RecordNotification(appName, title, body, glyph, accent, aumid, notif.Id);
 
             App.Log($"[NotificationListener] Showing notification from '{appName}' (AUMID: '{aumid}').");
             NotificationReceived?.Invoke(new ToastContent(
@@ -273,9 +275,12 @@ internal sealed class NotificationListenerService : IDisposable
                 string.IsNullOrWhiteSpace(title) ? appName : $"{appName} · {title}",
                 body,
                 accent,
-                TimeSpan.FromSeconds(4),
+                TimeSpan.FromSeconds(isMessaging ? 5.5 : 4),
                 TargetView: "notifications",
-                Priority: ToastPriority.Notification));
+                Priority: ToastPriority.Notification,
+                Category: "notification",
+                CanReply: isMessaging,
+                HistoryItem: item));
 
             // Show it in the island *instead of* the Windows banner: removing the notification
             // dismisses the native toast popup (it is also removed from Action Center).
@@ -302,6 +307,7 @@ internal sealed class NotificationListenerService : IDisposable
     {
         string glyph = glyphOverride ?? GlyphForAppName(appName);
         Color accent = accentOverride ?? AccentForAppName(appName);
+        bool isMessaging = IsMessagingApp(appName);
         var item = new NotificationHistoryItem
         {
             AppName = string.IsNullOrWhiteSpace(appName) ? "Notification" : appName.Trim(),
@@ -313,7 +319,8 @@ internal sealed class NotificationListenerService : IDisposable
             Accent = accent,
             AccentBrush = ThemeBrushes.CreateFrozen(accent),
             IconBgBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0x28, accent.R, accent.G, accent.B)),
-            ReceivedAt = DateTime.Now
+            ReceivedAt = DateTime.Now,
+            IsMessagingApp = isMessaging
         };
 
         lock (_history)
@@ -657,6 +664,30 @@ internal sealed class NotificationListenerService : IDisposable
         if (n.Contains("zoom")) return Color.FromRgb(0x0B, 0x5C, 0xFF);
         if (n.Contains("mail") || n.Contains("outlook")) return Color.FromRgb(0x00, 0x78, 0xD4);
         return Color.FromRgb(0x0A, 0x84, 0xFF);
+    }
+
+    /// <summary>
+    /// Identifies whether the application is an instant messaging or communication app
+    /// that supports interactive Quick Reply in Dynamic Island.
+    /// </summary>
+    public static bool IsMessagingApp(string? appName)
+    {
+        if (string.IsNullOrWhiteSpace(appName)) return false;
+        string n = appName.ToLowerInvariant();
+        return n.Contains("whatsapp") ||
+               n.Contains("telegram") ||
+               n.Contains("discord") ||
+               n.Contains("slack") ||
+               n.Contains("teams") ||
+               n.Contains("signal") ||
+               n.Contains("skype") ||
+               n.Contains("phone link") ||
+               n.Contains("your phone") ||
+               n.Contains("messages") ||
+               n.Contains("messenger") ||
+               n.Contains("wechat") ||
+               n.Contains("viber") ||
+               n.Contains("chat");
     }
 
     public void Dispose()

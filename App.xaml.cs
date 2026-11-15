@@ -18,6 +18,7 @@ public partial class App : Application
 {
     public static InstallerStartupMode StartupMode { get; set; } = InstallerStartupMode.Normal;
     public static bool IsDiagnosticMode { get; set; } = false;
+    public static bool IsPostUpdateLaunch { get; set; } = false;
 
     private static readonly string LogFile = AppPaths.LogFile;
     private const long MaxLogSizeBytes = 512 * 1024; // Cap log file at 512 KB
@@ -59,8 +60,12 @@ public partial class App : Application
         catch { }
     }
 
+    private static bool _gpuPreferenceChecked;
+
     internal static void EnsurePowerSavingGpuPreference()
     {
+        if (_gpuPreferenceChecked) return;
+        _gpuPreferenceChecked = true;
         try
         {
             string? exePath = Environment.ProcessPath;

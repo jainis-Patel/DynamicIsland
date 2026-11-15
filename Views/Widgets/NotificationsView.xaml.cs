@@ -22,6 +22,9 @@ public partial class NotificationsView : UserControl
     private void NotificationCard_Click(object sender, MouseButtonEventArgs e) =>
         Island?.NotificationCard_Click(sender, e);
 
+    private void ReplyNotificationItem_Click(object sender, RoutedEventArgs e) =>
+        Island?.ReplyNotificationItem_Click(sender, e);
+
     private void RemoveNotificationItem_Click(object sender, RoutedEventArgs e) =>
         Island?.RemoveNotificationItem_Click(sender, e);
 

@@ -25,7 +25,8 @@ public enum ExpandedView
     PhoneBridge,
     MechSounds,
     CaptureStudio,
-    Calendar
+    Calendar,
+    QuickReply
 }
 
 public static class ExpandedViewExtensions
@@ -51,6 +52,7 @@ public static class ExpandedViewExtensions
         ExpandedView.PhoneBridge => "phonebridge",
         ExpandedView.MechSounds => "mechsounds",
         ExpandedView.CaptureStudio => "capturestudio",
+        ExpandedView.QuickReply => "quickreply",
         _ => "media"
     };
 
@@ -147,6 +149,10 @@ public static class ExpandedViewExtensions
             case "ocr":
             case "screenshot":
                 view = ExpandedView.CaptureStudio;
+                return true;
+            case "quickreply":
+            case "reply":
+                view = ExpandedView.QuickReply;
                 return true;
             default:
                 view = ExpandedView.Media;

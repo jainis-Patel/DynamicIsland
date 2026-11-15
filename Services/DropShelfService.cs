@@ -179,7 +179,9 @@ internal sealed class DropShelfService
         _ = Task.Run(() => AtomicJsonStore.Save(ShelfFile, paths, SaveLock));
     }
 
-    private static bool TryCreateItem(string path, bool isPinned, out ShelfItem? item)
+    internal static bool TryCreateItem(string path, out ShelfItem? item) => TryCreateItem(path, false, out item);
+
+    internal static bool TryCreateItem(string path, bool isPinned, out ShelfItem? item)
     {
         item = null;
         try

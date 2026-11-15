@@ -35,6 +35,41 @@ public sealed record GlassSettings
 
     public static Builder Create() => new Builder();
 
+    /// <summary>
+    /// P2a perf: Zero-allocation linear interpolation between two preset GlassSettings.
+    /// Avoids Builder allocations during per-frame morph transitions.
+    /// </summary>
+    public static GlassSettings Lerp(GlassSettings a, GlassSettings b, float t)
+    {
+        t = Math.Clamp(t, 0f, 1f);
+        static float L(float x, float y, float f) => x + (y - x) * f;
+        static byte LB(byte x, byte y, float f) => (byte)(x + (y - x) * f);
+
+        return new GlassSettings
+        {
+            Thickness = L(a.Thickness, b.Thickness, t),
+            BevelWidth = L(a.BevelWidth, b.BevelWidth, t),
+            IndexOfRefraction = L(a.IndexOfRefraction, b.IndexOfRefraction, t),
+            BlurRadius = L(a.BlurRadius, b.BlurRadius, t),
+            Saturation = L(a.Saturation, b.Saturation, t),
+            Brightness = L(a.Brightness, b.Brightness, t),
+            TintColor = Color.FromArgb(
+                LB(a.TintColor.A, b.TintColor.A, t),
+                LB(a.TintColor.R, b.TintColor.R, t),
+                LB(a.TintColor.G, b.TintColor.G, t),
+                LB(a.TintColor.B, b.TintColor.B, t)),
+            SpecularStrength = L(a.SpecularStrength, b.SpecularStrength, t),
+            RimPower = L(a.RimPower, b.RimPower, t),
+            LightDirection = a.LightDirection, // Direction doesn't morph
+            Dispersion = L(a.Dispersion, b.Dispersion, t),
+            EdgeFeather = L(a.EdgeFeather, b.EdgeFeather, t),
+            CornerRadius = L(a.CornerRadius, b.CornerRadius, t),
+            CornerSmoothing = L(a.CornerSmoothing, b.CornerSmoothing, t),
+            Shape = t > 0.20f ? b.Shape : a.Shape,
+            MergeSmoothness = L(a.MergeSmoothness, b.MergeSmoothness, t),
+        };
+    }
+
     public sealed class Builder
     {
         private GlassSettings _settings;

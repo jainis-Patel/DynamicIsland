@@ -52,6 +52,15 @@ public partial class SettingsView : UserControl
     private void DockButton_Click(object sender, RoutedEventArgs e) =>
         Island?.DockButton_Click(sender, e);
 
+    private void ExpandTriggerBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.ExpandTriggerBtn_Click(sender, e);
+
+    private void GhostModifierBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.GhostModifierBtn_Click(sender, e);
+
+    private void QuickTuckToggleBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.QuickTuckToggleBtn_Click(sender, e);
+
     private void DockPinToggleBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.DockPinToggleBtn_Click(sender, e);
 
@@ -220,4 +229,45 @@ public partial class SettingsView : UserControl
     private void VolumeOsdBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.VolumeOsdBtn_Click(sender, e);
 
+    private void NatureDensitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
+        Island?.NatureDensitySlider_ValueChanged(sender, e);
+
+    private void NatureBloomSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
+        Island?.NatureBloomSlider_ValueChanged(sender, e);
+
+    private void NatureScaleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
+        Island?.NatureScaleSlider_ValueChanged(sender, e);
+
+    private void NatureDropSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
+        Island?.NatureDropSlider_ValueChanged(sender, e);
+
+    private void NatureButterflyBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.NatureButterflyBtn_Click(sender, e);
+
+    private void NaturePollenSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
+        Island?.NaturePollenSlider_ValueChanged(sender, e);
+
+    private void NaturePollenToggleBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.NaturePollenToggleBtn_Click(sender, e);
+
+    private void NaturePresetBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.NaturePresetBtn_Click(sender, e);
+
+    private void GoToThemesTabBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.GoToThemesTabBtn_Click(sender, e);
+
+    private void CheckUpdatesBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.CheckUpdatesBtn_Click(sender, e);
+
+    private void UpdateChannelBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.UpdateChannelBtn_Click(sender, e);
+
+    private void InstallUpdateBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.InstallUpdateBtn_Click(sender, e);
+
+    private void AutoCheckToggleBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.AutoCheckToggleBtn_Click(sender, e);
+
+    private void ToggleVersionHistoryBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.ToggleVersionHistoryBtn_Click(sender, e);
 }

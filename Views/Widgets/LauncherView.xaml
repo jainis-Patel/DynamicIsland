@@ -111,7 +111,7 @@
 
         <!-- Unified Fluent App Tile Template (Native Floating Icons, Soft Hover Highlight) -->
         <DataTemplate x:Key="UnifiedAppTileTemplate">
-            <Border Width="142" Height="60" CornerRadius="10"
+            <Border Width="142" Height="62" CornerRadius="11"
                     BorderThickness="1" Margin="0,0,5,5" Padding="4,2"
                     Cursor="Hand"
                     ToolTipService.InitialShowDelay="350" ToolTipService.BetweenShowDelay="100"
@@ -123,12 +123,12 @@
                 </Border.ToolTip>
                 <Border.Style>
                     <Style TargetType="Border">
-                        <Setter Property="Background" Value="Transparent" />
-                        <Setter Property="BorderBrush" Value="Transparent" />
+                        <Setter Property="Background" Value="#0DFFFFFF" />
+                        <Setter Property="BorderBrush" Value="#1AFFFFFF" />
                         <Style.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#1CFFFFFF" />
-                                <Setter Property="BorderBrush" Value="#25FFFFFF" />
+                                <Setter Property="Background" Value="#24FFFFFF" />
+                                <Setter Property="BorderBrush" Value="#40FFFFFF" />
                             </Trigger>
                         </Style.Triggers>
                     </Style>
@@ -217,11 +217,11 @@
                         <TextBlock Style="{StaticResource Glyph}" Text="&#xE721;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}"
                                    VerticalAlignment="Center" Margin="0,0,4,0" />
                         <Grid Grid.Column="1" VerticalAlignment="Center">
-                            <TextBox x:Name="SearchInputBox" Width="64" Background="Transparent" BorderThickness="0"
+                            <TextBox x:Name="SearchInputBox" Width="96" Background="Transparent" BorderThickness="0"
                                      Foreground="{DynamicResource PrimaryTextBrush}" FontSize="8.5"
                                      VerticalAlignment="Center" CaretBrush="{DynamicResource AccentBrush}"
                                      TextChanged="SearchInputBox_TextChanged" />
-                            <TextBlock x:Name="SearchPlaceholder" Text="Search..." FontSize="8.5"
+                            <TextBlock x:Name="SearchPlaceholder" Text="Search apps &amp; widgets..." FontSize="8"
                                        Foreground="{DynamicResource SecondaryBrush}" Opacity="0.55"
                                        VerticalAlignment="Center" IsHitTestVisible="False" Margin="1,0,0,0" />
                         </Grid>

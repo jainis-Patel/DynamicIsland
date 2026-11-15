@@ -1,0 +1,148 @@
+name: Release & Publish Update
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, Verify & Publish Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Extract Tag & Version
+        id: version_step
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $cleanVersion = $tag.TrimStart('v','V')
+          $isBeta = $tag.Contains("-beta") -or $tag.Contains("-rc") -or $tag.Contains("-alpha")
+          $channel = if ($isBeta) { "beta" } else { "stable" }
+          
+          Write-Host "Tag: $tag, Version: $cleanVersion, Channel: $channel"
+          echo "TAG=$tag" >> $env:GITHUB_ENV
+          echo "VERSION=$cleanVersion" >> $env:GITHUB_ENV
+          echo "CHANNEL=$channel" >> $env:GITHUB_ENV
+          echo "IS_PRERELEASE=$isBeta" >> $env:GITHUB_ENV
+
+      - name: Install Inno Setup 6
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress --yes
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build Release
+        run: dotnet build -c Release --no-restore -p:Version=${{ env.VERSION }}
+
+      - name: Run Deterministic Self-Test Suite (56+ Checks)
+        run: dotnet run -c Release --no-build -- --self-test
+
+      - name: Publish Single-File Native Binary (win-x64)
+        run: |
+          dotnet publish DynamicIsland.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:Version=${{ env.VERSION }} -o publish/
+
+      - name: Compile Inno Setup Installer
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            $iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue)?.Source
+          }
+          Write-Host "Using Inno Setup compiler: $iscc"
+          & $iscc /DMyAppVersion="${{ env.VERSION }}" installer/DynamicIsland.iss
+          
+          # Rename generated installer for standardized distribution naming
+          $innoOut = "publish\installer\DynamicIsland-Setup-Inno.exe"
+          $stdOut = "publish\installer\DynamicIsland-Setup.exe"
+          if (Test-Path $innoOut) {
+            Move-Item -Path $innoOut -Destination $stdOut -Force
+          }
+
+      - name: Package Portable Distribution ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path publish/DynamicIsland.exe, installer/app.ico, AllowPhoneBridgeFirewall.bat -DestinationPath publish/DynamicIsland-Portable.zip -Force
+
+      - name: Compute Cryptographic Hashes & Generate release-manifest.json
+        id: manifest_step
+        shell: pwsh
+        run: |
+          $setupExe = "publish\installer\DynamicIsland-Setup.exe"
+          $portableZip = "publish\DynamicIsland-Portable.zip"
+          $singleExe = "publish\DynamicIsland.exe"
+
+          $setupHash = (Get-FileHash -Path $setupExe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $setupSize = (Get-Item $setupExe).Length
+
+          $portableHash = (Get-FileHash -Path $portableZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $portableSize = (Get-Item $portableZip).Length
+
+          $singleHash = (Get-FileHash -Path $singleExe -Algorithm SHA256).Hash.ToLowerInvariant()
+
+          # Output checksums.sha256 file
+          $checksumsContent = @"
+$setupHash  DynamicIsland-Setup.exe
+$portableHash  DynamicIsland-Portable.zip
+$singleHash  DynamicIsland.exe
+"@
+          Set-Content -Path "publish/checksums.sha256" -Value $checksumsContent -Encoding utf8
+
+          # Build Canonical release-manifest.json
+          $manifest = [ordered]@{
+            version = "${{ env.VERSION }}"
+            releaseTag = "${{ env.TAG }}"
+            channel = "${{ env.CHANNEL }}"
+            releaseDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            minWindowsBuild = "10.0.19041.0"
+            changelogUrl = "https://github.com/${{ github.repository }}/releases/tag/${{ env.TAG }}"
+            summary = "Dynamic Island ${{ env.TAG }} release for Windows 10/11."
+            isCritical = $false
+            downloads = [ordered]@{
+              installer = [ordered]@{
+                url = "https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/DynamicIsland-Setup.exe"
+                sha256 = $setupHash
+                sizeBytes = $setupSize
+              }
+              portable = [ordered]@{
+                url = "https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/DynamicIsland-Portable.zip"
+                sha256 = $portableHash
+                sizeBytes = $portableSize
+              }
+            }
+          }
+
+          $manifestJson = $manifest | ConvertTo-Json -Depth 5
+          Set-Content -Path "publish/release-manifest.json" -Value $manifestJson -Encoding utf8
+          Set-Content -Path "release-manifest.json" -Value $manifestJson -Encoding utf8
+          Write-Host "Generated release-manifest.json:"
+          Write-Host $manifestJson
+
+      - name: Publish GitHub Release with Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            publish/installer/DynamicIsland-Setup.exe
+            publish/DynamicIsland-Portable.zip
+            publish/DynamicIsland.exe
+            publish/release-manifest.json
+            publish/checksums.sha256
+          prerelease: ${{ env.IS_PRERELEASE == 'True' }}
+          generate_release_notes: true
+          tag_name: ${{ env.TAG }}
+          name: Dynamic Island ${{ env.TAG }}

@@ -1,12 +1,17 @@
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using DynamicIsland.Core;
 using DynamicIsland.Services;
@@ -29,8 +34,8 @@ public partial class BasketWindow : Window
         InitializeComponent();
         BasketItemsList.ItemsSource = _items;
 
-        // Auto-hide empty basket after 9 seconds if user doesn't drop anything
-        _autoCloseTimer = new DispatcherTimer(TimeSpan.FromSeconds(9), DispatcherPriority.Background, (sender, _) =>
+        // Auto-hide empty basket after 12 seconds if user doesn't drop anything
+        _autoCloseTimer = new DispatcherTimer(TimeSpan.FromSeconds(12), DispatcherPriority.Background, (sender, _) =>
         {
             if (_items.Count == 0)
             {
@@ -49,6 +54,7 @@ public partial class BasketWindow : Window
             {
                 DynamicIsland.LiquidGlass.GlassHost.Attach(OuterCard, DynamicIsland.LiquidGlass.GlassPresets.Regular);
             }
+            PlayEntranceAnimation();
         };
 
         LocationChanged += (_, _) =>
@@ -76,6 +82,18 @@ public partial class BasketWindow : Window
                 e.Handled = true;
             }
         };
+    }
+
+    private void PlayEntranceAnimation()
+    {
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var animX = new DoubleAnimation(0.92, 1.0, new Duration(TimeSpan.FromMilliseconds(160))) { EasingFunction = ease };
+        var animY = new DoubleAnimation(0.92, 1.0, new Duration(TimeSpan.FromMilliseconds(160))) { EasingFunction = ease };
+        var animFade = new DoubleAnimation(0.0, 1.0, new Duration(TimeSpan.FromMilliseconds(120)));
+
+        BasketScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, animX);
+        BasketScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, animY);
+        OuterCard.BeginAnimation(UIElement.OpacityProperty, animFade);
     }
 
     protected override void OnClosed(EventArgs e)
@@ -162,14 +180,18 @@ public partial class BasketWindow : Window
         e.Handled = true;
     }
 
+    // P2c perf: Frozen brush for drag border (avoids unfrozen SolidColorBrush on every drag event)
+    private static readonly SolidColorBrush DragIdleBorderBrush = Core.ThemeBrushes.CreateFrozen(
+        Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF));
+
     private void Window_DragLeave(object sender, DragEventArgs e)
     {
-        OuterCard.BorderBrush = new SolidColorBrush(Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF));
+        OuterCard.BorderBrush = DragIdleBorderBrush;
     }
 
     private void Window_Drop(object sender, DragEventArgs e)
     {
-        OuterCard.BorderBrush = new SolidColorBrush(Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF));
+        OuterCard.BorderBrush = DragIdleBorderBrush;
         _autoCloseTimer.Stop();
 
         if (e.Data.GetDataPresent(DataFormats.FileDrop) &&
@@ -194,30 +216,9 @@ public partial class BasketWindow : Window
             if (_items.Any(i => string.Equals(i.FullPath, path, StringComparison.OrdinalIgnoreCase)))
                 continue;
 
-            if (File.Exists(path))
+            if (DropShelfService.TryCreateItem(path, out var shelfItem) && shelfItem != null)
             {
-                var fi = new FileInfo(path);
-                string ext = fi.Extension.ToLowerInvariant();
-                _items.Insert(0, new ShelfItem(
-                    path,
-                    fi.Name,
-                    DropShelfService.FormatFileSize(fi.Length),
-                    "\uE7C3",
-                    DropShelfService.IsImageExtension(ext),
-                    DropShelfService.TagForExtension(ext),
-                    DropShelfService.BrushForExtension(ext)));
-            }
-            else if (Directory.Exists(path))
-            {
-                var di = new DirectoryInfo(path);
-                _items.Insert(0, new ShelfItem(
-                    path,
-                    di.Name,
-                    "Folder",
-                    "\uE8B7",
-                    false,
-                    "DIR",
-                    ThemeBrushes.Blue));
+                _items.Insert(0, shelfItem);
             }
         }
         RefreshUI();
@@ -248,7 +249,16 @@ public partial class BasketWindow : Window
     {
         if (_items.Count > 0)
         {
+            int count = _items.Count;
             _shelfService.AddPaths(_items.Select(i => i.FullPath).ToList());
+            IslandWindow.Instance?.PushToast(new ToastContent(
+                "\uE8B7",
+                "Drop Shelf",
+                $"{count} item{(count == 1 ? "" : "s")} moved to Shelf",
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(2.5),
+                TargetView: "shelf",
+                Priority: ToastPriority.System));
             Close();
         }
     }
@@ -257,6 +267,23 @@ public partial class BasketWindow : Window
 
     private void Item_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (e.ClickCount == 2)
+        {
+            if (sender is FrameworkElement { DataContext: ShelfItem item } && (File.Exists(item.FullPath) || Directory.Exists(item.FullPath)))
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(item.FullPath) { UseShellExecute = true });
+                }
+                catch (Exception ex)
+                {
+                    App.Log($"[BasketWindow] Open failed for '{item.FullPath}': {ex.Message}");
+                }
+            }
+            e.Handled = true;
+            return;
+        }
+
         _dragStart = e.GetPosition(this);
         e.Handled = true;
     }
@@ -272,6 +299,49 @@ public partial class BasketWindow : Window
                 DragDrop.DoDragDrop(el, data, DragDropEffects.Copy);
             }
         }
+    }
+
+    private void CopyItemBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string path } && File.Exists(path))
+        {
+            DropShelfService.CopyFileToClipboard(path);
+            IslandWindow.Instance?.PushToast(new ToastContent(
+                "\uE8C8",
+                "File Copied",
+                $"{Path.GetFileName(path)} \u00B7 Ready to paste (Ctrl+V)",
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(2.0),
+                TargetView: "shelf",
+                Priority: ToastPriority.Feedback,
+                Category: "basketcopy"));
+        }
+    }
+
+    private void CopyAllBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var files = _items.Select(i => i.FullPath).Where(f => File.Exists(f) || Directory.Exists(f)).ToArray();
+        if (files.Length == 0) return;
+
+        var data = new DataObject(DataFormats.FileDrop, files);
+        Clipboard.SetDataObject(data, true);
+
+        IslandWindow.Instance?.PushToast(new ToastContent(
+            "\uE8C8",
+            "All Files Copied",
+            $"{files.Length} file{(files.Length == 1 ? "" : "s")} placed on clipboard (Ctrl+V)",
+            ThemeBrushes.GreenColor,
+            TimeSpan.FromSeconds(2.5),
+            TargetView: "shelf",
+            Priority: ToastPriority.Feedback,
+            Category: "basketcopy"));
+    }
+
+    private void ClearAllBtn_Click(object sender, RoutedEventArgs e)
+    {
+        _items.Clear();
+        RefreshUI();
+        Close();
     }
 
     private void DragAll_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -313,6 +383,15 @@ public partial class BasketWindow : Window
             _items.Clear();
             AddFilesToBasket(new[] { zipPath });
             _shelfService.AddPaths(new[] { zipPath });
+            IslandWindow.Instance?.PushToast(new ToastContent(
+                "\uF012",
+                "ZIP Archive Created",
+                $"{Path.GetFileName(zipPath)} placed in Basket",
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(2.8),
+                TargetView: "shelf",
+                Priority: ToastPriority.Feedback,
+                Category: "basketzip"));
         }
         catch (Exception ex)
         {
@@ -353,5 +432,4 @@ public partial class BasketWindow : Window
         menu.PlacementTarget = ConvertMenuBtn;
         menu.IsOpen = true;
     }
-
 }

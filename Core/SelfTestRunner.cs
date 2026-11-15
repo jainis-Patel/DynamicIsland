@@ -97,6 +97,8 @@ internal static class SelfTestRunner
         Run("LiquidGlass: Settings validation, fluent builder, parameter clamping & preset invariants", TestLiquidGlassSettingsValidation);
         Run("LiquidGlass: Analytical SDF math, smin smooth-union, 3D normal reconstruction & Snell's law", TestLiquidGlassSdfMath);
         Run("LiquidGlass: GPU headless golden-image refraction rendering & multi-body liquid bridge", TestLiquidGlassGoldenImage);
+        Run("UpdateManager: SemVersion 2.0.0 parsing, sorting & pre-release precedence", TestSemVersionComparison);
+        Run("UpdateManager: Manifest JSON serialization, channel resolution & hash verification", TestUpdateManifestAndIntegrity);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -510,12 +512,38 @@ internal static class SelfTestRunner
         Assert(AppPaths.SettingsFile.EndsWith("settings.json", StringComparison.OrdinalIgnoreCase), "Invalid SettingsFile path");
 
         // Verify IslandStyles.xaml parses cleanly without any runtime XAML errors
-        _ = Application.Current ?? new Application();
+        var app = Application.Current ?? new Application();
         var dict = new ResourceDictionary
         {
             Source = new Uri("pack://application:,,,/DynamicIsland;component/Resources/IslandStyles.xaml", UriKind.Absolute)
         };
+        if (!app.Resources.MergedDictionaries.Any(d => d.Source == dict.Source))
+        {
+            app.Resources.MergedDictionaries.Add(dict);
+        }
         Assert(dict.Count > 0, "IslandStyles.xaml resource dictionary must load with entries");
+
+        // Verify SettingsView.xaml and IslandWindow load cleanly without runtime exceptions
+        try
+        {
+            var settingsView = new DynamicIsland.Views.Widgets.SettingsView();
+            Assert(settingsView.SettingsThemesTab != null, "SettingsThemesTab must not be null");
+            Assert(settingsView.NatureDensitySlider != null, "NatureDensitySlider must not be null");
+            Assert(settingsView.NatureScaleSlider != null, "NatureScaleSlider must not be null");
+            Assert(settingsView.NatureDropSlider != null, "NatureDropSlider must not be null");
+            Assert(settingsView.NatureBloomSlider != null, "NatureBloomSlider must not be null");
+            Assert(settingsView.NatureButterfly0Btn != null, "NatureButterfly0Btn must not be null");
+            Assert(settingsView.NaturePollenSlider != null, "NaturePollenSlider must not be null");
+
+            var island = new IslandWindow();
+            Assert(island.IslandThemeUnderlay != null, "IslandThemeUnderlay must not be null");
+            Assert(island.IslandThemeOverlay != null, "IslandThemeOverlay must not be null");
+        }
+        catch (Exception ex)
+        {
+            var baseEx = ex.GetBaseException();
+            Assert(false, $"Initialization crash: {ex.Message} -> Base: {baseEx.Message}\n{ex.StackTrace}");
+        }
     }
 
     private static void TestThemeBrushesFrozen()
@@ -688,6 +716,12 @@ internal static class SelfTestRunner
 
             listener.ClearHistory();
             Assert(listener.HistoryCount == 0, "Expected empty history after ClearHistory");
+
+            Assert(NotificationListenerService.IsMessagingApp("WhatsApp"), "WhatsApp must be recognized as messaging app");
+            Assert(NotificationListenerService.IsMessagingApp("Telegram"), "Telegram must be recognized as messaging app");
+            Assert(NotificationListenerService.IsMessagingApp("Discord"), "Discord must be recognized as messaging app");
+            Assert(NotificationListenerService.IsMessagingApp("Microsoft Teams"), "Teams must be recognized as messaging app");
+            Assert(!NotificationListenerService.IsMessagingApp("Windows Update"), "Windows Update must not be recognized as messaging app");
         }
         finally
         {
@@ -1039,12 +1073,10 @@ SSID 3 : Home_Router
 
     private static void TestIslandNatureThemes()
     {
-        // 1. Verify available nature themes exist
-        Assert(SettingsService.AvailableIslandThemes.Count >= 5, "Must define at least 5 island themes");
+        // 1. Verify available nature themes exist (None, Ivy & Blooms, Meadow)
+        Assert(SettingsService.AvailableIslandThemes.Count == 3, "AvailableIslandThemes should contain 3 themes");
         Assert(SettingsService.AvailableIslandThemes.Contains("None"), "Must include None");
         Assert(SettingsService.AvailableIslandThemes.Contains("Ivy & Blooms"), "Must include Ivy & Blooms");
-        Assert(SettingsService.AvailableIslandThemes.Contains("Sakura Branch"), "Must include Sakura Branch");
-        Assert(SettingsService.AvailableIslandThemes.Contains("Blossom Tree"), "Must include Blossom Tree");
         Assert(SettingsService.AvailableIslandThemes.Contains("Meadow"), "Must include Meadow");
 
         // 2. Normalization & alias resolution
@@ -1053,8 +1085,8 @@ SSID 3 : Home_Router
         Assert(SettingsService.NormalizeIslandTheme("Ivy and Blooms") == "Ivy & Blooms", "Must resolve 'Ivy and Blooms'");
         Assert(SettingsService.NormalizeIslandTheme("bloom") == "Ivy & Blooms", "Must resolve 'bloom'");
         Assert(SettingsService.NormalizeIslandTheme("blooms") == "Ivy & Blooms", "Must resolve 'blooms'");
-        Assert(SettingsService.NormalizeIslandTheme("sakura") == "Sakura Branch", "Must resolve 'sakura'");
-        Assert(SettingsService.NormalizeIslandTheme("tree") == "Blossom Tree", "Must resolve 'tree'");
+        Assert(SettingsService.NormalizeIslandTheme("sakura") == "Ivy & Blooms", "Must map legacy 'sakura' to Ivy & Blooms");
+        Assert(SettingsService.NormalizeIslandTheme("tree") == "Ivy & Blooms", "Must map legacy 'tree' to Ivy & Blooms");
         Assert(SettingsService.NormalizeIslandTheme("meadow") == "Meadow", "Must resolve 'meadow'");
         Assert(SettingsService.NormalizeIslandTheme("clean") == "None", "Must resolve 'clean' to None");
         Assert(SettingsService.NormalizeIslandTheme("none") == "None", "Must resolve 'none'");
@@ -1067,12 +1099,36 @@ SSID 3 : Home_Router
         {
             var settings = new SettingsService(tempPath);
             Assert(settings.Current.IslandTheme == "Ivy & Blooms", "Default island theme must be Ivy & Blooms");
+            Assert(settings.Current.NatureDensity == 0.70, "Default NatureDensity must be 0.70");
+            Assert(settings.Current.NatureScale == 0.85, "Default NatureScale must be 0.85");
+            Assert(settings.Current.NatureDropLength == 60.0, "Default NatureDropLength must be 60.0");
+            Assert(settings.Current.NatureButterflyCount == 2, "Default NatureButterflyCount must be 2");
+            Assert(settings.Current.NatureBloomDensity == 0.75, "Default NatureBloomDensity must be 0.75");
+            Assert(settings.Current.NaturePollenEnabled == true, "Default NaturePollenEnabled must be true");
+            Assert(settings.Current.NaturePollenCount == 14, "Default NaturePollenCount must be 14");
 
-            settings.Update(s => s.IslandTheme = "Sakura Branch", nameof(AppSettings.IslandTheme));
+            settings.Update(s =>
+            {
+                s.IslandTheme = "Meadow";
+                s.NatureDensity = 1.15;
+                s.NatureScale = 1.05;
+                s.NatureDropLength = 85.0;
+                s.NatureButterflyCount = 3;
+                s.NatureBloomDensity = 0.90;
+                s.NaturePollenEnabled = false;
+                s.NaturePollenCount = 8;
+            }, nameof(AppSettings.IslandTheme));
             settings.SaveNow();
 
             var reloaded = new SettingsService(tempPath);
-            Assert(reloaded.Current.IslandTheme == "Sakura Branch", "Must persist Sakura Branch across reload");
+            Assert(reloaded.Current.IslandTheme == "Meadow", "Must persist Meadow across reload");
+            Assert(Math.Abs(reloaded.Current.NatureDensity - 1.15) < 1e-4, "Must persist NatureDensity across reload");
+            Assert(Math.Abs(reloaded.Current.NatureScale - 1.05) < 1e-4, "Must persist NatureScale across reload");
+            Assert(Math.Abs(reloaded.Current.NatureDropLength - 85.0) < 1e-4, "Must persist NatureDropLength across reload");
+            Assert(reloaded.Current.NatureButterflyCount == 3, "Must persist NatureButterflyCount across reload");
+            Assert(Math.Abs(reloaded.Current.NatureBloomDensity - 0.90) < 1e-4, "Must persist NatureBloomDensity across reload");
+            Assert(reloaded.Current.NaturePollenEnabled == false, "Must persist NaturePollenEnabled across reload");
+            Assert(reloaded.Current.NaturePollenCount == 8, "Must persist NaturePollenCount across reload");
         }
         finally
         {
@@ -2319,7 +2375,8 @@ SSID 3 : Home_Router
                                                    or ExpandedView.Calendar
                                                    or ExpandedView.Launcher
                                                    or ExpandedView.Termi
-                                                   or ExpandedView.Converter;
+                                                   or ExpandedView.Converter
+                                                   or ExpandedView.QuickReply;
 
         Assert(IsInputFocusable(ExpandedView.Launcher), "Launcher must accept keyboard focus");
         Assert(IsInputFocusable(ExpandedView.Termi), "Termi-Notch must accept keyboard focus");
@@ -2328,6 +2385,7 @@ SSID 3 : Home_Router
         Assert(IsInputFocusable(ExpandedView.Calc), "Calc must accept keyboard focus");
         Assert(IsInputFocusable(ExpandedView.Clipboard), "Clipboard must accept keyboard focus");
         Assert(IsInputFocusable(ExpandedView.Calendar), "Calendar must accept keyboard focus");
+        Assert(IsInputFocusable(ExpandedView.QuickReply), "QuickReply must accept keyboard focus");
         Assert(!IsInputFocusable(ExpandedView.Media), "Media should not steal keyboard focus");
         Assert(!IsInputFocusable(ExpandedView.SystemHud), "System HUD should not steal keyboard focus");
 
@@ -2376,6 +2434,41 @@ SSID 3 : Home_Router
         // Partial window (e.g. 1000x800)
         var smallRect = new Interop.NativeMethods.RECT { Left = 100, Top = 100, Right = 1100, Bottom = 900 };
         Assert(!FullscreenWatcher.IsWindowBorderlessFullscreen(smallRect, monInfo, 0), "Floating window must NOT be detected as fullscreen game");
+
+        // 4. Mathematical capsule geometry hit-testing (Zero-Leak Tab Passthrough)
+        // Pill: left=100, top=0, right=248 (width=148), bottom=30, radius=15
+        double pLeft = 100, pTop = 0, pRight = 248, pBottom = 30, radius = 15;
+
+        // Center of pill capsule
+        Assert(IslandWindow.IsPointInRoundedRect(174, 15, pLeft, pTop, pRight, pBottom, radius), "Center of pill must be inside");
+
+        // Straight interior edges
+        Assert(IslandWindow.IsPointInRoundedRect(174, 1, pLeft, pTop, pRight, pBottom, radius), "Top edge center must be inside");
+        Assert(IslandWindow.IsPointInRoundedRect(174, 29, pLeft, pTop, pRight, pBottom, radius), "Bottom edge center must be inside");
+
+        // Corner interior curve (e.g. top-left corner circle center is at (115, 15))
+        Assert(IslandWindow.IsPointInRoundedRect(105, 10, pLeft, pTop, pRight, pBottom, radius), "Inside top-left rounded curve must be inside");
+
+        // Corner EMPTY space (outside radius circle)
+        Assert(!IslandWindow.IsPointInRoundedRect(101, 1, pLeft, pTop, pRight, pBottom, radius), "Empty corner space outside rounded curve must NOT be inside");
+        Assert(!IslandWindow.IsPointInRoundedRect(247, 1, pLeft, pTop, pRight, pBottom, radius), "Empty top-right corner space must NOT be inside");
+        Assert(!IslandWindow.IsPointInRoundedRect(101, 29, pLeft, pTop, pRight, pBottom, radius), "Empty bottom-left corner space must NOT be inside");
+        Assert(!IslandWindow.IsPointInRoundedRect(247, 29, pLeft, pTop, pRight, pBottom, radius), "Empty bottom-right corner space must NOT be inside");
+
+        // Points completely outside capsule bounds
+        Assert(!IslandWindow.IsPointInRoundedRect(95, 15, pLeft, pTop, pRight, pBottom, radius), "Left of pill must NOT be inside");
+        Assert(!IslandWindow.IsPointInRoundedRect(255, 15, pLeft, pTop, pRight, pBottom, radius), "Right of pill must NOT be inside");
+        Assert(!IslandWindow.IsPointInRoundedRect(174, -5, pLeft, pTop, pRight, pBottom, radius), "Above pill must NOT be inside");
+        Assert(!IslandWindow.IsPointInRoundedRect(174, 35, pLeft, pTop, pRight, pBottom, radius), "Below pill must NOT be inside");
+
+        // 5. State Machine Click-Only Tab-Safe Mode
+        var sm = new IslandStateMachine { ClickOnlyMode = true };
+        sm.SetPointerInside(true);
+        Assert(sm.State == IslandState.Idle, "Click-Only mode must not auto-expand state machine on hover");
+        sm.ExpandNow();
+        Assert(sm.State == IslandState.Expanded, "Explicit ExpandNow must still expand in Click-Only mode");
+        sm.CollapseNow();
+        Assert(sm.State == IslandState.Idle, "CollapseNow must return state to Idle");
     }
 
     private static void TestLiquidGlassSettingsValidation()
@@ -2559,5 +2652,61 @@ SSID 3 : Home_Router
 
         Assert(fiBackdrop.Length > 5000, $"Golden backdrop PNG too small ({fiBackdrop.Length} bytes)");
         Assert(fiOutput.Length > 5000, $"Golden output PNG too small ({fiOutput.Length} bytes)");
+    }
+
+    private static void TestSemVersionComparison()
+    {
+        Assert(SemVersion.TryParse("0.4.0", out var v040), "Failed to parse 0.4.0");
+        Assert(SemVersion.TryParse("v0.5.0", out var v050), "Failed to parse v0.5.0 with leading v");
+        Assert(SemVersion.TryParse("0.5.0-beta.1", out var vBeta1), "Failed to parse 0.5.0-beta.1");
+        Assert(SemVersion.TryParse("0.5.0-beta.2", out var vBeta2), "Failed to parse 0.5.0-beta.2");
+        Assert(SemVersion.TryParse("1.0.0+build123", out var vBuild), "Failed to parse version with build metadata");
+
+        Assert(v040 < v050, "0.4.0 must be less than 0.5.0");
+        Assert(v050 > v040, "0.5.0 must be greater than 0.4.0");
+        Assert(vBeta1 < v050, "0.5.0-beta.1 must be less than 0.5.0 (stable release has higher precedence)");
+        Assert(vBeta1 < vBeta2, "0.5.0-beta.1 must be less than 0.5.0-beta.2");
+        Assert(v040 < vBeta1, "0.4.0 must be less than 0.5.0-beta.1");
+        Assert(vBuild == new SemVersion(1, 0, 0), "Build metadata should be stripped for version equality");
+        Assert(vBeta1.IsPreRelease, "vBeta1 must be flagged as pre-release");
+        Assert(!v040.IsPreRelease, "0.4.0 must not be flagged as pre-release");
+    }
+
+    private static void TestUpdateManifestAndIntegrity()
+    {
+        string sampleJson = """
+        {
+          "version": "0.5.0",
+          "releaseTag": "v0.5.0",
+          "channel": "stable",
+          "releaseDate": "2026-11-15T12:00:00Z",
+          "summary": "Liquid glass and update manager",
+          "downloads": {
+            "installer": {
+              "url": "https://github.com/JainisPatel/DynamicIsland/releases/download/v0.5.0/DynamicIsland-Setup.exe",
+              "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+              "sizeBytes": 90000000
+            }
+          }
+        }
+        """;
+
+        var manifest = System.Text.Json.JsonSerializer.Deserialize<UpdateManifest>(sampleJson, new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        Assert(manifest != null, "Manifest deserialization must succeed");
+        Assert(manifest!.Version == "0.5.0", "Manifest version must match 0.5.0");
+        Assert(manifest.ParsedChannel == UpdateChannel.Stable, "Parsed channel must be Stable");
+        Assert(manifest.Downloads.Installer != null, "Installer download asset must be present");
+        Assert(manifest.Downloads.Installer!.Sha256 == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "Sha256 hash must match");
+
+        // Verify SHA-256 calculation on known input ("abc")
+        // Known SHA-256 for "abc": ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+        byte[] testBytes = System.Text.Encoding.UTF8.GetBytes("abc");
+        string computedHash = UpdateIntegrityVerifier.ComputeSha256(testBytes);
+        Assert(string.Equals(computedHash, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", StringComparison.OrdinalIgnoreCase),
+            $"Computed SHA256 was '{computedHash}', expected ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
 }

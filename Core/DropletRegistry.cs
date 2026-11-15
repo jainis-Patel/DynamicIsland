@@ -419,9 +419,32 @@ public sealed class DropletRegistry
 
     public IReadOnlyList<DropletDescriptor> All => _ordered;
 
-    public int EnabledCount => _ordered.Count(d => d.IsEnabled);
+    public int EnabledCount
+    {
+        get
+        {
+            int count = 0;
+            for (int i = 0; i < _ordered.Count; i++)
+            {
+                if (_ordered[i].IsEnabled) count++;
+            }
+            return count;
+        }
+    }
 
-    public int TotalActiveRamKb => _ordered.Where(d => d.IsEnabled).Sum(d => d.EstimatedRamKb);
+    public int TotalActiveRamKb
+    {
+        get
+        {
+            int sum = 0;
+            for (int i = 0; i < _ordered.Count; i++)
+            {
+                var d = _ordered[i];
+                if (d.IsEnabled) sum += d.EstimatedRamKb;
+            }
+            return sum;
+        }
+    }
 
     /// <summary>
     /// Synchronizes droplet enabled states from persisted <c>EnabledDroplets</c> list.

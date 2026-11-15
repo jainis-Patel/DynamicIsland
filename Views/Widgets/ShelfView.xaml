@@ -5,72 +5,180 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:core="clr-namespace:DynamicIsland.Core"
              mc:Ignorable="d"
-             d:DesignHeight="150" d:DesignWidth="464">
+             d:DesignHeight="150" d:DesignWidth="464"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Ideal"
+             TextOptions.TextRenderingMode="ClearType">
+
+    <UserControl.Resources>
+        <!-- Subtle Icon Action Button inside Shelf Cards -->
+        <Style x:Key="CardMicroActionBtn" TargetType="Button">
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="1,0,0,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBg" Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBg" Property="Background" Value="#1EFFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="BtnBg" Property="Background" Value="#2DFFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Compact Pill Badge Button for Card Bottom-Right Context Actions (OCR) -->
+        <Style x:Key="CardBadgeActionBtn" TargetType="Button">
+            <Setter Property="Height" Value="16" />
+            <Setter Property="Padding" Value="5,0" />
+            <Setter Property="Margin" Value="3,0,0,0" />
+            <Setter Property="Background" Value="#14FFFFFF" />
+            <Setter Property="BorderBrush" Value="#22FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BadgeBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BadgeBorder" Property="Background" Value="#24FFFFFF" />
+                                <Setter TargetName="BadgeBorder" Property="BorderBrush" Value="#40FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Vertical Toolbar Divider -->
+        <Style x:Key="ToolbarSeparator" TargetType="Border">
+            <Setter Property="Width" Value="1" />
+            <Setter Property="Height" Value="12" />
+            <Setter Property="Background" Value="{DynamicResource CardBorderBrush}" />
+            <Setter Property="Opacity" Value="0.6" />
+            <Setter Property="Margin" Value="2,0,4,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
+
+        <!-- ═════════════════════════════════════════════════════════════════ -->
+        <!-- ROW 0: MODE SWITCHER & SHELF ACTIONS                              -->
+        <!-- ═════════════════════════════════════════════════════════════════ -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+            <!-- Left: Segmented View Switcher (Shelf | Clips) + Item Counter -->
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="2" Margin="0,0,8,0">
+                <Border Background="#0AFFFFFF" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="2" Margin="0,0,7,0">
                     <StackPanel Orientation="Horizontal">
-                        <Border Background="{DynamicResource CardSurfaceBrush}" CornerRadius="6" Padding="7,2">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8F4;" FontSize="9" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Files" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="5" Padding="7,1.5">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="8" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Shelf" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                             </StackPanel>
                         </Border>
                         <Button Click="SwitchToClipboard_Click" Style="{StaticResource IslandButton}" Height="18" Padding="7,0" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Switch to Clipboard History (Ctrl+Alt+V)">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Clipboard" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE77F;" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" Opacity="0.8" />
+                                <TextBlock Text="Clips" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
                     </StackPanel>
                 </Border>
-                <Border x:Name="ShelfCountBadge" Background="#181824" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="9" Padding="7,1.5" Margin="0,0,6,0" VerticalAlignment="Center">
-                    <TextBlock x:Name="ShelfCountText" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Text="0 items" />
+
+                <!-- Subtle Monospace Counter Pill -->
+                <Border x:Name="ShelfCountBadge" Background="{DynamicResource ChipBgBrush}" CornerRadius="4.5" Padding="5,1.5" Margin="0,0,5,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="ShelfCountText" Style="{StaticResource Digits}" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Text="0 items" />
                 </Border>
-                <Button Click="ShelfScrollLeft_Click" x:Name="ShelfScrollLeftBtn" Style="{StaticResource IslandButton}" Height="20" Width="20" Padding="0" Margin="0,0,3,0" ToolTipService.ToolTip="Scroll Left" Visibility="Collapsed">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE76B;" FontSize="8.5" />
+
+                <!-- Scroll Pager Arrows -->
+                <Button Click="ShelfScrollLeft_Click" x:Name="ShelfScrollLeftBtn" Style="{StaticResource IslandButton}" Height="19" Width="19" Padding="0" Margin="0,0,2,0" ToolTipService.ToolTip="Scroll Left" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE76B;" FontSize="7.5" />
                 </Button>
-                <Button Click="ShelfScrollRight_Click" x:Name="ShelfScrollRightBtn" Style="{StaticResource IslandButton}" Height="20" Width="20" Padding="0" Margin="0" ToolTipService.ToolTip="Scroll Right" Visibility="Collapsed">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE76C;" FontSize="8.5" />
+                <Button Click="ShelfScrollRight_Click" x:Name="ShelfScrollRightBtn" Style="{StaticResource IslandButton}" Height="19" Width="19" Padding="0" Margin="0" ToolTipService.ToolTip="Scroll Right" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE76C;" FontSize="7.5" />
                 </Button>
             </StackPanel>
 
-            <!-- Minimal, cohesive Apple-grade action pills -->
-            <Button Click="ClearShelfButton_Click" x:Name="ClearShelfButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="22" Width="22" Padding="0" Margin="4,0,0,0" ToolTipService.ToolTip="Clear unpinned items">
-                <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="9" Foreground="#8E8E93" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </Button>
-            <Button Click="ShelfActionsButton_Click" x:Name="ShelfActionsButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="22" Padding="9,0" Margin="4,0,0,0" ToolTipService.ToolTip="Convert, Merge PDF, Compress Video, Share to Phone, or Zip">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE70F;" FontSize="9" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                    <TextBlock Text="Actions" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE70D;" FontSize="7.5" Foreground="{DynamicResource AccentBrush}" Margin="3,0,0,0" VerticalAlignment="Center" />
-                </StackPanel>
-            </Button>
-            <Button Click="CopyAllShelfButton_Click" x:Name="CopyAllShelfButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="4,0,0,0" ToolTipService.ToolTip="Copy all files to clipboard (Ctrl+V pasteable)">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="9" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                    <TextBlock Text="Copy All" FontSize="9.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                </StackPanel>
-            </Button>
-            <Button Click="SummonBasketButton_Click" x:Name="SummonBasketButton" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="4,0,0,0" ToolTipService.ToolTip="Summon Floating Staging Basket (or jiggle cursor while dragging files)">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE74B;" FontSize="9.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                    <TextBlock Text="Basket" FontSize="9.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                </StackPanel>
-            </Button>
+            <!-- Right: Grouped Utility & Staging Action Strip -->
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Basket button: Always available to summon staging basket -->
+                <Button Click="SummonBasketButton_Click" x:Name="SummonBasketButton" Style="{StaticResource IslandButton}" Height="20" Padding="6.5,0" Margin="0" ToolTipService.ToolTip="Summon Floating Staging Basket (or jiggle cursor while dragging files)">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE74B;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Basket" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
 
-            <!-- Hidden forwarder handles for keyboard / programmatic invocations -->
-            <Button x:Name="ZipShelfButton" Visibility="Collapsed" Click="ZipShelfButton_Click" />
-            <Button x:Name="WindowsShareButton" Visibility="Collapsed" Click="WindowsShareButton_Click" />
-            <Button x:Name="PhoneShareButton" Visibility="Collapsed" Click="PhoneShareButton_Click" />
+                <!-- Item Actions: Cleanly grouped and shown ONLY when files are present on the shelf -->
+                <StackPanel x:Name="ShelfItemActionsGroup" Orientation="Horizontal" VerticalAlignment="Center" Margin="3,0,0,0" Visibility="Collapsed">
+                    <Button Click="CopyAllShelfButton_Click" x:Name="CopyAllShelfButton" Style="{StaticResource IslandButton}" Height="20" Padding="6.5,0" Margin="0,0,3,0" ToolTipService.ToolTip="Copy all files to clipboard (Ctrl+V pasteable)">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                            <TextBlock Text="Copy All" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Click="ShelfActionsButton_Click" x:Name="ShelfActionsButton" Style="{StaticResource IslandButton}" Height="20" Padding="6.5,0" Margin="0,0,3,0" ToolTipService.ToolTip="Convert, Merge PDF, Compress Video, Share to Phone, or Zip">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE70F;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                            <TextBlock Text="Actions" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE70D;" FontSize="7" Foreground="{DynamicResource AccentBrush}" Margin="2,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <Border Style="{StaticResource ToolbarSeparator}" />
+
+                    <Button Click="ClearShelfButton_Click" x:Name="ClearShelfButton" Style="{StaticResource IslandButton}" Height="20" Padding="6.5,0" Margin="0" ToolTipService.ToolTip="Clear unpinned items from shelf">
+                        <TextBlock Text="Clear" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Non-visual forwarder handles for keyboard / programmatic invocations (zero-sized, never leaks into layout) -->
+            <Grid Visibility="Collapsed" Width="0" Height="0">
+                <Button x:Name="ZipShelfButton" Visibility="Collapsed" Click="ZipShelfButton_Click" />
+                <Button x:Name="WindowsShareButton" Visibility="Collapsed" Click="WindowsShareButton_Click" />
+                <Button x:Name="PhoneShareButton" Visibility="Collapsed" Click="PhoneShareButton_Click" />
+            </Grid>
         </DockPanel>
+
+        <!-- ═════════════════════════════════════════════════════════════════ -->
+        <!-- ROW 1: HORIZONTAL SHELF DECK & REFINED EMPTY STATE                -->
+        <!-- ═════════════════════════════════════════════════════════════════ -->
         <Grid Grid.Row="1">
-            <ScrollViewer PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel" MouseUp="ScrollViewer_MouseUp" x:Name="ShelfScrollViewer" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly">
+            <!-- Active Populated Shelf Item Deck -->
+            <ScrollViewer PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel"
+                          MouseUp="ScrollViewer_MouseUp"
+                          x:Name="ShelfScrollViewer"
+                          HorizontalScrollBarVisibility="Hidden"
+                          VerticalScrollBarVisibility="Disabled"
+                          PanningMode="HorizontalOnly">
                 <StackPanel Orientation="Horizontal">
                     <ItemsControl x:Name="ShelfItemsControl">
                         <ItemsControl.ItemsPanel>
@@ -80,70 +188,111 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Width="132" Height="88" CornerRadius="12"
-                                        BorderThickness="1" Margin="0,0,8,0"
-                                        Cursor="Hand" ToolTip="{Binding FullPath, StringFormat='{}{0}&#x0a;• Drag to drop into another app&#x0a;• Double-click to open&#x0a;• Right-click for Actions/OCR'}"
+                                <Border x:Name="ShelfCardBorder"
+                                        Width="136" Height="82"
+                                        CornerRadius="9"
+                                        BorderThickness="1"
+                                        Margin="0,0,7,0"
+                                        Cursor="Hand"
+                                        ToolTip="{Binding FullPath, StringFormat='{}{0}&#x0a;• Drag to drop into another app&#x0a;• Double-click to open&#x0a;• Right-click for Actions/OCR'}"
                                         MouseLeftButtonDown="ShelfItem_MouseLeftButtonDown"
                                         MouseRightButtonUp="ShelfItem_MouseRightButtonUp"
                                         MouseMove="ShelfItem_MouseMove">
                                     <Border.Style>
                                         <Style TargetType="Border">
-                                            <Setter Property="Background" Value="#161622" />
-                                            <Setter Property="BorderBrush" Value="#2AFFFFFF" />
+                                            <Setter Property="Background" Value="{DynamicResource CardSurfaceBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
                                             <Style.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="#222232" />
-                                                    <Setter Property="BorderBrush" Value="#50FFFFFF" />
+                                                    <Setter Property="Background" Value="{DynamicResource ChipBgBrush}" />
+                                                    <Setter Property="BorderBrush" Value="#42FFFFFF" />
                                                 </Trigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Border.Style>
-                                    <Grid Margin="9,7">
+
+                                    <Grid Margin="8,6">
                                         <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="18" />
                                             <RowDefinition Height="*" />
-                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="16" />
                                         </Grid.RowDefinitions>
-                                        <!-- Top Row: Icon/Thumbnail + Extension Badge + Pin/Remove -->
-                                        <DockPanel Grid.Row="0">
-                                            <Grid VerticalAlignment="Center">
-                                                <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" Visibility="{Binding GlyphVisibility}" FontSize="13" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-                                                <Border Width="32" Height="20" CornerRadius="4.5" ClipToBounds="True" Visibility="{Binding ThumbnailVisibility}" BorderBrush="#30FFFFFF" BorderThickness="1">
-                                                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+
+                                        <!-- Card Top Bar: Icon/Thumbnail + Extension Badge + Pin/Remove -->
+                                        <DockPanel Grid.Row="0" LastChildFill="False">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Grid VerticalAlignment="Center">
+                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}"
+                                                               Visibility="{Binding GlyphVisibility}"
+                                                               FontSize="11"
+                                                               Foreground="{DynamicResource AccentBrush}"
+                                                               VerticalAlignment="Center" />
+                                                    <Border Width="26" Height="16" CornerRadius="3.5" ClipToBounds="True"
+                                                            Visibility="{Binding ThumbnailVisibility}"
+                                                            BorderBrush="#30FFFFFF" BorderThickness="1">
+                                                        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                                    </Border>
+                                                </Grid>
+
+                                                <Border Background="{Binding BadgeColorBrush}" CornerRadius="3.5" Padding="4,0.5" Margin="5,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding ExtensionTag}" FontSize="7" FontWeight="Bold" Foreground="#0B0B0E" />
                                                 </Border>
-                                            </Grid>
-                                            <Border Background="{Binding BadgeColorBrush}" CornerRadius="4" Padding="4.5,1" Margin="6,0,0,0" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding ExtensionTag}" FontSize="7.5" FontWeight="Bold" Foreground="#0B0B0E" />
-                                            </Border>
+                                            </StackPanel>
+
+                                            <!-- Micro-Action Strip: Pin stays colored if active, Remove is quiet until hover -->
                                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Button Tag="{Binding FullPath}" Click="PinShelfItem_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="0,0,2,0" ToolTip="Pin / Unpin on Shelf">
-                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding PinGlyph}" FontSize="8.5" Foreground="{Binding PinForeground}" />
+                                                <Button Tag="{Binding FullPath}" Click="PinShelfItem_Click" Style="{StaticResource CardMicroActionBtn}" ToolTip="Pin / Unpin on Shelf">
+                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding PinGlyph}" FontSize="8" Foreground="{Binding PinForeground}" />
                                                 </Button>
-                                                <Button Tag="{Binding FullPath}" Click="RemoveShelfItem_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="0" ToolTip="Remove from Shelf">
-                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8.5" Foreground="#86868B" />
+
+                                                <Button Tag="{Binding FullPath}" Click="RemoveShelfItem_Click" Style="{StaticResource CardMicroActionBtn}" ToolTip="Remove from Shelf">
+                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" Opacity="0.7" />
                                                 </Button>
                                             </StackPanel>
                                         </DockPanel>
 
-                                        <!-- Middle Row: File Name -->
-                                        <TextBlock Grid.Row="1" Text="{Binding FileName}" FontSize="10.5" FontWeight="SemiBold"
-                                                   Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,2" />
+                                        <!-- Card Body: Clean File Name with Balanced Line Height -->
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding FileName}"
+                                                   FontSize="10"
+                                                   FontWeight="Medium"
+                                                   LineHeight="13"
+                                                   LineStackingStrategy="BlockLineHeight"
+                                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                                   TextWrapping="Wrap"
+                                                   MaxHeight="28"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,2" />
 
-                                        <!-- Bottom Row: File Size + Quick Action Icons -->
-                                        <DockPanel Grid.Row="2" VerticalAlignment="Bottom">
-                                            <TextBlock Text="{Binding FileSizeText}" FontSize="8.5" Foreground="#8E8E93" VerticalAlignment="Center" />
-                                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                                                <Button Tag="{Binding FullPath}" Visibility="{Binding OcrVisibility}" Click="ItemOcr_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Extract Text (Offline OCR)">
-                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE721;" FontSize="9.5" Foreground="{DynamicResource AccentBrush}" />
+                                        <!-- Card Footer: File Size + Bottom Action Badges -->
+                                        <DockPanel Grid.Row="2" VerticalAlignment="Bottom" LastChildFill="True">
+                                            <TextBlock Text="{Binding FileSizeText}"
+                                                       Style="{StaticResource Digits}"
+                                                       FontSize="8"
+                                                       Foreground="{DynamicResource SecondaryBrush}"
+                                                       Opacity="0.8"
+                                                       VerticalAlignment="Center" />
+
+                                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                                                <!-- OCR Pill Badge (for Images) -->
+                                                <Button Tag="{Binding FullPath}" Click="ItemOcr_Click"
+                                                        Visibility="{Binding OcrVisibility}"
+                                                        Style="{StaticResource CardBadgeActionBtn}" ToolTip="Extract Text (Offline OCR)">
+                                                    <TextBlock Text="OCR" FontSize="7.5" FontWeight="SemiBold" Foreground="#C084FC" />
                                                 </Button>
-                                                <Button Tag="{Binding FullPath}" Click="ItemWindowsShare_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" ToolTip="Share via Windows Sheet">
-                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE72D;" FontSize="9.5" Foreground="#8E8E93" />
+
+                                                <!-- File Micro-Actions -->
+                                                <Button Tag="{Binding FullPath}" Click="CopyShelfFile_Click" Style="{StaticResource CardMicroActionBtn}" ToolTip="Copy File (Ctrl+V Pasteable)">
+                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
                                                 </Button>
-                                                <Button Tag="{Binding FullPath}" Click="CopyShelfFile_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Copy File (Ctrl+V Pasteable)">
-                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE77F;" FontSize="9.5" Foreground="#8E8E93" />
+
+                                                <Button Tag="{Binding FullPath}" Click="ItemWindowsShare_Click" Style="{StaticResource CardMicroActionBtn}" ToolTip="Share via Windows Sheet">
+                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE72D;" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
                                                 </Button>
-                                                <Button Tag="{Binding FullPath}" Click="RevealShelfItem_Click" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Show in Explorer">
-                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8DA;" FontSize="9.5" Foreground="#8E8E93" />
+
+                                                <Button Tag="{Binding FullPath}" Click="RevealShelfItem_Click" Style="{StaticResource CardMicroActionBtn}" ToolTip="Show in File Explorer">
+                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8DA;" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
                                                 </Button>
                                             </StackPanel>
                                         </DockPanel>
@@ -153,56 +302,73 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <!-- Drag All Stack Card -->
-                    <Border MouseLeftButtonDown="DragAllShelf_MouseLeftButtonDown" MouseMove="DragAllShelf_MouseMove" x:Name="DragAllShelfBtn" Width="76" Height="88" CornerRadius="12" BorderThickness="1" Margin="0,0,8,0" Cursor="SizeAll" ToolTipService.ToolTip="Drag ALL shelf items together in one motion" Visibility="Collapsed">
+                    <!-- Drag All Stack Card (Matches Deck Aspect Ratio) -->
+                    <Border MouseLeftButtonDown="DragAllShelf_MouseLeftButtonDown"
+                            MouseMove="DragAllShelf_MouseMove"
+                            x:Name="DragAllShelfBtn"
+                            Width="74" Height="82"
+                            CornerRadius="9"
+                            BorderThickness="1"
+                            Margin="0,0,7,0"
+                            Cursor="SizeAll"
+                            ToolTipService.ToolTip="Drag ALL shelf items together in one motion"
+                            Visibility="Collapsed">
                         <Border.Style>
                             <Style TargetType="Border">
-                                <Setter Property="Background" Value="#161622" />
-                                <Setter Property="BorderBrush" Value="#2AFFFFFF" />
+                                <Setter Property="Background" Value="{DynamicResource CardSurfaceBrush}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="#222232" />
+                                        <Setter Property="Background" Value="{DynamicResource ChipBgBrush}" />
                                         <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                                     </Trigger>
                                 </Style.Triggers>
                             </Style>
                         </Border.Style>
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <Border Width="30" Height="30" CornerRadius="15" Background="#1C1C28" BorderBrush="#35FFFFFF" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,5">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE75C;" FontSize="13" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Width="26" Height="26" CornerRadius="13" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,4">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE75C;" FontSize="11" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <TextBlock Text="Drag All" FontSize="9.5" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
-                            <TextBlock Text="Stack" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="Drag All" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="Stack" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Border>
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- Modern Droppy-Style Empty Placeholder -->
-            <Border x:Name="ShelfEmptyPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center" BorderThickness="1" BorderBrush="#24FFFFFF" CornerRadius="16" Background="#0F1018" Padding="24,14">
+            <!-- Refined Minimalist Empty State Card (Symmetrical & Centered) -->
+            <Border x:Name="ShelfEmptyPlaceholder"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="{DynamicResource CardSurfaceBrush}"
+                    BorderBrush="{DynamicResource CardBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="22,10">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Border Width="36" Height="36" CornerRadius="18" Background="#1A1A28" BorderBrush="#30FFFFFF" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,6">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8F4;" FontSize="15" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Border Width="30" Height="30" CornerRadius="8" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,6">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="13" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Text="Drop Shelf is Empty" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
-                    <TextBlock Text="Drag files, photos, or text snippets here to hold in transit" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" Margin="0,2,0,10" HorizontalAlignment="Center" />
+                    <TextBlock Text="Drop Shelf is Empty" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Text="Drag files, photos, or text snippets here to hold in transit" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,1,0,8" HorizontalAlignment="Center" />
+                    
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button Click="PasteToShelf_Click" Style="{StaticResource IslandButton}" Height="22" Padding="9,0" Margin="0,0,6,0" ToolTipService.ToolTip="Paste files or screenshot from clipboard (Ctrl+V)">
+                        <Button Click="PasteToShelf_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0,0,5,0" ToolTipService.ToolTip="Paste files or screenshot from clipboard (Ctrl+V)">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE77F;" FontSize="9" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Paste Clipboard" FontSize="9.5" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE77F;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Paste Clip" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
-                        <Button Click="PhoneShareButton_Click" Style="{StaticResource IslandButton}" Height="22" Padding="9,0" Margin="0,0,6,0" ToolTipService.ToolTip="Phone Drop: Instant Wi-Fi bridge to send/receive photos &amp; files with your phone">
+                        <Button Click="PhoneShareButton_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0,0,5,0" ToolTipService.ToolTip="Phone Drop: Instant Wi-Fi bridge to send/receive photos &amp; files with your phone">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8EA;" FontSize="9" Foreground="#30D158" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Phone Drop..." FontSize="9.5" FontWeight="Medium" Foreground="#30D158" VerticalAlignment="Center" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8EA;" FontSize="8.5" Foreground="#30D158" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Phone Drop" FontSize="8.5" FontWeight="Medium" Foreground="#30D158" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
-                        <Button Click="BrowseToShelf_Click" Style="{StaticResource IslandButton}" Height="22" Padding="9,0" ToolTipService.ToolTip="Browse files on your PC">
+                        <Button Click="BrowseToShelf_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" ToolTipService.ToolTip="Browse files on your PC">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xED25;" FontSize="9" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Browse..." FontSize="9.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xED25;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Browse" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
                     </StackPanel>

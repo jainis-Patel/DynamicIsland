@@ -96,13 +96,9 @@ public partial class IslandWindow
             ? $"{_shelfService.Count} item{(_shelfService.Count == 1 ? "" : "s")} \u00B7 {_shelfService.TotalSizeFormatted}"
             : "0 items";
         ShelfEmptyPlaceholder.Visibility = _shelfService.HasItems ? Visibility.Collapsed : Visibility.Visible;
-        if (ZipShelfButton != null)
+        if (ShelfItemActionsGroup != null)
         {
-            ZipShelfButton.Visibility = _shelfService.HasItems ? Visibility.Visible : Visibility.Collapsed;
-        }
-        if (WindowsShareButton != null)
-        {
-            WindowsShareButton.Visibility = _shelfService.HasItems ? Visibility.Visible : Visibility.Collapsed;
+            ShelfItemActionsGroup.Visibility = _shelfService.HasItems ? Visibility.Visible : Visibility.Collapsed;
         }
         if (ShelfActionsButton != null)
         {

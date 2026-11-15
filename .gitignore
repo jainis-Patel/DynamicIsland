@@ -9,6 +9,7 @@ publish/
 publish_new/
 publish_*/
 dist/
+dist_*/
 release/
 old/
 scratch/

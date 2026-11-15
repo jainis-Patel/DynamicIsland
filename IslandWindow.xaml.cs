@@ -54,6 +54,7 @@ public partial class IslandWindow : Window
     private static readonly PillShape NotesExpandedShape      = new(484, 240, 36);
     private static readonly PillShape AudioExpandedShape      = new(484, 216, 34);
     private static readonly PillShape ShelfExpandedShape      = new(484, 188, 34);
+    private static readonly PillShape QuickReplyExpandedShape = new(484, 156, 36);
 
     // Tactile interaction constants (WWDC Fluid Interfaces spec)
     private const double HoverWidthSwell = 10.0;
@@ -140,6 +141,7 @@ public partial class IslandWindow : Window
                 ExpandedView.PhoneBridge   => PhoneBridgeExpandedShape,
                 ExpandedView.MechSounds    => MechSoundsExpandedShape,
                 ExpandedView.CaptureStudio => CaptureStudioExpandedShape,
+                ExpandedView.QuickReply    => QuickReplyExpandedShape,
                 ExpandedView.Notifications => GetNotificationsExpandedShape(),
                 ExpandedView.Media when _mediaService.Current == null || string.IsNullOrWhiteSpace(_mediaService.Current.Title)
                                            => new PillShape(484, 114, 28),
@@ -192,8 +194,8 @@ public partial class IslandWindow : Window
     private readonly Spring _width, _height, _radius, _dropletOffset;
     private readonly RectangleGeometry _contentClip = new();
     private readonly Stopwatch _stopwatch = new();
-    private readonly CursorTracker _cursor;
-    private readonly FullscreenWatcher _fullscreen;
+    private readonly CursorTracker _cursor = null!;
+    private readonly FullscreenWatcher _fullscreen = null!;
     private readonly DispatcherTimer _clockTimer;
     private readonly DispatcherTimer _topmostTimer;
     private readonly FrameworkElement[] _panels;
@@ -250,6 +252,7 @@ public partial class IslandWindow : Window
     private readonly WindowsShareService _windowsShareService;
     private readonly LanQuickShareService _lanQuickShareService;
     private readonly TaskService _taskService;
+    private readonly UpdateManagerService _updateService;
     private Views.MiniPlayerWindow? _miniPlayerWindow;
     private TrayIconService? _trayIcon;
 
@@ -265,7 +268,9 @@ public partial class IslandWindow : Window
     internal DropletRegistry? Droplets => _dropletRegistry;
     internal ClipboardHistoryService ClipboardService => _clipboardService;
     internal DropShelfService Shelf => _shelfService;
+    internal UpdateManagerService UpdateService => _updateService;
     internal void NavigateToView(ExpandedView view) => SwitchExpandedView(view);
+    internal void PushToast(ToastContent content) => _machine.PushToast(content);
     internal void ShowToast(string glyph, string title, string message, Color accent, string category)
     {
         _machine.PushToast(new ToastContent(
@@ -327,7 +332,7 @@ public partial class IslandWindow : Window
         _width = new Spring(idle.Width);
         _height = new Spring(idle.Height);
         _radius = new Spring(idle.Radius);
-        _dropletOffset = new Spring(0);
+        _dropletOffset = new Spring(0) { RestEpsilon = 0.01 };
 
         ContentHost.Clip = null;
 
@@ -365,6 +370,7 @@ public partial class IslandWindow : Window
             [ExpandedView.PhoneBridge]   = (PhoneBridgeContainer, LauncherButton),
             [ExpandedView.MechSounds]    = (MechSoundsContainer, LauncherButton),
             [ExpandedView.CaptureStudio] = (CaptureStudioContainer, LauncherButton),
+            [ExpandedView.QuickReply]    = (QuickReplyContainer, NotificationsButton),
             [ExpandedView.Notifications] = (NotificationsContainer, NotificationsButton),
             [ExpandedView.Settings]      = (SettingsContainer, SettingsButton),
         };
@@ -430,6 +436,8 @@ public partial class IslandWindow : Window
 
         // Register Services
         _settingsService = _services.Register(new SettingsService());
+        ApplyExpandTrigger(_settingsService.Current.ExpandTrigger);
+        if (_cursor != null) _cursor.EnableFastSwipeGuard = _settingsService.Current.EnableFastSwipeGuard;
         _audioEndpointService = _services.Register(new AudioEndpointService(Dispatcher));
         _mediaService = _services.Register(new MediaSessionService(Dispatcher));
         _audioSpectrum = _services.Register(new AudioSpectrum());
@@ -474,6 +482,10 @@ public partial class IslandWindow : Window
         _keyboardSoundService = _services.Register(new KeyboardSoundService());
         _windowsShareService = _services.Register(new WindowsShareService(() => _hwnd));
         _lanQuickShareService = _services.Register(new LanQuickShareService(Dispatcher, _shelfService, _clipboardService));
+        _updateService = _services.Register(new UpdateManagerService(_settingsService, dispatcher: Dispatcher));
+        _updateService.UpdateAvailable += OnUpdateAvailable;
+        _updateService.StatusChanged += OnUpdateStatusChanged;
+        _updateService.DownloadProgressChanged += OnUpdateDownloadProgressChanged;
         _dropletRegistry.DropletStateChanged += (dropletId, enabled) =>
         {
             if (dropletId == "jiggle_basket")
@@ -507,7 +519,8 @@ public partial class IslandWindow : Window
             _machine.State == IslandState.Idle &&
             !_pointerInside &&
             !(_mediaService.Current?.IsPlaying ?? false) &&
-            _width.IsAtRest && _height.IsAtRest));
+            _width.IsAtRest && _height.IsAtRest &&
+            !_rendering));
 
         _mediaService.Changed += OnMediaChanged;
         _mediaService.TrackChanged += OnTrackChanged;
@@ -573,6 +586,8 @@ public partial class IslandWindow : Window
         InitializeVoiceMemoUI();
         ApplySettings();
         _settingsService.PropertyChanged += OnSettingsPropertyChanged;
+        _updateService.StartBackgroundWorker();
+        CheckPostUpdateLaunchStatus();
     }
 
     // ═════════════════════════════════════════════════════════════════
@@ -585,6 +600,13 @@ public partial class IslandWindow : Window
         Pill.MouseLeftButtonDown += (_, e) =>
         {
             if (_machine.State == IslandState.Expanded) return;
+
+            if (e.ClickCount == 2 && (_settingsService?.Current.EnableQuickTuck ?? true))
+            {
+                TuckIsland();
+                e.Handled = true;
+                return;
+            }
 
             _isPillPressed = true;
             Pill.CaptureMouse();
@@ -759,7 +781,7 @@ public partial class IslandWindow : Window
     /// </summary>
     private void AnimateContainerEntrance(FrameworkElement targetContainer, int direction)
     {
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var ease = SharedCubicOut; // P2b perf: reuse shared frozen instance instead of allocating
         var duration = new Duration(TimeSpan.FromMilliseconds(220));
 
         targetContainer.Opacity = 0;

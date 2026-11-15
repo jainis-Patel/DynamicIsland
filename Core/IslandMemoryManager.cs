@@ -18,7 +18,7 @@ internal sealed class IslandMemoryManager : IDisposable
     public IslandMemoryManager(Dispatcher dispatcher, Func<bool> isSafeToTrim)
     {
         _isSafeToTrim = isSafeToTrim;
-        _idleTrimTimer = new DispatcherTimer(TimeSpan.FromSeconds(18), DispatcherPriority.ApplicationIdle, OnIdleTimerElapsed, dispatcher);
+        _idleTrimTimer = new DispatcherTimer(TimeSpan.FromSeconds(12), DispatcherPriority.ApplicationIdle, OnIdleTimerElapsed, dispatcher);
     }
 
     /// <summary>

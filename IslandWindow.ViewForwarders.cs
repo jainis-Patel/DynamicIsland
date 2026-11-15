@@ -87,6 +87,7 @@ public partial class IslandWindow
     internal Button PhoneShareButton => ShelfContainer.PhoneShareButton;
     internal Button ShelfActionsButton => ShelfContainer.ShelfActionsButton;
     internal Button SummonBasketButton => ShelfContainer.SummonBasketButton;
+    internal FrameworkElement? ShelfItemActionsGroup => ShelfContainer.ShelfItemActionsGroup;
 
     // -------------------------------------------------------------------------
     //  Clipboard View Forwarders (ClipboardContainer)
@@ -166,6 +167,14 @@ public partial class IslandWindow
     internal TextBlock SecondaryDropletSubtext => SettingsContainer.SecondaryDropletSubtext;
     internal Button DockCenterBtn => SettingsContainer.DockCenterBtn;
     internal Button DockLeftBtn => SettingsContainer.DockLeftBtn;
+    internal Button ExpandTriggerClickBtn => SettingsContainer.ExpandTriggerClickBtn;
+    internal Button ExpandTriggerSnappyBtn => SettingsContainer.ExpandTriggerSnappyBtn;
+    internal Button ExpandTriggerRelaxedBtn => SettingsContainer.ExpandTriggerRelaxedBtn;
+    internal Button GhostModCtrlBtn => SettingsContainer.GhostModCtrlBtn;
+    internal Button GhostModAltBtn => SettingsContainer.GhostModAltBtn;
+    internal Button GhostModNoneBtn => SettingsContainer.GhostModNoneBtn;
+    internal Button QuickTuckToggleBtn => SettingsContainer.QuickTuckToggleBtn;
+    internal TextBlock QuickTuckToggleText => SettingsContainer.QuickTuckToggleText;
     internal Button DockPinAudioBtn => SettingsContainer.DockPinAudioBtn;
     internal TextBlock DockPinAudioText => SettingsContainer.DockPinAudioText;
     internal Button DockPinBatteryBtn => SettingsContainer.DockPinBatteryBtn;
@@ -292,6 +301,40 @@ public partial class IslandWindow
     internal TextBlock ResetSettingsText => SettingsContainer.ResetSettingsText;
     internal TextBlock SelectedThemeName => SettingsContainer.SelectedThemeName;
     internal System.Windows.Controls.ScrollViewer SettingsAppearanceTab => SettingsContainer.SettingsAppearanceTab;
+    internal System.Windows.Controls.ScrollViewer SettingsThemesTab => SettingsContainer.SettingsThemesTab;
+    internal System.Windows.Controls.Button SettingsTabThemesBtn => SettingsContainer.SettingsTabThemesBtn;
+    internal System.Windows.Controls.TextBlock SettingsTabThemesText => SettingsContainer.SettingsTabThemesText;
+    internal System.Windows.Controls.TextBlock NatureActiveThemeBadge => SettingsContainer.NatureActiveThemeBadge;
+    internal System.Windows.Controls.TextBlock NatureThemeSubtext => SettingsContainer.NatureThemeSubtext;
+    internal System.Windows.Controls.Button ThemesTabNoneBtn => SettingsContainer.ThemesTabNoneBtn;
+    internal System.Windows.Controls.TextBlock ThemesTabNoneText => SettingsContainer.ThemesTabNoneText;
+    internal System.Windows.Controls.Button ThemesTabIvyBtn => SettingsContainer.ThemesTabIvyBtn;
+    internal System.Windows.Controls.TextBlock ThemesTabIvyText => SettingsContainer.ThemesTabIvyText;
+    internal System.Windows.Controls.Button ThemesTabMeadowBtn => SettingsContainer.ThemesTabMeadowBtn;
+    internal System.Windows.Controls.TextBlock ThemesTabMeadowText => SettingsContainer.ThemesTabMeadowText;
+    internal System.Windows.Controls.Slider NatureDensitySlider => SettingsContainer.NatureDensitySlider;
+    internal System.Windows.Controls.TextBlock NatureDensityText => SettingsContainer.NatureDensityText;
+    internal System.Windows.Controls.Slider NatureBloomSlider => SettingsContainer.NatureBloomSlider;
+    internal System.Windows.Controls.TextBlock NatureBloomText => SettingsContainer.NatureBloomText;
+    internal System.Windows.Controls.Slider NatureScaleSlider => SettingsContainer.NatureScaleSlider;
+    internal System.Windows.Controls.TextBlock NatureScaleText => SettingsContainer.NatureScaleText;
+    internal System.Windows.Controls.Slider NatureDropSlider => SettingsContainer.NatureDropSlider;
+    internal System.Windows.Controls.TextBlock NatureDropText => SettingsContainer.NatureDropText;
+    internal System.Windows.Controls.TextBlock NatureButterflySubtext => SettingsContainer.NatureButterflySubtext;
+    internal System.Windows.Controls.Button NatureButterfly0Btn => SettingsContainer.NatureButterfly0Btn;
+    internal System.Windows.Controls.TextBlock NatureButterfly0Text => SettingsContainer.NatureButterfly0Text;
+    internal System.Windows.Controls.Button NatureButterfly1Btn => SettingsContainer.NatureButterfly1Btn;
+    internal System.Windows.Controls.TextBlock NatureButterfly1Text => SettingsContainer.NatureButterfly1Text;
+    internal System.Windows.Controls.Button NatureButterfly2Btn => SettingsContainer.NatureButterfly2Btn;
+    internal System.Windows.Controls.TextBlock NatureButterfly2Text => SettingsContainer.NatureButterfly2Text;
+    internal System.Windows.Controls.Button NatureButterfly3Btn => SettingsContainer.NatureButterfly3Btn;
+    internal System.Windows.Controls.TextBlock NatureButterfly3Text => SettingsContainer.NatureButterfly3Text;
+    internal System.Windows.Controls.Button NatureButterfly4Btn => SettingsContainer.NatureButterfly4Btn;
+    internal System.Windows.Controls.TextBlock NatureButterfly4Text => SettingsContainer.NatureButterfly4Text;
+    internal System.Windows.Controls.Button NaturePollenToggleBtn => SettingsContainer.NaturePollenToggleBtn;
+    internal System.Windows.Controls.TextBlock NaturePollenToggleText => SettingsContainer.NaturePollenToggleText;
+    internal System.Windows.Controls.Slider NaturePollenSlider => SettingsContainer.NaturePollenSlider;
+    internal System.Windows.Controls.TextBlock NaturePollenText => SettingsContainer.NaturePollenText;
     internal System.Windows.Controls.ScrollViewer SettingsClockAudioTab => SettingsContainer.SettingsClockAudioTab;
     internal DynamicIsland.Core.VirtualPetControl SettingsHeroPet => SettingsContainer.SettingsHeroPet;
     internal System.Windows.Controls.TextBlock SettingsHeroPetName => SettingsContainer.SettingsHeroPetName;
@@ -359,10 +402,6 @@ public partial class IslandWindow
     internal System.Windows.Controls.TextBlock IslandThemeNoneText => SettingsContainer.IslandThemeNoneText;
     internal System.Windows.Controls.Button IslandThemeIvyBtn => SettingsContainer.IslandThemeIvyBtn;
     internal System.Windows.Controls.TextBlock IslandThemeIvyText => SettingsContainer.IslandThemeIvyText;
-    internal System.Windows.Controls.Button IslandThemeSakuraBtn => SettingsContainer.IslandThemeSakuraBtn;
-    internal System.Windows.Controls.TextBlock IslandThemeSakuraText => SettingsContainer.IslandThemeSakuraText;
-    internal System.Windows.Controls.Button IslandThemeTreeBtn => SettingsContainer.IslandThemeTreeBtn;
-    internal System.Windows.Controls.TextBlock IslandThemeTreeText => SettingsContainer.IslandThemeTreeText;
     internal System.Windows.Controls.Button IslandThemeMeadowBtn => SettingsContainer.IslandThemeMeadowBtn;
     internal System.Windows.Controls.TextBlock IslandThemeMeadowText => SettingsContainer.IslandThemeMeadowText;
     internal System.Windows.Controls.Button VisualizerStyleAuroraBtn => SettingsContainer.VisualizerStyleAuroraBtn;
@@ -371,6 +410,26 @@ public partial class IslandWindow
     internal System.Windows.Controls.Button VisualizerStyleSiriBtn => SettingsContainer.VisualizerStyleSiriBtn;
     internal Button VolumeOsdBtn => SettingsContainer.VolumeOsdBtn;
     internal TextBlock VolumeOsdText => SettingsContainer.VolumeOsdText;
+    internal TextBlock AppVersionText => SettingsContainer.AppVersionText;
+    internal TextBlock UpdateStatusSubtitleText => SettingsContainer.UpdateStatusSubtitleText;
+    internal Button CheckUpdatesBtn => SettingsContainer.CheckUpdatesBtn;
+    internal TextBlock CheckUpdatesBtnText => SettingsContainer.CheckUpdatesBtnText;
+    internal Button UpdateChannelBtn => SettingsContainer.UpdateChannelBtn;
+    internal TextBlock UpdateChannelText => SettingsContainer.UpdateChannelText;
+    internal Border UpdateAvailableBanner => SettingsContainer.UpdateAvailableBanner;
+    internal TextBlock UpdateVersionTitleText => SettingsContainer.UpdateVersionTitleText;
+    internal TextBlock UpdateSummaryText => SettingsContainer.UpdateSummaryText;
+    internal Button InstallUpdateBtn => SettingsContainer.InstallUpdateBtn;
+    internal TextBlock InstallUpdateBtnText => SettingsContainer.InstallUpdateBtnText;
+    internal ProgressBar UpdateProgressBar => SettingsContainer.UpdateProgressBar;
+    internal TextBlock UpdateProgressText => SettingsContainer.UpdateProgressText;
+    internal Button AutoCheckToggleBtn => SettingsContainer.AutoCheckToggleBtn;
+    internal TextBlock AutoCheckToggleText => SettingsContainer.AutoCheckToggleText;
+    internal TextBlock LastCheckTimestampText => SettingsContainer.LastCheckTimestampText;
+    internal Button ToggleVersionHistoryBtn => SettingsContainer.ToggleVersionHistoryBtn;
+    internal TextBlock ToggleVersionHistoryText => SettingsContainer.ToggleVersionHistoryText;
+    internal StackPanel VersionHistoryContainer => SettingsContainer.VersionHistoryContainer;
+    internal StackPanel VersionHistoryList => SettingsContainer.VersionHistoryList;
 
     // -------------------------------------------------------------------------
     //  Audio View Forwarders (AudioContainer)

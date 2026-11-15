@@ -20,7 +20,10 @@
 
     <Grid x:Name="Root" Background="Transparent" RenderTransformOrigin="0.5,0">
         <Grid.RenderTransform>
-            <ScaleTransform x:Name="RootScaleTransform" ScaleX="1" ScaleY="1" />
+            <TransformGroup>
+                <ScaleTransform x:Name="RootScaleTransform" ScaleX="1" ScaleY="1" />
+                <TranslateTransform x:Name="RootTranslateTransform" X="0" Y="0" />
+            </TransformGroup>
         </Grid.RenderTransform>
 
         <!-- Ambient halo / back-glow responding to media artwork accent and bass FFT (zero-shader radial falloff) -->
@@ -492,23 +495,37 @@
                 <!-- ── Toast / Alert Banner (320x56) ────────────────── -->
                 <Grid x:Name="ToastPanel" Width="336" Height="58"
                       HorizontalAlignment="Center" VerticalAlignment="Top">
-                    <Grid Margin="14,0,18,0">
+                    <Grid Margin="14,0,14,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <Border x:Name="ToastIconBg" Width="34" Height="34" CornerRadius="17"
                                 VerticalAlignment="Center" Background="#280A84FF">
                             <TextBlock x:Name="ToastGlyph" Style="{StaticResource Glyph}" HorizontalAlignment="Center"
                                        FontSize="15" Foreground="#0A84FF" Text="&#xE767;" />
                         </Border>
-                        <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
                             <TextBlock x:Name="ToastTitle" FontSize="13" FontWeight="SemiBold"
                                        Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" Text="Volume" />
                             <TextBlock x:Name="ToastSubtitle" FontSize="11.5" Margin="0,1,0,0"
                                        Foreground="{DynamicResource SecondaryBrush}"
                                        TextTrimming="CharacterEllipsis" Text="65%" />
                         </StackPanel>
+
+                        <Button x:Name="ToastReplyButton" Grid.Column="2"
+                                Visibility="Collapsed"
+                                Style="{StaticResource IslandButton}"
+                                Height="26" Padding="8,0" Margin="0"
+                                VerticalAlignment="Center"
+                                Click="ToastReplyButton_Click"
+                                ToolTipService.ToolTip="Quick Reply directly in Dynamic Island">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock x:Name="ToastReplyGlyph" Style="{StaticResource Glyph}" Text="&#xE725;" FontSize="9.5" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="ToastReplyText" Text="Reply" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                     </Grid>
                 </Grid>
 
@@ -536,6 +553,7 @@
                         <widgets:PhoneBridgeView x:Name="PhoneBridgeContainer" Visibility="Collapsed" />
                         <widgets:MechSoundsView x:Name="MechSoundsContainer" Visibility="Collapsed" />
                         <widgets:CaptureStudioView x:Name="CaptureStudioContainer" Visibility="Collapsed" />
+                        <widgets:QuickReplyView x:Name="QuickReplyContainer" Visibility="Collapsed" />
                     </Grid>
                 </Grid>
             </Grid>
@@ -589,22 +607,22 @@
             <Grid>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Background="Transparent" Margin="7,0,7,0">
                 <!-- 1. Home / Now Playing Overview (Image 2) -->
-                <Button x:Name="MediaHomeButton" AutomationProperties.Name="Home Overview" Style="{StaticResource DockIconButton}" ToolTip="Home · Now Playing &amp; Vitals">
+                <Button x:Name="MediaHomeButton" AutomationProperties.Name="Home Overview" Style="{StaticResource DockIconButton}" ToolTip="Home · Now Playing &amp; Vitals (Ctrl+1)">
                     <TextBlock Style="{StaticResource Glyph}" FontSize="13" Text="&#xE80F;" />
                 </Button>
 
                 <!-- 2. Apple Notch Calendar & Tasks (Image 2) -->
-                <Button x:Name="CalendarButton" AutomationProperties.Name="Calendar and Tasks" Style="{StaticResource DockIconButton}" ToolTip="Calendar &amp; Tasks (Today's Plans)">
+                <Button x:Name="CalendarButton" AutomationProperties.Name="Calendar and Tasks" Style="{StaticResource DockIconButton}" ToolTip="Calendar &amp; Tasks (Ctrl+2)">
                     <TextBlock Style="{StaticResource Glyph}" FontSize="12.5" Text="&#xE787;" />
                 </Button>
 
                 <!-- 3. Drop Shelf & Files (Image 2) -->
-                <Button x:Name="ShelfButton" AutomationProperties.Name="Drop Shelf and Files" Style="{StaticResource DockIconButton}" ToolTip="Drop Shelf &amp; Clipboard">
+                <Button x:Name="ShelfButton" AutomationProperties.Name="Drop Shelf and Files" Style="{StaticResource DockIconButton}" ToolTip="Drop Shelf &amp; Files (Ctrl+3)">
                     <TextBlock Style="{StaticResource Glyph}" FontSize="12.5" Text="&#xE8B7;" />
                 </Button>
 
                 <!-- 4. Notification Center (Bell with Live Unread Badge) -->
-                <Button x:Name="NotificationsButton" AutomationProperties.Name="Notification Center" Style="{StaticResource DockIconButton}" ToolTip="Notification Center (Ctrl+Alt+N)">
+                <Button x:Name="NotificationsButton" AutomationProperties.Name="Notification Center" Style="{StaticResource DockIconButton}" ToolTip="Notification Center (Ctrl+4 / Ctrl+Alt+N)">
                     <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock x:Name="NotificationsButtonGlyph" Style="{StaticResource Glyph}" FontSize="12.5" Text="&#xEA8F;" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         <Border x:Name="NotificationsBadgeHost" Visibility="Collapsed" Background="{DynamicResource AccentBrush}"
@@ -617,12 +635,12 @@
                 </Button>
 
                 <!-- 5. Media & Sound (Image 2) -->
-                <Button x:Name="AudioButton" AutomationProperties.Name="Audio and Music" Style="{StaticResource DockIconButton}" ToolTip="Music, Lyrics &amp; Audio">
+                <Button x:Name="AudioButton" AutomationProperties.Name="Audio and Music" Style="{StaticResource DockIconButton}" ToolTip="Music &amp; Audio (Ctrl+5)">
                     <TextBlock Style="{StaticResource Glyph}" FontSize="12.5" Text="&#xE8D6;" />
                 </Button>
 
                 <!-- 6. All Apps & Widgets Grid Launcher (Image 2) -->
-                <Button x:Name="LauncherButton" AutomationProperties.Name="Apps and Widgets" Style="{StaticResource DockIconButton}" ToolTip="Apps &amp; Widgets">
+                <Button x:Name="LauncherButton" AutomationProperties.Name="Apps and Widgets" Style="{StaticResource DockIconButton}" ToolTip="Apps &amp; Widgets Panel (Ctrl+6)">
                     <TextBlock Style="{StaticResource Glyph}" FontSize="13" Text="&#xF0E2;" />
                 </Button>
 

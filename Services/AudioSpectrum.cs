@@ -253,6 +253,22 @@ internal sealed class AudioSpectrum : IDisposable
 
     private void Analyze(int sampleRate)
     {
+        float maxSample = 0f;
+        for (int i = 0; i < FftSize; i++)
+        {
+            float val = Math.Abs(_ring[i]);
+            if (val > maxSample) maxSample = val;
+        }
+
+        if (maxSample < 0.0001f)
+        {
+            for (int band = 0; band < BandCount; band++)
+                Volatile.Write(ref _bands[band], 0f);
+            for (int band = 0; band < ExpandedBandCount; band++)
+                Volatile.Write(ref _bands16[band], 0f);
+            return;
+        }
+
         for (int i = 0; i < FftSize; i++)
         {
             _fft[i].X = _ring[(_ringPos + i) & (FftSize - 1)] * _window[i];

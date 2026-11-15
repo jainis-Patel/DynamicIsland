@@ -122,6 +122,12 @@ public static class Program
             return 0;
         }
 
+        if (args.Any(a => string.Equals(a, "--updated", StringComparison.OrdinalIgnoreCase)))
+        {
+            App.IsPostUpdateLaunch = true;
+            Core.UpdateHandoffEngine.CleanupOldBackups();
+        }
+
         // Check for Silent or GUI Uninstall Mode
         if (Core.InstallerService.IsUninstallMode(args))
         {

@@ -8,7 +8,7 @@ namespace DynamicIsland.Core;
 /// </summary>
 public sealed class Spring
 {
-    private const double RestEpsilon = 0.05;
+    public double RestEpsilon { get; set; } = 0.05;
 
     public double Value { get; set; }
     public double Velocity { get; set; }

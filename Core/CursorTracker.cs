@@ -22,6 +22,12 @@ internal sealed class CursorTracker : IDisposable
     private IntPtr _lastMonitor;
     private IntPtr _candidateMonitor;
     private long _candidateSinceTick;
+    private POINT _lastPos;
+    private long _lastPosTick;
+    private double _velocityX;
+
+    public bool EnableFastSwipeGuard { get; set; } = true;
+    public double CurrentVelocityX => _velocityX;
 
     public event Action<bool>? InsideChanged;
     public event Action<IntPtr>? MonitorChanged;
@@ -56,6 +62,20 @@ internal sealed class CursorTracker : IDisposable
     {
         if (!GetCursorPos(out var p)) return;
 
+        long now = Environment.TickCount64;
+        long dtMs = now - _lastPosTick;
+        if (dtMs > 0 && dtMs < 500)
+        {
+            double dx = Math.Abs(p.X - _lastPos.X);
+            _velocityX = (dx / dtMs) * 1000.0;
+        }
+        else
+        {
+            _velocityX = 0.0;
+        }
+        _lastPos = p;
+        _lastPosTick = now;
+
         bool inside = false;
         bool near = false;
 
@@ -69,6 +89,12 @@ internal sealed class CursorTracker : IDisposable
                     p.Y <= zone.Bottom + ProximityYMarginPx);
         }
 
+        // Ignore transient fast swipe across top bezel (e.g. flicking across browser tabs)
+        if (inside && EnableFastSwipeGuard && _velocityX > 350.0)
+        {
+            inside = false;
+        }
+
         if (near != _fastMode)
         {
             _fastMode = near;
@@ -78,7 +104,7 @@ internal sealed class CursorTracker : IDisposable
         IntPtr currentMon = MonitorFromPoint(p, MONITOR_DEFAULTTONEAREST);
         if (currentMon != IntPtr.Zero)
         {
-            long now = Environment.TickCount64;
+            now = Environment.TickCount64;
             if (_lastMonitor == IntPtr.Zero)
             {
                 _lastMonitor = currentMon;

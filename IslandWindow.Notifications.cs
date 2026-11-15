@@ -8,6 +8,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using DynamicIsland.Core;
+using DynamicIsland.Interop;
 using DynamicIsland.Services;
 using static DynamicIsland.Interop.NativeMethods;
 
@@ -53,6 +54,113 @@ public partial class IslandWindow
             _height.Target = targetShape.Height;
             _radius.Target = targetShape.Radius;
             EnsureRendering();
+        }
+    }
+
+    public void OpenQuickReply(NotificationHistoryItem item)
+    {
+        if (item == null) return;
+        QuickReplyContainer.SetNotification(item);
+        _machine.SetPinned(true);
+        SwitchExpandedView(ExpandedView.QuickReply);
+        QuickReplyContainer.FocusInput();
+    }
+
+    public void CancelQuickReply()
+    {
+        _machine.SetPinned(false);
+        _machine.CollapseNow();
+    }
+
+    public void OpenTargetApp(NotificationHistoryItem item)
+    {
+        if (item == null) return;
+        NotificationListenerService.ActivateNotification(item);
+        _machine.SetPinned(false);
+        _machine.CollapseNow();
+    }
+
+    public async Task<bool> SendQuickReplyAsync(NotificationHistoryItem item, string text)
+    {
+        if (item == null || string.IsNullOrWhiteSpace(text)) return false;
+
+        string cleanText = text.Trim();
+        try
+        {
+            // 1. Stage text onto Windows clipboard with transient retry
+            for (int i = 0; i < 3; i++)
+            {
+                try
+                {
+                    Clipboard.SetText(cleanText);
+                    break;
+                }
+                catch
+                {
+                    await Task.Delay(25);
+                }
+            }
+
+            // 2. Focus the target messaging application window
+            bool activated = NotificationListenerService.ActivateNotification(item);
+
+            // 3. Wait for the window to finish foreground transition and accept input
+            await Task.Delay(200);
+
+            // 4. Inject Ctrl+V and Return to deliver the staged message
+            NativeMethods.SimulatePasteAndEnter();
+
+            // 5. Tactile liquid impulse feedback
+            TriggerLiquidImpulse(180, -90, 25);
+
+            // 6. Dismiss the notification from history ring buffer
+            _notificationListener.RemoveHistoryItem(item.Id);
+
+            // 7. Collapse Island back
+            _machine.SetPinned(false);
+            _machine.CollapseNow();
+
+            // 8. Surface instant feedback confirmation toast
+            _machine.PushToast(new ToastContent(
+                "\uE73E",
+                "Reply Sent",
+                $"Delivered to {item.Title}",
+                item.Accent,
+                TimeSpan.FromSeconds(2.0),
+                Priority: ToastPriority.Feedback));
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[QuickReply] Error sending reply: {ex.Message}");
+            _machine.PushToast(new ToastContent(
+                "\uE783",
+                "Reply Saved to Clipboard",
+                cleanText,
+                ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(2.5),
+                Priority: ToastPriority.Feedback));
+            return false;
+        }
+    }
+
+    internal void ToastReplyButton_Click(object sender, RoutedEventArgs e)
+    {
+        var item = _machine.ActiveToast?.HistoryItem ?? _notificationListener.History.FirstOrDefault();
+        if (item != null)
+        {
+            OpenQuickReply(item);
+        }
+        e.Handled = true;
+    }
+
+    internal void ReplyNotificationItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: NotificationHistoryItem item })
+        {
+            OpenQuickReply(item);
+            e.Handled = true;
         }
     }
 

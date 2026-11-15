@@ -13,7 +13,7 @@ public enum ThemeLayer
 
 /// <summary>
 /// High-performance vector living nature theme renderer for Dynamic Island.
-/// Renders living botanical themes (Ivy &amp; Blooms, Sakura Branch, Blossom Tree, Meadow)
+/// Renders living botanical themes (Ivy &amp; Blooms, Meadow)
 /// around the island capsule with zero runtime memory allocations, frozen brushes,
 /// and smooth 60Hz-240Hz+ frame-rate invariance.
 /// </summary>
@@ -43,11 +43,24 @@ public sealed class IslandNatureThemeControl : FrameworkElement
     private Rect _pillBounds;
     private bool _reducedMotion;
 
+    // Granular nature theme customization parameters
+    private double _density = 0.70;
+    private double _scale = 0.85;
+    private double _dropLength = 60.0;
+    private int _butterflyCount = 2;
+    private double _bloomDensity = 0.75;
+    private bool _pollenEnabled = true;
+    private int _pollenCount = 14;
+
     // Cached vine perimeter points to avoid per-frame allocations
     private double _cachedPillW = -1;
     private double _cachedPillH = -1;
     private double _cachedPillX = -1;
     private double _cachedPillY = -1;
+    private double _cachedDensity = -1;
+    private double _cachedScale = -1;
+    private double _cachedDropLength = -1;
+    private double _cachedBloomDensity = -1;
     private List<VinePoint[]>? _cachedVines;
     private List<BranchData>? _cachedBranches;
 
@@ -57,11 +70,28 @@ public sealed class IslandNatureThemeControl : FrameworkElement
         ClipToBounds = false;
     }
 
-    public void Step(double t, Rect pillBounds, bool reducedMotion)
+    public void Step(
+        double t,
+        Rect pillBounds,
+        bool reducedMotion,
+        double density = 0.70,
+        double scale = 0.85,
+        double dropLength = 60.0,
+        int butterflyCount = 2,
+        double bloomDensity = 0.75,
+        bool pollenEnabled = true,
+        int pollenCount = 14)
     {
         _time = t;
         _pillBounds = pillBounds;
         _reducedMotion = reducedMotion;
+        _density = Math.Clamp(density, 0.20, 1.50);
+        _scale = Math.Clamp(scale, 0.40, 1.40);
+        _dropLength = Math.Clamp(dropLength, 20.0, 120.0);
+        _butterflyCount = Math.Clamp(butterflyCount, 0, 4);
+        _bloomDensity = Math.Clamp(bloomDensity, 0.20, 1.50);
+        _pollenEnabled = pollenEnabled;
+        _pollenCount = Math.Clamp(pollenCount, 0, 30);
         InvalidateVisual();
     }
 
@@ -69,12 +99,15 @@ public sealed class IslandNatureThemeControl : FrameworkElement
     //  Pre-allocated, Frozen Brush & Pen Singletons (Zero GC Pressure)
     // =========================================================================
 
+    private static readonly Pen MainVineDarkPen;
+    private static readonly Pen MainVineLightPen;
+    private static readonly Pen SecVineDarkPen;
+    private static readonly Pen SecVineLightPen;
+    private static readonly Pen BranchDarkPen;
+    private static readonly Pen BranchLightPen;
+
     private static readonly Pen StemDarkPen;
     private static readonly Pen StemLightPen;
-    private static readonly Pen VineBarkDarkPen;
-    private static readonly Pen VineBarkLightPen;
-    private static readonly Pen TreeBarkDarkPen;
-    private static readonly Pen TreeBarkLightPen;
     private static readonly Pen MeadowStemDarkPen;
     private static readonly Pen MeadowStemLightPen;
     private static readonly Pen VeinPen;
@@ -91,7 +124,6 @@ public sealed class IslandNatureThemeControl : FrameworkElement
 
     private static readonly LinearGradientBrush IvyLeafDarkBrush;
     private static readonly LinearGradientBrush IvyLeafLightBrush;
-    private static readonly LinearGradientBrush TreeLeafBrush;
     private static readonly LinearGradientBrush MeadowLeafBrush;
     private static readonly LinearGradientBrush GrassBrush;
 
@@ -114,7 +146,6 @@ public sealed class IslandNatureThemeControl : FrameworkElement
     private static readonly SolidColorBrush BlueMorphoSpotBrush;
     private static readonly SolidColorBrush SwallowtailSpotBrush;
 
-    private static readonly LinearGradientBrush SakuraPetalBrush;
     private static readonly LinearGradientBrush LilacPetalBrush;
     private static readonly LinearGradientBrush RosePetalBrush;
     private static readonly LinearGradientBrush JasminePetal1Brush;
@@ -128,37 +159,37 @@ public sealed class IslandNatureThemeControl : FrameworkElement
     {
         T Freeze<T>(T obj) where T : Freezable { obj.Freeze(); return obj; }
 
-        StemDarkPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x1F, 0x2A, 0x16))), 2.4) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
-        StemLightPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x6B, 0x8C, 0x3A))), 1.0) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
+        MainVineDarkPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x1C, 0x2A, 0x15))), 2.8) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round });
+        MainVineLightPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x6E, 0x9C, 0x3E))), 1.1) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round });
+        SecVineDarkPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x1C, 0x2A, 0x15))), 2.0) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round });
+        SecVineLightPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x6E, 0x9C, 0x3E))), 0.8) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round });
+        BranchDarkPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x1C, 0x2A, 0x15))), 1.5) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round });
+        BranchLightPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x6E, 0x9C, 0x3E))), 0.6) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round });
 
-        VineBarkDarkPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x2B, 0x1B, 0x17))), 3.0) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
-        VineBarkLightPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x6E, 0x4D, 0x3F))), 1.2) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
+        StemDarkPen = MainVineDarkPen;
+        StemLightPen = MainVineLightPen;
 
-        TreeBarkDarkPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x33, 0x23, 0x1A))), 4.0) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
-        TreeBarkLightPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x7E, 0x5E, 0x3E))), 1.5) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
-
-        MeadowStemDarkPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x2C, 0x62, 0x32))), 2.0) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
-        MeadowStemLightPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x74, 0xB8, 0x5C))), 0.9) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
+        MeadowStemDarkPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x2C, 0x62, 0x32))), 2.8) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
+        MeadowStemLightPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x74, 0xB8, 0x5C))), 1.6) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
 
         VeinPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(64, 255, 255, 255))), 0.7));
-        IvyLeafVeinPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(82, 225, 255, 200))), 0.6));
+        IvyLeafVeinPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(100, 225, 255, 195))), 0.7));
         PetalSepPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(36, 0, 0, 0))), 0.5));
-        GloryRaysPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(140, 255, 255, 255))), 1.0));
+        GloryRaysPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(150, 255, 255, 255))), 1.1));
 
-        ButterflyMonarchPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x15, 0x0B, 0x06))), 1.2) { LineJoin = PenLineJoin.Round });
-        ButterflyBluePen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x07, 0x11, 0x26))), 1.2) { LineJoin = PenLineJoin.Round });
-        ButterflyWhitePen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x24))), 1.2) { LineJoin = PenLineJoin.Round });
+        ButterflyMonarchPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x15, 0x0B, 0x06))), 1.3) { LineJoin = PenLineJoin.Round });
+        ButterflyBluePen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x07, 0x11, 0x26))), 1.3) { LineJoin = PenLineJoin.Round });
+        ButterflyWhitePen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x24))), 1.3) { LineJoin = PenLineJoin.Round });
         ButterflyVeinPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(128, 0, 0, 0))), 0.7));
         ButterflyBodyPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x12, 0x0A, 0x06))), 0.7));
 
         StamenPinkPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0xD9, 0x4F, 0x7A))), 0.6));
         StamenPurplePen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x7A, 0x4C, 0xC0))), 0.6));
 
-        IvyLeafDarkBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0x14, 0x3D, 0x1F), Color.FromRgb(0x4F, 0x9A, 0x3C), new Point(0, 0), new Point(1, 1)));
-        IvyLeafLightBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0x2A, 0x6A, 0x30), Color.FromRgb(0x8F, 0xD0, 0x5C), new Point(0, 0), new Point(1, 1)));
-        TreeLeafBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0x3B, 0x7A, 0x2C), Color.FromRgb(0x8F, 0xC8, 0x4E), new Point(0, 0), new Point(1, 0)));
+        IvyLeafDarkBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0x1B, 0x4D, 0x22), Color.FromRgb(0x48, 0x94, 0x38), new Point(0, 0), new Point(1, 1)));
+        IvyLeafLightBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0x2E, 0x75, 0x2E), Color.FromRgb(0x82, 0xC4, 0x4A), new Point(0, 0), new Point(1, 1)));
         MeadowLeafBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0x27, 0x60, 0x2F), Color.FromRgb(0x79, 0xB8, 0x5A), new Point(0, 0), new Point(1, 0)));
-        GrassBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0x1B, 0x45, 0x26), Color.FromRgb(0x86, 0xCC, 0x5E), new Point(0, 0), new Point(0, 1)));
+        GrassBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0x1B, 0x45, 0x26), Color.FromRgb(0x86, 0xCC, 0x5E), new Point(0, 1), new Point(0, 0)));
 
         var gloryRadial = new RadialGradientBrush(Color.FromRgb(0xFF, 0xFF, 0xFF), Color.FromRgb(0x33, 0x39, 0x9F));
         gloryRadial.GradientStops.Add(new GradientStop(Color.FromRgb(0xCF, 0xE3, 0xFF), 0.25));
@@ -186,7 +217,6 @@ public sealed class IslandNatureThemeControl : FrameworkElement
         BlueMorphoSpotBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xCF, 0xEA, 0xFF)));
         SwallowtailSpotBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF)));
 
-        SakuraPetalBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0xF1, 0x9A, 0xB5), Color.FromRgb(0xFF, 0xE9, 0xEF), new Point(0, 0), new Point(1, 0)));
         LilacPetalBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0xC9, 0xA2, 0xF0), Color.FromRgb(0xF4, 0xEA, 0xFF), new Point(0, 0), new Point(1, 0)));
         RosePetalBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0xF5, 0x8F, 0xB4), Color.FromRgb(0xFF, 0xE3, 0xEC), new Point(0, 0), new Point(1, 0)));
         JasminePetal1Brush = Freeze(new LinearGradientBrush(Color.FromRgb(0xEA, 0xDF, 0xBF), Color.FromRgb(0xFF, 0xFF, 0xFF), new Point(0, 0), new Point(1, 0)));
@@ -250,15 +280,6 @@ public sealed class IslandNatureThemeControl : FrameworkElement
 
         switch (theme)
         {
-            case "Sakura Branch":
-                if (Layer == ThemeLayer.Underlay) RenderSakuraBranch(dc, p, t);
-                else RenderSakuraPetals(dc, p, t);
-                break;
-
-            case "Blossom Tree":
-                if (Layer == ThemeLayer.Underlay) RenderBlossomTree(dc, p, t);
-                break;
-
             case "Meadow":
                 if (Layer == ThemeLayer.Underlay) RenderMeadow(dc, p, t);
                 else RenderMeadowButterfly(dc, p, t);
@@ -286,7 +307,11 @@ public sealed class IslandNatureThemeControl : FrameworkElement
             Math.Abs(p.Width - _cachedPillW) < 0.5 &&
             Math.Abs(p.Height - _cachedPillH) < 0.5 &&
             Math.Abs(p.X - _cachedPillX) < 0.5 &&
-            Math.Abs(p.Y - _cachedPillY) < 0.5)
+            Math.Abs(p.Y - _cachedPillY) < 0.5 &&
+            Math.Abs(_density - _cachedDensity) < 0.01 &&
+            Math.Abs(_scale - _cachedScale) < 0.01 &&
+            Math.Abs(_dropLength - _cachedDropLength) < 0.5 &&
+            Math.Abs(_bloomDensity - _cachedBloomDensity) < 0.01)
         {
             return;
         }
@@ -295,9 +320,19 @@ public sealed class IslandNatureThemeControl : FrameworkElement
         _cachedPillH = p.Height;
         _cachedPillX = p.X;
         _cachedPillY = p.Y;
+        _cachedDensity = _density;
+        _cachedScale = _scale;
+        _cachedDropLength = _dropLength;
+        _cachedBloomDensity = _bloomDensity;
 
         double cenX = p.X + p.Width / 2.0;
         double cenY = p.Y + p.Height / 2.0;
+        double rr = p.Height / 2.0;
+        double cy = p.Y + rr;
+        double cxL = p.X + rr;
+        double cxR = p.X + p.Width - rr;
+        double topY = Math.Max(0.0, p.Y);
+        double botY = p.Y + p.Height;
 
         VinePoint[] Fin(List<Point> pts)
         {
@@ -320,78 +355,292 @@ public sealed class IslandNatureThemeControl : FrameworkElement
             return res;
         }
 
-        VinePoint[] Perim(double side, double o, double wob, double endF, double drop)
+        var vineList = new List<VinePoint[]>();
+
+        // ---------------------------------------------------------------------
+        // Vine 0: Left Perimeter Runner & Cascading Wing Tendril
+        // ---------------------------------------------------------------------
         {
             var pts = new List<Point>();
-            double rr = p.Height / 2.0;
-            double cy = p.Y + rr;
-            double cx = p.X + (side < 0 ? rr : p.Width - rr);
+            double o = 2.5 * _scale;
             double R = rr + o;
 
-            // Climb up along side from bottom drop
-            for (double y = p.Y + p.Height + drop; y > cy + R; y -= 4.0)
+            // 1. Cling along top rim towards left cap (strictly kept below top boundary)
+            double topYClamped = Math.Max(1.8, topY + 1.8);
+            double startX = p.X + p.Width * 0.42;
+            for (double x = startX; x >= cxL; x -= 3.5)
             {
-                pts.Add(new Point(cx, y));
+                pts.Add(new Point(x, topYClamped));
             }
 
-            // Curve around capsule end cap
+            // 2. Round the left semicircle cap
             double angleStep = 4.0 / Math.Max(1.0, R);
-            for (double a = 0.0; a <= Math.PI; a += angleStep)
+            for (double a = -Math.PI / 2.0; a <= Math.PI / 2.0; a += angleStep)
             {
-                double an = Math.PI / 2.0 + (side < 0 ? a : -a);
-                pts.Add(new Point(cx + Math.Cos(an) * R, cy + Math.Sin(an) * R));
+                double px = cxL - Math.Cos(a) * R;
+                double py = cy + Math.Sin(a) * R;
+                pts.Add(new Point(px, Math.Max(1.5, py)));
             }
 
-            // Wrap along top rim
-            double end = p.X + p.Width * endF;
-            if (side < 0)
+            // 3. Hug bottom-left rim eastward
+            double bEnd = p.X + p.Width * 0.22;
+            for (double x = cxL; x <= bEnd; x += 3.5)
             {
-                for (double x = cx; x < end; x += 4.0) pts.Add(new Point(x, p.Y - o));
-            }
-            else
-            {
-                for (double x = cx; x > end; x -= 4.0) pts.Add(new Point(x, p.Y - o));
+                pts.Add(new Point(x, botY + o));
             }
 
-            // Apply organic sinusoidal wobble
+            // 4. Cascade gracefully downward and outward to the left
+            double cascadeDrop = _dropLength * 0.95;
+            for (double y = botY + o; y <= botY + o + cascadeDrop; y += 3.2)
+            {
+                double frac = (y - (botY + o)) / Math.Max(1.0, cascadeDrop);
+                double outCurve = -Math.Sin(frac * Math.PI * 0.85) * (34.0 * _scale);
+                double sway = Math.Sin(frac * Math.PI * 2.2 + 0.5) * 8.0;
+                pts.Add(new Point(bEnd + outCurve + sway, y));
+            }
+
+            // 5. Delicate terminal spiral curl
+            if (pts.Count > 0)
+            {
+                var last = pts[^1];
+                double tx = last.X, ty = last.Y;
+                double curAng = Math.PI * 0.55;
+                for (int k = 0; k < 11; k++)
+                {
+                    curAng += 0.38;
+                    tx += Math.Cos(curAng) * (1.8 * _scale);
+                    ty += Math.Sin(curAng) * (1.8 * _scale);
+                    pts.Add(new Point(tx, ty));
+                }
+            }
+
+            // Apply gentle natural wobble
             var wobbled = new List<Point>(pts.Count);
             for (int i = 0; i < pts.Count; i++)
             {
-                wobbled.Add(new Point(
-                    pts[i].X + Math.Sin(i * wob) * 2.4,
-                    pts[i].Y + Math.Cos(i * wob * 0.8) * 1.8));
+                double wy = pts[i].Y + Math.Cos(i * 0.35) * 1.5;
+                wobbled.Add(new Point(pts[i].X + Math.Sin(i * 0.4) * 1.8, Math.Max(1.5, wy)));
             }
-
-            return Fin(wobbled);
+            vineList.Add(Fin(wobbled));
         }
 
-        _cachedVines = new List<VinePoint[]>
+        // ---------------------------------------------------------------------
+        // Vine 1: Right Perimeter Runner & Cascading Wing Tendril
+        // ---------------------------------------------------------------------
         {
-            Perim(-1, 3.0, 0.35, 0.60, 48.0),
-            Perim(1, 3.0, 0.33, 0.40, 48.0),
-            Perim(-1, 9.0, 0.27, 0.78, 80.0),
-            Perim(1, 9.0, 0.29, 0.22, 75.0)
-        };
+            var pts = new List<Point>();
+            double o = 2.5 * _scale;
+            double R = rr + o;
 
+            // 1. Cling along top rim towards right cap
+            double topYClamped = Math.Max(1.8, topY + 1.8);
+            double startX = p.X + p.Width * 0.58;
+            for (double x = startX; x <= cxR; x += 3.5)
+            {
+                pts.Add(new Point(x, topYClamped));
+            }
+
+            // 2. Round the right semicircle cap
+            double angleStep = 4.0 / Math.Max(1.0, R);
+            for (double a = -Math.PI / 2.0; a <= Math.PI / 2.0; a += angleStep)
+            {
+                double px = cxR + Math.Cos(a) * R;
+                double py = cy + Math.Sin(a) * R;
+                pts.Add(new Point(px, Math.Max(1.5, py)));
+            }
+
+            // 3. Hug bottom-right rim westward
+            double bEnd = p.X + p.Width * 0.78;
+            for (double x = cxR; x >= bEnd; x -= 3.5)
+            {
+                pts.Add(new Point(x, botY + o));
+            }
+
+            // 4. Cascade gracefully downward and outward to the right
+            double cascadeDrop = _dropLength * 0.95;
+            for (double y = botY + o; y <= botY + o + cascadeDrop; y += 3.2)
+            {
+                double frac = (y - (botY + o)) / Math.Max(1.0, cascadeDrop);
+                double outCurve = Math.Sin(frac * Math.PI * 0.85) * (34.0 * _scale);
+                double sway = Math.Sin(frac * Math.PI * 2.2 + 1.2) * 8.0;
+                pts.Add(new Point(bEnd + outCurve + sway, y));
+            }
+
+            // 5. Terminal spiral curl
+            if (pts.Count > 0)
+            {
+                var last = pts[^1];
+                double tx = last.X, ty = last.Y;
+                double curAng = Math.PI * 0.45;
+                for (int k = 0; k < 11; k++)
+                {
+                    curAng -= 0.38;
+                    tx += Math.Cos(curAng) * (1.8 * _scale);
+                    ty += Math.Sin(curAng) * (1.8 * _scale);
+                    pts.Add(new Point(tx, ty));
+                }
+            }
+
+            var wobbled = new List<Point>(pts.Count);
+            for (int i = 0; i < pts.Count; i++)
+            {
+                double wy = pts[i].Y + Math.Cos(i * 0.33) * 1.5;
+                wobbled.Add(new Point(pts[i].X + Math.Sin(i * 0.38) * 1.8, Math.Max(1.5, wy)));
+            }
+            vineList.Add(Fin(wobbled));
+        }
+
+        // ---------------------------------------------------------------------
+        // Vine 2: Continuous Under-Pill Trellis & Left-Center Cascade (Eliminates the empty gap!)
+        // ---------------------------------------------------------------------
+        {
+            var pts = new List<Point>();
+            double o = 3.5 * _scale;
+
+            // 1. Runs completely across the bottom edge of the pill from left to right
+            for (double x = cxL - 6.0; x <= cxR + 6.0; x += 3.5)
+            {
+                double wave = Math.Sin(x * 0.08) * 2.0;
+                pts.Add(new Point(x, botY + o + wave));
+            }
+
+            // 2. Cascades downward from 32% width
+            double detachX = p.X + p.Width * 0.32;
+            double cascadeDrop = _dropLength * 1.15;
+            for (double y = botY + o; y <= botY + o + cascadeDrop; y += 3.4)
+            {
+                double frac = (y - (botY + o)) / Math.Max(1.0, cascadeDrop);
+                double wave = Math.Sin(frac * Math.PI * 2.0 + 0.8) * (14.0 * _scale);
+                pts.Add(new Point(detachX + wave, y));
+            }
+
+            // 3. Spiral curl
+            if (pts.Count > 0)
+            {
+                var last = pts[^1];
+                double tx = last.X, ty = last.Y;
+                double curAng = Math.PI * 0.5;
+                for (int k = 0; k < 10; k++)
+                {
+                    curAng += 0.40;
+                    tx += Math.Cos(curAng) * (1.6 * _scale);
+                    ty += Math.Sin(curAng) * (1.6 * _scale);
+                    pts.Add(new Point(tx, ty));
+                }
+            }
+
+            var wobbled = new List<Point>(pts.Count);
+            for (int i = 0; i < pts.Count; i++)
+            {
+                wobbled.Add(new Point(pts[i].X + Math.Sin(i * 0.28) * 1.4, pts[i].Y));
+            }
+            vineList.Add(Fin(wobbled));
+        }
+
+        // ---------------------------------------------------------------------
+        // Vine 3: Right-Center Cascade (if density > 0.45)
+        // ---------------------------------------------------------------------
+        if (_density > 0.45)
+        {
+            var pts = new List<Point>();
+            double o = 4.0 * _scale;
+            double detachX = p.X + p.Width * 0.68;
+            double cascadeDrop = _dropLength * 1.08;
+
+            for (double y = botY + o; y <= botY + o + cascadeDrop; y += 3.4)
+            {
+                double frac = (y - (botY + o)) / Math.Max(1.0, cascadeDrop);
+                double wave = Math.Sin(frac * Math.PI * 2.1 + 2.0) * (16.0 * _scale);
+                pts.Add(new Point(detachX + wave, y));
+            }
+
+            if (pts.Count > 0)
+            {
+                var last = pts[^1];
+                double tx = last.X, ty = last.Y;
+                double curAng = Math.PI * 0.5;
+                for (int k = 0; k < 10; k++)
+                {
+                    curAng -= 0.40;
+                    tx += Math.Cos(curAng) * (1.6 * _scale);
+                    ty += Math.Sin(curAng) * (1.6 * _scale);
+                    pts.Add(new Point(tx, ty));
+                }
+            }
+
+            var wobbled = new List<Point>(pts.Count);
+            for (int i = 0; i < pts.Count; i++)
+            {
+                wobbled.Add(new Point(pts[i].X + Math.Sin(i * 0.32) * 1.4, pts[i].Y));
+            }
+            vineList.Add(Fin(wobbled));
+        }
+
+        // ---------------------------------------------------------------------
+        // Vine 4: Center Droplet Tendril (if density > 0.75)
+        // ---------------------------------------------------------------------
+        if (_density > 0.75)
+        {
+            var pts = new List<Point>();
+            double detachX = p.X + p.Width * 0.50;
+            double cascadeDrop = _dropLength * 0.68;
+
+            for (double y = botY + 2.0; y <= botY + 2.0 + cascadeDrop; y += 3.2)
+            {
+                double frac = (y - (botY + 2.0)) / Math.Max(1.0, cascadeDrop);
+                double wave = Math.Sin(frac * Math.PI * 2.4) * (8.0 * _scale);
+                pts.Add(new Point(detachX + wave, y));
+            }
+
+            if (pts.Count > 0)
+            {
+                var last = pts[^1];
+                double tx = last.X, ty = last.Y;
+                double curAng = Math.PI * 0.5;
+                for (int k = 0; k < 9; k++)
+                {
+                    curAng += 0.44;
+                    tx += Math.Cos(curAng) * (1.4 * _scale);
+                    ty += Math.Sin(curAng) * (1.4 * _scale);
+                    pts.Add(new Point(tx, ty));
+                }
+            }
+
+            vineList.Add(Fin(pts));
+        }
+
+        _cachedVines = vineList;
+
+        // ---------------------------------------------------------------------
+        // Secondary Branches (Lateral Sprouts with Terminal Tendril Curls)
+        // ---------------------------------------------------------------------
         _cachedBranches = new List<BranchData>();
+        int branchSpacing = Math.Max(11, (int)(20.0 / Math.Max(0.3, _density)));
+
         for (int j = 0; j < _cachedVines.Count; j++)
         {
             var m = _cachedVines[j];
             var rng = new Mulberry32((uint)(100 + j));
-            for (int i = 16 + j * 3; i < m.Length - 12; i += 20 + (int)(rng.NextDouble() * 10))
+            for (int i = 12 + j * 3; i < m.Length - 14; i += branchSpacing + (int)(rng.NextDouble() * 7))
             {
                 var pt = m[i];
-                double ang = Math.Atan2(pt.Ny - 0.6, pt.Nx) + (rng.NextDouble() - 0.5) * 0.8;
-                double curX = pt.X, curY = pt.Y;
+                // Outward and downward branching vector
+                double dirX = pt.Nx * (rng.NextDouble() < 0.25 ? -0.3 : 0.8) + (rng.NextDouble() - 0.5) * 0.4;
+                double dirY = Math.Max(0.3, Math.Abs(pt.Ny) + 0.35 + rng.NextDouble() * 0.45);
+                double ang = Math.Atan2(dirY, dirX);
+
+                double curX = pt.X;
+                double curY = Math.Max(2.0, pt.Y);
                 var branchPts = new List<Point>();
-                int steps = 14 + (int)(rng.NextDouble() * 18);
-                double cu = (rng.NextDouble() - 0.5) * 0.07;
+                int steps = Math.Max(8, (int)((12 + rng.NextDouble() * 16) * Math.Min(1.2, _scale * 1.1)));
+                double cu = (rng.NextDouble() - 0.5) * 0.08;
 
                 for (int k = 0; k < steps; k++)
                 {
-                    ang += cu + (rng.NextDouble() - 0.5) * 0.3;
-                    curX += Math.Cos(ang) * 3.2;
-                    curY += Math.Sin(ang) * 3.2;
+                    ang += cu + (rng.NextDouble() - 0.5) * 0.22;
+                    curX += Math.Cos(ang) * 3.0 * _scale;
+                    curY += Math.Sin(ang) * 3.0 * _scale;
+                    curY = Math.Max(2.0, curY);
                     branchPts.Add(new Point(curX, curY));
                 }
 
@@ -399,8 +648,9 @@ public sealed class IslandNatureThemeControl : FrameworkElement
                 for (int k = 0; k < 10; k++)
                 {
                     ang += 0.36 * sg;
-                    curX += Math.Cos(ang) * 1.5;
-                    curY += Math.Sin(ang) * 1.5;
+                    curX += Math.Cos(ang) * 1.4 * _scale;
+                    curY += Math.Sin(ang) * 1.4 * _scale;
+                    curY = Math.Max(2.0, curY);
                     branchPts.Add(new Point(curX, curY));
                 }
 
@@ -424,8 +674,8 @@ public sealed class IslandNatureThemeControl : FrameworkElement
         int[] ks = new int[_cachedVines.Count];
         for (int j = 0; j < _cachedVines.Count; j++)
         {
-            double delay = j > 1 ? 1.5 : 0.0;
-            ks[j] = (int)(_cachedVines[j].Length * EaseOutCubic((cyc - delay) / 11.0));
+            double delay = j > 1 ? 1.2 : 0.0;
+            ks[j] = (int)(_cachedVines[j].Length * EaseOutCubic((cyc - delay) / 10.0));
         }
 
         for (int j = 0; j < _cachedVines.Count; j++)
@@ -439,7 +689,7 @@ public sealed class IslandNatureThemeControl : FrameworkElement
         for (int q = 0; q < _cachedBranches.Count; q++)
         {
             var b = _cachedBranches[q];
-            int n = (int)(b.Points.Length * Clamp((ks[b.ParentIdx] - b.AttachIdx) / 36.0));
+            int n = (int)(b.Points.Length * Clamp((ks[b.ParentIdx] - b.AttachIdx) / 32.0));
             if (n > 2)
             {
                 DrawVine(dc, b.Points, n, 1.4, t, flowers, q + 9, isBranch: true);
@@ -455,7 +705,7 @@ public sealed class IslandNatureThemeControl : FrameworkElement
         if (fade < 0.99) dc.Pop();
     }
 
-    private static void DrawVine(DrawingContext dc, VinePoint[] pts, int n, double w, double t, List<FlowerData> fl, int sd, bool isBranch)
+    private void DrawVine(DrawingContext dc, VinePoint[] pts, int n, double w, double t, List<FlowerData> fl, int sd, bool isBranch)
     {
         if (n < 2) return;
 
@@ -471,8 +721,10 @@ public sealed class IslandNatureThemeControl : FrameworkElement
         }
         stemGeom.Freeze();
 
-        dc.DrawGeometry(null, StemDarkPen, stemGeom);
-        dc.DrawGeometry(null, StemLightPen, stemGeom);
+        Pen darkPen = isBranch ? BranchDarkPen : (sd > 1 ? SecVineDarkPen : MainVineDarkPen);
+        Pen lightPen = isBranch ? BranchLightPen : (sd > 1 ? SecVineLightPen : MainVineLightPen);
+        dc.DrawGeometry(null, darkPen, stemGeom);
+        dc.DrawGeometry(null, lightPen, stemGeom);
 
         // 2. Draw English Ivy Leaves alternating along the stem
         for (int i = 3; i < n; i += 3)
@@ -481,38 +733,53 @@ public sealed class IslandNatureThemeControl : FrameworkElement
             double sd2 = ((i / 3) % 2 == 1) ? 1.0 : -1.0;
             double sc = EaseOutCubic((n - i) / 22.0);
             double h = ((uint)((i + sd * 31) * 2654435761u)) / 4294967296.0;
-            double len = (11.0 + h * 8.0) * sc * (isBranch ? 0.8 : 1.0);
+            double len = (10.5 + h * 8.0) * sc * _scale * (isBranch ? 0.8 : 1.0);
             if (len < 1.5) continue;
 
             double ang = Math.Atan2(pt.Ty, pt.Tx) + sd2 * (0.95 + Math.Sin(t * 1.2 + i * 0.7) * 0.1);
+
+            // CRITICAL: Prevent top-edge clipping and squashing when pill is flush with monitor top!
+            if (pt.Y < 14.0 && Math.Sin(ang) < 0)
+            {
+                // Align leaf smoothly along capsule contour (tangential or outwards/downwards)
+                double cosSign = Math.Cos(ang) >= 0 ? 1.0 : -1.0;
+                ang = cosSign > 0 ? 0.18 + h * 0.15 : Math.PI - 0.18 - h * 0.15;
+            }
+
             double lx = pt.X + Math.Cos(ang) * len * 0.25;
-            double ly = pt.Y + Math.Sin(ang) * len * 0.25;
+            double ly = Math.Max(1.5, pt.Y + Math.Sin(ang) * len * 0.25);
 
             dc.DrawLine(MeadowStemDarkPen, new Point(pt.X, pt.Y), new Point(lx, ly));
-            DrawIvyLeaf(dc, lx, ly, ang, len, h > 0.55);
+            DrawIvyLeaf(dc, lx, ly, ang, len, h > 0.50);
         }
 
-        // 3. Flower bud candidates
-        for (int i = 10; i < n; i += 16 + ((i * 7) % 5))
+        // 3. Flower bud candidates spaced according to _bloomDensity
+        int flowerSpacing = Math.Max(9, (int)(16.0 / Math.Max(0.25, _bloomDensity)));
+        for (int i = 8; i < n; i += flowerSpacing + ((i * 7) % 5))
         {
             var pt = pts[i];
             double h = (((uint)(i * 40503 + sd * 977)) % 1000) / 1000.0;
-            double k = EaseOutCubic((n - i) / 26.0);
+            double k = EaseOutCubic((n - i) / 24.0);
             if (k > 0.05)
             {
+                double fx = pt.X + pt.Nx * (5.0 + h * 5.0) * _scale;
+                double fy = Math.Max(2.0, pt.Y + Math.Abs(pt.Ny) * (4.0 + h * 4.0) * _scale);
+                // Cycle flower types: 0=Morning Glory, 1=Jasmine, 2=Lilac, 3=Pink Camellia
+                int flowerType = ((i / 14) + sd) % 4;
                 fl.Add(new FlowerData(
-                    pt.X + pt.Nx * (5.0 + h * 5.0),
-                    pt.Y + pt.Ny * (5.0 + h * 5.0),
-                    k * (0.75 + h * 0.5),
+                    fx,
+                    fy,
+                    k * (0.85 + h * 0.4) * _scale,
                     h * 6.283 + Math.Sin(t + i) * 0.08,
-                    ((i / 16) + sd) % 4));
+                    flowerType));
             }
         }
 
-        if (isBranch && n == pts.Length && n > 13)
+        // Branch tips flower bud
+        if (isBranch && n == pts.Length && n > 10)
         {
-            var pt = pts[n - 13];
-            fl.Add(new FlowerData(pt.X, pt.Y, 0.85, 0.5, (sd + n) % 4));
+            var pt = pts[n - 10];
+            fl.Add(new FlowerData(pt.X, Math.Max(2.0, pt.Y + 2.0), 0.85 * _scale, 0.5, (sd + n) % 4));
         }
     }
 
@@ -596,7 +863,7 @@ public sealed class IslandNatureThemeControl : FrameworkElement
             double a = i * 1.2566 + 0.6283;
             dc.DrawLine(GloryRaysPen, new Point(Math.Cos(a) * 1.5, Math.Sin(a) * 1.5), new Point(Math.Cos(a) * 9.0, Math.Sin(a) * 9.0));
         }
-        dc.DrawEllipse(GloryCenterBrush, null, new Point(0, 0), 1.7, 1.7);
+        dc.DrawEllipse(GloryCenterBrush, null, new Point(0, 0), 1.8, 1.8);
 
         dc.Pop();
     }
@@ -691,41 +958,66 @@ public sealed class IslandNatureThemeControl : FrameworkElement
 
     private void RenderIvyOverlay(DrawingContext dc, Rect p, double t)
     {
-        // 1. Shimmering golden pollen / firefly specks drifting past the island
-        for (int j = 0; j < 20; j++)
+        // 1. Shimmering golden pollen / firefly specks drifting past the island in the visible airspace
+        if (_pollenEnabled && _pollenCount > 0)
         {
-            double px = p.X - 20.0 + (((j * 97) % 100) / 100.0) * (p.Width + 40.0) + Math.Sin(t * 0.5 + j) * 10.0;
-            double py = p.Y + 8.0 + (((j * 53) % 100) / 100.0) * (p.Height + 50.0) - ((t * 7.0 + j * 9.0) % 40.0);
-            double alpha = 0.5 * Math.Abs(Math.Sin(t + j));
-            if (alpha > 0.05)
+            int pollenMax = Math.Clamp(_pollenCount, 0, 30);
+            for (int j = 0; j < pollenMax; j++)
             {
-                dc.PushOpacity(alpha);
-                dc.DrawEllipse(GoldenPollenBrush, null, new Point(px, py), 1.5, 1.5);
-                dc.Pop();
+                double px = p.X - 35.0 + (((j * 97) % 100) / 100.0) * (p.Width + 70.0) + Math.Sin(t * 0.5 + j) * 12.0;
+                double py = p.Y + p.Height + 10.0 + (((j * 53) % 100) / 100.0) * 110.0 - ((t * 6.0 + j * 8.0) % 40.0);
+                double alpha = 0.55 * Math.Abs(Math.Sin(t + j));
+                if (alpha > 0.04)
+                {
+                    dc.PushOpacity(alpha);
+                    dc.DrawEllipse(GoldenPollenBrush, null, new Point(px, py), 1.5 * _scale, 1.5 * _scale);
+                    dc.Pop();
+                }
             }
         }
 
-        // 2. Three Fluttering Butterflies: Monarch, Blue Morpho, White Swallowtail
-        double[] speeds = { 11.0, 13.0, 9.0 };
-        double[] scales = { 0.95, 0.85, 0.75 };
-        Brush[] wingBrushes = { MonarchWingBrush, BlueMorphoWingBrush, SwallowtailWingBrush };
-        Pen[] wingPens = { ButterflyMonarchPen, ButterflyBluePen, ButterflyWhitePen };
-        Brush[] spotBrushes = { MonarchSpotBrush, BlueMorphoSpotBrush, SwallowtailSpotBrush };
-
-        for (int i = 0; i < 3; i++)
+        // 2. Fluttering Butterflies orbiting gracefully around the cascading foliage
+        int count = Math.Clamp(_butterflyCount, 0, 4);
+        if (count > 0)
         {
-            Point FlightPath(double u)
+            double[] speeds = { 11.0, 13.0, 9.0, 12.0 };
+            double[] scales = { 1.0, 0.9, 0.8, 0.85 };
+            Brush[] wingBrushes = { MonarchWingBrush, BlueMorphoWingBrush, SwallowtailWingBrush, BlueMorphoWingBrush };
+            Pen[] wingPens = { ButterflyMonarchPen, ButterflyBluePen, ButterflyWhitePen, ButterflyBluePen };
+            Brush[] spotBrushes = { MonarchSpotBrush, BlueMorphoSpotBrush, SwallowtailSpotBrush, BlueMorphoSpotBrush };
+
+            for (int i = 0; i < count; i++)
             {
-                double bx = p.X + p.Width / 2.0 + Math.Sin(u * (0.21 + 0.07 * i) + i * 2.0) * (Math.Min(190.0, p.Width / 2.0 + 80.0) - i * 22.0);
-                double by = p.Y + p.Height / 2.0 + 32.0 + i * 16.0 + Math.Sin(u * (0.37 + 0.05 * i) + i) * (36.0 + i * 8.0);
-                return new Point(bx, by);
+                Point FlightPath(double u)
+                {
+                    double bx, by;
+                    if (i == 0) // Monarch fluttering near right cascading foliage
+                    {
+                        double cx = p.X + p.Width * 0.82;
+                        bx = cx + Math.Sin(u * 0.35) * (45.0 * _scale) + Math.Cos(u * 0.15) * 15.0;
+                        by = p.Y + p.Height + 28.0 + Math.Sin(u * 0.52) * 22.0;
+                    }
+                    else if (i == 1) // Blue Morpho fluttering near left cascading foliage
+                    {
+                        double cx = p.X + p.Width * 0.18;
+                        bx = cx + Math.Sin(u * 0.42 + 1.5) * (45.0 * _scale) - Math.Cos(u * 0.18) * 15.0;
+                        by = p.Y + p.Height + 32.0 + Math.Sin(u * 0.61 + 2.0) * 20.0;
+                    }
+                    else // Swallowtail looping gently across center underlay
+                    {
+                        double cx = p.X + p.Width * 0.50;
+                        bx = cx + Math.Sin(u * 0.28 + 3.0) * (p.Width * 0.35);
+                        by = p.Y + p.Height + 48.0 + Math.Sin(u * 0.45 + 1.0) * 18.0;
+                    }
+                    return new Point(bx, by);
+                }
+
+                Point ptA = FlightPath(t);
+                Point ptB = FlightPath(t + 0.05);
+                double ang = Math.Atan2(ptB.X - ptA.X, -(ptB.Y - ptA.Y));
+
+                DrawButterfly(dc, ptA.X, ptA.Y, t + i, ang, scales[i] * _scale, speeds[i], wingBrushes[i], wingPens[i], spotBrushes[i]);
             }
-
-            Point ptA = FlightPath(t);
-            Point ptB = FlightPath(t + 0.05);
-            double ang = Math.Atan2(ptB.X - ptA.X, -(ptB.Y - ptA.Y));
-
-            DrawButterfly(dc, ptA.X, ptA.Y, t + i, ang, scales[i], speeds[i], wingBrushes[i], wingPens[i], spotBrushes[i]);
         }
     }
 
@@ -807,235 +1099,71 @@ public sealed class IslandNatureThemeControl : FrameworkElement
     }
 
     // =========================================================================
-    //  THEME 2: Sakura Branch
-    // =========================================================================
-
-    private void RenderSakuraBranch(DrawingContext dc, Rect p, double t)
-    {
-        double k = EaseOutCubic(t / 3.2);
-        var rng = new Mulberry32(5);
-
-        double x0 = p.X + p.Width + 40.0;
-        double y0 = p.Y + 2.0;
-        double cx = p.X + p.Width * 0.70;
-        double cy = p.Y + 18.0;
-        double x1 = p.X + p.Width * 0.35;
-        double y1 = p.Y + p.Height + 12.0;
-
-        DrawLimb(dc, x0, y0, cx, cy, x1, y1, 7.0, 2.5, k, VineBarkDarkPen, VineBarkLightPen);
-
-        for (int i = 0; i < 11; i++)
-        {
-            double u = 0.1 + i * 0.08;
-            double tk = EaseOutCubic((k - u) * 4.0);
-            if (tk <= 0) { rng.NextDouble(); rng.NextDouble(); rng.NextDouble(); continue; }
-
-            var b = Qp(x0, y0, cx, cy, x1, y1, u);
-            double ang = (100.0 + rng.NextDouble() * 70.0) * Math.PI / 180.0;
-            double len = 20.0 + rng.NextDouble() * 26.0;
-            double sw = Math.Sin(t * 1.2 + i) * 3.0;
-            double ex = b.X + Math.Cos(ang) * len + sw;
-            double ey = b.Y + Math.Sin(ang) * len;
-
-            DrawLimb(dc, b.X, b.Y, (b.X + ex) / 2.0 + 6.0, (b.Y + ey) / 2.0 - 4.0, ex, ey, 2.4, 0.9, tk, VineBarkDarkPen, VineBarkLightPen);
-
-            if (tk >= 0.95)
-            {
-                double bs = EaseOutCubic((t - u * 3.0 - 1.2) / 1.4) * 1.15;
-                DrawBlossom(dc, ex, ey, bs, i, SakuraPetalBrush, StamenPinkPen);
-                DrawBlossom(dc, ex - 8.0, ey - 6.0, bs * 0.8, i + 2, SakuraPetalBrush, StamenPinkPen);
-                DrawBlossom(dc, ex + 7.0, ey - 4.0, bs * 0.7, i + 4, SakuraPetalBrush, StamenPinkPen);
-                DrawBlossom(dc, (b.X + ex) / 2.0, (b.Y + ey) / 2.0, bs * 0.75, i + 1, SakuraPetalBrush, StamenPinkPen);
-            }
-        }
-    }
-
-    private void RenderSakuraPetals(DrawingContext dc, Rect p, double t)
-    {
-        for (int i = 0; i < 24; i++)
-        {
-            double z = 0.45 + ((i * 37) % 10) / 10.0 * 0.75;
-            double f = (t * 0.06 * (0.6 + z) + i * 0.113) % 1.0;
-            double px = p.X - 40.0 + (((i * 97) % 100) / 100.0) * (p.Width + 80.0) + Math.Sin(t * 1.2 + i) * 16.0;
-            double py = p.Y - 10.0 + f * (p.Height + 110.0);
-            double alpha = (0.5 + z * 0.4) * Math.Sin(f * Math.PI);
-
-            if (alpha > 0.05)
-            {
-                var mat = Matrix.Identity;
-                mat.Scale(1.0, 0.4 + Math.Abs(Math.Sin(t * 2.0 + i)) * 0.6);
-                mat.Rotate((t * 1.4 + i) * 180.0 / Math.PI);
-                mat.Translate(px, py);
-
-                dc.PushOpacity(alpha);
-                dc.PushTransform(new MatrixTransform(mat));
-                DrawPetal(dc, 8.0 * z, 4.0 * z, SakuraPetalBrush, 0, notched: true);
-                dc.Pop();
-                dc.Pop();
-            }
-        }
-    }
-
-    // =========================================================================
-    //  THEME 3: Blossom Tree
-    // =========================================================================
-
-    private sealed class TreeNode
-    {
-        public double X, Y, X1, Y1, Cx, Cy, W, Ph;
-        public int D;
-        public List<TreeNode> Kids = new();
-    }
-
-    private static TreeNode? _cachedTree;
-    private static TreeNode BuildTree(uint seed)
-    {
-        if (_cachedTree != null) return _cachedTree;
-        var rng = new Mulberry32(seed);
-
-        TreeNode F(double x, double y, double len, double a, int d, double w)
-        {
-            double rad = a * Math.PI / 180.0;
-            double x1 = x + Math.Cos(rad) * len;
-            double y1 = y + Math.Sin(rad) * len;
-            double b = (rng.NextDouble() - 0.5) * len * 0.5;
-            var node = new TreeNode
-            {
-                X = x, Y = y, X1 = x1, Y1 = y1,
-                Cx = (x + x1) / 2.0 - Math.Sin(rad) * b,
-                Cy = (y + y1) / 2.0 + Math.Cos(rad) * b,
-                D = d, W = w, Ph = rng.NextDouble() * 6.0
-            };
-            if (d < 5)
-            {
-                int m = d < 1 ? 3 : (rng.NextDouble() < 0.25 ? 3 : 2);
-                for (int i = 0; i < m; i++)
-                {
-                    double sp = (i - (m - 1) / 2.0) * (26.0 + rng.NextDouble() * 14.0) + (rng.NextDouble() - 0.5) * 10.0;
-                    node.Kids.Add(F(x1, y1, len * (0.72 + rng.NextDouble() * 0.08), a + sp, d + 1, w * 0.68));
-                }
-            }
-            return node;
-        }
-
-        _cachedTree = F(0, 0, 32.0, 90.0, 0, 7.5);
-        return _cachedTree;
-    }
-
-    private void RenderBlossomTree(DrawingContext dc, Rect p, double t)
-    {
-        double cyc = t % 18.0;
-        double gr = EaseOutCubic(cyc / 7.0);
-        double fade = cyc > 16.0 ? (18.0 - cyc) / 2.0 : 1.0;
-        if (fade <= 0.01) return;
-
-        if (fade < 0.99) dc.PushOpacity(fade);
-
-        var root = BuildTree(21);
-        DrawTreeNode(dc, root, p.X + p.Width / 2.0, p.Y + p.Height - 1.0, gr, t);
-
-        if (fade < 0.99) dc.Pop();
-    }
-
-    private static void DrawTreeNode(DrawingContext dc, TreeNode n, double ox, double oy, double gr, double t)
-    {
-        double gd = Clamp(gr * 8.0 - n.D * 1.05);
-        if (gd <= 0) return;
-
-        double sw = Math.Sin(t * 1.1 + n.Ph) * n.D * 0.45;
-        Point e = DrawLimb(dc,
-            n.X + ox, n.Y + oy,
-            n.Cx + ox + sw * 0.5, n.Cy + oy,
-            n.X1 + ox + sw, n.Y1 + oy,
-            n.W, n.W * 0.7, gd, TreeBarkDarkPen, TreeBarkLightPen);
-
-        if (gd >= 0.95)
-        {
-            if (n.D >= 2)
-            {
-                var mat = Matrix.Identity;
-                mat.Rotate((n.Ph * 2.0) * 180.0 / Math.PI);
-                mat.Translate(e.X, e.Y);
-                dc.PushTransform(new MatrixTransform(mat));
-                DrawPetal(dc, 7.5, 3.5, TreeLeafBrush, 0, notched: false);
-                dc.Pop();
-            }
-            if (n.D >= 3)
-            {
-                DrawBlossom(dc, e.X, e.Y, Clamp(gr * 8.0 - n.D - 0.3) * 0.85, n.Ph + t * 0.1, SakuraPetalBrush, StamenPinkPen);
-            }
-        }
-
-        foreach (var kid in n.Kids)
-        {
-            DrawTreeNode(dc, kid, ox + sw, oy, gr, t);
-        }
-    }
-
-    // =========================================================================
-    //  THEME 4: Meadow
+    //  THEME 2: Meadow (Cascading Hanging Wildflower Meadow)
     // =========================================================================
 
     private void RenderMeadow(DrawingContext dc, Rect p, double t)
     {
         var rng = new Mulberry32(11);
+        double yAnchor = p.Y + p.Height;
 
-        // 1. Hanging/growing grass blades
-        for (int i = 0; i < 50; i++)
+        // 1. Meadow grass blades draping down from the pill bottom edge
+        int bladeCount = Math.Max(15, (int)(70 * _density));
+        for (int i = 0; i < bladeCount; i++)
         {
-            double x = p.X + 8.0 + i * (p.Width - 16.0) / 49.0 + (rng.NextDouble() - 0.5) * 4.0;
-            double h = 10.0 + rng.NextDouble() * 20.0;
-            double ln = (rng.NextDouble() - 0.5) * 12.0 + Math.Sin(t * 1.3 + i * 0.7) * 3.0;
+            double x = p.X + 10.0 + i * (p.Width - 20.0) / Math.Max(1.0, bladeCount - 1) + (rng.NextDouble() - 0.5) * 4.0;
+            double h = (14.0 + rng.NextDouble() * 28.0) * _scale;
+            double ln = (rng.NextDouble() - 0.5) * 14.0 + Math.Sin(t * 1.3 + i * 0.7) * 3.0;
             double k = EaseOutCubic((t - 0.2 - rng.NextDouble() * 1.2) / 1.2);
             double tx = x + ln * k;
-            double ty = p.Y + p.Height + h * k;
+            double ty = yAnchor + h * k;
 
             var blade = new StreamGeometry();
             using (var ctx = blade.Open())
             {
-                ctx.BeginFigure(new Point(x - 1.2, p.Y + p.Height), isFilled: true, isClosed: true);
-                ctx.QuadraticBezierTo(new Point(x + ln * 0.1, p.Y + p.Height + h * k * 0.6), new Point(tx, ty), isStroked: false, isSmoothJoin: true);
-                ctx.QuadraticBezierTo(new Point(x + ln * 0.2 + 1.0, p.Y + p.Height + h * k * 0.5), new Point(x + 1.2, p.Y + p.Height), isStroked: false, isSmoothJoin: true);
+                ctx.BeginFigure(new Point(x - 1.4, yAnchor), isFilled: true, isClosed: true);
+                ctx.QuadraticBezierTo(new Point(x + ln * 0.1, yAnchor + h * k * 0.6), new Point(tx, ty), isStroked: false, isSmoothJoin: true);
+                ctx.QuadraticBezierTo(new Point(x + ln * 0.2 + 1.0, yAnchor + h * k * 0.5), new Point(x + 1.4, yAnchor), isStroked: false, isSmoothJoin: true);
             }
             blade.Freeze();
             dc.DrawGeometry(GrassBrush, null, blade);
         }
 
-        // 2. Wildflower stems (daisies, poppies, lavender)
-        int flowerCount = 7;
+        // 2. Wildflower stems (daisies, poppies, lavender) hanging and blooming below
+        int flowerCount = Math.Max(2, (int)(8 * _bloomDensity));
         for (int i = 0; i < flowerCount; i++)
         {
             var rx = new Mulberry32((uint)(i * 7 + 3));
-            double x = p.X + 20.0 + i * (p.Width - 40.0) / (flowerCount - 1) + (rx.NextDouble() - 0.5) * 8.0;
-            double h = 32.0 + rx.NextDouble() * 32.0;
+            double x = p.X + 24.0 + i * (p.Width - 48.0) / Math.Max(1.0, flowerCount - 1) + (rx.NextDouble() - 0.5) * 10.0;
+            double h = (42.0 + rx.NextDouble() * 46.0) * _scale;
             double k = EaseOutCubic((t - 0.6 - i * 0.28) / 1.8);
-            double ln = (rx.NextDouble() - 0.5) * 22.0;
-            double sw = Math.Sin(t * 1.2 + i * 1.7) * 3.5 * k;
+            double ln = (rx.NextDouble() - 0.5) * 26.0;
+            double sw = Math.Sin(t * 1.2 + i * 1.7) * 4.0 * k;
             double ex = x + ln * k + sw;
-            double ey = p.Y + p.Height + h * k;
+            double ey = yAnchor + h * k;
             double cx = x + ln * 0.1;
-            double cy = p.Y + p.Height + h * k * 0.55;
+            double cy = yAnchor + h * k * 0.55;
 
-            DrawLimb(dc, x, p.Y + p.Height, cx, cy, ex, ey, 2.2, 1.2, 1.0, MeadowStemDarkPen, MeadowStemLightPen);
+            DrawLimb(dc, x, yAnchor, cx, cy, ex, ey, 2.8 * _scale, 1.6 * _scale, 1.0, MeadowStemDarkPen, MeadowStemLightPen);
 
             // Small stem leaves
             for (int leafIdx = 0; leafIdx < 2; leafIdx++)
             {
-                double u = leafIdx == 0 ? 0.35 : 0.65;
+                double u = leafIdx == 0 ? 0.3 : 0.55;
                 double sd = leafIdx == 0 ? -1.0 : 1.0;
-                var q = Qp(x, p.Y + p.Height, cx, cy, ex, ey, u);
+                var q = Qp(x, yAnchor, cx, cy, ex, ey, u);
 
                 var mat = Matrix.Identity;
-                mat.Rotate((0.9 + sd * 0.8 + Math.Sin(t + i) * 0.05) * 180.0 / Math.PI);
+                mat.Rotate((0.9 + sd * 0.7 + Math.Sin(t + i) * 0.05) * 180.0 / Math.PI);
                 mat.Translate(q.X, q.Y);
                 dc.PushTransform(new MatrixTransform(mat));
-                DrawPetal(dc, 12.0 * k, 3.5 * k, MeadowLeafBrush, 0, notched: false);
+                DrawPetal(dc, 14.0 * k * _scale, 4.0 * k * _scale, MeadowLeafBrush, 0, notched: false);
                 dc.Pop();
             }
 
-            // Blossom types: 0=Daisy, 1=Poppy, 2=Lavender
+            // Blossom types: 0=Daisy, 1=Poppy, 2=Lavender, 3=Daisy, 4=Poppy, 5=Lavender, 6=Daisy, 7=Poppy
             int fType = i % 3;
-            double s = k * (0.75 + rx.NextDouble() * 0.25);
+            double s = k * (0.85 + rx.NextDouble() * 0.3) * _scale;
             double ph = rx.NextDouble() * 6.0;
 
             switch (fType)
@@ -1122,7 +1250,7 @@ public sealed class IslandNatureThemeControl : FrameworkElement
         {
             double sw = Math.Sin(t * 1.4 + ph + i * 0.2) * 0.5;
             double flX = (i % 2 == 1 ? 2.4 : -2.4) + sw;
-            double flY = -i * 3.0;
+            double flY = i * 3.0; // Cascading downward florets
 
             dc.DrawEllipse(i % 2 == 1 ? LavFloret1Brush : LavFloret2Brush, null, new Point(flX, flY), 2.4, 1.7);
         }
@@ -1132,11 +1260,12 @@ public sealed class IslandNatureThemeControl : FrameworkElement
 
     private void RenderMeadowButterfly(DrawingContext dc, Rect p, double t)
     {
-        double bx = p.X + p.Width / 2.0 + Math.Sin(t * 0.45) * (p.Width / 2.0 + 40.0);
-        double by = p.Y + p.Height + 25.0 + Math.Sin(t * 0.8) * 16.0;
+        if (_butterflyCount <= 0) return;
+        double bx = p.X + p.Width / 2.0 + Math.Sin(t * 0.45) * 180.0;
+        double by = p.Y + p.Height + 50.0 + Math.Sin(t * 0.8) * 25.0;
         double ang = Math.Sin(t * 0.9) * 0.3;
 
-        DrawButterfly(dc, bx, by, t, ang, 0.9, 12.0, MonarchWingBrush, ButterflyMonarchPen, MonarchSpotBrush);
+        DrawButterfly(dc, bx, by, t, ang, 1.0 * _scale, 12.0, MonarchWingBrush, ButterflyMonarchPen, MonarchSpotBrush);
     }
 
     // =========================================================================

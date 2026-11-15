@@ -413,6 +413,35 @@ internal static class NativeMethods
 
     public const int ASFW_ANY = -1;
 
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+    public const byte VK_CONTROL = 0x11;
+    public const byte VK_V = 0x56;
+    public const byte VK_RETURN = 0x0D;
+    public const uint KEYEVENTF_KEYUP = 0x0002;
+
+    /// <summary>
+    /// Injects Ctrl+V paste followed by Enter to deliver a staged reply to the active foreground messenger window.
+    /// </summary>
+    public static void SimulatePasteAndEnter()
+    {
+        // Ctrl down
+        keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
+        // V down & up
+        keybd_event(VK_V, 0, 0, UIntPtr.Zero);
+        keybd_event(VK_V, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        // Ctrl up
+        keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+
+        // Allow application message queue to digest clipboard paste
+        Thread.Sleep(60);
+
+        // Return (Enter) down & up
+        keybd_event(VK_RETURN, 0, 0, UIntPtr.Zero);
+        keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+    }
+
     [DllImport("xinput1_4.dll", EntryPoint = "XInputGetBatteryInformation")]
     public static extern int XInputGetBatteryInformation14(int dwUserIndex, byte devType, ref XINPUT_BATTERY_INFORMATION pBatteryInformation);
 
@@ -512,7 +541,11 @@ internal static class NativeMethods
     public const int WM_MOUSEMOVE = 0x0200;
     public const int WM_LBUTTONDOWN = 0x0201;
     public const int VK_LBUTTON = 0x01;
+    public const int VK_SHIFT = 0x10;
+    public const int VK_MENU = 0x12;
     public const int VK_CAPITAL = 0x14;
+    public const int VK_DOWN = 0x28;
+    public const int VK_Z = 0x5A;
     public const int VK_NUMLOCK = 0x90;
     public const int VK_SCROLL = 0x91;
     public const int VK_VOLUME_MUTE = 0xAD;

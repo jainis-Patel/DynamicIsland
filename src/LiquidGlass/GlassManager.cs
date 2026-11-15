@@ -57,6 +57,10 @@ public sealed class GlassManager : IDisposable
 
     public event EventHandler? FrameReady;
 
+    // P1b perf: Cached shape arrays to avoid per-frame heap allocations during morphing
+    private readonly GlassShape[] _singleShapeBuffer = new GlassShape[1];
+    private readonly GlassShape[] _dualShapeBuffer = new GlassShape[2];
+
     private GlassManager()
     {
     }
@@ -112,7 +116,7 @@ public sealed class GlassManager : IDisposable
         int safeH = Math.Max(height, 10);
 
         int shapeCount = hasSecondaryDroplet ? 2 : 1;
-        var shapes = new GlassShape[shapeCount];
+        var shapes = hasSecondaryDroplet ? _dualShapeBuffer : _singleShapeBuffer;
 
         // Shape 0: Main Dynamic Island Capsule
         shapes[0] = GlassShape.FromBounds(0, 0, safeW, safeH, cornerRadius, settings.Shape);
@@ -162,7 +166,9 @@ public sealed class GlassManager : IDisposable
         int safeH = Math.Max(height, 10);
 
         var shape = GlassShape.FromBounds(0, 0, safeW, safeH, cornerRadius, shapeType);
-        var shapes = new[] { shape };
+        // P1b perf: Reuse cached single-element array
+        _singleShapeBuffer[0] = shape;
+        var shapes = _singleShapeBuffer;
 
         var screenOffset = new Vector2(screenX, screenY);
         var backdropSize = new Vector2(_sharedBackdrop.FrameWidth, _sharedBackdrop.FrameHeight);

@@ -208,9 +208,16 @@ public partial class IslandWindow
 
     private void OnPointerInsideChanged(bool inside)
     {
+        if (_isTucked) return;
+
         bool dockHovered = FloatingDockHost != null && (FloatingDockHost.IsMouseOver || FloatingDockHost.IsKeyboardFocusWithin);
         bool pillHovered = Pill != null && Pill.IsMouseOver;
         bool effectiveInside = inside || dockHovered || pillHovered;
+
+        if (!effectiveInside && _isGhostVisualActive)
+        {
+            NotifyGhostPassthroughHover(false);
+        }
 
         bool wasInside = _pointerInside;
         _pointerInside = effectiveInside;
@@ -279,9 +286,11 @@ public partial class IslandWindow
         if (next == IslandState.Hidden)
         {
             Root.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(160)));
+            _topmostTimer.Stop(); // P1a perf: no need to reassert topmost while hidden
         }
         else if (previous == IslandState.Hidden)
         {
+            _topmostTimer.Start(); // P1a perf: resume topmost reassertion when visible
             ReassertTopmost();
             Root.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(220)));
         }
@@ -323,6 +332,21 @@ public partial class IslandWindow
         ToastSubtitle.Text = toast.Subtitle;
         PillGlowColor.Color = toast.Accent;
         PillGlowSecondaryColor.Color = toast.Accent;
+
+        if (ToastReplyButton != null)
+        {
+            if (toast.CanReply)
+            {
+                ToastReplyButton.Visibility = Visibility.Visible;
+                ToastReplyButton.Tag = toast.HistoryItem;
+                if (ToastReplyGlyph != null) ToastReplyGlyph.Foreground = _lastToastFgBrush;
+                if (ToastReplyText != null) ToastReplyText.Foreground = _lastToastFgBrush;
+            }
+            else
+            {
+                ToastReplyButton.Visibility = Visibility.Collapsed;
+            }
+        }
 
         if (replacing && !IsReducedMotion)
         {
@@ -458,7 +482,7 @@ public partial class IslandWindow
     private void SetDockActive(Button? btn)
     {
         var inactiveBrush = ThemeBrushes.DockInactiveText;
-        var activeBrush = ThemeBrushes.PrimaryText;
+        var activeBrush = Resources["AccentBrush"] as Brush ?? ThemeBrushes.PrimaryText;
 
         foreach (var b in _dockButtons)
         {
@@ -466,7 +490,7 @@ public partial class IslandWindow
             b.BorderBrush = Brushes.Transparent;
             b.BorderThickness = new Thickness(0);
             b.Foreground = inactiveBrush;
-            UpdateDockButtonContentVisual(b, isActive: false);
+            UpdateDockButtonContentVisual(b, inactiveBrush, isActive: false);
         }
 
         if (btn != null)
@@ -475,7 +499,7 @@ public partial class IslandWindow
             btn.BorderBrush = ThemeBrushes.DockActiveBorder;
             btn.BorderThickness = new Thickness(1);
             btn.Foreground = activeBrush;
-            UpdateDockButtonContentVisual(btn, isActive: true);
+            UpdateDockButtonContentVisual(btn, activeBrush, isActive: true);
 
             try
             {
@@ -485,10 +509,8 @@ public partial class IslandWindow
         }
     }
 
-    private static void UpdateDockButtonContentVisual(Button button, bool isActive)
+    private static void UpdateDockButtonContentVisual(Button button, Brush targetFg, bool isActive)
     {
-        var targetFg = isActive ? ThemeBrushes.PrimaryText : ThemeBrushes.DockInactiveText;
-
         if (button.Content is TextBlock tb)
         {
             tb.Foreground = targetFg;
@@ -606,6 +628,16 @@ public partial class IslandWindow
         if (!_rendering) return;
         CompositionTarget.Rendering -= OnRendering;
         _rendering = false;
+
+        // P0 perf: Render one final glass frame at the settled geometry so the
+        // at-rest pill has a correct Liquid Glass bitmap even though the FrameReady
+        // handler now skips dispatches when _rendering is false.
+        if (ThemeManager.IsLiquidGlass && DynamicIsland.LiquidGlass.GlassManager.Instance.IsEnabled)
+        {
+            UpdatePillLiquidGlass(Pill.ActualWidth > 0 ? Pill.ActualWidth : 148,
+                Pill.ActualHeight > 0 ? Pill.ActualHeight : 30,
+                15.0f, _dropletOffset?.Value ?? 0);
+        }
     }
 
     private void OnRendering(object? sender, EventArgs e)
@@ -651,12 +683,22 @@ public partial class IslandWindow
 
         double pillW = _appliedWidth > 0 ? _appliedWidth : Pill.Width;
         double pillH = _appliedHeight > 0 ? _appliedHeight : Pill.Height;
-        double pillX = (Root.ActualWidth > 0 ? Root.ActualWidth : CanvasWidthDip - pillW) / 2.0;
+        double rootW = Root.ActualWidth > 0 ? Root.ActualWidth : CanvasWidthDip;
+        double pillX = (rootW - pillW) / 2.0;
         double pillY = 0.0;
         var pillRect = new Rect(pillX, pillY, pillW, pillH);
 
-        IslandThemeUnderlay?.Step(t, pillRect, IsReducedMotion);
-        IslandThemeOverlay?.Step(t, pillRect, IsReducedMotion);
+        var cur = _settingsService?.Current;
+        double density = cur?.NatureDensity ?? 0.70;
+        double scale = cur?.NatureScale ?? 0.85;
+        double dropLength = cur?.NatureDropLength ?? 60.0;
+        int butterflyCount = cur?.NatureButterflyCount ?? 2;
+        double bloomDensity = cur?.NatureBloomDensity ?? 0.75;
+        bool pollenEnabled = cur?.NaturePollenEnabled ?? true;
+        int pollenCount = cur?.NaturePollenCount ?? 14;
+
+        IslandThemeUnderlay?.Step(t, pillRect, IsReducedMotion, density, scale, dropLength, butterflyCount, bloomDensity, pollenEnabled, pollenCount);
+        IslandThemeOverlay?.Step(t, pillRect, IsReducedMotion, density, scale, dropLength, butterflyCount, bloomDensity, pollenEnabled, pollenCount);
     }
 
     private void UpdateVirtualPet(double t)
@@ -725,7 +767,7 @@ public partial class IslandWindow
                 if (elapsed >= TotalScamperDuration)
                 {
                     _isPetScampering = false;
-                    _nextScamperAllowedTime = t + 150.0 + (new Random().NextDouble() * 120.0);
+                    _nextScamperAllowedTime = t + 150.0 + (Random.Shared.NextDouble() * 120.0); // P2d perf: avoid transient Random allocation
                     if (state == IslandState.Idle) IdlePetCompanion?.PetClickImpulse();
                     else CompactPetCompanion?.PetClickImpulse();
                 }
@@ -1029,6 +1071,8 @@ public partial class IslandWindow
         Pill.Width = w;
         Pill.Height = h;
 
+        if (Pill.Margin.Top != 0) Pill.Margin = new Thickness(0);
+        if (PillGlow != null && PillGlow.Margin.Top != 0) PillGlow.Margin = new Thickness(0);
         if (FloatingDockTranslate != null)
         {
             FloatingDockTranslate.Y = h + 4;
@@ -1082,10 +1126,13 @@ public partial class IslandWindow
             if (ContentHost.Clip != _contentClip) ContentHost.Clip = _contentClip;
         }
 
-        PillGlow.Width = w + 56;
-        PillGlow.Height = h + 32;
-        double glowTopR = topR > 0 ? topR + 12 : 0;
-        PillGlow.CornerRadius = new CornerRadius(glowTopR, glowTopR, effectiveR + 12, effectiveR + 12);
+        if (PillGlow != null)
+        {
+            PillGlow.Width = w + 56;
+            PillGlow.Height = h + 32;
+            double glowTopR = topR > 0 ? topR + 12 : 0;
+            PillGlow.CornerRadius = new CornerRadius(glowTopR, glowTopR, effectiveR + 12, effectiveR + 12);
+        }
     }
 
     private void UpdateLiveBars(double t)
@@ -1267,6 +1314,9 @@ public partial class IslandWindow
     private int _lastPillGlassW;
     private int _lastPillGlassH;
     private float _lastPillGlassR;
+    private bool _lastHasSecondary;
+    private float _lastDropletX;
+    private float _lastDropletY;
 
     internal void UpdatePillLiquidGlass(double w, double h, float radius, double dropT)
     {
@@ -1283,8 +1333,12 @@ public partial class IslandWindow
         int targetH = (int)Math.Max(h, 20);
 
         bool hasSecondary = dropT > 0.01 && SecondaryDroplet != null && SecondaryDroplet.Visibility == Visibility.Visible;
+        float dropX = (float)(SecondaryDropletTranslate?.X ?? 0);
+        float dropY = (float)(SecondaryDropletTranslate?.Y ?? 0);
 
-        if (targetW == _lastPillGlassW && targetH == _lastPillGlassH && Math.Abs(radius - _lastPillGlassR) < 0.5f && !hasSecondary)
+        if (targetW == _lastPillGlassW && targetH == _lastPillGlassH && Math.Abs(radius - _lastPillGlassR) < 0.5f &&
+            hasSecondary == _lastHasSecondary &&
+            (!hasSecondary || (Math.Abs(dropX - _lastDropletX) < 0.5f && Math.Abs(dropY - _lastDropletY) < 0.5f)))
         {
             return;
         }
@@ -1292,6 +1346,9 @@ public partial class IslandWindow
         _lastPillGlassW = targetW;
         _lastPillGlassH = targetH;
         _lastPillGlassR = radius;
+        _lastHasSecondary = hasSecondary;
+        _lastDropletX = dropX;
+        _lastDropletY = dropY;
 
         float screenX = 0;
         float screenY = 0;
@@ -1303,6 +1360,8 @@ public partial class IslandWindow
         }
         catch { }
 
+        // P2a perf: Use zero-allocation GlassSettings.Lerp between pre-computed presets
+        // instead of Builder pattern that allocates per-frame during morph transitions.
         // Adaptive preset based on current morphing state:
         // Compact idle/toast: Punchy Pill capsule profile
         // Expanding/Expanded: Squircle Card profile with lower refraction thickness
@@ -1311,25 +1370,10 @@ public partial class IslandWindow
         if (targetH > 38 || targetW > 200)
         {
             float t = Math.Clamp((float)(targetH - 30) / (176f - 30f), 0.0f, 1.0f);
-            static float Lerp(float a, float b, float factor) => a + (b - a) * factor;
-
-            settings = DynamicIsland.LiquidGlass.GlassSettings.Create()
-                .WithThickness(Lerp(18.0f, 10.0f, t))
-                .WithBevelWidth(Lerp(16.0f, 22.0f, t))
-                .WithIndexOfRefraction(Lerp(1.50f, 1.45f, t))
-                .WithBlurRadius(Lerp(26.0f, 32.0f, t))
-                .WithSaturation(Lerp(1.22f, 1.28f, t))
-                .WithBrightness(Lerp(0.98f, 1.00f, t))
-                .WithTint(Color.FromArgb(
-                    (byte)Lerp(0x75, 0x55, t),
-                    (byte)Lerp(0x05, 0x10, t),
-                    (byte)Lerp(0x05, 0x11, t),
-                    (byte)Lerp(0x09, 0x18, t)))
-                .WithSpecular(Lerp(0.88f, 0.70f, t), rimPower: Lerp(2.4f, 2.0f, t))
-                .WithCornerRadius(radius)
-                .WithCornerSmoothing(0.80f)
-                .WithShape(t > 0.20f ? DynamicIsland.LiquidGlass.GlassShapeType.Squircle : DynamicIsland.LiquidGlass.GlassShapeType.Capsule)
-                .Build();
+            settings = DynamicIsland.LiquidGlass.GlassSettings.Lerp(
+                DynamicIsland.LiquidGlass.GlassPresets.Pill,
+                DynamicIsland.LiquidGlass.GlassPresets.Card,
+                t) with { CornerRadius = radius, CornerSmoothing = 0.80f };
         }
 
         var bmp = DynamicIsland.LiquidGlass.GlassManager.Instance.RenderPillGlass(
