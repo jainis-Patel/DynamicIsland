@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release Tag (e.g. v0.4.1)'
+        required: false
+        default: 'v0.4.1'
 
 permissions:
   contents: write
@@ -28,7 +34,7 @@ jobs:
         id: version_step
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}"
+          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch" -and "${{ inputs.tag }}" -ne "") { "${{ inputs.tag }}" } else { "${{ github.ref_name }}" }
           $cleanVersion = $tag.TrimStart('v','V')
           $isBeta = $tag.Contains("-beta") -or $tag.Contains("-rc") -or $tag.Contains("-alpha")
           $channel = if ($isBeta) { "beta" } else { "stable" }
@@ -58,7 +64,7 @@ jobs:
 
       - name: Publish Single-File Native Binary (win-x64)
         run: |
-          dotnet publish DynamicIsland.csproj -c Release -r win-x64 --no-restore --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:Version=${{ env.VERSION }} -o publish/
+          dotnet publish DynamicIsland.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:Version=${{ env.VERSION }} -o publish/
 
       - name: Compile Inno Setup Installer
         shell: pwsh

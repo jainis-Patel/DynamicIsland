@@ -29,4 +29,4 @@ jobs:
         run: dotnet run -c Release -r win-x64 --no-build -- --self-test
 
       - name: Publish Single-File Release
-        run: dotnet publish -c Release -r win-x64 --no-restore -p:PublishProfile=WinX64
+        run: dotnet publish DynamicIsland.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish/
