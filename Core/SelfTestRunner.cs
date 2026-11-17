@@ -100,6 +100,7 @@ internal static class SelfTestRunner
         Run("UpdateManager: SemVersion 2.0.0 parsing, sorting & pre-release precedence", TestSemVersionComparison);
         Run("UpdateManager: Manifest JSON serialization, channel resolution & hash verification", TestUpdateManifestAndIntegrity);
         Run("Option2And3: Live download speeds, rotating ring & notification app grouping / stacking", TestLiveDownloadsAndNotificationAppGrouping);
+        Run("Choreographer: Power governor modes, task scheduling, interval scaling & iGPU preference", TestChoreographerAndPowerGovernor);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -2784,5 +2785,45 @@ SSID 3 : Home_Router
         var single2 = NotificationAppGroup.FromSingle(sampleItems[4]);
         Assert(single.Equals(single2), "Identical groups must be equal");
         Assert(single.GetHashCode() == single2.GetHashCode(), "Identical groups must share hash code");
+    }
+
+    private static void TestChoreographerAndPowerGovernor()
+    {
+        // 1. Integrated GPU preference
+        bool gpuPref = Choreographer.EnsureIntegratedGpuPreference();
+        // Should execute cleanly (true on standard Windows, or false if registry key inaccessible, but never throw)
+
+        // 2. Choreographer lifecycle and chore calculations
+        using var ch = new Choreographer();
+        Assert(ch.CurrentMode == PowerGovernorMode.HighPerformance ||
+               ch.CurrentMode == PowerGovernorMode.Balanced ||
+               ch.CurrentMode == PowerGovernorMode.BatterySaver, "CurrentMode must be a valid governor mode");
+
+        var choreNormal = new ScheduledChore("normal_task", () => { }, 10, PowerSensitivity.Normal);
+        var choreRelaxed = new ScheduledChore("relaxed_task", () => { }, 5, PowerSensitivity.Relaxed);
+        var choreSuspended = new ScheduledChore("suspended_task", () => { }, 2, PowerSensitivity.Suspended);
+
+        // Verify base interval calculations
+        Assert(choreNormal.BaseIntervalSeconds == 10, "Normal base interval must be 10");
+        Assert(choreRelaxed.BaseIntervalSeconds == 5, "Relaxed base interval must be 5");
+        Assert(choreSuspended.BaseIntervalSeconds == 2, "Suspended base interval must be 2");
+
+        // 3. Register, Trigger, and Tick dispatching
+        int executionCount = 0;
+        ch.Register("test_chore", () => executionCount++, 2, PowerSensitivity.Normal);
+
+        bool triggerResult = ch.Trigger("test_chore");
+        Assert(triggerResult, "Trigger should succeed for registered chore");
+        Assert(executionCount == 1, "Execution count should be 1 after manual trigger");
+
+        // Tick twice to elapse remaining countdown
+        ch.Tick();
+        ch.Tick();
+        Assert(executionCount >= 2, $"Execution count should be at least 2 after ticks, got {executionCount}");
+
+        // 4. Unregister
+        Assert(ch.Unregister("test_chore"), "Unregister should succeed for existing chore");
+        Assert(!ch.Unregister("non_existing"), "Unregister should return false for nonexistent chore");
+        Assert(!ch.Trigger("test_chore"), "Trigger should fail after chore was unregistered");
     }
 }

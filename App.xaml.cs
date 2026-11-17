@@ -66,26 +66,7 @@ public partial class App : Application
     {
         if (_gpuPreferenceChecked) return;
         _gpuPreferenceChecked = true;
-        try
-        {
-            string? exePath = Environment.ProcessPath;
-            if (string.IsNullOrWhiteSpace(exePath) || !File.Exists(exePath)) return;
-
-            using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\DirectX\UserGpuPreferences");
-            if (key != null)
-            {
-                object? existing = key.GetValue(exePath);
-                if (existing == null || !existing.ToString()!.Contains("GpuPreference=1;"))
-                {
-                    key.SetValue(exePath, "GpuPreference=1;");
-                    Log($"[GPU] Set UserGpuPreferences to GpuPreference=1 for {exePath}");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Log($"[GPU] EnsurePowerSavingGpuPreference notice: {ex.Message}");
-        }
+        Choreographer.EnsureIntegratedGpuPreference();
     }
 
     public static void FlushLogs()

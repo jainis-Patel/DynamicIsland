@@ -190,7 +190,9 @@ public partial class IslandWindow
         bool mediaPlaying = _mediaService.Current?.IsPlaying ?? false;
         bool visible = _machine.State != IslandState.Hidden;
         bool needsCompactBars = _machine.State == IslandState.Compact && mediaPlaying;
-        bool needsAmbientBass = visible && mediaPlaying && (_settingsService?.Current.EnableAmbientGlow ?? true);
+        bool needsAmbientBass = visible && mediaPlaying &&
+            (_settingsService?.Current.EnableAmbientGlow ?? true) &&
+            !(_choreographer?.ShouldThrottleVisuals ?? false);
 
         _audioSpectrum.SetActive(needsCompactBars || needsAmbientBass);
     }

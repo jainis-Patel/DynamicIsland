@@ -255,6 +255,7 @@ public partial class IslandWindow : Window
     private readonly LanQuickShareService _lanQuickShareService;
     private readonly TaskService _taskService;
     private readonly UpdateManagerService _updateService;
+    private readonly Choreographer _choreographer;
     private Views.MiniPlayerWindow? _miniPlayerWindow;
     private TrayIconService? _trayIcon;
 
@@ -490,6 +491,12 @@ public partial class IslandWindow : Window
         _updateService.UpdateAvailable += OnUpdateAvailable;
         _updateService.StatusChanged += OnUpdateStatusChanged;
         _updateService.DownloadProgressChanged += OnUpdateDownloadProgressChanged;
+        _choreographer = _services.Register(new Choreographer(Dispatcher));
+        _choreographer.PowerModeChanged += (prev, next) => Dispatcher.InvokeAsync(() =>
+        {
+            UpdateSpectrumActivity();
+        });
+        Choreographer.EnsureIntegratedGpuPreference();
         _dropletRegistry.DropletStateChanged += (dropletId, enabled) =>
         {
             if (dropletId == "jiggle_basket")
