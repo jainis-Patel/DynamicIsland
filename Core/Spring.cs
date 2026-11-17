@@ -92,4 +92,33 @@ public sealed class Spring
             Velocity = 0;
         }
     }
+
+    /// <summary>
+    /// Injects instantaneous impulse velocity (e.g. from pointer flick, gesture, or tactile snap).
+    /// </summary>
+    public void Impulse(double deltaVelocity)
+    {
+        Velocity += deltaVelocity;
+    }
+
+    /// <summary>
+    /// Sets a new target while optionally preserving or injecting pointer velocity for physically continuous gestures.
+    /// </summary>
+    public void Retarget(double newTarget, double? initialVelocity = null)
+    {
+        Target = newTarget;
+        if (initialVelocity.HasValue)
+        {
+            Velocity = initialVelocity.Value;
+        }
+    }
+
+    /// <summary>
+    /// Resets spring state immediately to a given value, clearing velocity.
+    /// </summary>
+    public void SnapTo(double value)
+    {
+        Value = Target = value;
+        Velocity = 0;
+    }
 }

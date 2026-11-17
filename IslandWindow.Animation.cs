@@ -283,6 +283,11 @@ public partial class IslandWindow
             TriggerLiquidImpulse(95, 30, 8);
         }
 
+        if (next == IslandState.Expanded || (previous == IslandState.Expanded && next != IslandState.Hidden))
+        {
+            TactileFeedback.PlaySnap();
+        }
+
         CrossfadeTo(next);
 
         if (next == IslandState.Hidden)

@@ -101,6 +101,7 @@ internal static class SelfTestRunner
         Run("UpdateManager: Manifest JSON serialization, channel resolution & hash verification", TestUpdateManifestAndIntegrity);
         Run("Option2And3: Live download speeds, rotating ring & notification app grouping / stacking", TestLiveDownloadsAndNotificationAppGrouping);
         Run("Choreographer: Power governor modes, task scheduling, interval scaling & iGPU preference", TestChoreographerAndPowerGovernor);
+        Run("SpringAndHaptics: Impulse, Retarget, SnapTo & zero-allocation synthesized RIFF WAVE haptics", TestSpringDynamicsAndTactileHaptics);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -2825,5 +2826,45 @@ SSID 3 : Home_Router
         Assert(ch.Unregister("test_chore"), "Unregister should succeed for existing chore");
         Assert(!ch.Unregister("non_existing"), "Unregister should return false for nonexistent chore");
         Assert(!ch.Trigger("test_chore"), "Trigger should fail after chore was unregistered");
+    }
+
+    private static void TestSpringDynamicsAndTactileHaptics()
+    {
+        // 1. Spring Impulse, Retarget, SnapTo
+        var s = new Spring(100) { Target = 100 };
+        Assert(s.IsAtRest, "Spring initialized at target must be at rest");
+
+        s.Impulse(250.0);
+        Assert(s.Velocity == 250.0, "Impulse should add 250.0 to velocity");
+        Assert(!s.IsAtRest, "Spring must not be at rest after impulse");
+
+        s.SnapTo(350.0);
+        Assert(s.Value == 350.0 && s.Target == 350.0 && s.Velocity == 0, "SnapTo must set Value, Target, and zero Velocity");
+        Assert(s.IsAtRest, "Spring must be at rest after SnapTo");
+
+        s.Retarget(450.0, 180.0);
+        Assert(s.Target == 450.0, "Retarget must update Target");
+        Assert(s.Velocity == 180.0, "Retarget must inject initial velocity");
+
+        // 2. Synthesized RIFF WAVE validation
+        byte[] wav = TactileFeedback.SynthesizeRiffWav(480, 420, 90.0, 12, 0.4);
+        Assert(wav != null, "Synthesized WAV must not be null");
+        Assert(wav!.Length > 44, "Synthesized WAV must have valid length > 44 bytes");
+
+        // Verify RIFF header
+        Assert(wav[0] == 'R' && wav[1] == 'I' && wav[2] == 'F' && wav[3] == 'F', "Must start with RIFF signature");
+        Assert(wav[8] == 'W' && wav[9] == 'A' && wav[10] == 'V' && wav[11] == 'E', "Must contain WAVE identifier");
+        Assert(wav[12] == 'f' && wav[13] == 'm' && wav[14] == 't' && wav[15] == ' ', "Must contain fmt chunk");
+        Assert(wav[36] == 'd' && wav[37] == 'a' && wav[38] == 't' && wav[39] == 'a', "Must contain data chunk");
+
+        // 3. Audio micro-haptics non-throwing execution
+        TactileFeedback.PlayTick();
+        TactileFeedback.PlaySnap();
+        TactileFeedback.PlayDismiss();
+
+        bool prevEnabled = TactileFeedback.IsEnabled;
+        TactileFeedback.IsEnabled = false;
+        TactileFeedback.PlayTick();
+        TactileFeedback.IsEnabled = prevEnabled;
     }
 }

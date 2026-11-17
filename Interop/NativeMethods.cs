@@ -683,4 +683,13 @@ internal static class NativeMethods
             ? info.szDevice
             : null;
     }
+
+    // ── Multimedia Sound (winmm.dll) ──────────────────────────────────
+    public const uint SND_ASYNC = 0x0001;
+    public const uint SND_NODEFAULT = 0x0002;
+    public const uint SND_MEMORY = 0x0004;
+
+    [DllImport("winmm.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool PlaySound(byte[]? ptrToSound, IntPtr hmod, uint fdwSound);
 }

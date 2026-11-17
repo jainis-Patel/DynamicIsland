@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using DynamicIsland.Core;
 using DynamicIsland.Services;
 
 namespace DynamicIsland.Views.Widgets;
@@ -56,6 +57,7 @@ public partial class NotificationsView : UserControl
     {
         if (sender is FrameworkElement { Tag: NotificationAppGroup group })
         {
+            TactileFeedback.PlayTick();
             Island?.ToggleNotificationAppGroup(group);
             e.Handled = true;
         }
@@ -132,6 +134,7 @@ public partial class NotificationsView : UserControl
                 bool dismiss = Math.Abs(dx) > 75 || (velocity > 550 && Math.Abs(dx) > 35);
                 if (dismiss)
                 {
+                    TactileFeedback.PlayDismiss();
                     double targetX = dx >= 0 ? 500 : -500;
                     var animX = new DoubleAnimation(targetX, TimeSpan.FromMilliseconds(160))
                     {
@@ -163,6 +166,7 @@ public partial class NotificationsView : UserControl
                 else
                 {
                     // Spring bounce back to center
+                    TactileFeedback.PlaySnap();
                     var bounceX = new DoubleAnimation(0, TimeSpan.FromMilliseconds(220))
                     {
                         EasingFunction = new ElasticEase { Oscillations = 1, Springiness = 4, EasingMode = EasingMode.EaseOut }
