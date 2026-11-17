@@ -20,6 +20,23 @@ internal static class WindowBlurHelper
     [DllImport("dwmapi.dll")]
     private static extern int DwmEnableBlurBehindWindow(IntPtr hWnd, ref DWM_BLURBEHIND pBlurBehind);
 
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+    public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    public const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
+
+    public const int DWMSBT_AUTO = 0;
+    public const int DWMSBT_NONE = 1;
+    public const int DWMSBT_MAINWINDOW = 2;      // Mica
+    public const int DWMSBT_TRANSIENTWINDOW = 3; // Acrylic
+    public const int DWMSBT_TABBEDWINDOW = 4;     // Mica Alt
+
+    public const int DWMWCP_DONOTROUND = 1;
+    public const int DWMWCP_ROUND = 2;
+    public const int DWMWCP_ROUNDSMALL = 3;
+
     private const int WCA_ACCENT_POLICY = 19;
 
     private enum AccentState
@@ -93,7 +110,29 @@ internal static class WindowBlurHelper
         }
         catch { }
 
-        // 2. Apply DWM Hardware Frosted Blur
+        // 2. Windows 11 Fluent 2 Native Backdrop Composition (Mica / Acrylic)
+        if (Environment.OSVersion.Version.Build >= 22000)
+        {
+            try
+            {
+                int darkMode = isDark ? 1 : 0;
+                DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref darkMode, sizeof(int));
+
+                // Windows 11 22H2 (Build 22621+) supports DWMWA_SYSTEMBACKDROP_TYPE
+                if (Environment.OSVersion.Version.Build >= 22621)
+                {
+                    int backdropType = DWMSBT_TRANSIENTWINDOW; // Transient Acrylic / Mica Alt
+                    int hr = DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref backdropType, sizeof(int));
+                    if (hr == 0)
+                    {
+                        return; // Successfully applied Windows 11 hardware backdrop
+                    }
+                }
+            }
+            catch { }
+        }
+
+        // 3. Fallback to Windows 10 SetWindowCompositionAttribute (WCA_ACCENT_POLICY)
         try
         {
             // GradientColor format: 0xAABBGGRR
@@ -165,6 +204,16 @@ internal static class WindowBlurHelper
             SetWindowDisplayAffinity(hwnd, 0 /* WDA_NONE */);
         }
         catch { }
+
+        if (Environment.OSVersion.Version.Build >= 22621)
+        {
+            try
+            {
+                int none = DWMSBT_NONE;
+                DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref none, sizeof(int));
+            }
+            catch { }
+        }
 
         try
         {

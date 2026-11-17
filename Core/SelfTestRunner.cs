@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using DynamicIsland.LiquidGlass;
+using DynamicIsland.Interop;
 using DynamicIsland.Services;
 using static DynamicIsland.Interop.NativeMethods;
 
@@ -102,6 +103,7 @@ internal static class SelfTestRunner
         Run("Option2And3: Live download speeds, rotating ring & notification app grouping / stacking", TestLiveDownloadsAndNotificationAppGrouping);
         Run("Choreographer: Power governor modes, task scheduling, interval scaling & iGPU preference", TestChoreographerAndPowerGovernor);
         Run("SpringAndHaptics: Impulse, Retarget, SnapTo & zero-allocation synthesized RIFF WAVE haptics", TestSpringDynamicsAndTactileHaptics);
+        Run("Phase3Visuals: Windows 11 Fluent 2 Mica/Acrylic, WM_DPICHANGED & HDR tone mapping", TestWindows11BackdropAndHdrToneMapping);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -2866,5 +2868,35 @@ SSID 3 : Home_Router
         TactileFeedback.IsEnabled = false;
         TactileFeedback.PlayTick();
         TactileFeedback.IsEnabled = prevEnabled;
+    }
+
+    private static void TestWindows11BackdropAndHdrToneMapping()
+    {
+        // 1. Transparency effects query
+        bool transparency = WindowBlurHelper.IsWindowsTransparencyEnabled();
+        // Should execute cleanly without throwing
+
+        // 2. Windows 11 DWM Constants validation
+        Assert(WindowBlurHelper.DWMSBT_AUTO == 0, "DWMSBT_AUTO must be 0");
+        Assert(WindowBlurHelper.DWMSBT_NONE == 1, "DWMSBT_NONE must be 1");
+        Assert(WindowBlurHelper.DWMSBT_MAINWINDOW == 2, "DWMSBT_MAINWINDOW must be 2");
+        Assert(WindowBlurHelper.DWMSBT_TRANSIENTWINDOW == 3, "DWMSBT_TRANSIENTWINDOW must be 3");
+        Assert(WindowBlurHelper.DWMSBT_TABBEDWINDOW == 4, "DWMSBT_TABBEDWINDOW must be 4");
+        Assert(NativeMethods.WM_DPICHANGED == 0x02E0, "WM_DPICHANGED must be 0x02E0");
+
+        // 3. HDR Tone Mapping algorithm validation
+        Color black = Color.FromRgb(0, 0, 0);
+        Color mappedBlack = ColorExtractor.ToneMapHdr(black);
+        Assert(mappedBlack.R == 0 && mappedBlack.G == 0 && mappedBlack.B == 0, "Black must tone-map to black");
+
+        Color pureWhite = Color.FromRgb(255, 255, 255);
+        Color mappedWhite = ColorExtractor.ToneMapHdr(pureWhite);
+        Assert(mappedWhite.R > 180 && mappedWhite.R <= 255, "White must remain high-luminance within byte bounds");
+        Assert(mappedWhite.R == mappedWhite.G && mappedWhite.G == mappedWhite.B, "Neutral white must preserve chromatic balance");
+
+        Color vividRed = Color.FromRgb(255, 30, 30);
+        Color mappedRed = ColorExtractor.ToneMapHdr(vividRed);
+        Assert(mappedRed.R > mappedRed.G * 2, "Dominant red hue must be preserved during HDR compression");
+        Assert(mappedRed.A == 255, "Alpha channel must be preserved");
     }
 }

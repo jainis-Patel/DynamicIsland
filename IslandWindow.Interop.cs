@@ -342,6 +342,19 @@ public partial class IslandWindow
                 Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(PositionWindow));
                 break;
 
+            case WM_DPICHANGED:
+            {
+                short newDpiX = unchecked((short)(wParam.ToInt64() & 0xFFFF));
+                if (newDpiX > 0)
+                {
+                    _dpiScale = newDpiX / 96.0;
+                }
+                _cachedTargetMonitor = IntPtr.Zero;
+                Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(PositionWindow));
+                handled = true;
+                break;
+            }
+
             case WM_SETTINGCHANGE:
                 if (wParam.ToInt32() == SPI_SETWORKAREA)
                 {

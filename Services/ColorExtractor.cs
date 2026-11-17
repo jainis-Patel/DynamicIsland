@@ -109,4 +109,38 @@ internal static class ColorExtractor
         };
         return Color.FromRgb((byte)((r + m) * 255), (byte)((g + m) * 255), (byte)((b + m) * 255));
     }
+
+    /// <summary>
+    /// Applies extended Reinhard-filmic tone mapping to an sRGB color to prevent harsh clipping,
+    /// channel blowout, and banding when rendering ambient glowing halos on HDR and wide-gamut displays.
+    /// </summary>
+    public static Color ToneMapHdr(Color color, double exposure = 1.0, double maxLuminance = 2.2)
+    {
+        double r = color.R / 255.0;
+        double g = color.G / 255.0;
+        double b = color.B / 255.0;
+
+        // Linearize sRGB to linear photometric space
+        double lr = r <= 0.04045 ? r / 12.92 : Math.Pow((r + 0.055) / 1.055, 2.4);
+        double lg = g <= 0.04045 ? g / 12.92 : Math.Pow((g + 0.055) / 1.055, 2.4);
+        double lb = b <= 0.04045 ? b / 12.92 : Math.Pow((b + 0.055) / 1.055, 2.4);
+
+        // Apply exposure scaling
+        lr *= exposure;
+        lg *= exposure;
+        lb *= exposure;
+
+        // Extended Reinhard tone mapping: mapped = (val * (1 + val / (maxLum^2))) / (1 + val)
+        double maxLumSq = maxLuminance * maxLuminance;
+        double mr = (lr * (1.0 + lr / maxLumSq)) / (1.0 + lr);
+        double mg = (lg * (1.0 + lg / maxLumSq)) / (1.0 + lg);
+        double mb = (lb * (1.0 + lb / maxLumSq)) / (1.0 + lb);
+
+        // Compress back to gamma sRGB space
+        byte fr = (byte)Math.Clamp(Math.Round((mr <= 0.0031308 ? 12.92 * mr : 1.055 * Math.Pow(mr, 1.0 / 2.4) - 0.055) * 255.0), 0, 255);
+        byte fg = (byte)Math.Clamp(Math.Round((mg <= 0.0031308 ? 12.92 * mg : 1.055 * Math.Pow(mg, 1.0 / 2.4) - 0.055) * 255.0), 0, 255);
+        byte fb = (byte)Math.Clamp(Math.Round((mb <= 0.0031308 ? 12.92 * mb : 1.055 * Math.Pow(mb, 1.0 / 2.4) - 0.055) * 255.0), 0, 255);
+
+        return Color.FromArgb(color.A, fr, fg, fb);
+    }
 }
