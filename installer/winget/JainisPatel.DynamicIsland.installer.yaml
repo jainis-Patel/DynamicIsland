@@ -1,0 +1,19 @@
+PackageIdentifier: JainisPatel.DynamicIsland
+PackageVersion: 0.5.0
+Platform:
+  - Windows.Desktop
+MinimumOSVersion: 10.0.19041.0
+InstallerType: inno
+Scope: user
+InstallModes:
+  - interactive
+  - silent
+  - silentWithProgress
+Installers:
+  - Architecture: x64
+    InstallerType: inno
+    InstallerUrl: https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.5.0/DynamicIsland-Setup.exe
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+    UpgradeBehavior: install
+ManifestType: installer
+ManifestVersion: 1.6.0

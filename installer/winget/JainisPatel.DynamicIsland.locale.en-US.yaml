@@ -1,0 +1,26 @@
+PackageIdentifier: JainisPatel.DynamicIsland
+PackageVersion: 0.5.0
+PackageLocale: en-US
+Publisher: Jainis Patel
+PublisherUrl: https://github.com/jainis-Patel
+PublisherSupportUrl: https://github.com/jainis-Patel/DynamicIsland/issues
+PackageName: Dynamic Island for Windows
+PackageUrl: https://github.com/jainis-Patel/DynamicIsland
+License: MIT
+LicenseUrl: https://github.com/jainis-Patel/DynamicIsland/blob/main/LICENSE
+ShortDescription: Apple-inspired Dynamic Island desktop overlay for Windows 10 & 11 with analytical spring physics, WASAPI audio spectrum, and Live Activities.
+Description: >-
+  An interactive, Apple-inspired Dynamic Island desktop overlay for Windows 10 & 11
+  built with WPF (.NET 8), closed-form analytical spring physics (60Hz - 240Hz+),
+  WASAPI real-time audio spectrum analysis, WinRT system integrations, Live Activity IPC,
+  Windows 11 Fluent 2 Mica/Acrylic backdrop composition, and zero-idle CPU overhead.
+Tags:
+  - dynamic-island
+  - overlay
+  - audio-visualizer
+  - clipboard-manager
+  - live-activities
+  - windows-11
+  - mica
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

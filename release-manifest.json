@@ -1,22 +1,22 @@
 {
-  "version": "0.4.2",
-  "releaseTag": "v0.4.2",
+  "version": "0.5.0",
+  "releaseTag": "v0.5.0",
   "channel": "stable",
-  "releaseDate": "2026-11-15T18:00:00Z",
+  "releaseDate": "2026-11-17T18:00:00Z",
   "minWindowsBuild": "10.0.19041.0",
-  "changelogUrl": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.4.2",
-  "summary": "Fix Inno Setup updater restart runtime error, add multi-drive fallback, and optimize downloads.",
+  "changelogUrl": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.5.0",
+  "summary": "Centralized power-aware Choreographer, Windows 11 Mica/Acrylic composition, Live Activity IPC 2.0 streaming, and clipboard secret redaction.",
   "isCritical": false,
   "downloads": {
     "installer": {
-      "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.4.2/DynamicIsland-Setup.exe",
-      "sha256": "",
-      "sizeBytes": 72000000
-    },
-    "portable": {
-      "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.4.2/DynamicIsland-Portable.zip",
+      "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.5.0/DynamicIsland-Setup.exe",
       "sha256": "",
       "sizeBytes": 74000000
+    },
+    "portable": {
+      "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.5.0/DynamicIsland-Portable.zip",
+      "sha256": "",
+      "sizeBytes": 76000000
     }
   }
 }

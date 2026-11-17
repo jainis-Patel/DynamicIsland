@@ -30,6 +30,20 @@ An interactive, Apple-inspired **Dynamic Island** desktop overlay for Windows 10
   - Evaluates arithmetic, exponents, square roots (`sqrt(144)`), percentages (`20% of 450`), temperatures, lengths, weights, digital storage (`2 gb in mb`), and currencies (`Services/QuickCalcService.cs`).
 - **Hardware Privacy Dots & 1-Click Mic Mute**:
   - Kernel-level registry watcher (`RegNotifyChangeKeyValue`) for zero-CPU webcam & microphone active indicators, call duration timer, and hardware microphone mute (`Services/PrivacyIndicatorService.cs`).
+- **Power-Aware Choreographer & Integrated GPU Affinity**:
+  - Centralized tick choreographer (`Core/Choreographer.cs`) that consolidates background polling intervals (1s, 5s, 30s) and automatically down-scales polling frequencies on battery power.
+  - Automatically suspends WASAPI audio spectrum and glowing backlight halos under Windows Battery Saver.
+  - Automatically pins the application process to the integrated GPU (`GpuPreference=1`) in Windows DirectX graphics preferences, keeping discrete NVIDIA/AMD GPUs asleep to preserve 10W–25W of battery power.
+- **Synthesized UI Micro-Haptics & Impulse Spring Physics**:
+  - Zero-allocation, in-memory synthesized 11ms–22ms RIFF WAVE tactile audio micro-ticks (`Core/TactileFeedback.cs`) played via Win32 `PlaySound(..., SND_ASYNC | SND_MEMORY)` on card flick-dismissal, chevron expand, and pill state morphing.
+  - Analytical impulse velocity injection (`Core/Spring.cs`) for physically continuous drag and flick momentum.
+- **Windows 11 Fluent 2 Mica / Acrylic Backdrops & HDR Tone Mapping**:
+  - Native hardware DWM backdrop composition (`DWMWA_SYSTEMBACKDROP_TYPE = DWMSBT_TRANSIENTWINDOW`) and dark mode immersion on Windows 11 22H2+ (`Interop/WindowBlurHelper.cs`), with seamless fallback to custom GPU Liquid Glass on Windows 10.
+  - Real-time `WM_DPICHANGED` multi-monitor transition tracking (`IslandWindow.Interop.cs`) for crisp Per-Monitor V2 DPI coordinate snapping.
+  - Extended Reinhard-filmic tone mapping (`Services/ColorExtractor.cs`) for vivid album art colors and ambient glowing halos on HDR displays.
+- **Live Activity IPC 2.0 & Clipboard Secret Redaction**:
+  - High-throughput Named Pipe (`\\.\pipe\DynamicIsland.Activities`) supporting multi-phase build pipelines (`phases`), real-time streaming thought chunks for AI coding agents (Antigravity, Claude Code, Copilot), and task failure signals (`Services/LiveActivityIpcService.cs`).
+  - Automated regex scanning and on-screen masking (`AKIA••••••••MPLE`) for sensitive credentials (OpenAI keys, GitHub tokens, AWS access keys, Private Keys, Slack tokens) in `Services/ClipboardHistoryService.cs`.
 - **Audio Output Switcher, Smart Power & Wireless Peripherals Hub**:
   - 1-click default audio output switching via `IPolicyConfig` (`Services/AudioEndpointService.cs`), Windows Power Scheme switching (`Services/PowerPlanService.cs`), and Bluetooth / XInput controller battery telemetry (`Services/PeripheralDeviceService.cs`).
 
@@ -87,7 +101,12 @@ dotnet publish -c Release -p:PublishProfile=WinX64
 
 Dynamic Island provides multiple zero-configuration installation options with no administrator UAC elevation required:
 
-### Option 1: Native Dark-Mode Setup Wizard (Recommended)
+### Option 1: Windows Package Manager (WinGet)
+```powershell
+winget install JainisPatel.DynamicIsland
+```
+
+### Option 2: Native Dark-Mode Setup Wizard (Recommended)
 Double-click `installer\DynamicIsland-Setup.exe` (or `publish\DynamicIsland-Setup.exe`).
 - Custom dark-mode installation wizard with squircle controls.
 - Configurable install directory (defaults to `%LocalAppData%\Programs\DynamicIsland`).
