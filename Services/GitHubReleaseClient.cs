@@ -84,7 +84,22 @@ internal sealed class GitHubReleaseClient : IDisposable
 
                 if (manifest != null && !string.IsNullOrWhiteSpace(manifest.Version))
                 {
-                    return manifest;
+                    // Pre-flight check: verify that the advertised download asset is reachable and not a 404
+                    string? assetUrl = manifest.Downloads?.Installer?.Url ?? manifest.Downloads?.Portable?.Url;
+                    if (!string.IsNullOrWhiteSpace(assetUrl))
+                    {
+                        bool exists = await CheckAssetExistsAsync(assetUrl, ct).ConfigureAwait(false);
+                        if (exists)
+                        {
+                            return manifest;
+                        }
+
+                        App.Log($"[GitHubClient] Manifest version {manifest.Version} asset is not yet published on GitHub ({assetUrl}). Falling back to GitHub Releases API.");
+                    }
+                    else
+                    {
+                        return manifest;
+                    }
                 }
             }
         }
@@ -95,6 +110,32 @@ internal sealed class GitHubReleaseClient : IDisposable
 
         // 2. Secondary Fallback: Query GitHub Releases API
         return await FetchManifestFromReleasesApiAsync(owner, repo, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Verifies that a remote release asset URL is reachable and does not return HTTP 404.
+    /// </summary>
+    internal async Task<bool> CheckAssetExistsAsync(string url, CancellationToken ct = default)
+    {
+        try
+        {
+            using var headReq = new HttpRequestMessage(HttpMethod.Head, url);
+            using var resp = await _http.SendAsync(headReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            if (resp.StatusCode == HttpStatusCode.NotFound)
+            {
+                return false;
+            }
+            return true;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+        catch
+        {
+            // For other network issues / timeouts, don't block
+            return true;
+        }
     }
 
     /// <summary>

@@ -244,6 +244,8 @@ internal sealed class UpdateManagerService : IDisposable
             LastErrorMessage = "Release package has not been published to GitHub yet (404 Not Found).";
             SetStatus(UpdateStatus.Failed, LastErrorMessage);
             App.Log($"[UpdateManager] Download 404: {asset.Url}");
+            _client.ClearETagCache();
+            LatestManifest = null;
             return false;
         }
         catch (Exception ex)
