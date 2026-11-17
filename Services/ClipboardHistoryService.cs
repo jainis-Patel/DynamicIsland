@@ -51,12 +51,18 @@ public sealed class ClipboardItem : INotifyPropertyChanged
     public int LineCount { get; init; } = 1;
     public int WordCount { get; init; } = 0;
     public string? CodeLanguage { get; init; }
+    public bool IsSecret { get; init; }
+    public string? SecretType { get; init; }
+
+    public string MaskedText => IsSecret && !string.IsNullOrEmpty(RawText)
+        ? ClipboardHistoryService.MaskSecret(RawText)
+        : RawText ?? "";
 
     public string RgbText => SwatchColor.HasValue
         ? $"rgb({SwatchColor.Value.R}, {SwatchColor.Value.G}, {SwatchColor.Value.B})"
         : "";
 
-    public string TypeTag => Type switch
+    public string TypeTag => IsSecret ? "SECRET" : Type switch
     {
         ClipboardItemType.Code => !string.IsNullOrEmpty(CodeLanguage) ? CodeLanguage : "CODE",
         ClipboardItemType.Url => "URL",
@@ -68,7 +74,7 @@ public sealed class ClipboardItem : INotifyPropertyChanged
 
     private Brush? _cachedSwatchBrush;
 
-    public Brush BadgeColorBrush => Type switch
+    public Brush BadgeColorBrush => IsSecret ? ThemeBrushes.Amber : Type switch
     {
         ClipboardItemType.Code => ThemeBrushes.ClipBadgeCode,
         ClipboardItemType.Url => ThemeBrushes.ClipBadgeUrl,
@@ -594,7 +600,23 @@ internal sealed class ClipboardHistoryService : IDisposable
                         }
                     }
 
-                    // 4. Fallback: General Text snippet
+                    // 4. Secret / API Token detection
+                    if (newItem == null && DetectSecret(text, out string secretType))
+                    {
+                        newItem = new ClipboardItem
+                        {
+                            Type = ClipboardItemType.Text,
+                            IsSecret = true,
+                            SecretType = secretType,
+                            Title = $"{secretType} detected",
+                            Subtitle = MaskSecret(text),
+                            RawText = text,
+                            LineCount = 1,
+                            WordCount = 1
+                        };
+                    }
+
+                    // 5. Fallback: General Text snippet
                     if (newItem == null)
                     {
                         int lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).Length;
@@ -916,6 +938,60 @@ internal sealed class ClipboardHistoryService : IDisposable
         }
 
         _ = Task.Run(() => AtomicJsonStore.Save(_persistencePath, snapshot, SaveFileLock));
+    }
+
+    private static readonly Regex GitHubTokenRegex = new(@"\b(gh[pousr]_[A-Za-z0-9_]{36,}|github_pat_[A-Za-z0-9_]{22,})\b", RegexOptions.Compiled);
+    private static readonly Regex OpenAiKeyRegex = new(@"\b(sk-[a-zA-Z0-9]{20,}|sk-proj-[a-zA-Z0-9_-]{20,})\b", RegexOptions.Compiled);
+    private static readonly Regex AwsKeyRegex = new(@"\b(AKIA[0-9A-Z]{16})\b", RegexOptions.Compiled);
+    private static readonly Regex PrivateKeyRegex = new(@"-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----", RegexOptions.Compiled);
+    private static readonly Regex SlackTokenRegex = new(@"\b(xox[baprs]-[0-9a-zA-Z]{10,})\b", RegexOptions.Compiled);
+    private static readonly Regex JwtRegex = new(@"\beyJ[A-Za-z0-9-_]{10,}\.eyJ[A-Za-z0-9-_]{10,}\.[A-Za-z0-9-_]+\b", RegexOptions.Compiled);
+
+    public static bool DetectSecret(string text, out string secretType)
+    {
+        secretType = "";
+        if (string.IsNullOrWhiteSpace(text)) return false;
+
+        if (GitHubTokenRegex.IsMatch(text))
+        {
+            secretType = "GitHub Token";
+            return true;
+        }
+        if (OpenAiKeyRegex.IsMatch(text))
+        {
+            secretType = "OpenAI API Key";
+            return true;
+        }
+        if (AwsKeyRegex.IsMatch(text))
+        {
+            secretType = "AWS Access Key";
+            return true;
+        }
+        if (PrivateKeyRegex.IsMatch(text))
+        {
+            secretType = "Private Key";
+            return true;
+        }
+        if (SlackTokenRegex.IsMatch(text))
+        {
+            secretType = "Slack Token";
+            return true;
+        }
+        if (JwtRegex.IsMatch(text))
+        {
+            secretType = "JWT Bearer Token";
+            return true;
+        }
+
+        return false;
+    }
+
+    public static string MaskSecret(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "";
+        string clean = text.Trim();
+        if (clean.Length <= 8) return "••••••••";
+        return $"{clean[..4]}••••••••{clean[^4..]}";
     }
 
     public void Dispose()

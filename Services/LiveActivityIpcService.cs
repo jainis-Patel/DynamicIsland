@@ -39,6 +39,15 @@ public sealed class ActivityIpcRequest
 
     [JsonPropertyName("targetView")]
     public string? TargetView { get; set; }
+
+    [JsonPropertyName("phases")]
+    public string[]? Phases { get; set; }
+
+    [JsonPropertyName("phaseIndex")]
+    public int? PhaseIndex { get; set; }
+
+    [JsonPropertyName("chunk")]
+    public string? Chunk { get; set; }
 }
 
 public sealed class ActivityIpcResponse
@@ -137,7 +146,7 @@ internal sealed class LiveActivityIpcService : IDisposable
         }
     }
 
-    private ActivityIpcResponse ProcessRequest(ActivityIpcRequest? req)
+    internal ActivityIpcResponse ProcessRequest(ActivityIpcRequest? req)
     {
         if (req == null || string.IsNullOrWhiteSpace(req.Action))
         {
@@ -166,15 +175,32 @@ internal sealed class LiveActivityIpcService : IDisposable
                     catch { }
                 }
 
+                string subtitle = req.Subtitle?.Trim() ?? "";
+                double? progress = req.Progress.HasValue ? Math.Clamp(req.Progress.Value, 0.0, 1.0) : null;
+
+                if (req.Phases != null && req.Phases.Length > 0)
+                {
+                    int pIndex = Math.Clamp(req.PhaseIndex ?? 0, 0, req.Phases.Length - 1);
+                    string phaseName = req.Phases[pIndex];
+                    subtitle = string.IsNullOrEmpty(subtitle)
+                        ? $"Step {pIndex + 1}/{req.Phases.Length}: {phaseName}"
+                        : $"[{pIndex + 1}/{req.Phases.Length}] {phaseName} · {subtitle}";
+
+                    if (!progress.HasValue)
+                    {
+                        progress = (pIndex + 0.5) / req.Phases.Length;
+                    }
+                }
+
                 var item = new LiveActivityItem
                 {
                     Id = req.Id.Trim(),
                     Source = string.IsNullOrWhiteSpace(req.Source) ? "External" : req.Source.Trim(),
                     Title = string.IsNullOrWhiteSpace(req.Title) ? req.Id.Trim() : req.Title.Trim(),
-                    Subtitle = req.Subtitle?.Trim() ?? "",
+                    Subtitle = subtitle,
                     Glyph = string.IsNullOrWhiteSpace(req.Glyph) ? "\uE7E7" : req.Glyph.Trim(),
                     AccentColor = accentColor,
-                    Progress = req.Progress.HasValue ? Math.Clamp(req.Progress.Value, 0.0, 1.0) : null,
+                    Progress = progress,
                     Priority = req.Priority ?? 60,
                     TargetViewKey = req.TargetView?.Trim()
                 };
@@ -190,8 +216,24 @@ internal sealed class LiveActivityIpcService : IDisposable
                     return new ActivityIpcResponse { Ok = false, Error = "Missing required 'id'." };
                 }
 
+                string? subtitle = req.Subtitle?.Trim();
                 double? clampedProgress = req.Progress.HasValue ? Math.Clamp(req.Progress.Value, 0.0, 1.0) : null;
-                bool ok = _hub.UpdateProgress(req.Id.Trim(), clampedProgress, req.Subtitle?.Trim());
+
+                if (req.Phases != null && req.Phases.Length > 0)
+                {
+                    int pIndex = Math.Clamp(req.PhaseIndex ?? 0, 0, req.Phases.Length - 1);
+                    string phaseName = req.Phases[pIndex];
+                    subtitle = string.IsNullOrEmpty(subtitle)
+                        ? $"Step {pIndex + 1}/{req.Phases.Length}: {phaseName}"
+                        : $"[{pIndex + 1}/{req.Phases.Length}] {phaseName} · {subtitle}";
+
+                    if (!clampedProgress.HasValue)
+                    {
+                        clampedProgress = (pIndex + 0.5) / req.Phases.Length;
+                    }
+                }
+
+                bool ok = _hub.UpdateProgress(req.Id.Trim(), clampedProgress, subtitle);
                 if (!ok && !string.IsNullOrWhiteSpace(req.Title))
                 {
                     // If not found, auto-publish
@@ -206,13 +248,53 @@ internal sealed class LiveActivityIpcService : IDisposable
                         Accent = req.Accent,
                         Progress = req.Progress,
                         Priority = req.Priority,
-                        TargetView = req.TargetView
+                        TargetView = req.TargetView,
+                        Phases = req.Phases,
+                        PhaseIndex = req.PhaseIndex
                     });
                 }
 
                 return ok
                     ? new ActivityIpcResponse { Ok = true, Message = $"Updated activity '{req.Id}'." }
                     : new ActivityIpcResponse { Ok = false, Error = $"Activity '{req.Id}' not found." };
+            }
+
+            case "stream":
+            case "chunk":
+            {
+                if (string.IsNullOrWhiteSpace(req.Id))
+                {
+                    return new ActivityIpcResponse { Ok = false, Error = "Missing required 'id'." };
+                }
+
+                string chunkText = req.Chunk?.Trim() ?? req.Subtitle?.Trim() ?? "";
+                double? clampedProgress = req.Progress.HasValue ? Math.Clamp(req.Progress.Value, 0.0, 1.0) : null;
+                bool ok = _hub.UpdateProgress(req.Id.Trim(), clampedProgress, chunkText);
+                return ok
+                    ? new ActivityIpcResponse { Ok = true, Message = $"Stream chunk applied to '{req.Id}'." }
+                    : new ActivityIpcResponse { Ok = false, Error = $"Activity '{req.Id}' not found." };
+            }
+
+            case "fail":
+            case "error":
+            {
+                if (string.IsNullOrWhiteSpace(req.Id))
+                {
+                    return new ActivityIpcResponse { Ok = false, Error = "Missing required 'id'." };
+                }
+
+                var existing = _hub.Activities.FirstOrDefault(a => string.Equals(a.Id, req.Id.Trim(), StringComparison.OrdinalIgnoreCase));
+                if (existing != null)
+                {
+                    _hub.Publish(existing with
+                    {
+                        Glyph = "\uE783",
+                        AccentColor = ThemeBrushes.RedColor,
+                        Subtitle = req.Subtitle?.Trim() ?? "Task failed",
+                        Progress = 1.0
+                    });
+                }
+                return new ActivityIpcResponse { Ok = true, Message = $"Marked activity '{req.Id}' as failed." };
             }
 
             case "complete":

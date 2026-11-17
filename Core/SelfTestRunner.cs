@@ -104,6 +104,7 @@ internal static class SelfTestRunner
         Run("Choreographer: Power governor modes, task scheduling, interval scaling & iGPU preference", TestChoreographerAndPowerGovernor);
         Run("SpringAndHaptics: Impulse, Retarget, SnapTo & zero-allocation synthesized RIFF WAVE haptics", TestSpringDynamicsAndTactileHaptics);
         Run("Phase3Visuals: Windows 11 Fluent 2 Mica/Acrylic, WM_DPICHANGED & HDR tone mapping", TestWindows11BackdropAndHdrToneMapping);
+        Run("Phase4Ecosystem: Live Activity IPC 2.0 multi-phase pipelines & clipboard secret redaction", TestLiveActivityIpcV2AndClipboardSecretDetection);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -2898,5 +2899,80 @@ SSID 3 : Home_Router
         Color mappedRed = ColorExtractor.ToneMapHdr(vividRed);
         Assert(mappedRed.R > mappedRed.G * 2, "Dominant red hue must be preserved during HDR compression");
         Assert(mappedRed.A == 255, "Alpha channel must be preserved");
+    }
+
+    private static void TestLiveActivityIpcV2AndClipboardSecretDetection()
+    {
+        // 1. Secret / API Key Detection
+        Assert(ClipboardHistoryService.DetectSecret("ghp_1234567890abcdef1234567890abcdef1234", out var ghType) && ghType == "GitHub Token",
+            "GitHub token should be detected");
+        Assert(ClipboardHistoryService.DetectSecret("sk-proj-abcde12345fghij67890klmno1234567890", out var oaType) && oaType == "OpenAI API Key",
+            "OpenAI API key should be detected");
+        Assert(ClipboardHistoryService.DetectSecret("AKIAIOSFODNN7EXAMPLE", out var awsType) && awsType == "AWS Access Key",
+            "AWS Access key should be detected");
+        Assert(ClipboardHistoryService.DetectSecret("-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA0...", out var pkType) && pkType == "Private Key",
+            "Private key should be detected");
+        Assert(ClipboardHistoryService.DetectSecret("xoxb-123456789012-1234567890123-abcdefghijkl", out var slackType) && slackType == "Slack Token",
+            "Slack token should be detected");
+        Assert(!ClipboardHistoryService.DetectSecret("https://github.com/microsoft/terminal", out _),
+            "Normal URL must not be detected as secret");
+        Assert(!ClipboardHistoryService.DetectSecret("This is a simple text sentence.", out _),
+            "Normal text must not be detected as secret");
+
+        // 2. Secret Masking
+        string masked = ClipboardHistoryService.MaskSecret("AKIAIOSFODNN7EXAMPLE");
+        Assert(masked.StartsWith("AKIA") && masked.EndsWith("MPLE") && masked.Contains("••••••••"),
+            $"Masked secret must have correct shape, got '{masked}'");
+
+        // 3. Live Activity IPC 2.0 Multi-Phase & Streaming Processing
+        var hub = new LiveActivityHub();
+        using var ipc = new LiveActivityIpcService(hub);
+
+        var pubReq = new ActivityIpcRequest
+        {
+            Action = "publish",
+            Id = "ci_pipeline",
+            Source = "Antigravity",
+            Title = "Release Build",
+            Phases = new[] { "Lint", "Test", "Publish" },
+            PhaseIndex = 1,
+            Subtitle = "Running unit tests"
+        };
+
+        var pubResp = ipc.ProcessRequest(pubReq);
+        Assert(pubResp.Ok, "Multi-phase publish request should succeed");
+
+        var act = hub.Activities.FirstOrDefault(a => a.Id == "ci_pipeline");
+        Assert(act != null, "Published activity must exist in hub");
+        Assert(act!.Subtitle.Contains("[2/3] Test"), $"Subtitle should contain formatted phase, got '{act.Subtitle}'");
+
+        // Stream thought chunk
+        var streamReq = new ActivityIpcRequest
+        {
+            Action = "stream",
+            Id = "ci_pipeline",
+            Chunk = "Compiling Test 63..."
+        };
+        var streamResp = ipc.ProcessRequest(streamReq);
+        Assert(streamResp.Ok, "Stream request should succeed");
+
+        act = hub.Activities.FirstOrDefault(a => a.Id == "ci_pipeline");
+        Assert(act!.Subtitle == "Compiling Test 63...", $"Subtitle should update to stream chunk, got '{act.Subtitle}'");
+
+        // Fail / Error request
+        var failReq = new ActivityIpcRequest
+        {
+            Action = "fail",
+            Id = "ci_pipeline",
+            Subtitle = "Build timed out"
+        };
+        var failResp = ipc.ProcessRequest(failReq);
+        Assert(failResp.Ok, "Fail request should succeed");
+
+        act = hub.Activities.FirstOrDefault(a => a.Id == "ci_pipeline");
+        Assert(act!.Glyph == "\uE783", "Failed activity must have warning glyph");
+        Assert(act.Subtitle == "Build timed out", "Failed activity must have error subtitle");
+
+        hub.ClearAll();
     }
 }
