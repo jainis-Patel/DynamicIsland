@@ -82,15 +82,26 @@ public partial class QuickReplyView : UserControl
         if (string.IsNullOrWhiteSpace(text) || _currentItem == null) return;
 
         var item = _currentItem;
-        ReplyTextBox.Text = string.Empty;
-        Island?.SendQuickReplyAsync(item, text);
+        SendButton.IsEnabled = false;
+        Island?.SendQuickReplyAsync(item, text).ContinueWith(t =>
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                SendButton.IsEnabled = true;
+                if (t.IsCompletedSuccessfully && t.Result)
+                {
+                    ReplyTextBox.Text = string.Empty;
+                }
+            });
+        });
     }
 
     private void OpenAppButton_Click(object sender, RoutedEventArgs e)
     {
         if (_currentItem != null)
         {
-            Island?.OpenTargetApp(_currentItem);
+            string pendingText = ReplyTextBox.Text?.Trim() ?? string.Empty;
+            Island?.OpenTargetApp(_currentItem, pendingText);
         }
     }
 

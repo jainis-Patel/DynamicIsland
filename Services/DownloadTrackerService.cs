@@ -8,6 +8,10 @@ public sealed class DownloadInfo
     public string FileName { get; init; } = "";
     public string FullPath { get; init; } = "";
     public long BytesReceived { get; set; }
+    public long PreviousBytes { get; set; }
+    public DateTime LastPolledAt { get; set; } = DateTime.UtcNow;
+    public double SpeedBytesPerSecond { get; set; }
+    public string SpeedText { get; set; } = "";
     public double EstimatedPercent { get; set; }
     public DateTime StartedAt { get; } = DateTime.Now;
 }
@@ -30,9 +34,24 @@ internal sealed class DownloadTrackerService : IDisposable
         get { lock (_activeDownloads) return _activeDownloads.Count > 0; }
     }
 
+    public int ActiveCount
+    {
+        get { lock (_activeDownloads) return _activeDownloads.Count; }
+    }
+
     public string? LatestDownloadName
     {
         get { lock (_activeDownloads) return _activeDownloads.Values.LastOrDefault()?.FileName; }
+    }
+
+    public string? LatestDownloadSpeedText
+    {
+        get { lock (_activeDownloads) return _activeDownloads.Values.LastOrDefault()?.SpeedText; }
+    }
+
+    public DownloadInfo? LatestDownload
+    {
+        get { lock (_activeDownloads) return _activeDownloads.Values.LastOrDefault(); }
     }
 
     public string? LatestDownloadStatusText
@@ -43,7 +62,7 @@ internal sealed class DownloadTrackerService : IDisposable
             {
                 var latest = _activeDownloads.Values.LastOrDefault();
                 if (latest == null) return null;
-                return FormatDownloadStatus(latest.FileName, latest.BytesReceived);
+                return FormatDownloadStatus(latest.FileName, latest.BytesReceived, latest.SpeedText);
             }
         }
     }
@@ -58,11 +77,37 @@ internal sealed class DownloadTrackerService : IDisposable
         return $"{bytes / (1024.0 * 1024.0 * 1024.0):0.00} GB";
     }
 
-    public static string FormatDownloadStatus(string fileName, long bytesReceived)
+    public static string FormatSpeed(double bytesPerSec)
+    {
+        if (bytesPerSec <= 0) return "";
+        if (bytesPerSec < 1024 * 1024)
+            return $"\u2193 {bytesPerSec / 1024.0:0} KB/s";
+        return $"\u2193 {bytesPerSec / (1024.0 * 1024.0):0.0} MB/s";
+    }
+
+    public static string FormatDownloadStatus(string fileName, long bytesReceived, string? speedText = null)
     {
         string clean = string.IsNullOrWhiteSpace(fileName) ? "Downloading" : fileName.Trim();
+        string bytesFormatted = FormatBytes(bytesReceived);
+        if (!string.IsNullOrWhiteSpace(speedText))
+        {
+            return $"{bytesFormatted} \u00B7 {clean} \u00B7 {speedText}";
+        }
         if (bytesReceived <= 0) return clean;
-        return $"{FormatBytes(bytesReceived)} \u00B7 {clean}";
+        return $"{bytesFormatted} \u00B7 {clean}";
+    }
+
+    public static void OpenDownloadsFolder()
+    {
+        try
+        {
+            string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+            if (Directory.Exists(downloads))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", downloads);
+            }
+        }
+        catch { }
     }
 
     public event Action? ActiveDownloadsChanged;
@@ -205,6 +250,20 @@ internal sealed class DownloadTrackerService : IDisposable
                     long len = file.Length;
                     if (len != kvp.Value.BytesReceived)
                     {
+                        DateTime now = DateTime.UtcNow;
+                        double sec = (now - kvp.Value.LastPolledAt).TotalSeconds;
+                        if (sec >= 0.4)
+                        {
+                            long diff = len - kvp.Value.PreviousBytes;
+                            if (diff >= 0)
+                            {
+                                kvp.Value.SpeedBytesPerSecond = diff / sec;
+                                kvp.Value.SpeedText = FormatSpeed(kvp.Value.SpeedBytesPerSecond);
+                            }
+                            kvp.Value.PreviousBytes = len;
+                            kvp.Value.LastPolledAt = now;
+                        }
+
                         kvp.Value.BytesReceived = len;
                         bytesChanged = true;
                     }

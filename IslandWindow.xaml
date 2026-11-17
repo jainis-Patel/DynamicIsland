@@ -300,22 +300,46 @@
 
                         <Grid x:Name="CompactCallHost" Visibility="Collapsed">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Border x:Name="CompactCallBadge" Width="20" Height="20" CornerRadius="10" Background="#2630D158" ClipToBounds="True">
+                                <Border x:Name="CompactCallBadge" Width="20" Height="20" CornerRadius="10" Background="#2630D158" ClipToBounds="True"
+                                        Cursor="Hand" ToolTip="Active Meeting / Call · Click to focus window" MouseLeftButtonDown="CompactCallBadge_Click">
                                     <TextBlock x:Name="CompactCallGlyph" Style="{StaticResource Glyph}" Text="&#xE717;" FontSize="10.5" HorizontalAlignment="Center" Foreground="#30D158" />
                                 </Border>
-                                <TextBlock x:Name="CompactCallText" Style="{StaticResource Digits}" FontSize="11.5" FontWeight="SemiBold"
-                                           Foreground="#30D158" Margin="8,0,0,0" MaxWidth="136"
+                                <TextBlock x:Name="CompactCallText" Style="{StaticResource Digits}" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="#30D158" Margin="8,0,0,0" MaxWidth="110"
+                                           Cursor="Hand" ToolTip="Click to focus meeting app"
+                                           MouseLeftButtonDown="CompactCallBadge_Click"
                                            TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Text="Call" />
+                                <!-- Live Hardware Microphone Mute / Unmute Button in Pill -->
+                                <Border x:Name="CompactMicToggleBtn" Width="22" Height="22" CornerRadius="11" Margin="6,0,0,0"
+                                        Background="#2630D158" BorderBrush="#3530D158" BorderThickness="1"
+                                        Cursor="Hand" ToolTip="Toggle Hardware Microphone Mute (Ctrl+Alt+K)"
+                                        MouseLeftButtonDown="CompactMicToggleBtn_Click">
+                                    <TextBlock x:Name="CompactMicToggleGlyph" Style="{StaticResource Glyph}" Text="&#xE720;" FontSize="9.5"
+                                               Foreground="#30D158" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
                             </StackPanel>
                         </Grid>
 
-                        <Grid x:Name="CompactDownloadHost" Visibility="Collapsed">
+                        <Grid x:Name="CompactDownloadHost" Visibility="Collapsed" Cursor="Hand"
+                              ToolTip="Active Browser Download · Click to open Downloads folder"
+                              MouseLeftButtonDown="CompactDownloadHost_Click">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Border Width="20" Height="20" CornerRadius="10" Background="#260A84FF" ClipToBounds="True">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" FontSize="10.5" HorizontalAlignment="Center" Foreground="#0A84FF" />
-                                </Border>
-                                <TextBlock x:Name="CompactDownloadText" FontSize="11.5" FontWeight="Medium"
-                                           Foreground="{DynamicResource PrimaryTextBrush}" Margin="8,0,0,0" MaxWidth="136"
+                                <!-- Real Circular Progress Ring with Rotating Dashed Arc -->
+                                <Grid Width="22" Height="22" VerticalAlignment="Center">
+                                    <Ellipse Width="20" Height="20" Stroke="#300A84FF" StrokeThickness="2" />
+                                    <Ellipse x:Name="CompactDownloadRing" Width="20" Height="20"
+                                             Stroke="#0A84FF" StrokeThickness="2"
+                                             StrokeDashArray="3.5 1.5" StrokeDashCap="Round"
+                                             RenderTransformOrigin="0.5,0.5">
+                                        <Ellipse.RenderTransform>
+                                            <RotateTransform x:Name="DownloadRingRotate" Angle="0" />
+                                        </Ellipse.RenderTransform>
+                                    </Ellipse>
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" FontSize="9.5"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#0A84FF" />
+                                </Grid>
+                                <TextBlock x:Name="CompactDownloadText" FontSize="11" FontWeight="Medium"
+                                           Foreground="{DynamicResource PrimaryTextBrush}" Margin="8,0,0,0" MaxWidth="160"
                                            TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Text="Downloading" />
                             </StackPanel>
                         </Grid>

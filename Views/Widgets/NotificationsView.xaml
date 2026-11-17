@@ -17,6 +17,12 @@
                 <Border x:Name="NotificationsCountBadge" BorderThickness="1" CornerRadius="8" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
                     <TextBlock x:Name="NotificationsCountText" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Text="0 items" />
                 </Border>
+                <Button x:Name="ToggleGroupingButton" Click="ToggleGroupingButton_Click" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="6,0,0,0" VerticalAlignment="Center" ToolTipService.ToolTip="Toggle between Stacked App Groups and Flat Timeline">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" x:Name="ToggleGroupingGlyph" Text="&#xE8B9;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="ToggleGroupingText" Text="Grouped" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
                 <Border x:Name="NotificationsDndBadge" Visibility="Collapsed" BorderThickness="1" CornerRadius="8" Padding="6,2" Margin="6,0,0,0" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource Glyph}" Text="&#xE74F;" FontSize="8.5" Margin="0,0,3,0" VerticalAlignment="Center" />
@@ -49,8 +55,14 @@
                         <DataTemplate>
                             <Border MinHeight="62" Margin="0,0,0,6" CornerRadius="10"
                                     BorderThickness="1" Padding="10,7" Cursor="Hand"
-                                    ToolTip="Click to open or copy notification"
-                                    MouseLeftButtonDown="NotificationCard_Click">
+                                    ToolTip="Click to open or copy notification · Swipe horizontally to dismiss"
+                                    MouseLeftButtonDown="NotificationCard_Click"
+                                    PreviewMouseLeftButtonDown="NotificationCard_PreviewMouseLeftButtonDown"
+                                    PreviewMouseMove="NotificationCard_PreviewMouseMove"
+                                    PreviewMouseLeftButtonUp="NotificationCard_PreviewMouseLeftButtonUp">
+                                <Border.RenderTransform>
+                                    <TranslateTransform X="0" Y="0" />
+                                </Border.RenderTransform>
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="Background" Value="{StaticResource CardSurfaceBrush}" />
@@ -67,22 +79,34 @@
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
+                                    <!-- Header: Icon, AppName, Stack Badge, Actions -->
                                     <DockPanel Grid.Row="0" LastChildFill="False">
                                         <Border Width="18" Height="18" CornerRadius="9" Background="{Binding IconBgBrush}" VerticalAlignment="Center">
                                             <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="9.5" Foreground="{Binding AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Border>
-                                        <TextBlock Text="{Binding AppName}" FontSize="9.5" FontWeight="SemiBold" Foreground="{Binding AccentBrush}" Margin="6,0,0,0" VerticalAlignment="Center" MaxWidth="220" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding AppName}" FontSize="9.5" FontWeight="SemiBold" Foreground="{Binding AccentBrush}" Margin="6,0,0,0" VerticalAlignment="Center" MaxWidth="190" TextTrimming="CharacterEllipsis" />
 
-                                        <Button Tag="{Binding Id}" Click="RemoveNotificationItem_Click" DockPanel.Dock="Right" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Dismiss Notification">
+                                        <!-- Multi-notification Stack Badge -->
+                                        <Border Visibility="{Binding MultipleBadgeVisibility}" Background="#1FFFFFFF" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="5,1" Margin="6,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding CountBadgeText}" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
+                                        </Border>
+
+                                        <!-- Dismiss Group / Notification Button -->
+                                        <Button Tag="{Binding}" Click="RemoveNotificationItem_Click" DockPanel.Dock="Right" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Dismiss Notification">
                                             <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8.5" Foreground="#86868B" />
                                         </Button>
+
+                                        <!-- Mute App Notifications -->
                                         <Button Tag="{Binding AppName}" Click="MuteAppNotification_Click" DockPanel.Dock="Right" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Mute Notifications from this App">
                                             <TextBlock Style="{StaticResource Glyph}" Text="&#xE74F;" FontSize="9" Foreground="#86868B" />
                                         </Button>
-                                        <Button Tag="{Binding}" Click="ReplyNotificationItem_Click" DockPanel.Dock="Right" Background="#16FFFFFF" BorderThickness="0" Cursor="Hand" Padding="6,2" Margin="3,0,4,0" ToolTip="Quick Reply to this message">
+
+                                        <!-- Quick Reply Button -->
+                                        <Button Tag="{Binding LatestItem}" Visibility="{Binding ReplyVisibility}" Click="ReplyNotificationItem_Click" DockPanel.Dock="Right" Background="#16FFFFFF" BorderThickness="0" Cursor="Hand" Padding="6,2" Margin="3,0,4,0" ToolTip="Quick Reply to this message">
                                             <Button.Resources>
                                                 <Style TargetType="Border">
                                                     <Setter Property="CornerRadius" Value="6" />
@@ -93,13 +117,67 @@
                                                 <TextBlock Text="Reply" FontSize="8.5" FontWeight="SemiBold" Foreground="{Binding AccentBrush}" VerticalAlignment="Center" />
                                             </StackPanel>
                                         </Button>
-                                        <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" Style="{StaticResource Digits}" FontSize="8.5" Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,4,0" />
+
+                                        <!-- Expand/Collapse Chevron Button -->
+                                        <Button Tag="{Binding}" Visibility="{Binding MultipleBadgeVisibility}" Click="ToggleGroupExpand_Click" DockPanel.Dock="Right" Background="#14FFFFFF" BorderThickness="0" Cursor="Hand" Padding="5,2" Margin="3,0,4,0" ToolTip="Expand or collapse stacked notifications">
+                                            <Button.Resources>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="CornerRadius" Value="6" />
+                                                </Style>
+                                            </Button.Resources>
+                                            <TextBlock Style="{StaticResource Glyph}" Text="{Binding ExpandGlyph}" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                                        </Button>
+
+                                        <!-- Latest Time -->
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding LatestTimeText}" Style="{StaticResource Digits}" FontSize="8.5" Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,4,0" />
                                     </DockPanel>
 
-                                    <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" Foreground="#F5F5F7"
+                                    <!-- Main Title -->
+                                    <TextBlock Grid.Row="1" Text="{Binding LatestTitle}" FontSize="11" FontWeight="SemiBold" Foreground="#F5F5F7"
                                                Margin="0,3,0,1" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Grid.Row="2" Text="{Binding Body}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}"
+
+                                    <!-- Main Body -->
+                                    <TextBlock Grid.Row="2" Text="{Binding LatestBody}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}"
                                                MaxHeight="28" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
+
+                                    <!-- Stacked Sub-Notifications List -->
+                                    <ItemsControl Grid.Row="3" Visibility="{Binding DetailsVisibility}" ItemsSource="{Binding Notifications}" Margin="0,8,0,0">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#121218" BorderBrush="#1FFFFFFF" BorderThickness="1" CornerRadius="8"
+                                                        Padding="8,5" Margin="0,0,0,4" Cursor="Hand"
+                                                        MouseLeftButtonDown="SubNotificationCard_Click"
+                                                        ToolTip="Click to open or copy notification">
+                                                    <Grid>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="*" />
+                                                        </Grid.RowDefinitions>
+                                                        <DockPanel Grid.Row="0" LastChildFill="False">
+                                                            <TextBlock Text="{Binding Title}" FontSize="10" FontWeight="SemiBold" Foreground="#F5F5F7" MaxWidth="230" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+
+                                                            <Button Tag="{Binding Id}" Click="RemoveNotificationItem_Click" DockPanel.Dock="Right" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="2" Margin="2,0,0,0" ToolTip="Dismiss this alert">
+                                                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8" Foreground="#86868B" />
+                                                            </Button>
+                                                            <Button Tag="{Binding}" Visibility="{Binding ReplyVisibility}" Click="ReplyNotificationItem_Click" DockPanel.Dock="Right" Background="#16FFFFFF" BorderThickness="0" Cursor="Hand" Padding="5,1" Margin="2,0,3,0" ToolTip="Quick Reply">
+                                                                <Button.Resources>
+                                                                    <Style TargetType="Border">
+                                                                        <Setter Property="CornerRadius" Value="5" />
+                                                                    </Style>
+                                                                </Button.Resources>
+                                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE725;" FontSize="8" Foreground="{Binding AccentBrush}" Margin="0,0,2.5,0" VerticalAlignment="Center" />
+                                                                    <TextBlock Text="Reply" FontSize="8" FontWeight="SemiBold" Foreground="{Binding AccentBrush}" VerticalAlignment="Center" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" Style="{StaticResource Digits}" FontSize="8" Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                                        </DockPanel>
+                                                        <TextBlock Grid.Row="1" Text="{Binding Body}" FontSize="9" Foreground="{StaticResource SecondaryBrush}" Margin="0,2,0,0" MaxHeight="24" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </Grid>
                             </Border>
                         </DataTemplate>

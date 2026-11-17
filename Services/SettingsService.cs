@@ -33,6 +33,8 @@ public sealed class AppSettings
     public int MonitorIndex { get; set; } = 0;
     public string? MonitorDeviceName { get; set; }
     public bool DoNotDisturb { get; set; } = false;
+    /// <summary>When true, multiple notifications from the same app are grouped/stacked into collapsible cards.</summary>
+    public bool GroupNotificationsByApp { get; set; } = true;
     /// <summary>When true, Windows notification banners are dismissed after being shown in the island.</summary>
     public bool ReplaceWindowsBanners { get; set; } = true;
     public bool ReduceMotion { get; set; } = false;
@@ -429,6 +431,7 @@ internal sealed class SettingsService
             s.AutoPowerPlanOnAc = false;
             s.EnableNightLightSim = false;
             s.NightLightWarmthKelvin = 3400;
+            s.GroupNotificationsByApp = true;
             s.WeatherCityOverride = null;
             s.HiddenDockViews.Clear();
             s.MutedNotificationApps.Clear();

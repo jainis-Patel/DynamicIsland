@@ -64,14 +64,15 @@ public partial class IslandWindow : Window
 
     private PillShape GetNotificationsExpandedShape()
     {
-        int count = _notificationListener?.HistoryCount ?? _notificationHistoryItems.Count;
+        int count = _notificationAppGroups.Count > 0 ? _notificationAppGroups.Count : (_notificationListener?.HistoryCount ?? _notificationHistoryItems.Count);
         if (count <= 0)
         {
             return new PillShape(484, 184, 36);
         }
 
-        int visibleCount = Math.Clamp(count, 1, 5);
-        double targetHeight = Math.Clamp(88 + (visibleCount * 64), 176, 408);
+        int expandedExtraItems = _notificationAppGroups.Where(g => g.IsExpanded).Sum(g => Math.Min(g.Notifications.Count - 1, 3));
+        int visibleCount = Math.Clamp(count + expandedExtraItems, 1, 5);
+        double targetHeight = Math.Clamp(88 + (visibleCount * 64), 176, 420);
         return new PillShape(484, targetHeight, 38);
     }
 
@@ -212,6 +213,7 @@ public partial class IslandWindow : Window
     private readonly ObservableCollection<AppAudioSessionInfo> _audioAppSessions = new();
     private readonly ObservableCollection<PeripheralDeviceInfo> _peripheralDevices = new();
     private readonly ObservableCollection<NotificationHistoryItem> _notificationHistoryItems = new();
+    private readonly ObservableCollection<NotificationAppGroup> _notificationAppGroups = new();
     private readonly ObservableCollection<WifiNetworkInfo> _wifiNetworks = new();
 
     // Services
@@ -256,6 +258,8 @@ public partial class IslandWindow : Window
     private Views.MiniPlayerWindow? _miniPlayerWindow;
     private TrayIconService? _trayIcon;
 
+    internal SystemPerformanceService? SystemPerfServiceInstance => _systemPerfService;
+    internal NetworkService? NetworkServiceInstance => _networkService;
     internal DropShelfService? DropShelfServiceInstance => _shelfService;
     internal CalendarService? CalendarServiceInstance => _calendarService;
     internal TaskService? TaskServiceInstance => _taskService;
@@ -414,7 +418,7 @@ public partial class IslandWindow : Window
         AudioEndpointsControl.ItemsSource = _audioEndpoints;
         AudioAppSessionsControl.ItemsSource = _audioAppSessions;
         PeripheralsItemsControl.ItemsSource = _peripheralDevices;
-        NotificationsItemsControl.ItemsSource = _notificationHistoryItems;
+        NotificationsItemsControl.ItemsSource = _notificationAppGroups;
         WifiNetworksItemsControl.ItemsSource = _wifiNetworks;
 
         _machine.StateChanged += OnStateChanged;

@@ -20,6 +20,8 @@ public partial class IslandWindow
     //  Notification Center History Drawer & Per-App Mute
     // =================================================================
 
+    private readonly HashSet<string> _expandedNotificationApps = new(StringComparer.OrdinalIgnoreCase);
+
     private void OnNotificationHistoryChanged()
     {
         if (NotificationsBadgeText == null) return;
@@ -40,21 +42,104 @@ public partial class IslandWindow
             NotificationsDndBadge.Visibility = _settingsService.Current.DoNotDisturb ? Visibility.Visible : Visibility.Collapsed;
         }
         UpdateMutedAppsBadgeUI();
+        UpdateGroupingButtonUI();
         NotificationsEmptyPlaceholder.Visibility = items.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
         ClearNotificationsButton.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         SyncObservableCollection(_notificationHistoryItems, items);
 
+        List<NotificationAppGroup> groups;
+        if (_settingsService.Current.GroupNotificationsByApp)
+        {
+            groups = NotificationListenerService.GroupNotifications(items);
+            foreach (var g in groups)
+            {
+                if (_expandedNotificationApps.Contains(g.AppName))
+                {
+                    g.IsExpanded = true;
+                }
+            }
+        }
+        else
+        {
+            groups = items.Select(NotificationAppGroup.FromSingle).ToList();
+        }
+        SyncObservableCollection(_notificationAppGroups, groups);
+
         // Dynamically adjust expanded height if currently viewing Notifications
         if (_machine.State == IslandState.Expanded && _currentExpandedView == ExpandedView.Notifications)
         {
-            var targetShape = GetTargetShape(_machine.State, ExpandedView.Notifications);
-            ExpandedPanel.Width = targetShape.Width;
-            ExpandedPanel.Height = targetShape.Height;
-            _width.Target = targetShape.Width;
-            _height.Target = targetShape.Height;
-            _radius.Target = targetShape.Radius;
-            EnsureRendering();
+            AdjustExpandedNotificationsHeight();
         }
+    }
+
+    internal void AdjustExpandedNotificationsHeight()
+    {
+        var targetShape = GetTargetShape(_machine.State, ExpandedView.Notifications);
+        ExpandedPanel.Width = targetShape.Width;
+        ExpandedPanel.Height = targetShape.Height;
+        _width.Target = targetShape.Width;
+        _height.Target = targetShape.Height;
+        _radius.Target = targetShape.Radius;
+        EnsureRendering();
+    }
+
+    internal void ToggleNotificationGrouping()
+    {
+        bool newGrouping = !_settingsService.Current.GroupNotificationsByApp;
+        _settingsService.Update(s => s.GroupNotificationsByApp = newGrouping, nameof(AppSettings.GroupNotificationsByApp));
+        UpdateGroupingButtonUI();
+        OnNotificationHistoryChanged();
+        TriggerLiquidImpulse(120, -50, 15);
+        _machine.PushToast(new ToastContent(
+            "\uE8B9",
+            newGrouping ? "Grouped by App" : "Chronological View",
+            newGrouping ? "Multiple notifications from the same app are stacked" : "Showing all notifications individually in timeline order",
+            ThemeBrushes.BlueColor,
+            TimeSpan.FromSeconds(2.0),
+            TargetView: "notifications",
+            Priority: ToastPriority.Feedback));
+    }
+
+    private void UpdateGroupingButtonUI()
+    {
+        if (ToggleGroupingButton == null || ToggleGroupingText == null || ToggleGroupingGlyph == null) return;
+        bool isGrouped = _settingsService.Current.GroupNotificationsByApp;
+        ToggleGroupingText.Text = isGrouped ? "Grouped" : "Flat";
+        ToggleGroupingGlyph.Text = isGrouped ? "\uE8B9" : "\uE8FD";
+        ToggleGroupingButton.ToolTip = isGrouped
+            ? "Notifications grouped by app (Click to switch to chronological flat timeline)"
+            : "Showing chronological flat timeline (Click to group by app)";
+        ToggleGroupingButton.Visibility = _notificationListener.HistoryCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    internal void ToggleNotificationAppGroup(NotificationAppGroup group)
+    {
+        if (group == null) return;
+        group.IsExpanded = !group.IsExpanded;
+        if (group.IsExpanded)
+        {
+            _expandedNotificationApps.Add(group.AppName);
+        }
+        else
+        {
+            _expandedNotificationApps.Remove(group.AppName);
+        }
+        TriggerLiquidImpulse(40, -15, 6);
+        AdjustExpandedNotificationsHeight();
+    }
+
+    internal void DismissNotificationGroup(NotificationAppGroup group)
+    {
+        if (group == null) return;
+        if (_settingsService.Current.GroupNotificationsByApp && group.HasMultiple)
+        {
+            _notificationListener.RemoveHistoryItemsByApp(group.AppName);
+        }
+        else if (!string.IsNullOrEmpty(group.LatestId))
+        {
+            _notificationListener.RemoveHistoryItem(group.LatestId);
+        }
+        TriggerLiquidImpulse(100, -40, 14);
     }
 
     public void OpenQuickReply(NotificationHistoryItem item)
@@ -72,12 +157,34 @@ public partial class IslandWindow
         _machine.CollapseNow();
     }
 
-    public void OpenTargetApp(NotificationHistoryItem item)
+    public void OpenTargetApp(NotificationHistoryItem item, string? pendingReplyText = null)
     {
         if (item == null) return;
-        NotificationListenerService.ActivateNotification(item);
+
+        // If the user entered a reply before opening the app, stage it onto the clipboard
+        if (!string.IsNullOrWhiteSpace(pendingReplyText))
+        {
+            try
+            {
+                Clipboard.SetText(pendingReplyText.Trim());
+            }
+            catch { }
+        }
+
+        NotificationListenerService.ActivateNotification(item, preferApp: true);
         _machine.SetPinned(false);
         _machine.CollapseNow();
+
+        if (!string.IsNullOrWhiteSpace(pendingReplyText))
+        {
+            _machine.PushToast(new ToastContent(
+                "\uE783",
+                "Reply Copied to Clipboard",
+                $"Ready to paste in {item.AppName} (Ctrl+V)",
+                item.Accent,
+                TimeSpan.FromSeconds(2.5),
+                Priority: ToastPriority.Feedback));
+        }
     }
 
     public async Task<bool> SendQuickReplyAsync(NotificationHistoryItem item, string text)
@@ -85,14 +192,28 @@ public partial class IslandWindow
         if (item == null || string.IsNullOrWhiteSpace(text)) return false;
 
         string cleanText = text.Trim();
+        IDataObject? savedClipboard = null;
+
         try
         {
-            // 1. Stage text onto Windows clipboard with transient retry
-            for (int i = 0; i < 3; i++)
+            // 1. Preserve previous clipboard contents so user data is not lost
+            try
+            {
+                savedClipboard = Clipboard.GetDataObject();
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[QuickReply] Could not preserve previous clipboard data: {ex.Message}");
+            }
+
+            // 2. Stage reply text onto Windows clipboard with transient retry
+            bool clipboardSet = false;
+            for (int i = 0; i < 4; i++)
             {
                 try
                 {
                     Clipboard.SetText(cleanText);
+                    clipboardSet = true;
                     break;
                 }
                 catch
@@ -101,53 +222,127 @@ public partial class IslandWindow
                 }
             }
 
-            // 2. Focus the target messaging application window
-            bool activated = NotificationListenerService.ActivateNotification(item);
+            // 3. Locate the target messenger window via EnumWindows
+            IntPtr targetHwnd = NotificationListenerService.FindAppWindow(item.AppName, item.AppUserModelId, item.Title);
 
-            // 3. Wait for the window to finish foreground transition and accept input
-            await Task.Delay(200);
+            if (targetHwnd == IntPtr.Zero)
+            {
+                // App is not currently top-level visible; attempt activation via protocol/AUMID
+                NotificationListenerService.ActivateNotification(item, preferApp: true);
 
-            // 4. Inject Ctrl+V and Return to deliver the staged message
-            NativeMethods.SimulatePasteAndEnter();
+                // Poll up to 1.2s (12 x 100ms) for the window to appear
+                for (int i = 0; i < 12; i++)
+                {
+                    await Task.Delay(100);
+                    targetHwnd = NotificationListenerService.FindAppWindow(item.AppName, item.AppUserModelId, item.Title);
+                    if (targetHwnd != IntPtr.Zero) break;
+                }
+            }
 
-            // 5. Tactile liquid impulse feedback
-            TriggerLiquidImpulse(180, -90, 25);
+            // 4. Forcibly bring window to foreground and verify input focus
+            bool isForeground = false;
+            if (targetHwnd != IntPtr.Zero)
+            {
+                NotificationListenerService.ForceForegroundWindow(targetHwnd);
 
-            // 6. Dismiss the notification from history ring buffer
-            _notificationListener.RemoveHistoryItem(item.Id);
+                // Wait up to 600ms verifying that the window actually became the active foreground window
+                for (int i = 0; i < 6; i++)
+                {
+                    await Task.Delay(100);
+                    if (NativeMethods.GetForegroundWindow() == targetHwnd)
+                    {
+                        isForeground = true;
+                        break;
+                    }
+                }
+            }
 
-            // 7. Collapse Island back
-            _machine.SetPinned(false);
-            _machine.CollapseNow();
+            // 5. Deliver or gracefully fallback
+            if (isForeground && clipboardSet)
+            {
+                // Target messaging window is verified in the foreground! Inject Ctrl+V and Enter
+                NativeMethods.SimulatePasteAndEnter();
 
-            // 8. Surface instant feedback confirmation toast
-            _machine.PushToast(new ToastContent(
-                "\uE73E",
-                "Reply Sent",
-                $"Delivered to {item.Title}",
-                item.Accent,
-                TimeSpan.FromSeconds(2.0),
-                Priority: ToastPriority.Feedback));
+                // Wait briefly for the messaging app to process clipboard paste
+                await Task.Delay(150);
 
-            return true;
+                // Restore previous clipboard data
+                RestoreClipboard(savedClipboard);
+
+                // Tactile liquid impulse feedback
+                TriggerLiquidImpulse(180, -90, 25);
+
+                // Dismiss notification from history ring buffer
+                _notificationListener.RemoveHistoryItem(item.Id);
+
+                // Collapse Island back
+                _machine.SetPinned(false);
+                _machine.CollapseNow();
+
+                // Instant feedback confirmation toast
+                _machine.PushToast(new ToastContent(
+                    "\uE73E",
+                    "Reply Sent",
+                    $"Delivered to {item.Title}",
+                    item.Accent,
+                    TimeSpan.FromSeconds(2.0),
+                    Priority: ToastPriority.Feedback));
+
+                return true;
+            }
+            else
+            {
+                // Fallback: App could not be confirmed in the foreground.
+                // NEVER blindly paste into the active window (which could be the user's terminal/editor).
+                // Leave the staged reply on the clipboard and notify the user with a helpful prompt.
+                _machine.SetPinned(false);
+                _machine.CollapseNow();
+
+                string appName = string.IsNullOrWhiteSpace(item.AppName) ? "app" : item.AppName;
+                _machine.PushToast(new ToastContent(
+                    "\uE783",
+                    "Reply Copied to Clipboard",
+                    $"Switch to {appName} and press Ctrl+V to send",
+                    item.Accent,
+                    TimeSpan.FromSeconds(3.5),
+                    Priority: ToastPriority.Feedback));
+
+                return false;
+            }
         }
         catch (Exception ex)
         {
             App.Log($"[QuickReply] Error sending reply: {ex.Message}");
+            _machine.SetPinned(false);
+            _machine.CollapseNow();
+
             _machine.PushToast(new ToastContent(
                 "\uE783",
                 "Reply Saved to Clipboard",
                 cleanText,
                 ThemeBrushes.AmberColor,
-                TimeSpan.FromSeconds(2.5),
+                TimeSpan.FromSeconds(3.0),
                 Priority: ToastPriority.Feedback));
             return false;
         }
     }
 
+    private static void RestoreClipboard(IDataObject? savedData)
+    {
+        if (savedData == null) return;
+        try
+        {
+            Clipboard.SetDataObject(savedData, true);
+        }
+        catch { }
+    }
+
     internal void ToastReplyButton_Click(object sender, RoutedEventArgs e)
     {
-        var item = _machine.ActiveToast?.HistoryItem ?? _notificationListener.History.FirstOrDefault();
+        var item = (sender as FrameworkElement)?.Tag as NotificationHistoryItem
+            ?? _machine.ActiveToast?.HistoryItem
+            ?? _notificationListener.History.FirstOrDefault(i => i.IsMessagingApp)
+            ?? _notificationListener.History.FirstOrDefault();
         if (item != null)
         {
             OpenQuickReply(item);
@@ -166,36 +361,61 @@ public partial class IslandWindow
 
     internal void NotificationCard_Click(object sender, MouseButtonEventArgs e)
     {
+        if (sender is FrameworkElement elem)
+        {
+            if (elem.DataContext is NotificationAppGroup group)
+            {
+                if (group.LatestItem != null)
+                {
+                    ActivateNotificationItem(group.LatestItem);
+                }
+                e.Handled = true;
+            }
+            else if (elem.DataContext is NotificationHistoryItem item)
+            {
+                ActivateNotificationItem(item);
+                e.Handled = true;
+            }
+        }
+    }
+
+    internal void SubNotificationCard_Click(object sender, MouseButtonEventArgs e)
+    {
         if (sender is FrameworkElement { DataContext: NotificationHistoryItem item })
         {
-            bool activated = NotificationListenerService.ActivateNotification(item);
-            if (activated)
-            {
-                _notificationListener.RemoveHistoryItem(item.Id);
-                _machine.CollapseNow();
-            }
-            else
-            {
-                // Fallback: copy notification text to clipboard
-                try
-                {
-                    string textToCopy = string.IsNullOrWhiteSpace(item.Body) || item.Body == item.Title
-                        ? item.Title
-                        : $"{item.Title}\n{item.Body}";
-                    Clipboard.SetText(textToCopy);
-
-                    _machine.PushToast(new ToastContent(
-                        item.Glyph,
-                        item.AppName,
-                        "Notification text copied to clipboard",
-                        item.Accent,
-                        TimeSpan.FromSeconds(2.0),
-                        TargetView: "notifications",
-                        Priority: ToastPriority.Feedback));
-                }
-                catch { }
-            }
+            ActivateNotificationItem(item);
             e.Handled = true;
+        }
+    }
+
+    private void ActivateNotificationItem(NotificationHistoryItem item)
+    {
+        bool activated = NotificationListenerService.ActivateNotification(item, preferApp: item.IsMessagingApp);
+        if (activated)
+        {
+            _notificationListener.RemoveHistoryItem(item.Id);
+            _machine.CollapseNow();
+        }
+        else
+        {
+            // Fallback: copy notification text to clipboard
+            try
+            {
+                string textToCopy = string.IsNullOrWhiteSpace(item.Body) || item.Body == item.Title
+                    ? item.Title
+                    : $"{item.Title}\n{item.Body}";
+                Clipboard.SetText(textToCopy);
+
+                _machine.PushToast(new ToastContent(
+                    item.Glyph,
+                    item.AppName,
+                    "Notification text copied to clipboard",
+                    item.Accent,
+                    TimeSpan.FromSeconds(2.0),
+                    TargetView: "notifications",
+                    Priority: ToastPriority.Feedback));
+            }
+            catch { }
         }
     }
 
@@ -207,11 +427,19 @@ public partial class IslandWindow
 
     internal void RemoveNotificationItem_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement { Tag: string id })
+        if (sender is FrameworkElement elem)
         {
-            _notificationListener.RemoveHistoryItem(id);
-            TriggerLiquidImpulse(60, -20, 8);
-            e.Handled = true;
+            if (elem.Tag is string id && !string.IsNullOrEmpty(id))
+            {
+                _notificationListener.RemoveHistoryItem(id);
+                TriggerLiquidImpulse(60, -20, 8);
+                e.Handled = true;
+            }
+            else if (elem.Tag is NotificationAppGroup group)
+            {
+                DismissNotificationGroup(group);
+                e.Handled = true;
+            }
         }
     }
 

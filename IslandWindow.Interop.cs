@@ -35,6 +35,7 @@ public partial class IslandWindow
     private const int HotkeyNotes = 18;
     private const int HotkeyTuck = 19;
     private const int HotkeyDock = 20;
+    private const int HotkeyMicMute = 21;
 
     private static readonly (int Id, string KeyName, uint DefaultVk)[] HotKeyBindings =
     {
@@ -58,6 +59,7 @@ public partial class IslandWindow
         (HotkeyNotes, "QuickNotes", 0x4A),           // VK_J (Ctrl+Alt+J)
         (HotkeyTuck, "TuckIsland", 0x28),             // VK_DOWN (Ctrl+Alt+Down)
         (HotkeyDock, "CycleDock", 0x5A),              // VK_Z (Ctrl+Alt+Z)
+        (HotkeyMicMute, "MicrophoneMute", 0x4B),      // VK_K (Ctrl+Alt+K)
     };
 
     private readonly Dictionary<string, bool> _hotkeyRegistrationStatus = new(StringComparer.OrdinalIgnoreCase);
@@ -1042,6 +1044,7 @@ public partial class IslandWindow
             case HotkeyTuck: ToggleTuck(); break;
             case HotkeyDock: CycleDockPosition(); break;
             case HotkeyMonitor: SwitchToNextMonitor(); break;
+            case HotkeyMicMute: ToggleMicMute(); break;
             case HotkeyQuit: Application.Current.Shutdown(); break;
         }
     }

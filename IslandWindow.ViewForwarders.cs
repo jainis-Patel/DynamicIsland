@@ -561,6 +561,9 @@ public partial class IslandWindow
     internal System.Windows.Controls.ScrollViewer NotificationsScrollViewer => NotificationsContainer.NotificationsScrollViewer;
     internal Button UnmuteAllAppsButton => NotificationsContainer.UnmuteAllAppsButton;
     internal TextBlock UnmuteAllAppsText => NotificationsContainer.UnmuteAllAppsText;
+    internal Button ToggleGroupingButton => NotificationsContainer.ToggleGroupingButton;
+    internal TextBlock ToggleGroupingGlyph => NotificationsContainer.ToggleGroupingGlyph;
+    internal TextBlock ToggleGroupingText => NotificationsContainer.ToggleGroupingText;
 
     // -------------------------------------------------------------------------
     //  SystemHud View Forwarders (SystemHudContainer)

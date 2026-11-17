@@ -99,6 +99,7 @@ internal static class SelfTestRunner
         Run("LiquidGlass: GPU headless golden-image refraction rendering & multi-body liquid bridge", TestLiquidGlassGoldenImage);
         Run("UpdateManager: SemVersion 2.0.0 parsing, sorting & pre-release precedence", TestSemVersionComparison);
         Run("UpdateManager: Manifest JSON serialization, channel resolution & hash verification", TestUpdateManifestAndIntegrity);
+        Run("Option2And3: Live download speeds, rotating ring & notification app grouping / stacking", TestLiveDownloadsAndNotificationAppGrouping);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -721,7 +722,25 @@ internal static class SelfTestRunner
             Assert(NotificationListenerService.IsMessagingApp("Telegram"), "Telegram must be recognized as messaging app");
             Assert(NotificationListenerService.IsMessagingApp("Discord"), "Discord must be recognized as messaging app");
             Assert(NotificationListenerService.IsMessagingApp("Microsoft Teams"), "Teams must be recognized as messaging app");
+            Assert(NotificationListenerService.IsMessagingApp("Phone Link"), "Phone Link must be recognized as messaging app");
+            Assert(NotificationListenerService.IsMessagingApp("Notification", "5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App"), "WhatsApp AUMID must be recognized as messaging app");
+            Assert(NotificationListenerService.IsMessagingApp("Notification", "Microsoft.YourPhone_8wekyb3d8bbwe!App"), "Phone Link AUMID must be recognized as messaging app");
+            Assert(NotificationListenerService.IsMessagingApp("Notification", "TelegramMessengerLLP.TelegramDesktop_t4vj0pshhgkw4!Telegram"), "Telegram AUMID must be recognized as messaging app");
             Assert(!NotificationListenerService.IsMessagingApp("Windows Update"), "Windows Update must not be recognized as messaging app");
+
+            var msgItem = new NotificationHistoryItem { AppName = "WhatsApp", IsMessagingApp = true };
+            var nonMsgItem = new NotificationHistoryItem { AppName = "System", IsMessagingApp = false };
+            Assert(msgItem.ReplyVisibility == Visibility.Visible, "Messaging item must have Visible ReplyVisibility");
+            Assert(nonMsgItem.ReplyVisibility == Visibility.Collapsed, "Non-messaging item must have Collapsed ReplyVisibility");
+
+            var waCandidates = NotificationListenerService.GetCandidateProcessNames("WhatsApp", "");
+            Assert(waCandidates.Contains("WhatsApp"), "WhatsApp candidate process names must contain 'WhatsApp'");
+
+            var phoneCandidates = NotificationListenerService.GetCandidateProcessNames("Phone Link", "");
+            Assert(phoneCandidates.Contains("PhoneExperienceHost"), "Phone Link candidate process names must contain 'PhoneExperienceHost'");
+
+            var teamsCandidates = NotificationListenerService.GetCandidateProcessNames("Teams", "");
+            Assert(teamsCandidates.Contains("ms-teams"), "Teams candidate process names must contain 'ms-teams'");
         }
         finally
         {
@@ -2714,5 +2733,56 @@ SSID 3 : Home_Router
         string computedHash = UpdateIntegrityVerifier.ComputeSha256(testBytes);
         Assert(string.Equals(computedHash, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", StringComparison.OrdinalIgnoreCase),
             $"Computed SHA256 was '{computedHash}', expected ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    }
+
+    private static void TestLiveDownloadsAndNotificationAppGrouping()
+    {
+        // 1. Verify download speed formatting
+        Assert(DownloadTrackerService.FormatSpeed(0) == "", "0 bytes speed must be empty string");
+        Assert(DownloadTrackerService.FormatSpeed(1024) == "\u2193 1 KB/s", "1024 bytes must format to \u2193 1 KB/s");
+        Assert(DownloadTrackerService.FormatSpeed(1048576) == "\u2193 1.0 MB/s", "1 MB must format to \u2193 1.0 MB/s");
+        Assert(DownloadTrackerService.FormatSpeed(5242880) == "\u2193 5.0 MB/s", "5 MB must format to \u2193 5.0 MB/s");
+
+        // 2. Verify notification item grouping & stacking
+        var sampleItems = new List<NotificationHistoryItem>
+        {
+            new() { Id = "1", AppName = "Slack", Title = "Alice", Body = "Hey!", ReceivedAt = DateTime.Now },
+            new() { Id = "2", AppName = "Slack", Title = "Bob", Body = "Meeting in 5", ReceivedAt = DateTime.Now },
+            new() { Id = "3", AppName = "Slack", Title = "Charlie", Body = "PR ready", ReceivedAt = DateTime.Now },
+            new() { Id = "4", AppName = "Discord", Title = "General", Body = "Game night?", ReceivedAt = DateTime.Now },
+            new() { Id = "5", AppName = "WhatsApp", Title = "Family", Body = "Photo sent", ReceivedAt = DateTime.Now }
+        };
+
+        var groups = NotificationListenerService.GroupNotifications(sampleItems);
+        Assert(groups.Count == 3, $"Expected 3 app groups, got {groups.Count}");
+
+        var slackGroup = groups.FirstOrDefault(g => g.AppName == "Slack");
+        Assert(slackGroup != null, "Slack group must exist");
+        Assert(slackGroup!.Count == 3, $"Slack group should have 3 items, got {slackGroup.Count}");
+        Assert(slackGroup.HasMultiple, "Slack group should have multiple items");
+        Assert(slackGroup.MultipleBadgeVisibility == Visibility.Visible, "Multiple badge should be visible");
+        Assert(slackGroup.CountBadgeText == "3 alerts", $"Expected '3 alerts', got '{slackGroup.CountBadgeText}'");
+        Assert(slackGroup.LatestTitle == "Alice", $"Expected LatestTitle 'Alice', got '{slackGroup.LatestTitle}'");
+
+        // Test Expand / Collapse mechanics
+        Assert(!slackGroup.IsExpanded, "Group should be collapsed by default");
+        Assert(slackGroup.DetailsVisibility == Visibility.Collapsed, "Details should be collapsed by default");
+        Assert(slackGroup.ExpandGlyph == "\uE70D", "Should display ChevronDown when collapsed");
+
+        slackGroup.IsExpanded = true;
+        Assert(slackGroup.DetailsVisibility == Visibility.Visible, "Details should be visible when expanded");
+        Assert(slackGroup.ExpandGlyph == "\uE70E", "Should display ChevronUp when expanded");
+
+        // Single notification app group
+        var single = NotificationAppGroup.FromSingle(sampleItems[4]);
+        Assert(single.AppName == "WhatsApp", "Single group app name must match");
+        Assert(single.Count == 1, "Single group count must be 1");
+        Assert(!single.HasMultiple, "Single group HasMultiple must be false");
+        Assert(single.MultipleBadgeVisibility == Visibility.Collapsed, "Single group badge must be collapsed");
+
+        // Notification equality & hashing
+        var single2 = NotificationAppGroup.FromSingle(sampleItems[4]);
+        Assert(single.Equals(single2), "Identical groups must be equal");
+        Assert(single.GetHashCode() == single2.GetHashCode(), "Identical groups must share hash code");
     }
 }

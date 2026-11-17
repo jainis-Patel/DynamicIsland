@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Windows.Foundation.Metadata;
@@ -27,6 +29,7 @@ public sealed class NotificationHistoryItem
     public Brush IconBgBrush { get; init; } = ThemeBrushes.DockActiveBg;
     public DateTime ReceivedAt { get; init; } = DateTime.Now;
     public bool IsMessagingApp { get; init; }
+    public Visibility ReplyVisibility => IsMessagingApp ? Visibility.Visible : Visibility.Collapsed;
     public string TimeText
     {
         get
@@ -38,6 +41,77 @@ public sealed class NotificationHistoryItem
             return ReceivedAt.ToString("HH:mm");
         }
     }
+}
+
+/// <summary>
+/// Aggregates notifications from the same application into an expandable stack card.
+/// </summary>
+public sealed class NotificationAppGroup : System.ComponentModel.INotifyPropertyChanged
+{
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+    public string AppName { get; init; } = "";
+    public string AppUserModelId { get; init; } = "";
+    public string Glyph { get; init; } = "\uE7E7";
+    public Color Accent { get; init; }
+    public Brush AccentBrush { get; init; } = ThemeBrushes.Blue;
+    public Brush IconBgBrush { get; init; } = ThemeBrushes.DockActiveBg;
+    public List<NotificationHistoryItem> Notifications { get; } = new();
+
+    private bool _isExpanded;
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set
+        {
+            if (_isExpanded != value)
+            {
+                _isExpanded = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsExpanded)));
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(ExpandGlyph)));
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(DetailsVisibility)));
+            }
+        }
+    }
+
+    public int Count => Notifications.Count;
+    public bool HasMultiple => Count > 1;
+    public Visibility MultipleBadgeVisibility => HasMultiple ? Visibility.Visible : Visibility.Collapsed;
+    public string CountBadgeText => $"{Count} alerts";
+    public string ExpandGlyph => _isExpanded ? "\uE70E" : "\uE70D";
+    public Visibility DetailsVisibility => (HasMultiple && _isExpanded) ? Visibility.Visible : Visibility.Collapsed;
+    public NotificationHistoryItem? LatestItem => Notifications.FirstOrDefault();
+    public string LatestId => LatestItem?.Id ?? "";
+    public string LatestTitle => LatestItem?.Title ?? AppName;
+    public string LatestBody => LatestItem?.Body ?? "";
+    public string LatestTimeText => LatestItem?.TimeText ?? "";
+    public bool IsMessagingApp => LatestItem?.IsMessagingApp ?? false;
+    public Visibility ReplyVisibility => LatestItem?.ReplyVisibility ?? Visibility.Collapsed;
+
+    public static NotificationAppGroup FromSingle(NotificationHistoryItem item)
+    {
+        var group = new NotificationAppGroup
+        {
+            AppName = item.AppName,
+            AppUserModelId = item.AppUserModelId,
+            Glyph = item.Glyph,
+            Accent = item.Accent,
+            AccentBrush = item.AccentBrush,
+            IconBgBrush = item.IconBgBrush
+        };
+        group.Notifications.Add(item);
+        return group;
+    }
+
+    public override bool Equals(object? obj) =>
+        obj is NotificationAppGroup other &&
+        string.Equals(AppName, other.AppName, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(LatestId, other.LatestId, StringComparison.Ordinal) &&
+        Count == other.Count &&
+        _isExpanded == other._isExpanded;
+
+    public override int GetHashCode() =>
+        HashCode.Combine(AppName?.ToLowerInvariant(), LatestId, Count, _isExpanded);
 }
 
 /// <summary>
@@ -265,7 +339,7 @@ internal sealed class NotificationListenerService : IDisposable
 
             string glyph = GlyphForAppName(appName);
             Color accent = AccentForAppName(appName);
-            bool isMessaging = IsMessagingApp(appName);
+            bool isMessaging = IsMessagingApp(appName, aumid);
 
             var item = RecordNotification(appName, title, body, glyph, accent, aumid, notif.Id);
 
@@ -307,7 +381,7 @@ internal sealed class NotificationListenerService : IDisposable
     {
         string glyph = glyphOverride ?? GlyphForAppName(appName);
         Color accent = accentOverride ?? AccentForAppName(appName);
-        bool isMessaging = IsMessagingApp(appName);
+        bool isMessaging = IsMessagingApp(appName, aumid);
         var item = new NotificationHistoryItem
         {
             AppName = string.IsNullOrWhiteSpace(appName) ? "Notification" : appName.Trim(),
@@ -364,6 +438,54 @@ internal sealed class NotificationListenerService : IDisposable
         return removed;
     }
 
+    public int RemoveHistoryItemsByApp(string appName)
+    {
+        if (string.IsNullOrWhiteSpace(appName)) return 0;
+        int count = 0;
+        var toRemoveIds = new List<uint>();
+        lock (_history)
+        {
+            var matching = _history.Where(i => string.Equals(i.AppName, appName, StringComparison.OrdinalIgnoreCase)).ToList();
+            foreach (var item in matching)
+            {
+                if (item.UserNotificationId > 0) toRemoveIds.Add(item.UserNotificationId);
+                _history.Remove(item);
+                count++;
+            }
+        }
+
+        if (count > 0)
+        {
+            foreach (var uid in toRemoveIds)
+            {
+                RemoveNativeNotification(uid);
+            }
+            HistoryChanged?.Invoke();
+        }
+        return count;
+    }
+
+    public static List<NotificationAppGroup> GroupNotifications(IEnumerable<NotificationHistoryItem> items)
+    {
+        var groups = new List<NotificationAppGroup>();
+        foreach (var group in items.GroupBy(i => string.IsNullOrWhiteSpace(i.AppName) ? (string.IsNullOrWhiteSpace(i.AppUserModelId) ? "System" : i.AppUserModelId) : i.AppName, StringComparer.OrdinalIgnoreCase))
+        {
+            var first = group.First();
+            var appGroup = new NotificationAppGroup
+            {
+                AppName = first.AppName,
+                AppUserModelId = first.AppUserModelId,
+                Glyph = first.Glyph,
+                Accent = first.Accent,
+                AccentBrush = first.AccentBrush,
+                IconBgBrush = first.IconBgBrush
+            };
+            appGroup.Notifications.AddRange(group);
+            groups.Add(appGroup);
+        }
+        return groups;
+    }
+
     public void RemoveNativeNotification(uint userNotificationId)
     {
         if (userNotificationId == 0 || _listener == null) return;
@@ -380,13 +502,16 @@ internal sealed class NotificationListenerService : IDisposable
     /// <summary>
     /// Activates the action that would occur when clicking a Windows notification banner:
     /// Brings the sending application to the foreground, opens URLs, or launches the app via AUMID.
+    /// When <paramref name="preferApp"/> is true (or if the sender is a messaging app), URL interception
+    /// is suppressed in favor of activating the messenger application directly.
     /// </summary>
-    public static bool ActivateNotification(NotificationHistoryItem item)
+    public static bool ActivateNotification(NotificationHistoryItem item, bool preferApp = false)
     {
         if (item == null) return false;
 
-        // 1. If notification body contains a URL, open the URL in default browser
-        if (!string.IsNullOrWhiteSpace(item.Body))
+        // 1. If notification body contains a URL, open the URL in default browser ONLY IF
+        // preferApp is false AND it is not a messaging app
+        if (!preferApp && !item.IsMessagingApp && !string.IsNullOrWhiteSpace(item.Body))
         {
             var match = Regex.Match(item.Body, @"https?://[^\s]+");
             if (match.Success && Uri.TryCreate(match.Value, UriKind.Absolute, out var uri))
@@ -401,10 +526,19 @@ internal sealed class NotificationListenerService : IDisposable
         }
 
         // 2. Try to find and focus an existing running window for this application
-        bool focused = TryFocusAppWindow(item.AppName, item.AppUserModelId);
-        if (focused) return true;
+        IntPtr hwnd = FindAppWindow(item.AppName, item.AppUserModelId, item.Title);
+        if (hwnd != IntPtr.Zero)
+        {
+            return ForceForegroundWindow(hwnd);
+        }
 
-        // 3. If not already focused, activate via Windows AUMID (shell:AppsFolder\<AppUserModelId>)
+        // 3. Try launching via known protocol URI if applicable
+        if (TryLaunchKnownAppProtocol(item.AppName, item.AppUserModelId))
+        {
+            return true;
+        }
+
+        // 4. Activate via Windows AUMID (shell:AppsFolder\<AppUserModelId>)
         if (!string.IsNullOrWhiteSpace(item.AppUserModelId))
         {
             try
@@ -421,16 +555,44 @@ internal sealed class NotificationListenerService : IDisposable
             }
         }
 
-        // 4. Fallback: try launching or focusing by known application name
+        // 5. Fallback: try launching by known application name
         return TryLaunchKnownApp(item.AppName);
     }
 
-    private static void BringWindowToForeground(IntPtr hWnd)
+    /// <summary>
+    /// Forcibly brings a target window to the foreground, bypassing Windows SetForegroundWindow
+    /// restrictions by attaching thread input queues and unlocking foreground lock timeout.
+    /// </summary>
+    public static bool ForceForegroundWindow(IntPtr hWnd)
     {
-        if (hWnd == IntPtr.Zero) return;
+        if (hWnd == IntPtr.Zero) return false;
         try
         {
             AllowSetForegroundWindow(ASFW_ANY);
+
+            IntPtr foregroundWnd = GetForegroundWindow();
+            uint foregroundThread = foregroundWnd != IntPtr.Zero
+                ? GetWindowThreadProcessId(foregroundWnd, out _)
+                : 0;
+            uint targetThread = GetWindowThreadProcessId(hWnd, out _);
+            uint currentThread = (uint)GetCurrentThreadId();
+
+            bool attachedFore = false;
+            bool attachedCurrent = false;
+
+            if (foregroundThread != 0 && foregroundThread != targetThread)
+            {
+                attachedFore = AttachThreadInput(foregroundThread, targetThread, true);
+            }
+            if (currentThread != 0 && currentThread != targetThread)
+            {
+                attachedCurrent = AttachThreadInput(currentThread, targetThread, true);
+            }
+
+            // Simulate pressing and releasing ALT key to reset foreground lock timeout
+            keybd_event((byte)VK_MENU, 0, 0, UIntPtr.Zero);
+            keybd_event((byte)VK_MENU, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+
             if (IsIconic(hWnd))
             {
                 ShowWindow(hWnd, SW_RESTORE);
@@ -439,95 +601,231 @@ internal sealed class NotificationListenerService : IDisposable
             {
                 ShowWindow(hWnd, SW_SHOW);
             }
+
+            BringWindowToTop(hWnd);
             SetForegroundWindow(hWnd);
-        }
-        catch { }
-    }
 
-    private static bool TryFocusAppWindow(string appName, string aumid)
-    {
-        if (string.IsNullOrWhiteSpace(appName) && string.IsNullOrWhiteSpace(aumid))
-            return false;
-
-        string cleanName = appName.Trim().ToLowerInvariant();
-
-        // Check common process aliases
-        List<string> candidateNames = new();
-        if (cleanName.Contains("visual studio code") || cleanName.Contains("code"))
-            candidateNames.Add("code");
-        if (cleanName.Contains("chatgpt"))
-            candidateNames.Add("ChatGPT");
-        if (cleanName.Contains("slack"))
-            candidateNames.Add("slack");
-        if (cleanName.Contains("discord"))
-            candidateNames.Add("Discord");
-        if (cleanName.Contains("telegram"))
-            candidateNames.Add("Telegram");
-        if (cleanName.Contains("whatsapp"))
-            candidateNames.Add("WhatsApp");
-        if (cleanName.Contains("spotify"))
-            candidateNames.Add("Spotify");
-        if (cleanName.Contains("chrome"))
-            candidateNames.Add("chrome");
-        if (cleanName.Contains("edge"))
-            candidateNames.Add("msedge");
-        if (cleanName.Contains("outlook"))
-        {
-            candidateNames.Add("OUTLOOK");
-            candidateNames.Add("olk");
-        }
-        if (cleanName.Contains("terminal"))
-            candidateNames.Add("WindowsTerminal");
-
-        candidateNames.Add(cleanName.Replace(" ", ""));
-
-        try
-        {
-            foreach (var candidate in candidateNames)
+            if (attachedFore)
             {
-                var procs = Process.GetProcessesByName(candidate);
-                try
-                {
-                    foreach (var p in procs)
-                    {
-                        if (p.MainWindowHandle != IntPtr.Zero)
-                        {
-                            BringWindowToForeground(p.MainWindowHandle);
-                            return true;
-                        }
-                    }
-                }
-                finally
-                {
-                    foreach (var p in procs) p.Dispose();
-                }
+                AttachThreadInput(foregroundThread, targetThread, false);
+            }
+            if (attachedCurrent)
+            {
+                AttachThreadInput(currentThread, targetThread, false);
             }
 
-            // Also search by MainWindowTitle containing appName
-            if (cleanName.Length > 2)
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[NotificationListener] ForceForegroundWindow error: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Finds the top-level window handle for a target application by matching candidate process names,
+    /// window titles, and AUMIDs using Win32 EnumWindows.
+    /// </summary>
+    public static IntPtr FindAppWindow(string appName, string aumid, string? title = null)
+    {
+        if (string.IsNullOrWhiteSpace(appName) && string.IsNullOrWhiteSpace(aumid))
+            return IntPtr.Zero;
+
+        var candidates = GetCandidateProcessNames(appName, aumid);
+        string cleanApp = (appName ?? "").Trim().ToLowerInvariant();
+        string cleanTitle = (title ?? "").Trim().ToLowerInvariant();
+
+        IntPtr bestHwnd = IntPtr.Zero;
+        int bestScore = 0;
+
+        EnumWindows((hWnd, lParam) =>
+        {
+            try
             {
-                var allProcs = Process.GetProcesses();
+                if (!IsWindowVisible(hWnd) && !IsIconic(hWnd))
+                    return true;
+
+                if (GetWindowRect(hWnd, out var rect))
+                {
+                    int w = rect.Right - rect.Left;
+                    int h = rect.Bottom - rect.Top;
+                    if (w < 80 || h < 80) return true;
+                }
+
+                GetWindowThreadProcessId(hWnd, out uint pid);
+                if (pid == 0) return true;
+
+                string procName = "";
                 try
                 {
-                    foreach (var p in allProcs)
+                    using var proc = Process.GetProcessById((int)pid);
+                    procName = proc.ProcessName;
+                }
+                catch { }
+
+                if (string.IsNullOrEmpty(procName)) return true;
+
+                bool matchesProc = candidates.Any(c => string.Equals(c, procName, StringComparison.OrdinalIgnoreCase));
+                if (!matchesProc) return true;
+
+                int score = 10;
+                var sb = new StringBuilder(256);
+                int len = GetWindowText(hWnd, sb, 256);
+                if (len > 0)
+                {
+                    string winTitle = sb.ToString().ToLowerInvariant();
+                    if (!string.IsNullOrEmpty(cleanTitle) && winTitle.Contains(cleanTitle))
                     {
-                        try
-                        {
-                            if (p.MainWindowHandle != IntPtr.Zero &&
-                                !string.IsNullOrWhiteSpace(p.MainWindowTitle) &&
-                                p.MainWindowTitle.ToLowerInvariant().Contains(cleanName))
-                            {
-                                BringWindowToForeground(p.MainWindowHandle);
-                                return true;
-                            }
-                        }
-                        catch { }
+                        score += 50;
+                    }
+                    if (!string.IsNullOrEmpty(cleanApp) && winTitle.Contains(cleanApp))
+                    {
+                        score += 20;
                     }
                 }
-                finally
+
+                if (score > bestScore)
                 {
-                    foreach (var p in allProcs) p.Dispose();
+                    bestScore = score;
+                    bestHwnd = hWnd;
                 }
+            }
+            catch { }
+
+            return true;
+        }, IntPtr.Zero);
+
+        return bestHwnd;
+    }
+
+    internal static List<string> GetCandidateProcessNames(string appName, string aumid)
+    {
+        var list = new List<string>();
+        string combined = $"{appName} {aumid}".ToLowerInvariant();
+
+        if (combined.Contains("whatsapp"))
+        {
+            list.Add("WhatsApp");
+            list.Add("WhatsApp.exe");
+        }
+        if (combined.Contains("discord"))
+        {
+            list.Add("Discord");
+            list.Add("Discord.exe");
+        }
+        if (combined.Contains("telegram"))
+        {
+            list.Add("Telegram");
+            list.Add("Telegram.exe");
+        }
+        if (combined.Contains("slack"))
+        {
+            list.Add("slack");
+            list.Add("Slack");
+        }
+        if (combined.Contains("phone link") || combined.Contains("yourphone") || combined.Contains("your phone") || combined.Contains("phoneexperiencehost"))
+        {
+            list.Add("PhoneExperienceHost");
+            list.Add("YourPhone");
+        }
+        if (combined.Contains("teams"))
+        {
+            list.Add("ms-teams");
+            list.Add("Teams");
+        }
+        if (combined.Contains("signal"))
+        {
+            list.Add("Signal");
+        }
+        if (combined.Contains("skype"))
+        {
+            list.Add("Skype");
+        }
+        if (combined.Contains("messenger"))
+        {
+            list.Add("Messenger");
+        }
+        if (combined.Contains("wechat"))
+        {
+            list.Add("WeChat");
+        }
+        if (combined.Contains("viber"))
+        {
+            list.Add("Viber");
+        }
+        if (combined.Contains("outlook") || combined.Contains("mail"))
+        {
+            list.Add("OUTLOOK");
+            list.Add("olk");
+            list.Add("HxOutlook");
+            list.Add("Thunderbird");
+        }
+        if (combined.Contains("visual studio code") || combined.Contains("code"))
+        {
+            list.Add("code");
+        }
+        if (combined.Contains("chatgpt"))
+        {
+            list.Add("ChatGPT");
+        }
+        if (combined.Contains("spotify"))
+        {
+            list.Add("Spotify");
+        }
+        if (combined.Contains("terminal"))
+        {
+            list.Add("WindowsTerminal");
+        }
+
+        string clean = (appName ?? "").Trim().Replace(" ", "");
+        if (!string.IsNullOrEmpty(clean) && !list.Contains(clean, StringComparer.OrdinalIgnoreCase))
+        {
+            list.Add(clean);
+        }
+
+        return list;
+    }
+
+    private static bool TryLaunchKnownAppProtocol(string appName, string aumid)
+    {
+        string combined = $"{appName} {aumid}".ToLowerInvariant();
+        try
+        {
+            if (combined.Contains("whatsapp"))
+            {
+                Process.Start(new ProcessStartInfo("whatsapp:") { UseShellExecute = true });
+                return true;
+            }
+            if (combined.Contains("telegram"))
+            {
+                Process.Start(new ProcessStartInfo("tg:") { UseShellExecute = true });
+                return true;
+            }
+            if (combined.Contains("discord"))
+            {
+                Process.Start(new ProcessStartInfo("discord:") { UseShellExecute = true });
+                return true;
+            }
+            if (combined.Contains("teams"))
+            {
+                Process.Start(new ProcessStartInfo("msteams:") { UseShellExecute = true });
+                return true;
+            }
+            if (combined.Contains("phone link") || combined.Contains("yourphone") || combined.Contains("phoneexperiencehost"))
+            {
+                Process.Start(new ProcessStartInfo("ms-chat:") { UseShellExecute = true });
+                return true;
+            }
+            if (combined.Contains("skype"))
+            {
+                Process.Start(new ProcessStartInfo("skype:") { UseShellExecute = true });
+                return true;
+            }
+            if (combined.Contains("spotify"))
+            {
+                Process.Start(new ProcessStartInfo("spotify:") { UseShellExecute = true });
+                return true;
             }
         }
         catch { }
@@ -621,6 +919,23 @@ internal sealed class NotificationListenerService : IDisposable
         {
             // AppInfo.DisplayInfo throws for some unpackaged (AUMID-only) senders.
         }
+
+        string aumid = SafeAumid(notif);
+        if (!string.IsNullOrWhiteSpace(aumid))
+        {
+            string lower = aumid.ToLowerInvariant();
+            if (lower.Contains("whatsapp")) return "WhatsApp";
+            if (lower.Contains("yourphone") || lower.Contains("phonelink")) return "Phone Link";
+            if (lower.Contains("telegram")) return "Telegram";
+            if (lower.Contains("discord")) return "Discord";
+            if (lower.Contains("slack")) return "Slack";
+            if (lower.Contains("teams")) return "Microsoft Teams";
+            if (lower.Contains("signal")) return "Signal";
+            if (lower.Contains("skype")) return "Skype";
+            if (lower.Contains("spotify")) return "Spotify";
+            if (lower.Contains("outlook")) return "Outlook";
+        }
+
         return "Notification";
     }
 
@@ -647,7 +962,8 @@ internal sealed class NotificationListenerService : IDisposable
     {
         string n = name.ToLowerInvariant();
         if (n.Contains("mail") || n.Contains("outlook")) return "\uE715";
-        if (n.Contains("chat") || n.Contains("message") || n.Contains("whatsapp") || n.Contains("telegram") || n.Contains("slack") || n.Contains("discord")) return "\uE8BD";
+        if (n.Contains("phone link") || n.Contains("your phone")) return "\uE8EA";
+        if (n.Contains("chat") || n.Contains("message") || n.Contains("whatsapp") || n.Contains("telegram") || n.Contains("slack") || n.Contains("discord") || n.Contains("signal")) return "\uE8BD";
         if (n.Contains("teams") || n.Contains("zoom") || n.Contains("meet") || n.Contains("call")) return "\uE717";
         if (n.Contains("update") || n.Contains("windows")) return "\uE777";
         return "\uE7E7";
@@ -662,33 +978,42 @@ internal sealed class NotificationListenerService : IDisposable
         if (n.Contains("slack")) return Color.FromRgb(0xEC, 0xB2, 0x2E);
         if (n.Contains("teams")) return Color.FromRgb(0x62, 0x64, 0xA7);
         if (n.Contains("zoom")) return Color.FromRgb(0x0B, 0x5C, 0xFF);
+        if (n.Contains("phone link") || n.Contains("your phone")) return Color.FromRgb(0x00, 0x78, 0xD4);
+        if (n.Contains("signal")) return Color.FromRgb(0x3A, 0x76, 0xF0);
         if (n.Contains("mail") || n.Contains("outlook")) return Color.FromRgb(0x00, 0x78, 0xD4);
         return Color.FromRgb(0x0A, 0x84, 0xFF);
     }
 
     /// <summary>
-    /// Identifies whether the application is an instant messaging or communication app
+    /// Identifies whether the application or AUMID represents an instant messaging or communication app
     /// that supports interactive Quick Reply in Dynamic Island.
     /// </summary>
-    public static bool IsMessagingApp(string? appName)
+    public static bool IsMessagingApp(string? appName, string? aumid = null)
     {
-        if (string.IsNullOrWhiteSpace(appName)) return false;
-        string n = appName.ToLowerInvariant();
-        return n.Contains("whatsapp") ||
-               n.Contains("telegram") ||
-               n.Contains("discord") ||
-               n.Contains("slack") ||
-               n.Contains("teams") ||
-               n.Contains("signal") ||
-               n.Contains("skype") ||
-               n.Contains("phone link") ||
-               n.Contains("your phone") ||
-               n.Contains("messages") ||
-               n.Contains("messenger") ||
-               n.Contains("wechat") ||
-               n.Contains("viber") ||
-               n.Contains("chat");
+        string n = (appName ?? "").ToLowerInvariant();
+        string a = (aumid ?? "").ToLowerInvariant();
+        string combined = $"{n} {a}".Trim();
+        if (string.IsNullOrWhiteSpace(combined)) return false;
+
+        return combined.Contains("whatsapp") ||
+               combined.Contains("telegram") ||
+               combined.Contains("discord") ||
+               combined.Contains("slack") ||
+               combined.Contains("teams") ||
+               combined.Contains("signal") ||
+               combined.Contains("skype") ||
+               combined.Contains("phone link") ||
+               combined.Contains("yourphone") ||
+               combined.Contains("your phone") ||
+               combined.Contains("phoneexperiencehost") ||
+               combined.Contains("messages") ||
+               combined.Contains("messenger") ||
+               combined.Contains("wechat") ||
+               combined.Contains("viber") ||
+               combined.Contains("chat");
     }
+
+    public static bool IsMessagingApp(string? appName) => IsMessagingApp(appName, null);
 
     public void Dispose()
     {

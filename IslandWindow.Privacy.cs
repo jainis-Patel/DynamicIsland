@@ -118,6 +118,30 @@ public partial class IslandWindow
                 : ThemeBrushes.PlanSaverActiveBg;
             CompactCallText.Foreground = muted ? ThemeBrushes.Red : ThemeBrushes.Green;
         }
+
+        if (CompactMicToggleBtn != null && CompactMicToggleGlyph != null)
+        {
+            CompactMicToggleGlyph.Text = muted ? "\uE74F" : "\uE720";
+            CompactMicToggleGlyph.Foreground = muted ? ThemeBrushes.Red : ThemeBrushes.Green;
+            CompactMicToggleBtn.Background = muted ? ThemeBrushes.AlertRedBg : ThemeBrushes.PlanSaverActiveBg;
+            CompactMicToggleBtn.BorderBrush = muted ? ThemeBrushes.AlertRedBorder : ThemeBrushes.PlanSaverActiveBorder;
+            CompactMicToggleBtn.ToolTip = muted ? "Microphone Muted \u00B7 Click to unmute (Ctrl+Alt+K)" : "Microphone Active \u00B7 Click to mute (Ctrl+Alt+K)";
+        }
+    }
+
+    internal void CompactMicToggleBtn_Click(object sender, MouseButtonEventArgs e)
+    {
+        ToggleMicMute();
+        e.Handled = true;
+    }
+
+    internal void CompactCallBadge_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (PrivacyIndicatorService.FocusCallAppWindow(_privacyService.ActiveCallApp))
+        {
+            _machine.CollapseNow();
+        }
+        e.Handled = true;
     }
 
     internal void ExpandedCallMicBadge_Click(object sender, MouseButtonEventArgs e)

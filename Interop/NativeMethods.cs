@@ -414,6 +414,30 @@ internal static class NativeMethods
     public const int ASFW_ANY = -1;
 
     [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool fAttach);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool BringWindowToTop(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    public static extern int GetWindowTextLength(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
     public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
     public const byte VK_CONTROL = 0x11;
@@ -423,9 +447,14 @@ internal static class NativeMethods
 
     /// <summary>
     /// Injects Ctrl+V paste followed by Enter to deliver a staged reply to the active foreground messenger window.
+    /// Cleanses any active modifier keys (Alt, Shift) to guarantee an uncorrupted Ctrl+V sequence.
     /// </summary>
     public static void SimulatePasteAndEnter()
     {
+        // Release any held modifier keys (Alt, Shift) to prevent triggering shortcuts (e.g. Alt+V, Ctrl+Shift+V)
+        keybd_event((byte)VK_MENU, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        keybd_event(0x10 /* VK_SHIFT */, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+
         // Ctrl down
         keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
         // V down & up
@@ -434,8 +463,8 @@ internal static class NativeMethods
         // Ctrl up
         keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
 
-        // Allow application message queue to digest clipboard paste
-        Thread.Sleep(60);
+        // Allow application message queue to digest clipboard paste and validate input
+        Thread.Sleep(90);
 
         // Return (Enter) down & up
         keybd_event(VK_RETURN, 0, 0, UIntPtr.Zero);

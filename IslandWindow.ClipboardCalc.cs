@@ -562,15 +562,47 @@ public partial class IslandWindow
 
     private void OnDownloadsChanged()
     {
-        if (_downloadService.HasActiveDownloads)
+        bool hasActive = _downloadService.HasActiveDownloads;
+        if (hasActive)
         {
             CompactDownloadText.Text = _downloadService.LatestDownloadStatusText
                 ?? _downloadService.LatestDownloadName
                 ?? "DOWNLOADING";
+            AnimateDownloadRing(true);
+        }
+        else
+        {
+            AnimateDownloadRing(false);
         }
 
         EvaluateActivity();
         EnsureRendering();
+    }
+
+    private void AnimateDownloadRing(bool active)
+    {
+        if (DownloadRingRotate == null) return;
+        if (active)
+        {
+            var anim = new DoubleAnimation
+            {
+                From = 0,
+                To = 360,
+                Duration = TimeSpan.FromSeconds(1.2),
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            DownloadRingRotate.BeginAnimation(RotateTransform.AngleProperty, anim);
+        }
+        else
+        {
+            DownloadRingRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+        }
+    }
+
+    internal void CompactDownloadHost_Click(object sender, MouseButtonEventArgs e)
+    {
+        DownloadTrackerService.OpenDownloadsFolder();
+        e.Handled = true;
     }
 
     private void OnDownloadCompleted(string fileName, string fullPath)
