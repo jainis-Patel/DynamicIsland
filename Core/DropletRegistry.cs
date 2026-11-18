@@ -411,6 +411,37 @@ public sealed class DropletRegistry
         Items.Add(descriptor);
     }
 
+    public void RegisterOrUpdate(DropletDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        if (_byId.TryGetValue(descriptor.Id, out var existing))
+        {
+            int idx = _ordered.IndexOf(existing);
+            if (idx >= 0) _ordered[idx] = descriptor;
+            int itemIdx = Items.IndexOf(existing);
+            if (itemIdx >= 0) Items[itemIdx] = descriptor;
+            _byId[descriptor.Id] = descriptor;
+        }
+        else
+        {
+            Register(descriptor);
+        }
+    }
+
+    public bool Unregister(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return false;
+        if (_byId.TryGetValue(id.Trim(), out var descriptor))
+        {
+            _byId.Remove(id.Trim());
+            _ordered.Remove(descriptor);
+            Items.Remove(descriptor);
+            try { descriptor.OnDeactivate?.Invoke(); } catch { }
+            return true;
+        }
+        return false;
+    }
+
     public DropletDescriptor? Get(string id) =>
         _byId.TryGetValue(id, out var d) ? d : null;
 

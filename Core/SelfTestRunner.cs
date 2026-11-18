@@ -110,6 +110,7 @@ internal static class SelfTestRunner
         Run("Pillar1PrecisionTouchpad: Fluid trackpad scrubbing, velocity flick skip & multi-touch pinch morphing", TestTouchpadGesturesAndVelocityInvariants);
         Run("Pillar2AiAgentApprovals: Two-way IPC prompt RPC, diff HUD parser & interactive buttons", TestAiAgentInteractiveApprovalsAndDiffViewer);
         Run("Pillar3FloatingPiPAndNotch: Tear-off drag gesture, magnetic corner snapping & hardware notch fillets", TestPillar3DetachableFloatingIslandAndHardwareNotch);
+        Run("Pillar4CommunityDropletsSdk: Schema-validated JSON definitions, hot-reloading & live polling pipeline", TestPillar4CommunityDropletsSdk);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -3335,5 +3336,90 @@ SSID 3 : Home_Router
         Assert(roundtripped!.IsDetachedFloating, "IsDetachedFloating must survive serialization");
         Assert(roundtripped.FloatingX == 1420.5 && roundtripped.FloatingY == 820.0, "Floating coordinates must roundtrip exactly");
         Assert(roundtripped.HardwareNotchPreset == "MacBookPro14", "HardwareNotchPreset must roundtrip");
+    }
+
+    private static void TestPillar4CommunityDropletsSdk()
+    {
+        // 1. Schema Validation - Valid Definition
+        string validJson = @"
+        {
+            ""id"": ""github_pr_tracker"",
+            ""name"": ""GitHub PR Tracker"",
+            ""description"": ""Track pending PR review requests & CI checks"",
+            ""version"": ""1.0.0"",
+            ""author"": ""Community Dev"",
+            ""glyph"": ""\uE7B5"",
+            ""category"": ""Productivity"",
+            ""refreshIntervalSec"": 30,
+            ""endpoint"": ""https://api.github.com/repos/sample/repo/pulls"",
+            ""formatTemplate"": ""{value} PRs Pending"",
+            ""responsePath"": ""count"",
+            ""actions"": [
+                { ""label"": ""Review PR"", ""glyph"": ""\uE7B5"", ""command"": ""https://github.com/pulls"", ""type"": ""OpenUrl"" }
+            ]
+        }";
+
+        var def = CommunityDropletSchemaValidator.Deserialize(validJson);
+        Assert(def != null, "Deserializing valid droplet JSON must succeed");
+        bool valid = CommunityDropletSchemaValidator.Validate(def, out var errors);
+        Assert(valid, $"Valid droplet must pass schema validation, got errors: {string.Join("; ", errors)}");
+        Assert(def!.Id == "github_pr_tracker" && def.Name == "GitHub PR Tracker", "Droplet properties mismatch");
+        Assert(def.RefreshIntervalSec == 30, "RefreshIntervalSec must be 30");
+
+        // 2. Schema Validation - Negative Cases
+        Assert(!CommunityDropletSchemaValidator.Validate(null, out _), "Null definition must fail validation");
+
+        var invalidIdDef = def with { Id = "invalid name with spaces!" };
+        Assert(!CommunityDropletSchemaValidator.Validate(invalidIdDef, out var idErrors) && idErrors.Count > 0,
+            "Alphanumeric regex check must fail for invalid IDs");
+
+        var invalidIntervalDef = def with { RefreshIntervalSec = 2 };
+        Assert(!CommunityDropletSchemaValidator.Validate(invalidIntervalDef, out var intErrors) && intErrors.Count > 0,
+            "Interval below 5s must fail validation to prevent aggressive polling");
+
+        var invalidUrlDef = def with { Endpoint = "ftp://invalid-scheme" };
+        Assert(!CommunityDropletSchemaValidator.Validate(invalidUrlDef, out var urlErrors) && urlErrors.Count > 0,
+            "Non-http/https endpoint must fail validation");
+
+        // 3. Dot-Syntax JSON Value Extraction Engine
+        string sampleJson = @"{ ""status"": ""ok"", ""data"": { ""price"": 94250.75, ""currency"": ""USD"" } }";
+        string extractedStatus = CommunityDropletService.ExtractJsonValue(sampleJson, "status");
+        Assert(extractedStatus == "ok", $"Expected 'ok', got '{extractedStatus}'");
+
+        string extractedPrice = CommunityDropletService.ExtractJsonValue(sampleJson, "data.price");
+        Assert(extractedPrice == "94250.75", $"Expected '94250.75', got '{extractedPrice}'");
+
+        string missingFallback = CommunityDropletService.ExtractJsonValue(sampleJson, "nonexistent.key");
+        Assert(missingFallback.Contains("status"), "Missing key should gracefully return fallback content");
+
+        // 4. Dynamic Droplet Registration & Hot-Unload Lifecycle
+        var registry = new DropletRegistry();
+        var hub = new LiveActivityHub();
+        using var service = new CommunityDropletService(registry, hub);
+
+        bool loaded = service.LoadDropletFromJson(validJson, notifyUser: false);
+        Assert(loaded, "LoadDropletFromJson must return true for valid definition");
+
+        var regDescriptor = registry.Get("github_pr_tracker");
+        Assert(regDescriptor != null, "Droplet must be registered in DropletRegistry");
+        Assert(regDescriptor!.Name == "GitHub PR Tracker", "Registered name must match");
+        Assert(service.LoadedDroplets.Count == 1, "LoadedDroplets count must be 1");
+
+        // Verify LiveActivityHub integration
+        var act = hub.Activities.FirstOrDefault(a => a.Id == "community_github_pr_tracker");
+        Assert(act != null, "Droplet must publish LiveActivity to hub");
+        Assert(act!.Actions != null && act.Actions.Count == 1, "Published activity must include declared actions");
+        Assert(act.Actions![0].Label == "Review PR", "Action label must match");
+
+        // Hot Unregister
+        bool removed = service.UnregisterCommunityDroplet("github_pr_tracker", notifyUser: false);
+        Assert(removed, "UnregisterCommunityDroplet must return true");
+        Assert(registry.Get("github_pr_tracker") == null, "Droplet must be removed from DropletRegistry");
+        Assert(!hub.Activities.Any(a => a.Id == "community_github_pr_tracker"), "Activity must be removed from hub");
+        Assert(service.LoadedDroplets.Count == 0, "LoadedDroplets count must be 0 after unregister");
+
+        // 5. AppPaths DropletsDirectory Invariant
+        string dropletsDir = AppPaths.DropletsDirectory;
+        Assert(Directory.Exists(dropletsDir), $"DropletsDirectory '{dropletsDir}' must exist");
     }
 }

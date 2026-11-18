@@ -267,6 +267,7 @@ public partial class IslandWindow : Window
     private readonly WindowsShareService _windowsShareService;
     private readonly LanQuickShareService _lanQuickShareService;
     private readonly TaskService _taskService;
+    private readonly CommunityDropletService _communityDropletService;
     private readonly UpdateManagerService _updateService;
     private readonly Choreographer _choreographer;
     private Views.MiniPlayerWindow? _miniPlayerWindow;
@@ -283,6 +284,7 @@ public partial class IslandWindow : Window
     internal KeyboardSoundService? KeyboardSoundServiceInstance => _keyboardSoundService;
     internal LanQuickShareService LanQuickShare => _lanQuickShareService;
     internal KeyboardSoundService KeyboardSound => _keyboardSoundService;
+    internal CommunityDropletService CommunityDroplets => _communityDropletService;
     internal DropletRegistry? Droplets => _dropletRegistry;
     internal ClipboardHistoryService ClipboardService => _clipboardService;
     internal DropShelfService Shelf => _shelfService;
@@ -491,6 +493,8 @@ public partial class IslandWindow : Window
         _meetingModeService = _services.Register(new MeetingModeService(Dispatcher, _calendarService, _privacyService, _liveActivityHub));
         _meetingModeService.Start();
         _dropletRegistry = new DropletRegistry(_settingsService);
+        _communityDropletService = _services.Register(new CommunityDropletService(_dropletRegistry, _liveActivityHub));
+        _communityDropletService.Start();
         _jiggleBasketService = _services.Register(new JiggleBasketService(Dispatcher, _shelfService, () => _dropletRegistry.IsEnabled("jiggle_basket")));
         _notesService = _services.Register(new NotesService());
         _taskService = _services.Register(new TaskService());

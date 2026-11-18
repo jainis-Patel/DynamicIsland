@@ -22,6 +22,19 @@ internal static class AppPaths
     public static string LogFile => GetDataFilePath("app.log");
     public static string LogArchiveFile => GetDataFilePath("app.1.log");
 
+    public static string DropletsDirectory
+    {
+        get
+        {
+            string dir = Path.Combine(DataDirectory, "Droplets");
+            if (!Directory.Exists(dir))
+            {
+                try { Directory.CreateDirectory(dir); } catch { }
+            }
+            return dir;
+        }
+    }
+
     public static string GetDataFilePath(string fileName)
     {
         string targetPath = Path.Combine(DataDirectory, fileName);

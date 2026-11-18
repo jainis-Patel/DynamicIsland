@@ -10,8 +10,8 @@
   "downloads": {
     "installer": {
       "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.5.0/DynamicIsland-Setup.exe",
-      "sha256": "7AA46893737B24CA705341965E11CEBA16AECD2922E0D8DECC88AE1851CA6E3C",
-      "sizeBytes": 74145585
+      "sha256": "8D07A9E2B28C7DA684FD4D2EE535C55D9645CEB64743FD1DFCBC2EB6384DCA96",
+      "sizeBytes": 74156725
     },
     "portable": {
       "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.5.0/DynamicIsland-Portable.zip",
