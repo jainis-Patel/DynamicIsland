@@ -133,6 +133,8 @@ internal sealed class SettingsService
         "Analog",
         "Neon",
         "Flip",
+        "Matrix",
+        "JumpHour",
     };
 
     public static string NormalizeClockStyle(string? style)
@@ -155,6 +157,14 @@ internal sealed class SettingsService
         if (string.Equals(trimmed, "Seconds", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(trimmed, "Second", StringComparison.OrdinalIgnoreCase))
             return "Seconds";
+        if (string.Equals(trimmed, "Matrix", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "FieldMatrix", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Telemetry", StringComparison.OrdinalIgnoreCase))
+            return "Matrix";
+        if (string.Equals(trimmed, "JumpHour", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Jump", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Guichet", StringComparison.OrdinalIgnoreCase))
+            return "JumpHour";
         return AvailableClockStyles.FirstOrDefault(s => string.Equals(s, trimmed, StringComparison.OrdinalIgnoreCase)) ?? "Minimal";
     }
 

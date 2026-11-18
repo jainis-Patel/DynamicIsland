@@ -998,7 +998,7 @@
                                     </Button>
 
                                     <!-- 6. Flip -->
-                                    <Button Click="ClockStyleBtn_Click" x:Name="ClockStyleFlipBtn" Tag="Flip" Style="{StaticResource ClockPreviewCardStyle}" Margin="0">
+                                    <Button Click="ClockStyleBtn_Click" x:Name="ClockStyleFlipBtn" Tag="Flip" Style="{StaticResource ClockPreviewCardStyle}">
                                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                             <Border Height="24" Width="92" CornerRadius="12" Background="#06070A" BorderBrush="#28FFFFFF" BorderThickness="1">
                                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -1012,6 +1012,39 @@
                                                 </StackPanel>
                                             </Border>
                                             <TextBlock Text="Split-Flap" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,5,0,0" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- 7. Matrix -->
+                                    <Button Click="ClockStyleBtn_Click" x:Name="ClockStyleMatrixBtn" Tag="Matrix" Style="{StaticResource ClockPreviewCardStyle}">
+                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                            <Border Height="24" Width="96" CornerRadius="12" Background="#06070A" BorderBrush="#28FFFFFF" BorderThickness="1">
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <Ellipse Width="3.5" Height="3.5" Fill="#30D158" Margin="0,0,3.5,0" />
+                                                    <TextBlock Text="12:45" Style="{StaticResource Digits}" FontSize="10.5" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
+                                                    <Border Width="1" Height="8" Background="#33FFFFFF" Margin="3.5,0" VerticalAlignment="Center" />
+                                                    <TextBlock Text="28s" Style="{StaticResource Digits}" FontSize="7.5" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Border>
+                                            <TextBlock Text="Matrix" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,5,0,0" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- 8. Jump-Hour -->
+                                    <Button Click="ClockStyleBtn_Click" x:Name="ClockStyleJumpHourBtn" Tag="JumpHour" Style="{StaticResource ClockPreviewCardStyle}" Margin="0">
+                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                            <Border Height="24" Width="96" CornerRadius="12" Background="#06070A" BorderBrush="#28FFFFFF" BorderThickness="1">
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <Border CornerRadius="3" Background="#33000000" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0.8" Padding="3,0.5">
+                                                        <TextBlock Text="12" Style="{StaticResource Digits}" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" />
+                                                    </Border>
+                                                    <Ellipse Width="3" Height="3" Fill="#FF2D55" Margin="3,0" />
+                                                    <Border CornerRadius="3" Background="#33000000" BorderBrush="#33FFFFFF" BorderThickness="0.8" Padding="3,0.5">
+                                                        <TextBlock Text="45" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="White" />
+                                                    </Border>
+                                                </StackPanel>
+                                            </Border>
+                                            <TextBlock Text="Jump-Hour" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,5,0,0" />
                                         </StackPanel>
                                     </Button>
                                 </StackPanel>

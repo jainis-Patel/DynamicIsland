@@ -141,107 +141,346 @@
 
                             <!-- Recessed TrueDepth Camera Lens Ring when idle -->
                             <Grid x:Name="IdleSensorDot" VerticalAlignment="Center">
-                                <Ellipse Width="8" Height="8" Fill="#0E0E13" Stroke="#24242E" StrokeThickness="1" />
-                                <Ellipse Width="3" Height="3" Fill="#1D1D28" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Ellipse Width="8.5" Height="8.5" Fill="#0A0A0F" Stroke="#282836" StrokeThickness="1" />
+                                <Ellipse Width="4.5" Height="4.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Ellipse.Fill>
+                                        <RadialGradientBrush Center="0.32,0.32" GradientOrigin="0.32,0.32" RadiusX="0.55" RadiusY="0.55">
+                                            <GradientStop Color="#555E9EFF" Offset="0" />
+                                            <GradientStop Color="#223A2E6E" Offset="0.6" />
+                                            <GradientStop Color="#08080C" Offset="1" />
+                                        </RadialGradientBrush>
+                                    </Ellipse.Fill>
+                                </Ellipse>
                             </Grid>
                         </StackPanel>
 
-                        <!-- Dynamic Clock Host (Switched via ClockStyle setting) -->
-                        <!-- 1. Minimal Style (Clean Apple OLED) -->
-                        <TextBlock x:Name="IdleClock" Style="{StaticResource Digits}"
-                                   FontSize="12" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource PrimaryTextBrush}" Text="12:00" VerticalAlignment="Center" />
+                        <!-- ══════════════════════════════════════════════════════════════════════ -->
+                        <!-- DYNAMIC CLOCK HOST (8 High-Craft Horological & Hardware Styles)        -->
+                        <!-- ══════════════════════════════════════════════════════════════════════ -->
 
-                        <!-- 2. Seconds Style (Precision Chronograph with Accent Seconds Badge) -->
+                        <!-- 1. Minimal Style (Apple Watch Ultra OLED Tabular Readout) -->
+                        <TextBlock x:Name="IdleClock" Style="{StaticResource Digits}"
+                                   Typography.NumeralAlignment="Tabular"
+                                   FontSize="12.5" FontWeight="SemiBold"
+                                   Margin="0,-0.5,0,0"
+                                   Foreground="{DynamicResource PrimaryTextBrush}" Text="12:00" VerticalAlignment="Center">
+                            <TextBlock.Effect>
+                                <DropShadowEffect BlurRadius="6" ShadowDepth="1" Direction="270" Color="#000000" Opacity="0.45" RenderingBias="Performance" />
+                            </TextBlock.Effect>
+                        </TextBlock>
+
+                        <!-- 2. Seconds Style (Braun / TAG Heuer Recessed Sub-Register Chronograph) -->
                         <StackPanel x:Name="IdleClockSecondsHost" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
                             <TextBlock x:Name="IdleClockSecHMin" Style="{StaticResource Digits}"
-                                       FontSize="12" FontWeight="SemiBold"
+                                       Typography.NumeralAlignment="Tabular"
+                                       FontSize="12.5" FontWeight="SemiBold"
+                                       Margin="0,-0.5,0,0"
                                        Foreground="{DynamicResource PrimaryTextBrush}" Text="12:00" VerticalAlignment="Center" />
-                            <Border Background="#25FF9F0A" BorderBrush="#50FF9F0A" BorderThickness="1" CornerRadius="4" Padding="3,0.5" Margin="4,0,0,0" VerticalAlignment="Center">
-                                <TextBlock x:Name="IdleClockSecDigits" Style="{StaticResource Digits}"
-                                           FontSize="9" FontWeight="Bold"
-                                           Foreground="{DynamicResource AccentBrush}" Text="00" VerticalAlignment="Center" />
+                            <Border CornerRadius="5" Padding="4.5,1" Margin="5,0,0,0" VerticalAlignment="Center"
+                                    BorderThickness="1" BorderBrush="#55FF9F0A">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#2EFF9F0A" Offset="0" />
+                                        <GradientStop Color="#14FF9F0A" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Ellipse Width="3" Height="3" Fill="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.9" />
+                                    <TextBlock x:Name="IdleClockSecDigits" Style="{StaticResource Digits}"
+                                               Typography.NumeralAlignment="Tabular"
+                                               FontSize="9.5" FontWeight="Bold"
+                                               Foreground="{DynamicResource AccentBrush}" Text="00" VerticalAlignment="Center" />
+                                </StackPanel>
                             </Border>
                         </StackPanel>
 
-                        <!-- 3. Date Badge Style (Apple Calendar Glass Chip + Time) -->
+                        <!-- 3. Date Badge Style (Patek / Apple Two-Tier Calendar Aperture Window) -->
                         <StackPanel x:Name="IdleClockDateHost" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
-                            <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="5" Padding="4.5,1" Margin="0,0,5,0" VerticalAlignment="Center">
-                                <TextBlock x:Name="IdleClockDateBadgeText" FontSize="8.5" FontWeight="Bold"
-                                           Foreground="{DynamicResource PrimaryTextBrush}" Text="Sat 7" />
+                            <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}"
+                                    BorderThickness="1" CornerRadius="5" Margin="0,0,5.5,0" VerticalAlignment="Center" ClipToBounds="True">
+                                <Grid>
+                                    <!-- Anodized Calendar Header Strip -->
+                                    <Border Height="2.2" VerticalAlignment="Top" HorizontalAlignment="Stretch">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                <GradientStop Color="#FF453A" Offset="0" />
+                                                <GradientStop Color="#FF9F0A" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                    <TextBlock x:Name="IdleClockDateBadgeText" FontSize="8.5" FontWeight="Bold"
+                                               Typography.Capitals="AllSmallCaps"
+                                               Margin="5,2.2,5,1"
+                                               Foreground="{DynamicResource PrimaryTextBrush}" Text="Sat 7" VerticalAlignment="Center" />
+                                </Grid>
                             </Border>
+                            <Border Width="1" Height="11" Background="{DynamicResource ChipBorderBrush}" Opacity="0.55" Margin="0,0,5.5,0" VerticalAlignment="Center" />
                             <TextBlock x:Name="IdleClockDateHMin" Style="{StaticResource Digits}"
-                                       FontSize="12" FontWeight="SemiBold"
+                                       Typography.NumeralAlignment="Tabular"
+                                       FontSize="12.5" FontWeight="SemiBold"
+                                       Margin="0,-0.5,0,0"
                                        Foreground="{DynamicResource PrimaryTextBrush}" Text="12:00" VerticalAlignment="Center" />
                         </StackPanel>
 
-                        <!-- 4. Swiss Railway Analog Watch Face (Precision Micro Dial) -->
+                        <!-- 4. Swiss SBB / Nomos Glashütte Mechanical Chronometer (Precision Micro Dial) -->
                         <StackPanel x:Name="IdleClockAnalogHost" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
-                            <Grid Width="18" Height="18" Margin="0,0,5,0" VerticalAlignment="Center">
-                                <Ellipse Fill="{DynamicResource ClockDialFaceBrush}" Stroke="{DynamicResource ClockDialBorderBrush}" StrokeThickness="0.8" />
-                                <!-- Hour Ticks at 12, 3, 6, 9 -->
-                                <Rectangle Width="1.2" Height="2" Fill="{DynamicResource ClockHandBrush}" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,1,0,0" RadiusX="0.5" RadiusY="0.5" />
-                                <Rectangle Width="1.2" Height="1.8" Fill="{DynamicResource ClockHandBrush}" Opacity="0.6" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,1" RadiusX="0.5" RadiusY="0.5" />
-                                <Rectangle Width="1.8" Height="1.2" Fill="{DynamicResource ClockHandBrush}" Opacity="0.6" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="1,0,0,0" RadiusX="0.5" RadiusY="0.5" />
-                                <Rectangle Width="1.8" Height="1.2" Fill="{DynamicResource ClockHandBrush}" Opacity="0.6" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,1,0" RadiusX="0.5" RadiusY="0.5" />
-                                <!-- Hour Hand -->
-                                <Line X1="9" Y1="9" X2="9" Y2="5" Stroke="{DynamicResource ClockHandBrush}" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
-                                    <Line.RenderTransform>
-                                        <RotateTransform x:Name="AnalogHourTransform" Angle="0" CenterX="9" CenterY="9" />
-                                    </Line.RenderTransform>
-                                </Line>
-                                <!-- Minute Hand -->
-                                <Line X1="9" Y1="9" X2="9" Y2="3" Stroke="{DynamicResource ClockHandBrush}" Opacity="0.85" StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
-                                    <Line.RenderTransform>
-                                        <RotateTransform x:Name="AnalogMinTransform" Angle="0" CenterX="9" CenterY="9" />
-                                    </Line.RenderTransform>
-                                </Line>
-                                <!-- Sweeping Second Hand (Swiss Red/Orange) -->
-                                <Line X1="9" Y1="9" X2="9" Y2="2" Stroke="{DynamicResource AccentBrush}" StrokeThickness="0.9" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
-                                    <Line.RenderTransform>
-                                        <RotateTransform x:Name="AnalogSecTransform" Angle="0" CenterX="9" CenterY="9" />
-                                    </Line.RenderTransform>
-                                </Line>
-                                <!-- Center Pinion Jewel -->
-                                <Ellipse Width="2.5" Height="2.5" Fill="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <!-- Outer Machined Steel Watch Case & Crown -->
+                            <Grid Width="21" Height="20" Margin="0,0,5.5,0" VerticalAlignment="Center">
+                                <!-- Winding Crown at 3 o'clock -->
+                                <Border Width="1.6" Height="3.6" CornerRadius="0.6" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Background="{DynamicResource ClockDialBorderBrush}" Opacity="0.85" />
+                                <!-- Brushed Bezel Ring -->
+                                <Border Width="19.6" Height="19.6" CornerRadius="9.8" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                        BorderThickness="1" BorderBrush="{DynamicResource ClockDialBorderBrush}"
+                                        Background="{DynamicResource ClockDialFaceBrush}">
+                                    <!-- Inner 18x18 Coordinate Grid (Preserves exact 9,9 pivot for code-behind transforms) -->
+                                    <Grid Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <!-- Recessed Sunburst Dial Vignette -->
+                                        <Ellipse>
+                                            <Ellipse.Fill>
+                                                <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.35,0.35" RadiusX="0.5" RadiusY="0.5">
+                                                    <GradientStop Color="#14FFFFFF" Offset="0" />
+                                                    <GradientStop Color="#00000000" Offset="0.65" />
+                                                    <GradientStop Color="#28000000" Offset="1" />
+                                                </RadialGradientBrush>
+                                            </Ellipse.Fill>
+                                        </Ellipse>
+                                        <!-- Precision 60-Minute Chapter Track Ring -->
+                                        <Ellipse Width="16.2" Height="16.2" Stroke="{DynamicResource ClockHandBrush}"
+                                                 StrokeThickness="0.45" StrokeDashArray="0.55 1.33" Opacity="0.38"
+                                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <!-- Cardinal Applied Baton Indices (12, 6, 9, 3) -->
+                                        <Rectangle Width="1.4" Height="2.3" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,1.1,0,0" RadiusX="0.5" RadiusY="0.5" />
+                                        <Rectangle Width="1.1" Height="1.9" Fill="{DynamicResource ClockHandBrush}" Opacity="0.75" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,1.1" RadiusX="0.4" RadiusY="0.4" />
+                                        <Rectangle Width="1.9" Height="1.1" Fill="{DynamicResource ClockHandBrush}" Opacity="0.75" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="1.1,0,0,0" RadiusX="0.4" RadiusY="0.4" />
+                                        <Rectangle Width="1.9" Height="1.1" Fill="{DynamicResource ClockHandBrush}" Opacity="0.75" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,1.1,0" RadiusX="0.4" RadiusY="0.4" />
+                                        <!-- Hour Hand (With Counterweight Tail) -->
+                                        <Line X1="9" Y1="10.1" X2="9" Y2="4.7" Stroke="{DynamicResource ClockHandBrush}" StrokeThickness="1.65" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
+                                            <Line.RenderTransform>
+                                                <RotateTransform x:Name="AnalogHourTransform" Angle="0" CenterX="9" CenterY="9" />
+                                            </Line.RenderTransform>
+                                        </Line>
+                                        <!-- Minute Hand (With Counterweight Tail) -->
+                                        <Line X1="9" Y1="10.5" X2="9" Y2="2.5" Stroke="{DynamicResource ClockHandBrush}" Opacity="0.92" StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
+                                            <Line.RenderTransform>
+                                                <RotateTransform x:Name="AnalogMinTransform" Angle="0" CenterX="9" CenterY="9" />
+                                            </Line.RenderTransform>
+                                        </Line>
+                                        <!-- Sweeping SBB Swiss Railway Second Hand -->
+                                        <Line X1="9" Y1="11.4" X2="9" Y2="2.0" Stroke="{DynamicResource AccentBrush}" StrokeThickness="0.85" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
+                                            <Line.RenderTransform>
+                                                <RotateTransform x:Name="AnalogSecTransform" Angle="0" CenterX="9" CenterY="9" />
+                                            </Line.RenderTransform>
+                                        </Line>
+                                        <!-- Dual-Stage Horological Pinion Cap & Arbor -->
+                                        <Ellipse Width="2.6" Height="2.6" Fill="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Ellipse Width="1.0" Height="1.0" Fill="#0E0E14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
                             </Grid>
                             <TextBlock x:Name="IdleClockAnalogHMin" Style="{StaticResource Digits}"
-                                       FontSize="11.5" FontWeight="SemiBold"
+                                       Typography.NumeralAlignment="Tabular"
+                                       FontSize="12" FontWeight="SemiBold"
+                                       Margin="0,-0.5,0,0"
                                        Foreground="{DynamicResource PrimaryTextBrush}" Text="12:00" VerticalAlignment="Center" />
                         </StackPanel>
 
-                        <!-- 5. Cyber Neon Aura Style (Dual-Stage Illuminated Cathode Glow) -->
+                        <!-- 5. Nixie / VFD Vacuum Fluorescent Cathode Tube Style -->
                         <Grid x:Name="IdleClockNeonHost" VerticalAlignment="Center" Visibility="Collapsed">
-                            <TextBlock x:Name="IdleClockNeonGlow" Style="{StaticResource Digits}"
-                                       FontSize="12" FontWeight="Bold"
-                                       Foreground="{DynamicResource AccentBrush}" Text="12:00"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <TextBlock.Effect>
-                                    <DropShadowEffect x:Name="NeonClockGlowEffect" BlurRadius="16" ShadowDepth="0" Color="#FF9F0A" Opacity="0.95" />
-                                </TextBlock.Effect>
-                            </TextBlock>
-                            <TextBlock x:Name="IdleClockNeon" Style="{StaticResource Digits}"
-                                       FontSize="12" FontWeight="Bold"
-                                       Foreground="{DynamicResource PrimaryTextBrush}" Text="12:00" Opacity="0.95"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Grid>
-
-                        <!-- 6. Retro Split-Flap Card Style (Solari di Udine Mechanical Flaps) -->
-                        <StackPanel x:Name="IdleClockFlipHost" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
-                            <Border Background="{DynamicResource ClockTileBgBrush}" BorderBrush="{DynamicResource ClockTileBorderBrush}" BorderThickness="0.8" CornerRadius="4" Padding="4,1" VerticalAlignment="Center">
+                            <Border CornerRadius="5.5" Padding="6,1" BorderThickness="1" ClipToBounds="True">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#4806060C" Offset="0" />
+                                        <GradientStop Color="#75030306" Offset="0.5" />
+                                        <GradientStop Color="#48080810" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <Border.BorderBrush>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#55FFFFFF" Offset="0" />
+                                        <GradientStop Color="#22FFFFFF" Offset="0.5" />
+                                        <GradientStop Color="#45FF9F0A" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.BorderBrush>
                                 <Grid>
-                                    <TextBlock x:Name="IdleFlipHourText" Style="{StaticResource Digits}" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource ClockTileFgBrush}" HorizontalAlignment="Center" Text="12" />
-                                    <Border Height="0.8" Background="{DynamicResource ClockTileDividerBrush}" VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="-4,0" />
-                                    <Border Height="0.5" Background="{DynamicResource ClockTileBorderBrush}" VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="-4,1,-4,0" Opacity="0.5" />
+                                    <!-- Borosilicate Cylindrical Glass Top Specular Glare -->
+                                    <Border Height="2.5" CornerRadius="3,3,0,0" VerticalAlignment="Top" Margin="-4,-0.5,-4,0" IsHitTestVisible="False">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Color="#32FFFFFF" Offset="0" />
+                                                <GradientStop Color="#00FFFFFF" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                    <!-- Heated Cathode Filament Wire Under-Bar -->
+                                    <Border Height="1" VerticalAlignment="Bottom" Margin="2,0,2,0.5" Opacity="0.45"
+                                            Background="{DynamicResource AccentBrush}" IsHitTestVisible="False" />
+                                    <!-- Primary Cathode Bloom Layer -->
+                                    <TextBlock x:Name="IdleClockNeonGlow" Style="{StaticResource Digits}"
+                                               Typography.NumeralAlignment="Tabular"
+                                               FontSize="12" FontWeight="Bold"
+                                               Margin="0,-0.5,0,0"
+                                               Foreground="{DynamicResource AccentBrush}" Text="12:00"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock.Effect>
+                                            <DropShadowEffect x:Name="NeonClockGlowEffect" BlurRadius="14" ShadowDepth="0" Color="#FF9F0A" Opacity="0.95" />
+                                        </TextBlock.Effect>
+                                    </TextBlock>
+                                    <!-- Crisp Filament Core Layer -->
+                                    <TextBlock x:Name="IdleClockNeon" Style="{StaticResource Digits}"
+                                               Typography.NumeralAlignment="Tabular"
+                                               FontSize="12" FontWeight="Bold"
+                                               Margin="0,-0.5,0,0"
+                                               Foreground="{DynamicResource PrimaryTextBrush}" Text="12:00" Opacity="0.96"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Grid>
                             </Border>
-                            <TextBlock Text=":" Style="{StaticResource Digits}" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" Margin="2.5,-1,2.5,0" VerticalAlignment="Center" />
-                            <Border Background="{DynamicResource ClockTileBgBrush}" BorderBrush="{DynamicResource ClockTileBorderBrush}" BorderThickness="0.8" CornerRadius="4" Padding="4,1" VerticalAlignment="Center">
+                        </Grid>
+
+                        <!-- 6. Solari di Udine Cifra 3 Mechanical Split-Flap Module -->
+                        <StackPanel x:Name="IdleClockFlipHost" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
+                            <!-- Hour Split-Flap Drum -->
+                            <Border Background="{DynamicResource ClockTileBgBrush}" BorderBrush="{DynamicResource ClockTileBorderBrush}"
+                                    BorderThickness="1" CornerRadius="4.5" Padding="4.5,1" VerticalAlignment="Center" ClipToBounds="True">
                                 <Grid>
-                                    <TextBlock x:Name="IdleFlipMinText" Style="{StaticResource Digits}" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource ClockTileFgBrush}" HorizontalAlignment="Center" Text="00" />
-                                    <Border Height="0.8" Background="{DynamicResource ClockTileDividerBrush}" VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="-4,0" />
-                                    <Border Height="0.5" Background="{DynamicResource ClockTileBorderBrush}" VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="-4,1,-4,0" Opacity="0.5" />
+                                    <!-- 3D Cylindrical Flap Shading -->
+                                    <Border Margin="-4.5,-1" IsHitTestVisible="False">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Color="#18FFFFFF" Offset="0" />
+                                                <GradientStop Color="#00000000" Offset="0.48" />
+                                                <GradientStop Color="#2A000000" Offset="0.52" />
+                                                <GradientStop Color="#14000000" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                    <TextBlock x:Name="IdleFlipHourText" Style="{StaticResource Digits}"
+                                               Typography.NumeralAlignment="Tabular"
+                                               FontSize="10.5" FontWeight="Bold"
+                                               Foreground="{DynamicResource ClockTileFgBrush}" HorizontalAlignment="Center" Text="12" />
+                                    <!-- Physical Split Seam & Stainless Hinge Pins -->
+                                    <Border Height="0.9" Background="{DynamicResource ClockTileDividerBrush}" VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="-4.5,0" />
+                                    <Rectangle Width="1.4" Height="2.2" Fill="{DynamicResource ClockTileBorderBrush}" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-4.5,0,0,0" />
+                                    <Rectangle Width="1.4" Height="2.2" Fill="{DynamicResource ClockTileBorderBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-4.5,0" />
                                 </Grid>
+                            </Border>
+
+                            <!-- Mechanical Dual-Pin Oscillator Colon -->
+                            <StackPanel VerticalAlignment="Center" Margin="2.5,0">
+                                <Ellipse Width="2" Height="2" Fill="{DynamicResource AccentBrush}" Margin="0,0,0,2.5" />
+                                <Ellipse Width="2" Height="2" Fill="{DynamicResource AccentBrush}" Opacity="0.75" />
+                            </StackPanel>
+
+                            <!-- Minute Split-Flap Drum -->
+                            <Border Background="{DynamicResource ClockTileBgBrush}" BorderBrush="{DynamicResource ClockTileBorderBrush}"
+                                    BorderThickness="1" CornerRadius="4.5" Padding="4.5,1" VerticalAlignment="Center" ClipToBounds="True">
+                                <Grid>
+                                    <!-- 3D Cylindrical Flap Shading -->
+                                    <Border Margin="-4.5,-1" IsHitTestVisible="False">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Color="#18FFFFFF" Offset="0" />
+                                                <GradientStop Color="#00000000" Offset="0.48" />
+                                                <GradientStop Color="#2A000000" Offset="0.52" />
+                                                <GradientStop Color="#14000000" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                    <TextBlock x:Name="IdleFlipMinText" Style="{StaticResource Digits}"
+                                               Typography.NumeralAlignment="Tabular"
+                                               FontSize="10.5" FontWeight="Bold"
+                                               Foreground="{DynamicResource ClockTileFgBrush}" HorizontalAlignment="Center" Text="00" />
+                                    <!-- Physical Split Seam & Stainless Hinge Pins -->
+                                    <Border Height="0.9" Background="{DynamicResource ClockTileDividerBrush}" VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="-4.5,0" />
+                                    <Rectangle Width="1.4" Height="2.2" Fill="{DynamicResource ClockTileBorderBrush}" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-4.5,0,0,0" />
+                                    <Rectangle Width="1.4" Height="2.2" Fill="{DynamicResource ClockTileBorderBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-4.5,0" />
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- 7. Field Telemetry Matrix Style (Teenage Engineering OP-1 Field / Braun Digital Instrument) -->
+                        <StackPanel x:Name="IdleClockMatrixHost" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
+                            <Border CornerRadius="5" Padding="5.5,1.2" BorderThickness="1"
+                                    Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <!-- Quartz Crystal Oscillator Live Beat Indicator -->
+                                    <Grid Width="6" Height="6" Margin="0,0,4.5,0" VerticalAlignment="Center">
+                                        <Ellipse Width="6" Height="6" Fill="#3530D158" />
+                                        <Ellipse x:Name="IdleClockMatrixPulseDot" Width="3.4" Height="3.4" Fill="#30D158"
+                                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <!-- High-Contrast Tabular Field Readout -->
+                                    <TextBlock x:Name="IdleClockMatrixHMin" Style="{StaticResource Digits}"
+                                               Typography.NumeralAlignment="Tabular"
+                                               FontSize="11.5" FontWeight="Bold"
+                                               Margin="0,-0.5,0,0"
+                                               Foreground="{DynamicResource PrimaryTextBrush}" Text="12:00" VerticalAlignment="Center" />
+                                    <!-- Micro Hardware Partition -->
+                                    <Border Width="1" Height="10" Background="{DynamicResource ChipBorderBrush}" Margin="4.5,0" VerticalAlignment="Center" />
+                                    <!-- Sub-Telemetry Register (Seconds / AM-PM / 24H) -->
+                                    <TextBlock x:Name="IdleClockMatrixMeta" Style="{StaticResource Digits}"
+                                               Typography.NumeralAlignment="Tabular"
+                                               FontSize="8.5" FontWeight="Bold"
+                                               Foreground="{DynamicResource AccentBrush}" Text="00s" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- 8. Haute-Horlogerie Jump-Hour Guichet (A. Lange & Söhne Zeitwerk / Cartier Tank à Guichets Bridge) -->
+                        <StackPanel x:Name="IdleClockJumpHourHost" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
+                            <!-- Brushed Rhodium Movement Bridge Plate -->
+                            <Border CornerRadius="6" Padding="4.5,1.2" BorderThickness="1" VerticalAlignment="Center">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#22FFFFFF" Offset="0" />
+                                        <GradientStop Color="#0DFFFFFF" Offset="0.5" />
+                                        <GradientStop Color="#1AFFFFFF" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <Border.BorderBrush>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#45FFFFFF" Offset="0" />
+                                        <GradientStop Color="#18FFFFFF" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.BorderBrush>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <!-- Left Flange Bridge Screw -->
+                                    <Grid Width="3" Height="3" Margin="0,0,3.5,0" VerticalAlignment="Center">
+                                        <Ellipse Fill="#50FFFFFF" />
+                                        <Line X1="0.5" Y1="1.5" X2="2.5" Y2="1.5" Stroke="#200000" StrokeThickness="0.6" />
+                                    </Grid>
+
+                                    <!-- Jump-Hour Cyclops Aperture Guichet -->
+                                    <Border CornerRadius="3.5" Background="#48000000" BorderBrush="{DynamicResource AccentBrush}"
+                                            BorderThickness="0.85" Padding="4,0.3" VerticalAlignment="Center">
+                                        <TextBlock x:Name="IdleJumpHourText" Style="{StaticResource Digits}"
+                                                   Typography.NumeralAlignment="Tabular"
+                                                   FontSize="10.5" FontWeight="Bold"
+                                                   Foreground="{DynamicResource AccentBrush}" Text="12" HorizontalAlignment="Center" />
+                                    </Border>
+
+                                    <!-- Center Synthetic Ruby Chaton Bearing Jewel -->
+                                    <Grid Width="5" Height="5" Margin="3.5,0" VerticalAlignment="Center">
+                                        <Ellipse Width="5" Height="5" Fill="#45FF9F0A" />
+                                        <Ellipse x:Name="IdleJumpSecDot" Width="3" Height="3" Fill="#FF2D55"
+                                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <!-- Trailing-Minute Panoramic Guichet -->
+                                    <Border CornerRadius="3.5" Background="#48000000" BorderBrush="{DynamicResource ChipBorderBrush}"
+                                            BorderThickness="0.85" Padding="4,0.3" VerticalAlignment="Center">
+                                        <TextBlock x:Name="IdleJumpMinText" Style="{StaticResource Digits}"
+                                                   Typography.NumeralAlignment="Tabular"
+                                                   FontSize="10.5" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource PrimaryTextBrush}" Text="00" HorizontalAlignment="Center" />
+                                    </Border>
+
+                                    <!-- Right Flange Bridge Screw -->
+                                    <Grid Width="3" Height="3" Margin="3.5,0,0,0" VerticalAlignment="Center">
+                                        <Ellipse Fill="#50FFFFFF" />
+                                        <Line X1="0.5" Y1="1.5" X2="2.5" Y2="1.5" Stroke="#200000" StrokeThickness="0.6" />
+                                    </Grid>
+                                </StackPanel>
                             </Border>
                         </StackPanel>
 

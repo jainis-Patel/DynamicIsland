@@ -1007,14 +1007,16 @@ SSID 3 : Home_Router
 
     private static void TestClockStyles()
     {
-        // 1. Verify all 6 supported clock styles exist
-        Assert(SettingsService.AvailableClockStyles.Count == 6, "Must define 6 clock styles");
+        // 1. Verify all 8 supported clock styles exist
+        Assert(SettingsService.AvailableClockStyles.Count == 8, "Must define 8 clock styles");
         Assert(SettingsService.AvailableClockStyles.Contains("Minimal"), "Must include Minimal");
         Assert(SettingsService.AvailableClockStyles.Contains("Seconds"), "Must include Seconds");
         Assert(SettingsService.AvailableClockStyles.Contains("DateBadge"), "Must include DateBadge");
         Assert(SettingsService.AvailableClockStyles.Contains("Analog"), "Must include Analog");
         Assert(SettingsService.AvailableClockStyles.Contains("Neon"), "Must include Neon");
         Assert(SettingsService.AvailableClockStyles.Contains("Flip"), "Must include Flip");
+        Assert(SettingsService.AvailableClockStyles.Contains("Matrix"), "Must include Matrix");
+        Assert(SettingsService.AvailableClockStyles.Contains("JumpHour"), "Must include JumpHour");
 
         // 2. Normalization test including aliases & synonyms
         Assert(SettingsService.NormalizeClockStyle("minimal") == "Minimal", "Must normalize case");
@@ -1026,6 +1028,11 @@ SSID 3 : Home_Router
         Assert(SettingsService.NormalizeClockStyle("Date") == "DateBadge", "Must recognize Date alias as DateBadge");
         Assert(SettingsService.NormalizeClockStyle("DateBadge") == "DateBadge", "Must recognize DateBadge");
         Assert(SettingsService.NormalizeClockStyle("Analog") == "Analog", "Must recognize Analog");
+        Assert(SettingsService.NormalizeClockStyle("Matrix") == "Matrix", "Must recognize Matrix");
+        Assert(SettingsService.NormalizeClockStyle("FieldMatrix") == "Matrix", "Must recognize FieldMatrix alias as Matrix");
+        Assert(SettingsService.NormalizeClockStyle("Telemetry") == "Matrix", "Must recognize Telemetry alias as Matrix");
+        Assert(SettingsService.NormalizeClockStyle("JumpHour") == "JumpHour", "Must recognize JumpHour");
+        Assert(SettingsService.NormalizeClockStyle("Guichet") == "JumpHour", "Must recognize Guichet alias as JumpHour");
         Assert(SettingsService.NormalizeClockStyle("unknown_xyz") == "Minimal", "Must fallback unknown to Minimal");
         Assert(SettingsService.NormalizeClockStyle(null) == "Minimal", "Must fallback null to Minimal");
 

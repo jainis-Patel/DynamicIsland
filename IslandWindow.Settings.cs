@@ -591,6 +591,8 @@ public partial class IslandWindow
                 "Analog" => "Micro Horology Analog",
                 "Neon" => "Cyber Neon Glow",
                 "Flip" => "Retro Flip Card",
+                "Matrix" => "Field Telemetry Matrix",
+                "JumpHour" => "Haute Jump-Hour Guichet",
                 _ => "Minimal Digital"
             };
             _machine.PushToast(new ToastContent(
@@ -629,6 +631,8 @@ public partial class IslandWindow
         StyleBtn(ClockStyleAnalogBtn, style == "Analog");
         StyleBtn(ClockStyleNeonBtn, style == "Neon");
         StyleBtn(ClockStyleFlipBtn, style == "Flip");
+        StyleBtn(ClockStyleMatrixBtn, style == "Matrix");
+        StyleBtn(ClockStyleJumpHourBtn, style == "JumpHour");
 
         ActiveClockStyleLabel.Text = style switch
         {
@@ -637,6 +641,8 @@ public partial class IslandWindow
             "Analog" => "Micro Horology Analog · Swiss Railway Dial",
             "Neon" => "Cyber Neon Glow · Dual-Stage Cathode Tube",
             "Flip" => "Retro Flip Card · Solari Split-Flap",
+            "Matrix" => "Field Telemetry Matrix · Teenage Engineering OP-1",
+            "JumpHour" => "Haute Jump-Hour Guichet · A. Lange & Söhne",
             _ => "Minimal Digital · Clean Apple OLED"
         };
     }
@@ -652,6 +658,8 @@ public partial class IslandWindow
         if (IdleClockNeonHost != null) IdleClockNeonHost.Visibility = normalized == "Neon" ? Visibility.Visible : Visibility.Collapsed;
         else if (IdleClockNeon != null) IdleClockNeon.Visibility = normalized == "Neon" ? Visibility.Visible : Visibility.Collapsed;
         if (IdleClockFlipHost != null) IdleClockFlipHost.Visibility = normalized == "Flip" ? Visibility.Visible : Visibility.Collapsed;
+        if (IdleClockMatrixHost != null) IdleClockMatrixHost.Visibility = normalized == "Matrix" ? Visibility.Visible : Visibility.Collapsed;
+        if (IdleClockJumpHourHost != null) IdleClockJumpHourHost.Visibility = normalized == "JumpHour" ? Visibility.Visible : Visibility.Collapsed;
 
         UpdateClockStyleUI();
         UpdateClockTimerInterval();

@@ -155,6 +155,8 @@ public partial class IslandWindow
     internal System.Windows.Controls.Button ClockStyleMinimalBtn => SettingsContainer.ClockStyleMinimalBtn;
     internal System.Windows.Controls.Button ClockStyleNeonBtn => SettingsContainer.ClockStyleNeonBtn;
     internal System.Windows.Controls.Button ClockStyleSecondsBtn => SettingsContainer.ClockStyleSecondsBtn;
+    internal System.Windows.Controls.Button ClockStyleMatrixBtn => SettingsContainer.ClockStyleMatrixBtn;
+    internal System.Windows.Controls.Button ClockStyleJumpHourBtn => SettingsContainer.ClockStyleJumpHourBtn;
     internal Button CompactLyricsToggleBtn => SettingsContainer.CompactLyricsToggleBtn;
     internal TextBlock CompactLyricsToggleText => SettingsContainer.CompactLyricsToggleText;
     internal Button DndToggleBtn => SettingsContainer.DndToggleBtn;

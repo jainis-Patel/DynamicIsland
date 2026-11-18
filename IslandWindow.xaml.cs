@@ -91,6 +91,8 @@ public partial class IslandWindow : Window
             "Analog"    => 160,
             "Neon"      => 144,
             "Flip"      => 154,
+            "Matrix"    => 176,
+            "JumpHour"  => 164,
             _           => 142,
         };
 
@@ -991,7 +993,8 @@ public partial class IslandWindow : Window
         bool compactLyricsActive = _machine.State == IslandState.Compact &&
                                    (_settingsService?.Current?.ShowLyricsInCompact ?? false) &&
                                    mediaPlaying;
-        bool idleAnalogActive = _machine.State == IslandState.Idle && currentStyle == "Analog";
+        bool idleAnalogActive = _machine.State == IslandState.Idle &&
+                                (currentStyle == "Analog" || currentStyle == "JumpHour" || currentStyle == "Matrix");
 
         bool needsSubSecond = expandedMediaActive || compactLyricsActive || idleAnalogActive;
 
@@ -1016,10 +1019,13 @@ public partial class IslandWindow : Window
             if (IdleClockAnalogHMin != null) IdleClockAnalogHMin.Text = time;
             if (IdleClockNeon != null) IdleClockNeon.Text = time;
             if (IdleClockNeonGlow != null) IdleClockNeonGlow.Text = time;
+            if (IdleClockMatrixHMin != null) IdleClockMatrixHMin.Text = time;
 
             string hourFormat = CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern.Contains("H") ? "HH" : "hh";
             if (IdleFlipHourText != null) IdleFlipHourText.Text = now.ToString(hourFormat, CultureInfo.CurrentCulture);
             if (IdleFlipMinText != null) IdleFlipMinText.Text = now.ToString("mm", CultureInfo.CurrentCulture);
+            if (IdleJumpHourText != null) IdleJumpHourText.Text = now.ToString(hourFormat, CultureInfo.CurrentCulture);
+            if (IdleJumpMinText != null) IdleJumpMinText.Text = now.ToString("mm", CultureInfo.CurrentCulture);
             if (ExpandedBigClock != null) ExpandedBigClock.Text = time;
             if (ExpandedMiniClock != null) ExpandedMiniClock.Text = time;
 
@@ -1048,6 +1054,19 @@ public partial class IslandWindow : Window
                 if (AnalogSecTransform != null) AnalogSecTransform.Angle = secAngle;
                 if (AnalogMinTransform != null) AnalogMinTransform.Angle = minAngle;
                 if (AnalogHourTransform != null) AnalogHourTransform.Angle = hourAngle;
+            }
+            else if (clockStyle == "Matrix")
+            {
+                if (IdleClockMatrixHMin != null) IdleClockMatrixHMin.Text = time;
+                if (IdleClockMatrixMeta != null) IdleClockMatrixMeta.Text = $"{now.Second:D2}s";
+                if (IdleClockMatrixPulseDot != null) IdleClockMatrixPulseDot.Opacity = (now.Millisecond < 500) ? 1.0 : 0.35;
+            }
+            else if (clockStyle == "JumpHour")
+            {
+                bool use24Hour = CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern.Contains("H");
+                if (IdleJumpHourText != null) IdleJumpHourText.Text = use24Hour ? now.ToString("HH", CultureInfo.CurrentCulture) : now.ToString("hh", CultureInfo.CurrentCulture);
+                if (IdleJumpMinText != null) IdleJumpMinText.Text = now.ToString("mm", CultureInfo.CurrentCulture);
+                if (IdleJumpSecDot != null) IdleJumpSecDot.Opacity = 0.55 + 0.45 * Math.Sin(now.TimeOfDay.TotalSeconds * Math.PI * 2.0);
             }
         }
 
