@@ -39,6 +39,7 @@ internal static class ThemeBrushes
     public static readonly SolidColorBrush RedDark = CreateFrozen(RedColor);
     public static readonly SolidColorBrush BlueDark = CreateFrozen(BlueColor);
     public static readonly SolidColorBrush PinkDark = CreateFrozen(PinkColor);
+    public static readonly SolidColorBrush PurpleDark = CreateFrozen(PurpleColor);
     public static readonly SolidColorBrush PrimaryTextDark = CreateFrozen(PrimaryTextColor);
     public static readonly SolidColorBrush SecondaryTextDark = CreateFrozen(SecondaryTextColor);
     public static readonly SolidColorBrush MutedGreyDark = CreateFrozen(MutedGreyColor);
@@ -50,6 +51,7 @@ internal static class ThemeBrushes
     public static readonly SolidColorBrush RedLight = CreateFrozen(RedColorLight);
     public static readonly SolidColorBrush BlueLight = CreateFrozen(BlueColorLight);
     public static readonly SolidColorBrush PinkLight = CreateFrozen(PinkColorLight);
+    public static readonly SolidColorBrush PurpleLight = CreateFrozen(PurpleColorLight);
     public static readonly SolidColorBrush PrimaryTextLight = CreateFrozen(PrimaryTextColorLight);
     public static readonly SolidColorBrush SecondaryTextLight = CreateFrozen(SecondaryTextColorLight);
     public static readonly SolidColorBrush MutedGreyLight = CreateFrozen(MutedGreyColorLight);
@@ -314,6 +316,7 @@ internal static class ThemeBrushes
     public static SolidColorBrush Red { get; internal set; } = RedDark;
     public static SolidColorBrush Blue { get; internal set; } = BlueDark;
     public static SolidColorBrush Pink { get; internal set; } = PinkDark;
+    public static SolidColorBrush Purple { get; internal set; } = PurpleDark;
     public static SolidColorBrush PrimaryText { get; internal set; } = PrimaryTextDark;
     public static SolidColorBrush SecondaryText { get; internal set; } = SecondaryTextDark;
     public static SolidColorBrush MutedGrey { get; internal set; } = MutedGreyDark;
@@ -414,6 +417,7 @@ internal static class ThemeBrushes
         Red = isDark ? RedDark : RedLight;
         Blue = isDark ? BlueDark : BlueLight;
         Pink = isDark ? PinkDark : PinkLight;
+        Purple = isDark ? PurpleDark : PurpleLight;
         PrimaryText = isDark ? PrimaryTextDark : PrimaryTextLight;
         SecondaryText = isDark ? SecondaryTextDark : SecondaryTextLight;
         MutedGrey = isDark ? MutedGreyDark : MutedGreyLight;

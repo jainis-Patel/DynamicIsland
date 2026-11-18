@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
+using DynamicIsland.Core;
 using Microsoft.Win32;
 
 namespace DynamicIsland.Services;
@@ -46,6 +47,9 @@ public readonly struct SystemVitalsSnapshot
     public readonly ProcessHogInfo Hog2;
     public readonly ProcessHogInfo Hog3;
     public readonly int HogCount;
+    public readonly GpuVitalsSnapshot Gpu;
+    public readonly CoreHeatmapSnapshot Cores;
+    public readonly RunawayProcessInfo Runaway;
 
     public SystemVitalsSnapshot(
         int cpuPercent,
@@ -59,7 +63,10 @@ public readonly struct SystemVitalsSnapshot
         ProcessHogInfo hog1,
         ProcessHogInfo hog2,
         ProcessHogInfo hog3,
-        int hogCount)
+        int hogCount,
+        GpuVitalsSnapshot? gpu = null,
+        CoreHeatmapSnapshot? cores = null,
+        RunawayProcessInfo? runaway = null)
     {
         CpuPercent = cpuPercent;
         RamPercent = ramPercent;
@@ -73,6 +80,9 @@ public readonly struct SystemVitalsSnapshot
         Hog2 = hog2;
         Hog3 = hog3;
         HogCount = hogCount;
+        Gpu = gpu ?? GpuVitalsSnapshot.Unavailable;
+        Cores = cores ?? CoreHeatmapSnapshot.Empty;
+        Runaway = runaway ?? RunawayProcessInfo.None;
     }
 }
 
@@ -228,8 +238,13 @@ public sealed class SystemPerformanceService : IDisposable
     private bool _isDisposed;
 
     private readonly uint _currentPid;
+    private readonly GpuTelemetryProvider _gpuProvider;
+    private readonly PerCoreCpuSampler _cpuCoreSampler;
+
     public string HardwareSummary { get; }
     public SystemVitalsSnapshot LatestSnapshot { get; private set; }
+    public GpuTelemetryProvider GpuProvider => _gpuProvider;
+    public PerCoreCpuSampler CpuCoreSampler => _cpuCoreSampler;
 
     public event Action<SystemVitalsSnapshot>? VitalsUpdated;
 
@@ -239,6 +254,8 @@ public sealed class SystemPerformanceService : IDisposable
     {
         _currentPid = (uint)Environment.ProcessId;
         HardwareSummary = ReadHardwareSummaryOnce();
+        _gpuProvider = new GpuTelemetryProvider();
+        _cpuCoreSampler = new PerCoreCpuSampler();
 
         // Prime initial CPU baseline
         GetSystemTimes(out _prevSystemIdleTime, out _prevSystemKernelTime, out _prevSystemUserTime);
@@ -350,11 +367,21 @@ public sealed class SystemPerformanceService : IDisposable
             ProcessHogInfo hog2 = LatestSnapshot.Hog2;
             ProcessHogInfo hog3 = LatestSnapshot.Hog3;
             int hogCount = LatestSnapshot.HogCount;
+            RunawayProcessInfo runaway = LatestSnapshot.Runaway;
 
             bool shouldScanProcesses = _isHudExpanded || forceProcessScan || (_consecutiveHighLoadTicks == 2);
             if (shouldScanProcesses)
             {
-                ScanTopProcessGroups(systemDeltaTicks, out hog1, out hog2, out hog3, out hogCount);
+                ScanTopProcessGroups(systemDeltaTicks, out hog1, out hog2, out hog3, out hogCount, out runaway);
+            }
+
+            // 3. Deep Hardware Telemetry (GPU & Cores) - only sampled when HUD is open or forced
+            GpuVitalsSnapshot gpu = LatestSnapshot.Gpu;
+            CoreHeatmapSnapshot cores = LatestSnapshot.Cores;
+            if (_isHudExpanded || forceProcessScan)
+            {
+                gpu = _gpuProvider.Sample();
+                cores = _cpuCoreSampler.Sample();
             }
 
             var snapshot = new SystemVitalsSnapshot(
@@ -369,11 +396,14 @@ public sealed class SystemPerformanceService : IDisposable
                 hog1,
                 hog2,
                 hog3,
-                hogCount);
+                hogCount,
+                gpu,
+                cores,
+                runaway);
 
             LatestSnapshot = snapshot;
 
-            // 3. Delta Gate: Dispatch to UI only if meaningful change occurred
+            // 4. Delta Gate: Dispatch to UI only if meaningful change occurred
             bool cpuChanged = Math.Abs(cpuPercent - _lastDispatchedCpu) >= 1;
             bool ramChanged = Math.Abs(usedGb - _lastDispatchedRamGb) >= 0.1;
 
@@ -447,12 +477,14 @@ public sealed class SystemPerformanceService : IDisposable
         out ProcessHogInfo hog1,
         out ProcessHogInfo hog2,
         out ProcessHogInfo hog3,
-        out int hogCount)
+        out int hogCount,
+        out RunawayProcessInfo runaway)
     {
         hog1 = default;
         hog2 = default;
         hog3 = default;
         hogCount = 0;
+        runaway = RunawayProcessInfo.None;
 
         uint bufferBytes = (uint)(_pidBuffer.Length * sizeof(uint));
         if (!K32EnumProcesses(_pidBuffer, bufferBytes, out uint bytesReturned))
@@ -593,6 +625,38 @@ public sealed class SystemPerformanceService : IDisposable
             hog3 = new ProcessHogInfo(top3.ExeName ?? "Unknown", top3.Count, top3.MaxPid, top3.TotalWorkingSet / (1024.0 * 1024.0), Math.Min(100.0, top3.TotalCpuPercent));
             hogCount = 3;
         }
+
+        // Identify non-whitelisted background runaway process consuming >= 20% CPU
+        IntPtr fgHwnd = GetForegroundWindow();
+        GetWindowThreadProcessId(fgHwnd, out uint foregroundPid);
+        double maxRunawayCpu = 0.0;
+        AggregatedGroup runawayCandidate = default;
+
+        foreach (var kvp in _groupAggregator)
+        {
+            AggregatedGroup g = kvp.Value;
+            if (g.TotalCpuPercent >= 20.0)
+            {
+                if (!IsProtectedProcess(g.ExeName) && g.MaxPid != foregroundPid && g.MaxPid != _currentPid)
+                {
+                    if (g.TotalCpuPercent > maxRunawayCpu)
+                    {
+                        maxRunawayCpu = g.TotalCpuPercent;
+                        runawayCandidate = g;
+                    }
+                }
+            }
+        }
+
+        if (maxRunawayCpu >= 20.0 && !string.IsNullOrEmpty(runawayCandidate.ExeName))
+        {
+            runaway = new RunawayProcessInfo(
+                hasRunaway: true,
+                exeName: runawayCandidate.ExeName,
+                pid: runawayCandidate.MaxPid,
+                cpuPercent: runawayCandidate.TotalCpuPercent,
+                memoryMb: runawayCandidate.TotalWorkingSet / (1024.0 * 1024.0));
+        }
     }
 
     private string? TryReadProcessExeName(IntPtr hProcess)
@@ -701,10 +765,7 @@ public sealed class SystemPerformanceService : IDisposable
             return false;
 
         // Block terminating critical OS processes
-        if (string.Equals(exeName, "dwm.exe", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(exeName, "explorer.exe", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(exeName, "csrss.exe", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(exeName, "svchost.exe", StringComparison.OrdinalIgnoreCase))
+        if (IsProtectedProcess(exeName))
         {
             return false;
         }
@@ -734,6 +795,68 @@ public sealed class SystemPerformanceService : IDisposable
         }
 
         return killedAny;
+    }
+
+    /// <summary>
+    /// Automatically identifies background tasks consuming >= 20% CPU and terminates them safely.
+    /// </summary>
+    public RunawayPurgeResult PurgeRunawayProcesses(double minCpuPercent = 20.0)
+    {
+        lock (_syncLock)
+        {
+            int killedCount = 0;
+            double freedCpu = 0.0;
+            var terminated = new List<string>();
+
+            IntPtr fgHwnd = GetForegroundWindow();
+            GetWindowThreadProcessId(fgHwnd, out uint foregroundPid);
+
+            foreach (var kvp in _groupAggregator)
+            {
+                var g = kvp.Value;
+                if (g.TotalCpuPercent >= minCpuPercent)
+                {
+                    string name = g.ExeName;
+                    if (IsProtectedProcess(name) || g.MaxPid == foregroundPid || g.MaxPid == _currentPid)
+                        continue;
+
+                    if (TryTerminateProcessGroup(name, g.MaxPid))
+                    {
+                        killedCount++;
+                        freedCpu += g.TotalCpuPercent;
+                        terminated.Add(name);
+                    }
+                }
+            }
+
+            if (killedCount > 0)
+            {
+                _pidCache.Clear();
+                SampleTelemetry(forceProcessScan: true, forceDispatch: true);
+            }
+
+            return new RunawayPurgeResult(killedCount, freedCpu, string.Join(", ", terminated));
+        }
+    }
+
+    public static bool IsProtectedProcess(string? exeName)
+    {
+        if (string.IsNullOrWhiteSpace(exeName)) return true;
+        string clean = exeName.Trim();
+        if (clean.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            clean = clean.Substring(0, clean.Length - 4);
+
+        return clean.Equals("explorer", StringComparison.OrdinalIgnoreCase) ||
+               clean.Equals("dwm", StringComparison.OrdinalIgnoreCase) ||
+               clean.Equals("csrss", StringComparison.OrdinalIgnoreCase) ||
+               clean.Equals("svchost", StringComparison.OrdinalIgnoreCase) ||
+               clean.Equals("lsass", StringComparison.OrdinalIgnoreCase) ||
+               clean.Equals("services", StringComparison.OrdinalIgnoreCase) ||
+               clean.Equals("wininit", StringComparison.OrdinalIgnoreCase) ||
+               clean.Equals("smss", StringComparison.OrdinalIgnoreCase) ||
+               clean.Equals("DynamicIsland", StringComparison.OrdinalIgnoreCase) ||
+               clean.Equals("System", StringComparison.OrdinalIgnoreCase) ||
+               clean.Equals("Idle", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool TryTerminateSinglePid(uint pid)
@@ -822,5 +945,7 @@ public sealed class SystemPerformanceService : IDisposable
         }
         _pollTimer?.Dispose();
         _pollTimer = null;
+        _gpuProvider.Dispose();
+        _cpuCoreSampler.Dispose();
     }
 }

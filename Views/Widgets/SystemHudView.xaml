@@ -5,18 +5,18 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:core="clr-namespace:DynamicIsland.Core"
              mc:Ignorable="d"
-             d:DesignHeight="150" d:DesignWidth="464">
+             d:DesignHeight="165" d:DesignWidth="464">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+        <DockPanel Grid.Row="0" Margin="0,0,0,5" LastChildFill="False">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Button Click="BackToLauncher_Click" Style="{StaticResource IslandButton}" Height="20" Width="20" Padding="0" Margin="0,0,6,0" ToolTipService.ToolTip="Back to Apps &amp; Widgets">
                     <TextBlock Style="{StaticResource Glyph}" Text="&#xE72B;" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
-                <TextBlock Style="{StaticResource SectionTitle}" Text="Activity &amp; System HUD" VerticalAlignment="Center" />
+                <TextBlock Style="{StaticResource SectionTitle}" Text="Activity &amp; Hardware HUD" VerticalAlignment="Center" />
                 <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
                         <Ellipse Width="5" Height="5" Fill="#30D158" Margin="0,0,4,0" VerticalAlignment="Center" />
@@ -25,43 +25,51 @@
                 </Border>
             </StackPanel>
             <Border DockPanel.Dock="Right" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="7,2" VerticalAlignment="Center">
-                <TextBlock x:Name="HudHardwareSubtitle" Text="Processor • Physical Memory" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                <TextBlock x:Name="HudHardwareSubtitle" Text="Hardware &amp; Vitals" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
             </Border>
         </DockPanel>
         <Grid Grid.Row="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="4" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
+            <!-- Row 0: Three Hardware Telemetry Cards (CPU, GPU, RAM) -->
             <Grid Grid.Row="0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="6" />
+                    <ColumnDefinition Width="5" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="5" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="11" Padding="10,6">
+                <!-- CPU Card -->
+                <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="7,5">
                     <Grid>
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <DockPanel Grid.Row="0" LastChildFill="False">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE9D9;" FontSize="10" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                <TextBlock Text="PROCESSOR" FontSize="9.5" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE9D9;" FontSize="9.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
+                                <TextBlock Text="CPU" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                             </StackPanel>
-                            <TextBlock x:Name="HudCpuHeroText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" Text="12%" VerticalAlignment="Center" />
+                            <TextBlock x:Name="HudCpuHeroText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" Text="12%" VerticalAlignment="Center" />
                         </DockPanel>
-                        <Border Grid.Row="1" Background="{DynamicResource IslandSliderTrackBrush}" CornerRadius="3" Height="5" Margin="0,4,0,3" ClipToBounds="True">
-                            <Border x:Name="HudCpuBarFill" Background="#30D158" CornerRadius="3" HorizontalAlignment="Left" Width="24" />
+                        <Border Grid.Row="1" Background="{DynamicResource IslandSliderTrackBrush}" CornerRadius="2.5" Height="4" Margin="0,3,0,2" ClipToBounds="True">
+                            <Border x:Name="HudCpuBarFill" Background="#30D158" CornerRadius="2.5" HorizontalAlignment="Left" Width="24" />
                         </Border>
-                        <TextBlock x:Name="HudCpuStatusText" Grid.Row="2" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Text="System &amp; User Delta • Healthy" TextTrimming="CharacterEllipsis" />
+                        <!-- Per-Core Micro Heatmap -->
+                        <StackPanel x:Name="HudCpuHeatmapPanel" Grid.Row="2" Orientation="Horizontal" Height="3" Margin="0,1,0,2" />
+                        <TextBlock x:Name="HudCpuStatusText" Grid.Row="3" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Text="Healthy • Cores" TextTrimming="CharacterEllipsis" />
                     </Grid>
                 </Border>
-                <Border Grid.Column="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="11" Padding="10,6">
+                <!-- GPU Card -->
+                <Border Grid.Column="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="7,5">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -70,69 +78,112 @@
                         </Grid.RowDefinitions>
                         <DockPanel Grid.Row="0" LastChildFill="False">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE7F4;" FontSize="10" Foreground="#0A84FF" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                <TextBlock Text="PHYSICAL MEMORY" FontSize="9.5" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE790;" FontSize="9.5" Foreground="#BF5AF2" Margin="0,0,3,0" VerticalAlignment="Center" />
+                                <TextBlock Text="GPU" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                             </StackPanel>
-                            <TextBlock x:Name="HudRamHeroText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="12.5" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" Text="12.4 / 32 GB" VerticalAlignment="Center" />
+                            <TextBlock x:Name="HudGpuHeroText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" Text="0%" VerticalAlignment="Center" />
                         </DockPanel>
-                        <Border Grid.Row="1" Background="{DynamicResource IslandSliderTrackBrush}" CornerRadius="3" Height="5" Margin="0,4,0,3" ClipToBounds="True">
-                            <Border x:Name="HudRamBarFill" Background="#0A84FF" CornerRadius="3" HorizontalAlignment="Left" Width="80" />
+                        <Border Grid.Row="1" Background="{DynamicResource IslandSliderTrackBrush}" CornerRadius="2.5" Height="4" Margin="0,3,0,2" ClipToBounds="True">
+                            <Border x:Name="HudGpuBarFill" Background="#BF5AF2" CornerRadius="2.5" HorizontalAlignment="Left" Width="20" />
                         </Border>
-                        <TextBlock x:Name="HudRamStatusText" Grid.Row="2" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Text="39% Used • 19.6 GB Free" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="HudGpuStatusText" Grid.Row="2" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Text="Idle • 0°C" TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                </Border>
+                <!-- RAM Card -->
+                <Border Grid.Column="4" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="7,5">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <DockPanel Grid.Row="0" LastChildFill="False">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE7F4;" FontSize="9.5" Foreground="#0A84FF" Margin="0,0,3,0" VerticalAlignment="Center" />
+                                <TextBlock Text="RAM" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock x:Name="HudRamHeroText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" Text="12.4 GB" VerticalAlignment="Center" />
+                        </DockPanel>
+                        <Border Grid.Row="1" Background="{DynamicResource IslandSliderTrackBrush}" CornerRadius="2.5" Height="4" Margin="0,3,0,2" ClipToBounds="True">
+                            <Border x:Name="HudRamBarFill" Background="#0A84FF" CornerRadius="2.5" HorizontalAlignment="Left" Width="40" />
+                        </Border>
+                        <TextBlock x:Name="HudRamStatusText" Grid.Row="2" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Text="39% • Free" TextTrimming="CharacterEllipsis" />
                     </Grid>
                 </Border>
             </Grid>
-            <Border Grid.Row="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="8,4" Margin="0,2,0,4">
+            <!-- Row 1: Runaway Process Alert Banner -->
+            <Border x:Name="HudRunawayBanner" Grid.Row="1" Visibility="Collapsed" Background="#26FF453A" BorderBrush="#80FF453A" BorderThickness="1" CornerRadius="8" Padding="8,3" Margin="0,3,0,2">
+                <DockPanel LastChildFill="False">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE7BA;" FontSize="9.5" Foreground="#FF453A" Margin="0,0,5,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="HudRunawayText" Text="Runaway background task detected" FontSize="8.5" FontWeight="SemiBold" Foreground="#FF453A" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <Button Click="HudKillRunaway_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="18" Padding="6,0" ToolTipService.ToolTip="Terminate the runaway background task immediately">
+                        <TextBlock Text="⚡ Terminate Task" FontSize="8" FontWeight="Bold" Foreground="#FF453A" VerticalAlignment="Center" />
+                    </Button>
+                </DockPanel>
+            </Border>
+            <!-- Row 2: Resource Hogs -->
+            <Border Grid.Row="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="8,3" Margin="0,2,0,3">
                 <StackPanel VerticalAlignment="Center">
-                    <Grid x:Name="HudHogRow1" Height="18">
+                    <Grid x:Name="HudHogRow1" Height="17">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="160" />
+                            <ColumnDefinition Width="150" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="HudHog1Name" Grid.Column="0" Text="chrome.exe (14)" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="9.5" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        <TextBlock x:Name="HudHog1Stats" Grid.Column="1" Text="1,420 MB • 3.2% CPU" Foreground="{DynamicResource SecondaryBrush}" FontSize="9" HorizontalAlignment="Right" Margin="0,0,8,0" VerticalAlignment="Center" />
-                        <Button Click="HudKillHog1_Click" x:Name="HudHog1KillBtn" Grid.Column="2" Style="{StaticResource IslandButton}" Height="16" Padding="6,0" ToolTipService.ToolTip="Click twice to terminate process group (or Shift+Click for instant kill)">
-                            <TextBlock x:Name="HudHog1KillText" Text="✕ Kill" FontSize="8" FontWeight="SemiBold" Foreground="#FF453A" />
+                        <TextBlock x:Name="HudHog1Name" Grid.Column="0" Text="chrome.exe (14)" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="9" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <TextBlock x:Name="HudHog1Stats" Grid.Column="1" Text="1,420 MB • 3.2% CPU" Foreground="{DynamicResource SecondaryBrush}" FontSize="8.5" HorizontalAlignment="Right" Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <Button Click="HudKillHog1_Click" x:Name="HudHog1KillBtn" Grid.Column="2" Style="{StaticResource IslandButton}" Height="15" Padding="5,0" ToolTipService.ToolTip="Click twice to terminate process group (or Shift+Click for instant kill)">
+                            <TextBlock x:Name="HudHog1KillText" Text="✕ Kill" FontSize="7.5" FontWeight="SemiBold" Foreground="#FF453A" />
                         </Button>
                     </Grid>
-                    <Grid x:Name="HudHogRow2" Height="18" Margin="0,1,0,0">
+                    <Grid x:Name="HudHogRow2" Height="17" Margin="0,1,0,0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="160" />
+                            <ColumnDefinition Width="150" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="HudHog2Name" Grid.Column="0" Text="Code.exe (8)" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="9.5" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        <TextBlock x:Name="HudHog2Stats" Grid.Column="1" Text="840 MB • 1.4% CPU" Foreground="{DynamicResource SecondaryBrush}" FontSize="9" HorizontalAlignment="Right" Margin="0,0,8,0" VerticalAlignment="Center" />
-                        <Button Click="HudKillHog2_Click" x:Name="HudHog2KillBtn" Grid.Column="2" Style="{StaticResource IslandButton}" Height="16" Padding="6,0" ToolTipService.ToolTip="Click twice to terminate process group (or Shift+Click for instant kill)">
-                            <TextBlock x:Name="HudHog2KillText" Text="✕ Kill" FontSize="8" FontWeight="SemiBold" Foreground="#FF453A" />
+                        <TextBlock x:Name="HudHog2Name" Grid.Column="0" Text="Code.exe (8)" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="9" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <TextBlock x:Name="HudHog2Stats" Grid.Column="1" Text="840 MB • 1.4% CPU" Foreground="{DynamicResource SecondaryBrush}" FontSize="8.5" HorizontalAlignment="Right" Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <Button Click="HudKillHog2_Click" x:Name="HudHog2KillBtn" Grid.Column="2" Style="{StaticResource IslandButton}" Height="15" Padding="5,0" ToolTipService.ToolTip="Click twice to terminate process group (or Shift+Click for instant kill)">
+                            <TextBlock x:Name="HudHog2KillText" Text="✕ Kill" FontSize="7.5" FontWeight="SemiBold" Foreground="#FF453A" />
                         </Button>
                     </Grid>
-                    <Grid x:Name="HudHogRow3" Height="18" Margin="0,1,0,0">
+                    <Grid x:Name="HudHogRow3" Height="17" Margin="0,1,0,0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="160" />
+                            <ColumnDefinition Width="150" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="HudHog3Name" Grid.Column="0" Text="Discord.exe (5)" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="9.5" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        <TextBlock x:Name="HudHog3Stats" Grid.Column="1" Text="410 MB • 0.5% CPU" Foreground="{DynamicResource SecondaryBrush}" FontSize="9" HorizontalAlignment="Right" Margin="0,0,8,0" VerticalAlignment="Center" />
-                        <Button Click="HudKillHog3_Click" x:Name="HudHog3KillBtn" Grid.Column="2" Style="{StaticResource IslandButton}" Height="16" Padding="6,0" ToolTipService.ToolTip="Click twice to terminate process group (or Shift+Click for instant kill)">
-                            <TextBlock x:Name="HudHog3KillText" Text="✕ Kill" FontSize="8" FontWeight="SemiBold" Foreground="#FF453A" />
+                        <TextBlock x:Name="HudHog3Name" Grid.Column="0" Text="Discord.exe (5)" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="9" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <TextBlock x:Name="HudHog3Stats" Grid.Column="1" Text="410 MB • 0.5% CPU" Foreground="{DynamicResource SecondaryBrush}" FontSize="8.5" HorizontalAlignment="Right" Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <Button Click="HudKillHog3_Click" x:Name="HudHog3KillBtn" Grid.Column="2" Style="{StaticResource IslandButton}" Height="15" Padding="5,0" ToolTipService.ToolTip="Click twice to terminate process group (or Shift+Click for instant kill)">
+                            <TextBlock x:Name="HudHog3KillText" Text="✕ Kill" FontSize="7.5" FontWeight="SemiBold" Foreground="#FF453A" />
                         </Button>
                     </Grid>
                 </StackPanel>
             </Border>
+            <!-- Row 3: Action Buttons -->
             <DockPanel Grid.Row="3" LastChildFill="False">
-                <Button Click="HudPurgeRamButton_Click" x:Name="HudPurgeRamButton" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" ToolTipService.ToolTip="Safely trim idle background working sets">
+                <StackPanel Orientation="Horizontal">
+                    <Button Click="HudPurgeRamButton_Click" x:Name="HudPurgeRamButton" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,6,0" ToolTipService.ToolTip="Safely trim idle background working sets">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE74D;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="HudPurgeRamText" Text="✨ Purge RAM" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Click="HudPurgeRunawaysButton_Click" x:Name="HudPurgeRunawaysButton" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" ToolTipService.ToolTip="Purge idle background tasks consuming excessive CPU">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE777;" FontSize="8.5" Foreground="#FF9F0A" Margin="0,0,3,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="HudPurgeRunawaysText" Text="⚡ Clean Runaways" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+                <Button Click="HudTaskManagerButton_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" ToolTipService.ToolTip="Launch Windows Task Manager">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE74D;" FontSize="9" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                        <TextBlock x:Name="HudPurgeRamText" Text="✨ Purge Idle RAM" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-                <Button Click="HudTaskManagerButton_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" ToolTipService.ToolTip="Launch Windows Task Manager">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE756;" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                        <TextBlock Text="Task Manager ↗" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE756;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Task Manager ↗" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
             </DockPanel>

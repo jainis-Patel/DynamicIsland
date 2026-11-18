@@ -28,6 +28,12 @@ public partial class SystemHudView : UserControl
     private void HudPurgeRamButton_Click(object sender, RoutedEventArgs e) =>
         Island?.HudPurgeRamButton_Click(sender, e);
 
+    private void HudPurgeRunawaysButton_Click(object sender, RoutedEventArgs e) =>
+        Island?.HudPurgeRunawaysButton_Click(sender, e);
+
+    private void HudKillRunaway_Click(object sender, RoutedEventArgs e) =>
+        Island?.HudKillRunaway_Click(sender, e);
+
     private void HudTaskManagerButton_Click(object sender, RoutedEventArgs e) =>
         Island?.HudTaskManagerButton_Click(sender, e);
 

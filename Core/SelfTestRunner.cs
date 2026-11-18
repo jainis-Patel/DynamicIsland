@@ -111,6 +111,7 @@ internal static class SelfTestRunner
         Run("Pillar2AiAgentApprovals: Two-way IPC prompt RPC, diff HUD parser & interactive buttons", TestAiAgentInteractiveApprovalsAndDiffViewer);
         Run("Pillar3FloatingPiPAndNotch: Tear-off drag gesture, magnetic corner snapping & hardware notch fillets", TestPillar3DetachableFloatingIslandAndHardwareNotch);
         Run("Pillar4CommunityDropletsSdk: Schema-validated JSON definitions, hot-reloading & live polling pipeline", TestPillar4CommunityDropletsSdk);
+        Run("Pillar5DeepGpuAndHardwareTelemetry: NVML/DXGI GPU sensors, per-core CPU heatmap & runaway process purge", TestPillar5DeepGpuAndHardwareTelemetry);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -3421,5 +3422,62 @@ SSID 3 : Home_Router
         // 5. AppPaths DropletsDirectory Invariant
         string dropletsDir = AppPaths.DropletsDirectory;
         Assert(Directory.Exists(dropletsDir), $"DropletsDirectory '{dropletsDir}' must exist");
+    }
+
+    private static void TestPillar5DeepGpuAndHardwareTelemetry()
+    {
+        // 1. Dual-Engine GPU Telemetry Provider (NVML + DXGI)
+        using var gpuProvider = new GpuTelemetryProvider();
+        var gpuSnap = gpuProvider.Sample();
+
+        Assert(gpuSnap.IsAvailable, "GPU Telemetry provider must detect a valid GPU adapter");
+        Assert(!string.IsNullOrWhiteSpace(gpuSnap.Name), "GPU model name must not be empty");
+        Assert(gpuSnap.UtilizationPercent >= 0 && gpuSnap.UtilizationPercent <= 100, $"GPU utilization out of bounds: {gpuSnap.UtilizationPercent}%");
+        Assert(gpuSnap.VramPercent >= 0 && gpuSnap.VramPercent <= 100, $"GPU VRAM percent out of bounds: {gpuSnap.VramPercent}%");
+        Assert(gpuSnap.VramUsedGb >= 0.0 && gpuSnap.VramUsedGb <= gpuSnap.VramTotalGb + 0.1, "GPU VRAM used must not exceed total VRAM");
+        Assert(gpuSnap.EngineType == "NVML" || gpuSnap.EngineType == "DXGI", $"Unexpected engine type: {gpuSnap.EngineType}");
+
+        // 2. High-Performance NtQuerySystemInformation Per-Core CPU Sampler
+        using var coreSampler = new PerCoreCpuSampler();
+        var baseline = coreSampler.Sample();
+        Thread.Sleep(30);
+        var activeSample = coreSampler.Sample();
+
+        Assert(activeSample.CoreLoads != null, "Core loads array must not be null");
+        Assert(activeSample.CoreLoads!.Length == Environment.ProcessorCount, $"Expected {Environment.ProcessorCount} cores, got {activeSample.CoreLoads.Length}");
+        for (int i = 0; i < activeSample.CoreLoads!.Length; i++)
+        {
+            int load = activeSample.CoreLoads[i];
+            Assert(load >= 0 && load <= 100, $"Core #{i} load out of bounds: {load}%");
+        }
+        Assert(activeSample.AverageCorePercent >= 0 && activeSample.AverageCorePercent <= 100, $"Average core percent out of bounds: {activeSample.AverageCorePercent}%");
+        Assert(activeSample.PeakCorePercent >= 0 && activeSample.PeakCorePercent <= 100, $"Peak core percent out of bounds: {activeSample.PeakCorePercent}%");
+
+        // 3. Protected OS Process Invariants
+        Assert(SystemPerformanceService.IsProtectedProcess("dwm.exe"), "dwm.exe must be protected from termination");
+        Assert(SystemPerformanceService.IsProtectedProcess("explorer.exe"), "explorer.exe must be protected from termination");
+        Assert(SystemPerformanceService.IsProtectedProcess("csrss.exe"), "csrss.exe must be protected from termination");
+        Assert(SystemPerformanceService.IsProtectedProcess("svchost.exe"), "svchost.exe must be protected from termination");
+        Assert(SystemPerformanceService.IsProtectedProcess("DynamicIsland.exe"), "DynamicIsland.exe must be protected from termination");
+        Assert(!SystemPerformanceService.IsProtectedProcess("rogue_miner.exe"), "Non-system processes must not be marked protected");
+
+        // 4. Runaway Process Model & Detection Verification
+        var runawayDef = new RunawayProcessInfo(true, "rogue_task.exe", 12345, 48.6, 620.0);
+        Assert(runawayDef.HasRunaway, "RunawayProcessInfo must reflect active runaway state");
+        Assert(runawayDef.CpuPercent == 48.6, "Runaway CPU percentage must match");
+        Assert(runawayDef.ExeName == "rogue_task.exe", "Runaway executable name must match");
+
+        // 5. SystemPerformanceService Deep Telemetry Integration & Purge
+        using var perfService = new SystemPerformanceService();
+        var snap = perfService.SampleTelemetry(forceProcessScan: true, forceDispatch: true);
+
+        Assert(snap.Gpu.IsAvailable, "SystemVitalsSnapshot must contain valid GPU vitals");
+        Assert(snap.Cores.CoreLoads.Length == Environment.ProcessorCount, "SystemVitalsSnapshot must contain valid per-core heatmap");
+        Assert(snap.Runaway.CpuPercent >= 0.0, "Runaway CPU percent must be non-negative");
+
+        // Runaway purge execution test
+        var purgeResult = perfService.PurgeRunawayProcesses(minCpuPercent: 95.0);
+        Assert(purgeResult.KilledProcesses >= 0, "PurgeRunawayProcesses must return non-negative killed count");
+        Assert(purgeResult.FreedCpuPercent >= 0.0, "PurgeRunawayProcesses must return non-negative freed CPU percent");
     }
 }

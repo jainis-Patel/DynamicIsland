@@ -130,51 +130,108 @@ public partial class IslandWindow
                 }
 
                 // Processor Metrics
-
                 if (HudCpuHeroText != null) HudCpuHeroText.Text = $"{snap.CpuPercent}%";
-
                 if (HudCpuBarFill != null)
-
                 {
-
-                    HudCpuBarFill.Width = Math.Clamp((snap.CpuPercent / 100.0) * 190.0, 4.0, 190.0);
-
+                    HudCpuBarFill.Width = Math.Clamp((snap.CpuPercent / 100.0) * 110.0, 3.0, 110.0);
                     HudCpuBarFill.Background = snap.CpuPercent >= 90 ? ThemeBrushes.Red : (snap.CpuPercent >= 80 ? ThemeBrushes.Amber : ThemeBrushes.Green);
-
+                }
+                if (HudCpuStatusText != null)
+                {
+                    HudCpuStatusText.Text = snap.CpuPercent >= 80
+                        ? "High Load • Throttling"
+                        : $"{Environment.ProcessorCount} Cores • Healthy";
                 }
 
-                if (HudCpuStatusText != null)
-
+                // Per-Core Heatmap Rendering
+                if (HudCpuHeatmapPanel != null && snap.Cores.CoreLoads != null && snap.Cores.CoreLoads.Length > 0)
                 {
+                    int coreCount = snap.Cores.CoreLoads.Length;
+                    if (HudCpuHeatmapPanel.Children.Count != coreCount)
+                    {
+                        HudCpuHeatmapPanel.Children.Clear();
+                        double barWidth = Math.Max(2.0, (105.0 / coreCount) - 1.0);
+                        for (int i = 0; i < coreCount; i++)
+                        {
+                            var b = new System.Windows.Controls.Border
+                            {
+                                Width = barWidth,
+                                Height = 3,
+                                CornerRadius = new CornerRadius(1),
+                                Margin = new Thickness(0, 0, 1, 0),
+                                Background = ThemeBrushes.Green
+                            };
+                            HudCpuHeatmapPanel.Children.Add(b);
+                        }
+                    }
 
-                    HudCpuStatusText.Text = snap.CpuPercent >= 80
+                    for (int i = 0; i < coreCount && i < HudCpuHeatmapPanel.Children.Count; i++)
+                    {
+                        if (HudCpuHeatmapPanel.Children[i] is System.Windows.Controls.Border b)
+                        {
+                            int load = snap.Cores.CoreLoads[i];
+                            b.Background = load >= 85 ? ThemeBrushes.Red : (load >= 60 ? ThemeBrushes.Amber : ThemeBrushes.Green);
+                        }
+                    }
+                }
 
-                        ? "High Processor Load • Throttling Possible"
+                // GPU Metrics
+                if (HudGpuHeroText != null)
+                {
+                    if (snap.Gpu.IsAvailable)
+                    {
+                        HudGpuHeroText.Text = snap.Gpu.UtilizationPercent > 0
+                            ? $"{snap.Gpu.UtilizationPercent}%"
+                            : (snap.Gpu.TemperatureC > 0 ? $"{snap.Gpu.TemperatureC}°C" : $"{snap.Gpu.VramPercent}%");
+                    }
+                    else
+                    {
+                        HudGpuHeroText.Text = "0%";
+                    }
+                }
 
-                        : "System & User Delta • Healthy";
+                if (HudGpuBarFill != null)
+                {
+                    double gpuRatio = snap.Gpu.IsAvailable
+                        ? Math.Max(snap.Gpu.UtilizationPercent, snap.Gpu.VramPercent) / 100.0
+                        : 0.0;
+                    HudGpuBarFill.Width = Math.Clamp(gpuRatio * 110.0, 3.0, 110.0);
+                    HudGpuBarFill.Background = snap.Gpu.TemperatureC >= 85 ? ThemeBrushes.Red : ThemeBrushes.Purple;
+                }
 
+                if (HudGpuStatusText != null)
+                {
+                    if (snap.Gpu.IsAvailable)
+                    {
+                        string tempStr = snap.Gpu.TemperatureC > 0 ? $"{snap.Gpu.TemperatureC}°C • " : "";
+                        HudGpuStatusText.Text = $"{tempStr}{snap.Gpu.VramUsedGb:0.0}/{snap.Gpu.VramTotalGb:0.0} GB";
+                    }
+                    else
+                    {
+                        HudGpuStatusText.Text = "Discrete GPU Sleep";
+                    }
                 }
 
                 // Memory Metrics
-
-                if (HudRamHeroText != null) HudRamHeroText.Text = $"{snap.RamUsedGb:0.0} / {snap.RamTotalGb:0.0} GB";
-
+                if (HudRamHeroText != null) HudRamHeroText.Text = $"{snap.RamUsedGb:0.0} GB";
                 if (HudRamBarFill != null)
-
                 {
-
-                    HudRamBarFill.Width = Math.Clamp((snap.RamPercent / 100.0) * 190.0, 4.0, 190.0);
-
+                    HudRamBarFill.Width = Math.Clamp((snap.RamPercent / 100.0) * 110.0, 3.0, 110.0);
                     HudRamBarFill.Background = snap.RamPercent >= 92 ? ThemeBrushes.Red : (snap.RamPercent >= 85 ? ThemeBrushes.Amber : ThemeBrushes.Blue);
-
+                }
+                if (HudRamStatusText != null)
+                {
+                    HudRamStatusText.Text = $"{snap.RamPercent}% • {snap.RamAvailGb:0.0} GB Free";
                 }
 
-                if (HudRamStatusText != null)
-
+                // Runaway Process Banner
+                if (HudRunawayBanner != null)
                 {
-
-                    HudRamStatusText.Text = $"{snap.RamPercent}% Load • {snap.RamAvailGb:0.0} GB Available";
-
+                    HudRunawayBanner.Visibility = snap.Runaway.HasRunaway ? Visibility.Visible : Visibility.Collapsed;
+                    if (snap.Runaway.HasRunaway && HudRunawayText != null)
+                    {
+                        HudRunawayText.Text = $"Runaway: {snap.Runaway.ExeName} ({snap.Runaway.CpuPercent:0.0}% CPU)";
+                    }
                 }
 
                 // Hardware & System Health Chip
@@ -515,6 +572,81 @@ public partial class IslandWindow
 
         });
 
+    }
+
+    internal void HudKillRunaway_Click(object sender, RoutedEventArgs e)
+    {
+        if (_systemPerfService == null) return;
+        var snap = _systemPerfService.LatestSnapshot;
+        if (!snap.Runaway.HasRunaway || string.IsNullOrEmpty(snap.Runaway.ExeName)) return;
+
+        string runawayExe = snap.Runaway.ExeName;
+        uint runawayPid = snap.Runaway.Pid;
+
+        Task.Run(() =>
+        {
+            bool killed = _systemPerfService.TryTerminateProcessGroup(runawayExe, runawayPid);
+            Dispatcher.InvokeAsync(() =>
+            {
+                TriggerLiquidImpulse(45, -15, 6);
+                if (killed)
+                {
+                    _machine.PushToast(new ToastContent(
+                        "\uE711",
+                        "Terminated Runaway Task",
+                        $"Closed runaway background process {runawayExe}.",
+                        ThemeBrushes.AmberColor,
+                        TimeSpan.FromSeconds(2.0),
+                        TargetView: "systemhud",
+                        Priority: ToastPriority.Feedback,
+                        Category: "system"));
+                }
+            });
+        });
+    }
+
+    internal void HudPurgeRunawaysButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_systemPerfService == null) return;
+
+        Task.Run(() =>
+        {
+            var result = _systemPerfService.PurgeRunawayProcesses(20.0);
+            Dispatcher.InvokeAsync(() =>
+            {
+                TriggerLiquidImpulse(55, -20, 8);
+                if (result.KilledProcesses > 0)
+                {
+                    if (HudPurgeRunawaysText != null)
+                        HudPurgeRunawaysText.Text = $"⚡ Purged ({result.KilledProcesses})";
+
+                    _machine.PushToast(new ToastContent(
+                        "\uE777",
+                        "Runaway Tasks Purged",
+                        $"Safely terminated {result.KilledProcesses} runaway task(s), freeing ~{result.FreedCpuPercent:0.0}% CPU.",
+                        ThemeBrushes.GreenColor,
+                        TimeSpan.FromSeconds(2.5),
+                        TargetView: "systemhud",
+                        Priority: ToastPriority.Feedback,
+                        Category: "system"));
+                }
+                else
+                {
+                    if (HudPurgeRunawaysText != null)
+                        HudPurgeRunawaysText.Text = "✓ All Clear";
+
+                    _machine.PushToast(new ToastContent(
+                        "\uE73E",
+                        "No Runaways Detected",
+                        "All background tasks are operating within normal CPU thresholds.",
+                        ThemeBrushes.GreenColor,
+                        TimeSpan.FromSeconds(2.0),
+                        TargetView: "systemhud",
+                        Priority: ToastPriority.Feedback,
+                        Category: "system"));
+                }
+            });
+        });
     }
 
     internal void HudTaskManagerButton_Click(object sender, RoutedEventArgs e)

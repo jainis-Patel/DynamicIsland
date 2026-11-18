@@ -576,6 +576,12 @@ public partial class IslandWindow
     internal Border HudCpuBarFill => SystemHudContainer.HudCpuBarFill;
     internal TextBlock HudCpuHeroText => SystemHudContainer.HudCpuHeroText;
     internal TextBlock HudCpuStatusText => SystemHudContainer.HudCpuStatusText;
+    internal StackPanel HudCpuHeatmapPanel => SystemHudContainer.HudCpuHeatmapPanel;
+    internal Border HudGpuBarFill => SystemHudContainer.HudGpuBarFill;
+    internal TextBlock HudGpuHeroText => SystemHudContainer.HudGpuHeroText;
+    internal TextBlock HudGpuStatusText => SystemHudContainer.HudGpuStatusText;
+    internal Border HudRunawayBanner => SystemHudContainer.HudRunawayBanner;
+    internal TextBlock HudRunawayText => SystemHudContainer.HudRunawayText;
     internal TextBlock HudHardwareSubtitle => SystemHudContainer.HudHardwareSubtitle;
     internal Button HudHog1KillBtn => SystemHudContainer.HudHog1KillBtn;
     internal TextBlock HudHog1KillText => SystemHudContainer.HudHog1KillText;
@@ -594,6 +600,8 @@ public partial class IslandWindow
     internal Grid HudHogRow3 => SystemHudContainer.HudHogRow3;
     internal Button HudPurgeRamButton => SystemHudContainer.HudPurgeRamButton;
     internal TextBlock HudPurgeRamText => SystemHudContainer.HudPurgeRamText;
+    internal Button HudPurgeRunawaysButton => SystemHudContainer.HudPurgeRunawaysButton;
+    internal TextBlock HudPurgeRunawaysText => SystemHudContainer.HudPurgeRunawaysText;
     internal Border HudRamBarFill => SystemHudContainer.HudRamBarFill;
     internal TextBlock HudRamHeroText => SystemHudContainer.HudRamHeroText;
     internal TextBlock HudRamStatusText => SystemHudContainer.HudRamStatusText;
