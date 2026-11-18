@@ -318,6 +318,71 @@ public partial class IslandWindow
         e.Handled = true;
     }
 
+    private static bool IsDescendantOfAny(DependencyObject? child, params DependencyObject?[] ancestors)
+    {
+        while (child != null)
+        {
+            for (int i = 0; i < ancestors.Length; i++)
+            {
+                if (ancestors[i] != null && child == ancestors[i])
+                    return true;
+            }
+            DependencyObject? parent = null;
+            if (child is Visual || child is System.Windows.Media.Media3D.Visual3D)
+            {
+                parent = VisualTreeHelper.GetParent(child);
+            }
+            child = parent ?? LogicalTreeHelper.GetParent(child);
+        }
+        return false;
+    }
+
+    internal void CycleClockStyle(int step)
+    {
+        var styles = SettingsService.AvailableClockStyles;
+        if (styles == null || styles.Count == 0) return;
+
+        string current = SettingsService.NormalizeClockStyle(_settingsService.Current.ClockStyle);
+        int idx = -1;
+        for (int i = 0; i < styles.Count; i++)
+        {
+            if (string.Equals(styles[i], current, StringComparison.OrdinalIgnoreCase))
+            {
+                idx = i;
+                break;
+            }
+        }
+        if (idx < 0) idx = 0;
+
+        int nextIdx = (idx + step) % styles.Count;
+        if (nextIdx < 0) nextIdx += styles.Count;
+
+        string target = styles[nextIdx];
+        _settingsService.Update(s => s.ClockStyle = target, nameof(AppSettings.ClockStyle));
+        ApplyClockStyle(target);
+
+        string label = target switch
+        {
+            "Seconds" => "Seconds (Precision)",
+            "DateBadge" => "Date & Time Badge",
+            "Analog" => "Micro Horology Analog",
+            "Neon" => "Cyber Neon Glow",
+            "Flip" => "Retro Flip Card",
+            "Matrix" => "Field Telemetry Matrix",
+            "JumpHour" => "Haute Jump-Hour Guichet",
+            _ => "Minimal Digital"
+        };
+        _machine.PushToast(new ToastContent(
+            "\uE823",
+            "Clock Face",
+            label,
+            ThemeBrushes.GreenColor,
+            TimeSpan.FromSeconds(1.6),
+            TargetView: "settings",
+            Priority: ToastPriority.Feedback,
+            Category: "clockstyle"));
+    }
+
     private void Pill_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (_machine.State == IslandState.Expanded) return;
@@ -345,6 +410,22 @@ public partial class IslandWindow
                 Category: "brightness"));
             e.Handled = true;
             return;
+        }
+
+        // When in Idle state: hovering over the clock face or holding Ctrl + Wheel cycles through all 8 clock styles
+        if (_machine.State == IslandState.Idle)
+        {
+            bool isOverClock = e.OriginalSource is DependencyObject dep &&
+                               IsDescendantOfAny(dep, IdleClock, IdleClockSecondsHost, IdleClockDateHost,
+                                   IdleClockAnalogHost, IdleClockNeonHost, IdleClockFlipHost,
+                                   IdleClockMatrixHost, IdleClockJumpHourHost);
+
+            if ((Keyboard.Modifiers & ModifierKeys.Control) != 0 || isOverClock)
+            {
+                CycleClockStyle(e.Delta < 0 ? 1 : -1);
+                e.Handled = true;
+                return;
+            }
         }
 
         // Fluid downward pull-to-expand gesture via trackpad scroll

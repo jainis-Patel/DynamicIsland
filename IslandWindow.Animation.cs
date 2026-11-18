@@ -355,6 +355,24 @@ public partial class IslandWindow
             }
         }
 
+        if (ToastActionsHost != null)
+        {
+            bool isPrompt = toast.OnPromptDecision != null || !string.IsNullOrWhiteSpace(toast.PromptActivityId);
+            if (isPrompt)
+            {
+                ToastActionsHost.Visibility = Visibility.Visible;
+                if (ToastReplyButton != null) ToastReplyButton.Visibility = Visibility.Collapsed;
+                if (ToastDiffBtn != null)
+                {
+                    ToastDiffBtn.Visibility = !string.IsNullOrWhiteSpace(toast.DiffText) ? Visibility.Visible : Visibility.Collapsed;
+                }
+            }
+            else
+            {
+                ToastActionsHost.Visibility = Visibility.Collapsed;
+            }
+        }
+
         if (replacing && !IsReducedMotion)
         {
             TriggerLiquidImpulse(280, 105, 30);

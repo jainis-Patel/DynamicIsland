@@ -37,6 +37,18 @@ public partial class SettingsView : UserControl
     private void ClockStyleBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.ClockStyleBtn_Click(sender, e);
 
+    private void ClockScrollLeft_Click(object sender, RoutedEventArgs e)
+    {
+        if (ClockStylesScrollViewer != null)
+            Island?.SmoothScrollHorizontal(ClockStylesScrollViewer, -240);
+    }
+
+    private void ClockScrollRight_Click(object sender, RoutedEventArgs e)
+    {
+        if (ClockStylesScrollViewer != null)
+            Island?.SmoothScrollHorizontal(ClockStylesScrollViewer, 240);
+    }
+
     private void DndToggleBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.DndToggleBtn_Click(sender, e);
 

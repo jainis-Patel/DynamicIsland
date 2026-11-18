@@ -10,6 +10,7 @@ using System.Windows.Threading;
 using DynamicIsland.LiquidGlass;
 using DynamicIsland.Interop;
 using DynamicIsland.Services;
+using DynamicIsland.Views.Widgets;
 using static DynamicIsland.Interop.NativeMethods;
 
 namespace DynamicIsland.Core;
@@ -107,6 +108,7 @@ internal static class SelfTestRunner
         Run("Phase4Ecosystem: Live Activity IPC 2.0 multi-phase pipelines & clipboard secret redaction", TestLiveActivityIpcV2AndClipboardSecretDetection);
         Run("Phase5Packaging: Inno Setup, WinGet manifest specification & v0.5.0 version invariants", TestWinGetManifestAndReleasePackageInvariants);
         Run("Pillar1PrecisionTouchpad: Fluid trackpad scrubbing, velocity flick skip & multi-touch pinch morphing", TestTouchpadGesturesAndVelocityInvariants);
+        Run("Pillar2AiAgentApprovals: Two-way IPC prompt RPC, diff HUD parser & interactive buttons", TestAiAgentInteractiveApprovalsAndDiffViewer);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -3143,5 +3145,93 @@ SSID 3 : Home_Router
         }
         long allocAfter = GC.GetAllocatedBytesForCurrentThread();
         Assert(allocAfter - allocBefore == 0, $"Gesture loop must allocate 0 heap bytes, allocated {allocAfter - allocBefore} bytes");
+    }
+
+    private static void TestAiAgentInteractiveApprovalsAndDiffViewer()
+    {
+        // 1. Two-way Named Pipe IPC Prompt Flow & Hub Invariants
+        var hub = new LiveActivityHub();
+        using var ipc = new LiveActivityIpcService(hub);
+
+        var promptReq = new ActivityIpcRequest
+        {
+            Action = "prompt",
+            Id = "ai_agent_approval_001",
+            Source = "Antigravity Agent",
+            Title = "File Edit Authorization",
+            Subtitle = "Modify LiveActivityIpcService.cs",
+            Buttons = new[] { "Approve", "Reject", "Diff" },
+            Diff = "--- a/Core/Service.cs\n+++ b/Core/Service.cs\n@@ -10,4 +10,6 @@\n public void Run()\n-    OldCall();\n+    NewCall();\n+    AuditLog();\n }\n",
+            Priority = 150
+        };
+
+        var resp = ipc.ProcessRequest(promptReq);
+        Assert(resp.Ok, "ProcessRequest with action 'prompt' must succeed");
+        Assert(ipc.HasPendingPrompts, "LiveActivityIpcService must report HasPendingPrompts == true");
+        Assert(ipc.GetLatestPendingPromptId() == "ai_agent_approval_001", "GetLatestPendingPromptId must match registered prompt id");
+
+        var act = hub.Activities.FirstOrDefault(a => a.Id == "ai_agent_approval_001");
+        Assert(act != null, "Published prompt must exist in LiveActivityHub");
+        Assert(act!.IsInteractivePrompt, "LiveActivityItem.IsInteractivePrompt must be true for prompt action");
+        Assert(act.Diff != null && act.Diff.Contains("NewCall()"), "LiveActivityItem must preserve diff string");
+        Assert(act.Actions != null && act.Actions.Count == 3, "LiveActivityItem must have exactly 3 actions");
+        Assert(act.Actions![0].Label == "Approve", "First action should be Approve");
+        Assert(act.Actions[1].Label == "Reject", "Second action should be Reject");
+        Assert(act.Actions[2].Label == "Diff", "Third action should be Diff");
+
+        // 2. Resolve prompt decision via IPC
+        bool resolved = ipc.ResolvePrompt("ai_agent_approval_001", "Approve");
+        Assert(resolved, "ResolvePrompt must return true for registered prompt");
+        Assert(!ipc.HasPendingPrompts, "HasPendingPrompts must be false after prompt resolution");
+        Assert(!hub.Activities.Any(a => a.Id == "ai_agent_approval_001"), "Prompt activity must be completed and removed from hub upon resolution");
+
+        // 3. Graceful fallback on non-existent prompt
+        Assert(!ipc.ResolvePrompt("non_existent_prompt", "Approve"), "ResolvePrompt for invalid ID must return false");
+
+        // 4. Unified Diff Syntax Classification & Metrics Extraction
+        string testDiff = "diff --git a/src/Island.cs b/src/Island.cs\n" +
+                          "--- a/src/Island.cs\n" +
+                          "+++ b/src/Island.cs\n" +
+                          "@@ -45,6 +45,8 @@\n" +
+                          " public void Initialize()\n" +
+                          " {\n" +
+                          "-    SetupLegacyNotch();\n" +
+                          "+    SetupModernIsland();\n" +
+                          "+    InitializeSpringEngine();\n" +
+                          "+    RegisterTouchpadGestures();\n" +
+                          " }\n" +
+                          "@@ -100,3 +102,2 @@\n" +
+                          "-    DeprecatedCall();\n" +
+                          " }";
+
+        var (filename, added, removed, chunks) = TermiNotchView.ParseDiffMetrics(testDiff);
+        Assert(filename == "src/Island.cs", $"Expected filename 'src/Island.cs', got '{filename}'");
+        Assert(added == 3, $"Expected 3 added lines, got {added}");
+        Assert(removed == 2, $"Expected 2 removed lines, got {removed}");
+        Assert(chunks == 2, $"Expected 2 diff chunks, got {chunks}");
+
+        var emptyMetrics = TermiNotchView.ParseDiffMetrics("");
+        Assert(emptyMetrics.Filename == "code.diff" && emptyMetrics.Added == 0 && emptyMetrics.Removed == 0 && emptyMetrics.Chunks == 0,
+            "Empty diff must yield default code.diff with zero metrics");
+
+        // 5. ToastContent Interactive Prompt Invariant
+        string? chosenDecision = null;
+        var toast = new ToastContent(
+            Glyph: "\uE756",
+            Title: "AI Prompt",
+            Subtitle: "Authorize changes?",
+            Accent: ThemeBrushes.BlueColor,
+            Duration: TimeSpan.FromSeconds(30),
+            PromptActivityId: "agent_prompt_99",
+            DiffText: "+ line added",
+            OnPromptDecision: decision => chosenDecision = decision
+        );
+
+        Assert(toast.IsInteractivePrompt, "ToastContent.IsInteractivePrompt must be true when PromptActivityId is populated");
+        Assert(toast.DiffText == "+ line added", "ToastContent must preserve DiffText");
+        toast.OnPromptDecision?.Invoke("Reject");
+        Assert(chosenDecision == "Reject", "Invoking OnPromptDecision must pass decision through");
+
+        hub.ClearAll();
     }
 }

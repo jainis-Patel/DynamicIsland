@@ -789,6 +789,34 @@
                                 <TextBlock x:Name="ToastReplyText" Text="Reply" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
+
+                        <!-- AI Agent Interactive Decision Buttons -->
+                        <StackPanel x:Name="ToastActionsHost" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
+                            <Button x:Name="ToastDiffBtn" Style="{StaticResource IslandButton}" Height="25" Padding="7,0" Margin="0,0,4,0"
+                                    Background="#220A84FF" BorderBrush="#350A84FF" BorderThickness="1"
+                                    Click="ToastDiffBtn_Click" ToolTipService.ToolTip="View AI Code Diff in Termi-Notch">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="9" Foreground="#0A84FF" Margin="0,0,3,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Diff" FontSize="9.5" FontWeight="SemiBold" Foreground="#0A84FF" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="ToastApproveBtn" Style="{StaticResource IslandButton}" Height="25" Padding="7,0" Margin="0,0,4,0"
+                                    Background="#2230D158" BorderBrush="#3530D158" BorderThickness="1"
+                                    Click="ToastApproveBtn_Click" ToolTipService.ToolTip="Approve Request (Ctrl+Alt+Y)">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE73E;" FontSize="9" Foreground="#30D158" Margin="0,0,3,0" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="ToastApproveText" Text="Approve" FontSize="9.5" FontWeight="SemiBold" Foreground="#30D158" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="ToastRejectBtn" Style="{StaticResource IslandButton}" Height="25" Padding="7,0" Margin="0"
+                                    Background="#22FF453A" BorderBrush="#35FF453A" BorderThickness="1"
+                                    Click="ToastRejectBtn_Click" ToolTipService.ToolTip="Reject Request (Ctrl+Alt+U)">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="9" Foreground="#FF453A" Margin="0,0,3,0" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="ToastRejectText" Text="Reject" FontSize="9.5" FontWeight="SemiBold" Foreground="#FF453A" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </Grid>
                 </Grid>
 

@@ -350,6 +350,102 @@ public partial class IslandWindow
         e.Handled = true;
     }
 
+    internal void ToastApproveBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var active = _machine.ActiveToast;
+        active?.OnPromptDecision?.Invoke("Approve");
+        if (!string.IsNullOrWhiteSpace(active?.PromptActivityId))
+        {
+            _liveActivityIpcService?.ResolvePrompt(active.PromptActivityId, "Approve");
+        }
+        TactileFeedback.PlaySnap();
+        _machine.CollapseNow();
+        e.Handled = true;
+    }
+
+    internal void ToastRejectBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var active = _machine.ActiveToast;
+        active?.OnPromptDecision?.Invoke("Reject");
+        if (!string.IsNullOrWhiteSpace(active?.PromptActivityId))
+        {
+            _liveActivityIpcService?.ResolvePrompt(active.PromptActivityId, "Reject");
+        }
+        TactileFeedback.PlaySnap();
+        _machine.CollapseNow();
+        e.Handled = true;
+    }
+
+    internal void ToastDiffBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var active = _machine.ActiveToast;
+        if (!string.IsNullOrWhiteSpace(active?.DiffText))
+        {
+            TermiContainer.StageDiff(
+                active.Title,
+                active.Subtitle,
+                active.DiffText,
+                decision =>
+                {
+                    active.OnPromptDecision?.Invoke(decision);
+                    if (!string.IsNullOrWhiteSpace(active.PromptActivityId))
+                    {
+                        _liveActivityIpcService?.ResolvePrompt(active.PromptActivityId, decision);
+                    }
+                });
+            SwitchExpandedView(ExpandedView.Termi, animateTransition: true);
+            _machine.ExpandNow();
+        }
+        e.Handled = true;
+    }
+
+    internal void PushInteractiveToast(
+        string glyph,
+        string title,
+        string subtitle,
+        Color accent,
+        TimeSpan duration,
+        string activityId,
+        string? diffText,
+        Action<string> onPromptDecision)
+    {
+        _machine.PushToast(new ToastContent(
+            Glyph: glyph,
+            Title: title,
+            Subtitle: subtitle,
+            Accent: accent,
+            Duration: duration,
+            TargetView: "termi",
+            Priority: ToastPriority.Notification,
+            Category: "agent_prompt",
+            PromptActivityId: activityId,
+            DiffText: diffText,
+            OnPromptDecision: onPromptDecision));
+    }
+
+    internal void TriggerActivePromptDecision(string decision)
+    {
+        var active = _machine.ActiveToast;
+        if (active != null && (active.OnPromptDecision != null || !string.IsNullOrWhiteSpace(active.PromptActivityId)))
+        {
+            active.OnPromptDecision?.Invoke(decision);
+            if (!string.IsNullOrWhiteSpace(active.PromptActivityId))
+            {
+                _liveActivityIpcService?.ResolvePrompt(active.PromptActivityId, decision);
+            }
+            TactileFeedback.PlaySnap();
+            _machine.CollapseNow();
+            return;
+        }
+
+        string? latestId = _liveActivityIpcService?.GetLatestPendingPromptId();
+        if (!string.IsNullOrWhiteSpace(latestId))
+        {
+            _liveActivityIpcService?.ResolvePrompt(latestId, decision);
+            TactileFeedback.PlaySnap();
+        }
+    }
+
     internal void ReplyNotificationItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: NotificationHistoryItem item })

@@ -15,7 +15,7 @@ if %ERRORLEVEL% neq 0 (
     exit /b %ERRORLEVEL%
 )
 
-echo [2/4] Running 64-test automated verification suite...
+echo [2/4] Running 66-test automated verification suite...
 call dotnet run -c Release -- --self-test
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Self-tests failed.

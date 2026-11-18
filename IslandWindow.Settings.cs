@@ -664,6 +664,22 @@ public partial class IslandWindow
         UpdateClockStyleUI();
         UpdateClockTimerInterval();
 
+        if (ClockStylesScrollViewer != null)
+        {
+            Button? activeBtn = normalized switch
+            {
+                "Seconds" => ClockStyleSecondsBtn,
+                "DateBadge" => ClockStyleDateBtn,
+                "Analog" => ClockStyleAnalogBtn,
+                "Neon" => ClockStyleNeonBtn,
+                "Flip" => ClockStyleFlipBtn,
+                "Matrix" => ClockStyleMatrixBtn,
+                "JumpHour" => ClockStyleJumpHourBtn,
+                _ => ClockStyleMinimalBtn
+            };
+            activeBtn?.BringIntoView();
+        }
+
         // Immediately update text on all clock controls
         _lastTimeText = null;
         _lastDateShortText = null;

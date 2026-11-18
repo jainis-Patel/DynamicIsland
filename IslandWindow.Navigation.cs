@@ -19,9 +19,11 @@ public partial class IslandWindow
     //  View Navigation & Dock Strip
     // =================================================================
 
+    internal void ExpandNow() => _machine.ExpandNow();
+
     private DateTime _lastViewSwitchTime = DateTime.MinValue;
 
-    private void SwitchExpandedView(ExpandedView view, bool animateTransition = true)
+    internal void SwitchExpandedView(ExpandedView view, bool animateTransition = true)
     {
         if (_machine.State != IslandState.Expanded)
         {
@@ -330,11 +332,30 @@ public partial class IslandWindow
         sv.BeginAnimation(AnimatedVerticalOffsetProperty, anim);
     }
 
-    private void SmoothScrollHorizontal(ScrollViewer sv, double delta)
+    private static T? FindVisualParent<T>(DependencyObject? child, DependencyObject? stopAt = null) where T : DependencyObject
+    {
+        while (child != null && child != stopAt)
+        {
+            if (child is T parent) return parent;
+            DependencyObject? parentObj = null;
+            if (child is Visual || child is System.Windows.Media.Media3D.Visual3D)
+            {
+                parentObj = VisualTreeHelper.GetParent(child);
+            }
+            child = parentObj ?? LogicalTreeHelper.GetParent(child);
+        }
+        return null;
+    }
+
+    internal void SmoothScrollHorizontal(ScrollViewer sv, double delta)
     {
         if (sv == null) return;
-        double target = Math.Clamp(sv.HorizontalOffset + delta, 0, sv.ScrollableWidth);
-        sv.ScrollToHorizontalOffset(target);
+        if (sv.ScrollableWidth <= 0 && sv.ExtentWidth <= 0)
+        {
+            sv.UpdateLayout();
+        }
+        double target = Math.Clamp(sv.HorizontalOffset + delta, 0, Math.Max(0, sv.ScrollableWidth));
+        SmoothScrollTo(sv, target);
     }
 
     private void SmoothScrollVertical(ScrollViewer sv, double delta)
@@ -359,6 +380,25 @@ public partial class IslandWindow
 
     internal void VerticalScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
+        if (e.OriginalSource is DependencyObject dep && sender is DependencyObject stopAt)
+        {
+            var innerSv = FindVisualParent<ScrollViewer>(dep, stopAt);
+            if (innerSv != null && innerSv != sender)
+            {
+                if (innerSv.ScrollableWidth <= 0 && innerSv.ExtentWidth <= 0)
+                {
+                    innerSv.UpdateLayout();
+                }
+
+                if (innerSv.ScrollableWidth > 0 || innerSv.PanningMode == PanningMode.HorizontalOnly)
+                {
+                    SmoothScrollHorizontal(innerSv, -e.Delta * 0.85);
+                    e.Handled = true;
+                    return;
+                }
+            }
+        }
+
         if (sender is ScrollViewer sv)
         {
             SmoothScrollVertical(sv, -e.Delta * 0.85);

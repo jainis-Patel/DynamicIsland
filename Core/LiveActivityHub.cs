@@ -17,7 +17,9 @@ public sealed record LiveActivityItem(
     double? Progress = null,
     int Priority = 0,
     string? TargetViewKey = null,
-    IReadOnlyList<LiveActivityAction>? Actions = null)
+    IReadOnlyList<LiveActivityAction>? Actions = null,
+    string? Diff = null,
+    DateTimeOffset? ExpiresAt = null)
 {
     public string Category { get => Source; init => Source = value; }
     public string? TargetView { get => TargetViewKey; init => TargetViewKey = value; }
@@ -25,6 +27,7 @@ public sealed record LiveActivityItem(
     public bool IsIndeterminate => !Progress.HasValue;
     public double ClampedProgress => Progress.HasValue ? Math.Clamp(Progress.Value, 0.0, 1.0) : 0.0;
     public string ProgressPercentText => Progress.HasValue ? $"{(int)Math.Round(ClampedProgress * 100)}%" : "";
+    public bool IsInteractivePrompt => Actions != null && Actions.Count > 0;
 }
 
 /// <summary>

@@ -48,6 +48,15 @@ public sealed class ActivityIpcRequest
 
     [JsonPropertyName("chunk")]
     public string? Chunk { get; set; }
+
+    [JsonPropertyName("buttons")]
+    public string[]? Buttons { get; set; }
+
+    [JsonPropertyName("diff")]
+    public string? Diff { get; set; }
+
+    [JsonPropertyName("timeoutSec")]
+    public int? TimeoutSec { get; set; }
 }
 
 public sealed class ActivityIpcResponse
@@ -60,6 +69,9 @@ public sealed class ActivityIpcResponse
 
     [JsonPropertyName("message")]
     public string? Message { get; set; }
+
+    [JsonPropertyName("selectedButton")]
+    public string? SelectedButton { get; set; }
 }
 
 /// <summary>
@@ -74,7 +86,12 @@ internal sealed class LiveActivityIpcService : IDisposable
 
     private readonly LiveActivityHub _hub;
     private readonly CancellationTokenSource _cts = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, TaskCompletionSource<string>> _pendingPrompts = new(StringComparer.OrdinalIgnoreCase);
     private bool _disposed;
+
+    public bool HasPendingPrompts => !_pendingPrompts.IsEmpty;
+
+    public string? GetLatestPendingPromptId() => _pendingPrompts.Keys.LastOrDefault();
 
     public LiveActivityIpcService(LiveActivityHub hub)
     {
@@ -84,6 +101,18 @@ internal sealed class LiveActivityIpcService : IDisposable
     public void Start()
     {
         Task.Run(ListenLoopAsync);
+    }
+
+    public bool ResolvePrompt(string id, string chosenButton)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return false;
+        if (_pendingPrompts.TryRemove(id.Trim(), out var tcs))
+        {
+            bool ok = tcs.TrySetResult(chosenButton);
+            _hub.Complete(id.Trim());
+            return ok;
+        }
+        return false;
     }
 
     private async Task ListenLoopAsync()
@@ -130,6 +159,13 @@ internal sealed class LiveActivityIpcService : IDisposable
                 if (string.IsNullOrWhiteSpace(line)) return;
 
                 var req = JsonSerializer.Deserialize<ActivityIpcRequest>(line);
+                if (req != null && (string.Equals(req.Action, "prompt", StringComparison.OrdinalIgnoreCase) ||
+                                    string.Equals(req.Action, "approval", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await HandlePromptClientAsync(req, writer, ct);
+                    return;
+                }
+
                 var resp = ProcessRequest(req);
                 string jsonResp = JsonSerializer.Serialize(resp);
                 await writer.WriteLineAsync(jsonResp);
@@ -143,6 +179,148 @@ internal sealed class LiveActivityIpcService : IDisposable
                 }
                 catch { }
             }
+        }
+    }
+
+    private async Task HandlePromptClientAsync(ActivityIpcRequest req, StreamWriter writer, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(req.Id))
+        {
+            var errResp = new ActivityIpcResponse { Ok = false, Error = "Missing required 'id' for prompt." };
+            await writer.WriteLineAsync(JsonSerializer.Serialize(errResp));
+            return;
+        }
+
+        string promptId = req.Id.Trim();
+        var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pendingPrompts[promptId] = tcs;
+
+        int timeoutSec = Math.Clamp(req.TimeoutSec ?? 60, 5, 300);
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSec));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+        using var reg = linkedCts.Token.Register(() =>
+        {
+            if (timeoutCts.IsCancellationRequested && !ct.IsCancellationRequested)
+            {
+                tcs.TrySetException(new TimeoutException($"Prompt '{promptId}' timed out after {timeoutSec} seconds."));
+            }
+            else
+            {
+                tcs.TrySetCanceled();
+            }
+        });
+
+        Color accentColor = ThemeBrushes.BlueColor;
+        if (!string.IsNullOrWhiteSpace(req.Accent))
+        {
+            try
+            {
+                var parsed = ColorConverter.ConvertFromString(req.Accent);
+                if (parsed is Color c) accentColor = c;
+            }
+            catch { }
+        }
+
+        var actions = new List<LiveActivityAction>();
+        string[] buttons = req.Buttons != null && req.Buttons.Length > 0 ? req.Buttons : new[] { "Approve", "Reject" };
+
+        foreach (var btn in buttons)
+        {
+            string bText = btn;
+            actions.Add(new LiveActivityAction(
+                Label: bText,
+                Glyph: bText.Contains("Approve", StringComparison.OrdinalIgnoreCase) || bText.Contains("Yes", StringComparison.OrdinalIgnoreCase) ? "\uE73E" :
+                       bText.Contains("Reject", StringComparison.OrdinalIgnoreCase) || bText.Contains("No", StringComparison.OrdinalIgnoreCase) ? "\uE711" :
+                       bText.Contains("Diff", StringComparison.OrdinalIgnoreCase) ? "\uE8B7" : "\uE768",
+                Callback: () =>
+                {
+                    if (bText.Contains("Diff", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(req.Diff))
+                    {
+                        IslandWindow.Instance?.Dispatcher.InvokeAsync(() =>
+                        {
+                            IslandWindow.Instance.TermiContainer?.StageDiff(
+                                req.Title ?? "AI Agent Change",
+                                req.Subtitle,
+                                req.Diff,
+                                decision => ResolvePrompt(promptId, decision));
+                            IslandWindow.Instance.SwitchExpandedView(ExpandedView.Termi, animateTransition: true);
+                            IslandWindow.Instance.ExpandNow();
+                        });
+                    }
+                    else
+                    {
+                        ResolvePrompt(promptId, bText);
+                    }
+                }
+            ));
+        }
+
+        var item = new LiveActivityItem
+        {
+            Id = promptId,
+            Source = string.IsNullOrWhiteSpace(req.Source) ? "AI Agent" : req.Source.Trim(),
+            Title = string.IsNullOrWhiteSpace(req.Title) ? "AI Approval Required" : req.Title.Trim(),
+            Subtitle = req.Subtitle?.Trim() ?? "Decision requested",
+            Glyph = string.IsNullOrWhiteSpace(req.Glyph) ? "\uE756" : req.Glyph.Trim(),
+            AccentColor = accentColor,
+            Progress = null,
+            Priority = req.Priority ?? 100,
+            TargetViewKey = "termi",
+            Actions = actions,
+            Diff = req.Diff,
+            ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(timeoutSec)
+        };
+
+        _hub.Publish(item);
+
+        IslandWindow.Instance?.Dispatcher.InvokeAsync(() =>
+        {
+            IslandWindow.Instance.PushInteractiveToast(
+                glyph: item.Glyph,
+                title: item.Title,
+                subtitle: item.Subtitle,
+                accent: item.AccentColor,
+                duration: TimeSpan.FromSeconds(timeoutSec),
+                activityId: promptId,
+                diffText: req.Diff,
+                onPromptDecision: decision => ResolvePrompt(promptId, decision));
+        });
+
+        try
+        {
+            string chosen = await tcs.Task;
+            var okResp = new ActivityIpcResponse
+            {
+                Ok = true,
+                SelectedButton = chosen,
+                Message = $"User decided '{chosen}'."
+            };
+            await writer.WriteLineAsync(JsonSerializer.Serialize(okResp));
+        }
+        catch (TimeoutException)
+        {
+            var timeoutResp = new ActivityIpcResponse
+            {
+                Ok = false,
+                Error = "timed_out",
+                Message = $"Prompt timed out after {timeoutSec} seconds."
+            };
+            await writer.WriteLineAsync(JsonSerializer.Serialize(timeoutResp));
+        }
+        catch (Exception ex)
+        {
+            var cancelResp = new ActivityIpcResponse
+            {
+                Ok = false,
+                Error = ex.Message,
+                Message = "Prompt cancelled."
+            };
+            await writer.WriteLineAsync(JsonSerializer.Serialize(cancelResp));
+        }
+        finally
+        {
+            _pendingPrompts.TryRemove(promptId, out _);
+            _hub.Complete(promptId);
         }
     }
 
@@ -320,8 +498,83 @@ internal sealed class LiveActivityIpcService : IDisposable
                 return new ActivityIpcResponse { Ok = true, Message = "Cleared all live activities." };
             }
 
+            case "prompt":
+            case "approval":
+            {
+                if (string.IsNullOrWhiteSpace(req.Id))
+                {
+                    return new ActivityIpcResponse { Ok = false, Error = "Missing required 'id'." };
+                }
+
+                string promptId = req.Id.Trim();
+                var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _pendingPrompts[promptId] = tcs;
+
+                var actions = new List<LiveActivityAction>();
+                string[] buttons = req.Buttons != null && req.Buttons.Length > 0 ? req.Buttons : new[] { "Approve", "Reject" };
+
+                foreach (var b in buttons)
+                {
+                    string bText = b;
+                    actions.Add(new LiveActivityAction(
+                        Label: bText,
+                        Glyph: bText.Contains("Approve", StringComparison.OrdinalIgnoreCase) ? "\uE73E" : "\uE711",
+                        Callback: () => ResolvePrompt(promptId, bText)
+                    ));
+                }
+
+                var item = new LiveActivityItem
+                {
+                    Id = promptId,
+                    Source = string.IsNullOrWhiteSpace(req.Source) ? "AI Agent" : req.Source.Trim(),
+                    Title = string.IsNullOrWhiteSpace(req.Title) ? "AI Approval Required" : req.Title.Trim(),
+                    Subtitle = req.Subtitle?.Trim() ?? "Decision requested",
+                    Glyph = string.IsNullOrWhiteSpace(req.Glyph) ? "\uE756" : req.Glyph.Trim(),
+                    AccentColor = ThemeBrushes.BlueColor,
+                    Priority = req.Priority ?? 100,
+                    TargetViewKey = "termi",
+                    Actions = actions,
+                    Diff = req.Diff
+                };
+
+                _hub.Publish(item);
+                return new ActivityIpcResponse { Ok = true, Message = $"Registered interactive prompt '{promptId}'." };
+            }
+
             default:
                 return new ActivityIpcResponse { Ok = false, Error = $"Unknown action '{req.Action}'." };
+        }
+    }
+
+    public static async Task<(bool Success, string SelectedButton, string Message)> PromptCliAsync(ActivityIpcRequest request, int timeoutMs = 60000)
+    {
+        try
+        {
+            using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            using var cts = new CancellationTokenSource(timeoutMs);
+
+            await client.ConnectAsync(cts.Token);
+            using var reader = new StreamReader(client, Encoding.UTF8);
+            using var writer = new StreamWriter(client, new UTF8Encoding(false)) { AutoFlush = true };
+
+            request.Action = "prompt";
+            string json = JsonSerializer.Serialize(request);
+            await writer.WriteLineAsync(json);
+
+            string? line = await reader.ReadLineAsync(cts.Token);
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return (false, "", "Empty response from Dynamic Island prompt service.");
+            }
+
+            var resp = JsonSerializer.Deserialize<ActivityIpcResponse>(line);
+            if (resp == null) return (false, "", "Invalid response from prompt service.");
+
+            return (resp.Ok, resp.SelectedButton ?? "", resp.Message ?? resp.Error ?? "");
+        }
+        catch (Exception ex)
+        {
+            return (false, "", $"Prompt pipe failure: {ex.Message}");
         }
     }
 

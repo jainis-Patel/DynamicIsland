@@ -25,7 +25,13 @@ public sealed record ToastContent(
     ToastPriority Priority = ToastPriority.System,
     string? Category = null,
     bool CanReply = false,
-    NotificationHistoryItem? HistoryItem = null);
+    NotificationHistoryItem? HistoryItem = null,
+    string? PromptActivityId = null,
+    string? DiffText = null,
+    Action<string>? OnPromptDecision = null)
+{
+    public bool IsInteractivePrompt => OnPromptDecision != null || !string.IsNullOrWhiteSpace(PromptActivityId);
+}
 
 /// <summary>
 /// Resolves the visible state from independent inputs, by priority:
