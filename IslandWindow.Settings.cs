@@ -155,7 +155,27 @@ public partial class IslandWindow
                 break;
 
             case nameof(AppSettings.HardwareNotchMode):
+            case nameof(AppSettings.HardwareNotchWidth):
+            case nameof(AppSettings.HardwareNotchHeight):
+            case nameof(AppSettings.HardwareNotchRadius):
+            case nameof(AppSettings.HardwareNotchPreset):
                 UpdateNotchBezelUI();
+                if (_machine.State == IslandState.Idle)
+                {
+                    var targetIdle = GetIdleShape();
+                    _width.Target = targetIdle.Width;
+                    _height.Target = targetIdle.Height;
+                    _radius.Target = targetIdle.Radius;
+                }
+                ApplyGeometry();
+                PositionWindow();
+                EnsureRendering();
+                break;
+
+            case nameof(AppSettings.IsDetachedFloating):
+                _isDetachedPiP = cur.IsDetachedFloating;
+                _floatingCenterX = cur.FloatingX;
+                _floatingCenterY = cur.FloatingY;
                 ApplyGeometry();
                 PositionWindow();
                 EnsureRendering();

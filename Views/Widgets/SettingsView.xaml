@@ -1184,6 +1184,9 @@
                                     <Button Click="NotchBezelToggleBtn_Click" x:Name="NotchBezelToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0">
                                         <TextBlock x:Name="NotchBezelToggleText" Text="Notch Off" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
                                     </Button>
+                                    <Button Click="FloatingPiPToggleBtn_Click" x:Name="FloatingPiPToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="3,0,0,0" ToolTipService.ToolTip="Detach into Floating Picture-in-Picture window (Ctrl+Alt+F)">
+                                        <TextBlock x:Name="FloatingPiPToggleText" Text="PiP Off" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
+                                    </Button>
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="2" VerticalAlignment="Center">

@@ -1088,10 +1088,15 @@ public partial class IslandWindow
         }
 
         // Dynamic liquid droplet corner-rounding boost during high-velocity morphs
+        bool isDetached = _isDetachedPiP || (_settingsService?.Current.IsDetachedFloating ?? false);
         double effectiveR = Math.Clamp(r + (r * 0.22 * liquid * motionEnergy), 0, Math.Min(w, h) / 2);
-        double topR = hardwareNotch
-            ? 0
-            : Math.Clamp((offset * 1.5) + (effectiveR * 0.18 * liquid * motionEnergy), 0, effectiveR);
+        var (topR, bottomR) = MagneticDockingEngine.ComputeCornerRadii(
+            effectiveR,
+            isDetached,
+            hardwareNotch,
+            offset,
+            liquid,
+            motionEnergy);
 
         Pill.Width = w;
         Pill.Height = h;
@@ -1103,12 +1108,28 @@ public partial class IslandWindow
             FloatingDockTranslate.Y = h + 4;
         }
 
-        var corners = new CornerRadius(topR, topR, effectiveR, effectiveR);
+        var corners = new CornerRadius(topR, topR, bottomR, bottomR);
         PillBackground.CornerRadius = corners;
         if (PillGlassSheen != null) PillGlassSheen.CornerRadius = corners;
         PillStroke.CornerRadius = corners;
-        PillStroke.BorderThickness = hardwareNotch ? new Thickness(1, 0, 1, 1) : new Thickness(1);
+        PillStroke.BorderThickness = (hardwareNotch && !isDetached) ? new Thickness(1, 0, 1, 1) : new Thickness(1);
         DropOverlay.CornerRadius = corners;
+
+        if (PillDropShadow != null)
+        {
+            if (isDetached)
+            {
+                PillDropShadow.BlurRadius = 36.0;
+                PillDropShadow.ShadowDepth = 8.0;
+                PillDropShadow.Opacity = 0.65;
+            }
+            else
+            {
+                PillDropShadow.BlurRadius = 28.0;
+                PillDropShadow.ShadowDepth = 4.0;
+                PillDropShadow.Opacity = 0.55;
+            }
+        }
 
         if (ThemeManager.IsLiquidGlass && DynamicIsland.LiquidGlass.GlassManager.Instance.IsEnabled)
         {
@@ -1121,17 +1142,22 @@ public partial class IslandWindow
 
         if (NotchLeftEar != null && NotchRightEar != null)
         {
-            var earVis = hardwareNotch ? Visibility.Visible : Visibility.Collapsed;
+            var earVis = (hardwareNotch && !isDetached) ? Visibility.Visible : Visibility.Collapsed;
             if (NotchLeftEar.Visibility != earVis)
             {
                 NotchLeftEar.Visibility = earVis;
                 NotchRightEar.Visibility = earVis;
             }
+            if (earVis == Visibility.Visible)
+            {
+                double notchR = _settingsService?.Current.HardwareNotchRadius ?? 12.0;
+                UpdateNotchEarGeometry(notchR);
+            }
         }
         if (NotchCameraHost != null)
         {
             bool showCam = _settingsService?.Current?.ShowCameraLensIcon ?? true;
-            var camVis = (hardwareNotch && _machine.State == IslandState.Idle && showCam) ? Visibility.Visible : Visibility.Collapsed;
+            var camVis = (hardwareNotch && !isDetached && _machine.State == IslandState.Idle && showCam) ? Visibility.Visible : Visibility.Collapsed;
             if (NotchCameraHost.Visibility != camVis)
             {
                 NotchCameraHost.Visibility = camVis;
@@ -1329,10 +1355,24 @@ public partial class IslandWindow
     {
         _lastMousePos = e.GetPosition(Pill);
         _lastMouseMoveTime = DateTime.UtcNow;
+
+        if (_isPillPressed && e.LeftButton == MouseButtonState.Pressed && _machine.State != IslandState.Expanded)
+        {
+            try
+            {
+                ProcessPillDrag(PointToScreen(e.GetPosition(this)));
+            }
+            catch { }
+        }
     }
 
     private void Pill_MouseLeave(object sender, MouseEventArgs e)
     {
+        if (_isPillPressed && e.LeftButton != MouseButtonState.Pressed)
+        {
+            _isPillPressed = false;
+            EndPillDrag();
+        }
     }
 
     private ImageBrush? _pillGlassBrush;

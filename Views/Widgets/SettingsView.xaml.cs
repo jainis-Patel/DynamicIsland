@@ -151,6 +151,9 @@ public partial class SettingsView : UserControl
     private void NotchBezelToggleBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.NotchBezelToggleBtn_Click(sender, e);
 
+    private void FloatingPiPToggleBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.FloatingPiPToggleBtn_Click(sender, e);
+
     private void NotchOffsetSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
         Island?.NotchOffsetSlider_ValueChanged(sender, e);
 

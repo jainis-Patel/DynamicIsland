@@ -109,6 +109,7 @@ internal static class SelfTestRunner
         Run("Phase5Packaging: Inno Setup, WinGet manifest specification & v0.5.0 version invariants", TestWinGetManifestAndReleasePackageInvariants);
         Run("Pillar1PrecisionTouchpad: Fluid trackpad scrubbing, velocity flick skip & multi-touch pinch morphing", TestTouchpadGesturesAndVelocityInvariants);
         Run("Pillar2AiAgentApprovals: Two-way IPC prompt RPC, diff HUD parser & interactive buttons", TestAiAgentInteractiveApprovalsAndDiffViewer);
+        Run("Pillar3FloatingPiPAndNotch: Tear-off drag gesture, magnetic corner snapping & hardware notch fillets", TestPillar3DetachableFloatingIslandAndHardwareNotch);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -3233,5 +3234,106 @@ SSID 3 : Home_Router
         Assert(chosenDecision == "Reject", "Invoking OnPromptDecision must pass decision through");
 
         hub.ClearAll();
+    }
+
+    private static void TestPillar3DetachableFloatingIslandAndHardwareNotch()
+    {
+        // 1. Tear-Off Drag Threshold Invariant
+        Assert(MagneticDockingEngine.TearOffThreshold == 35.0, "TearOffThreshold must be 35.0 DIP");
+        Assert(MagneticDockingEngine.MagneticSnapRadius == 85.0, "MagneticSnapRadius must be 85.0 DIP");
+
+        // 2. Magnetic Edge & Corner Snapping Calculations
+        var monBounds = new Rect(0, 0, 1920, 1080);
+        var workArea = new Rect(0, 0, 1920, 1040); // 40px taskbar at bottom
+        double pillW = 180.0;
+        double pillH = 34.0;
+
+        // 2a. Top-Center (Bezel Re-Dock)
+        var (targetTop, snappedTop) = MagneticDockingEngine.CalculateMagneticSnap(
+            new Point(960, 32), monBounds, workArea, pillW, pillH, notchYOffset: 0);
+        Assert(targetTop == MagneticDockTarget.TopCenter, $"Expected TopCenter target near top bezel, got {targetTop}");
+        Assert(snappedTop.X == 960.0, $"Snapped X must be monitor center 960, got {snappedTop.X}");
+        Assert(snappedTop.Y == 17.0, $"Snapped Y must align to half-pill height 17, got {snappedTop.Y}");
+
+        // 2b. Taskbar Notification Tray (Bottom-Right)
+        var (targetTray, snappedTray) = MagneticDockingEngine.CalculateMagneticSnap(
+            new Point(1800, 1005), monBounds, workArea, pillW, pillH, notchYOffset: 0);
+        Assert(targetTray == MagneticDockTarget.TaskbarTray, $"Expected TaskbarTray target near bottom right, got {targetTray}");
+        Assert(snappedTray.X == 1806.0, $"Expected snapped tray X 1806, got {snappedTray.X}");
+        Assert(snappedTray.Y == 1011.0, $"Expected snapped tray Y 1011, got {snappedTray.Y}");
+
+        // 2c. Bottom-Left Corner
+        var (targetBL, snappedBL) = MagneticDockingEngine.CalculateMagneticSnap(
+            new Point(125, 1005), monBounds, workArea, pillW, pillH, notchYOffset: 0);
+        Assert(targetBL == MagneticDockTarget.BottomLeft, $"Expected BottomLeft target, got {targetBL}");
+        Assert(snappedBL.X == 114.0, $"Expected snapped BL X 114, got {snappedBL.X}");
+        Assert(snappedBL.Y == 1011.0, $"Expected snapped BL Y 1011, got {snappedBL.Y}");
+
+        // 2d. Top-Right Corner
+        var (targetTR, _) = MagneticDockingEngine.CalculateMagneticSnap(
+            new Point(1810, 45), monBounds, workArea, pillW, pillH, notchYOffset: 0);
+        Assert(targetTR == MagneticDockTarget.TopRight, $"Expected TopRight target, got {targetTR}");
+
+        // 2e. Top-Left Corner
+        var (targetTL, _) = MagneticDockingEngine.CalculateMagneticSnap(
+            new Point(110, 45), monBounds, workArea, pillW, pillH, notchYOffset: 0);
+        Assert(targetTL == MagneticDockTarget.TopLeft, $"Expected TopLeft target, got {targetTL}");
+
+        // 2f. Free Floating (No Magnetic Snap)
+        var (targetFree, snappedFree) = MagneticDockingEngine.CalculateMagneticSnap(
+            new Point(960, 500), monBounds, workArea, pillW, pillH, notchYOffset: 0);
+        Assert(targetFree == MagneticDockTarget.None, $"Expected None (free floating) at screen center, got {targetFree}");
+        Assert(snappedFree.X == 960.0 && snappedFree.Y == 500.0, "Free floating position should preserve raw coordinates");
+
+        // 3. Corner Radii Invariants
+        // Detached PiP: must produce symmetric capsule (top == bottom == effectiveR)
+        var (pipTopR, pipBottomR) = MagneticDockingEngine.ComputeCornerRadii(
+            effectiveRadius: 17.0, isDetached: true, hardwareNotch: false, notchYOffset: 0, liquidIntensity: 0.65, motionEnergy: 0);
+        Assert(pipTopR == 17.0 && pipBottomR == 17.0, $"PiP detached mode must be symmetric capsule (17, 17), got ({pipTopR}, {pipBottomR})");
+
+        // Docked Hardware Notch: top must be flat 0, bottom rounded
+        var (notchTopR, notchBottomR) = MagneticDockingEngine.ComputeCornerRadii(
+            effectiveRadius: 17.0, isDetached: false, hardwareNotch: true, notchYOffset: 0, liquidIntensity: 0.65, motionEnergy: 0);
+        Assert(notchTopR == 0.0 && notchBottomR == 17.0, $"Hardware notch mode must have flat top 0 and rounded bottom 17, got ({notchTopR}, {notchBottomR})");
+
+        // 4. Dynamic Concave Ear SVG Fillet Generation
+        string leftEarSvg = MagneticDockingEngine.GenerateNotchEarSvgPath(12.0, isLeft: true);
+        Assert(leftEarSvg == "M 0,0 L 12,0 L 12,12 A 12,12 0 0 1 0,0 Z", $"Unexpected left ear SVG: {leftEarSvg}");
+
+        string rightEarSvg = MagneticDockingEngine.GenerateNotchEarSvgPath(12.0, isLeft: false);
+        Assert(rightEarSvg == "M 0,12 L 0,0 L 12,0 A 12,12 0 0 1 0,12 Z", $"Unexpected right ear SVG: {rightEarSvg}");
+
+        // 5. Hardware Notch Presets
+        var mbp16 = SettingsService.GetNotchPresetDimensions("MacBookPro16");
+        Assert(mbp16.Width == 188.0 && mbp16.Height == 35.0 && mbp16.Radius == 12.0, "MBP16 preset dimensions mismatch");
+
+        var mbp14 = SettingsService.GetNotchPresetDimensions("MacBookPro14");
+        Assert(mbp14.Width == 172.0 && mbp14.Height == 32.0 && mbp14.Radius == 11.0, "MBP14 preset dimensions mismatch");
+
+        var mba = SettingsService.GetNotchPresetDimensions("MacBookAir");
+        Assert(mba.Width == 160.0 && mba.Height == 30.0 && mba.Radius == 10.0, "MBA preset dimensions mismatch");
+
+        var xps = SettingsService.GetNotchPresetDimensions("DellXps");
+        Assert(xps.Width == 140.0 && xps.Height == 26.0 && xps.Radius == 8.0, "Dell XPS preset dimensions mismatch");
+
+        // 6. AppSettings serialization roundtrip for floating PiP & notch properties
+        var settings = new AppSettings
+        {
+            IsDetachedFloating = true,
+            FloatingX = 1420.5,
+            FloatingY = 820.0,
+            FloatingDockTarget = "TaskbarTray",
+            HardwareNotchMode = true,
+            HardwareNotchWidth = 172.0,
+            HardwareNotchHeight = 32.0,
+            HardwareNotchRadius = 11.0,
+            HardwareNotchPreset = "MacBookPro14"
+        };
+        string json = System.Text.Json.JsonSerializer.Serialize(settings);
+        var roundtripped = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json);
+        Assert(roundtripped != null, "Settings must deserialize cleanly");
+        Assert(roundtripped!.IsDetachedFloating, "IsDetachedFloating must survive serialization");
+        Assert(roundtripped.FloatingX == 1420.5 && roundtripped.FloatingY == 820.0, "Floating coordinates must roundtrip exactly");
+        Assert(roundtripped.HardwareNotchPreset == "MacBookPro14", "HardwareNotchPreset must roundtrip");
     }
 }

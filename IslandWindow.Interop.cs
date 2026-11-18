@@ -38,6 +38,7 @@ public partial class IslandWindow
     private const int HotkeyMicMute = 21;
     private const int HotkeyPromptApprove = 22;
     private const int HotkeyPromptReject = 23;
+    private const int HotkeyToggleFloat = 24;
 
     private static readonly (int Id, string KeyName, uint DefaultVk)[] HotKeyBindings =
     {
@@ -64,6 +65,7 @@ public partial class IslandWindow
         (HotkeyMicMute, "MicrophoneMute", 0x4B),      // VK_K (Ctrl+Alt+K)
         (HotkeyPromptApprove, "PromptApprove", 0x59), // VK_Y (Ctrl+Alt+Y)
         (HotkeyPromptReject, "PromptReject", 0x55),   // VK_U (Ctrl+Alt+U)
+        (HotkeyToggleFloat, "ToggleFloating", 0x46),  // VK_F (Ctrl+Alt+F)
     };
 
     private readonly Dictionary<string, bool> _hotkeyRegistrationStatus = new(StringComparer.OrdinalIgnoreCase);
@@ -617,16 +619,27 @@ public partial class IslandWindow
         int monWidth = info.rcMonitor.Width;
 
         int x;
-        if (dock == "Left")
-            x = info.rcWork.Left + (int)Math.Round((24 - pillMarginInsideWindow) * scale);
-        else if (dock == "Right")
-            x = info.rcWork.Right - widthPx - (int)Math.Round((24 - pillMarginInsideWindow) * scale);
-        else
-            x = monLeft + (monWidth - widthPx) / 2;
+        int y;
+        bool isDetached = _isDetachedPiP || (_settingsService?.Current.IsDetachedFloating ?? false);
 
-        bool hardwareNotch = _settingsService?.Current.HardwareNotchMode ?? false;
-        int notchOffsetPx = hardwareNotch ? 0 : (int)Math.Round((_settingsService?.Current.NotchYOffset ?? 0) * scale);
-        int y = monTop + notchOffsetPx;
+        if (isDetached && _floatingCenterX > 0 && _floatingCenterY > 0)
+        {
+            x = (int)Math.Round((_floatingCenterX - (CanvasWidthDip / 2.0)) * scale);
+            y = (int)Math.Round((_floatingCenterY - (Pill?.Height ?? 30.0) / 2.0) * scale);
+        }
+        else
+        {
+            if (dock == "Left")
+                x = info.rcWork.Left + (int)Math.Round((24 - pillMarginInsideWindow) * scale);
+            else if (dock == "Right")
+                x = info.rcWork.Right - widthPx - (int)Math.Round((24 - pillMarginInsideWindow) * scale);
+            else
+                x = monLeft + (monWidth - widthPx) / 2;
+
+            bool hardwareNotch = _settingsService?.Current.HardwareNotchMode ?? false;
+            int notchOffsetPx = hardwareNotch ? 0 : (int)Math.Round((_settingsService?.Current.NotchYOffset ?? 0) * scale);
+            y = monTop + notchOffsetPx;
+        }
 
         _windowRectPx = new RECT { Left = x, Top = y, Right = x + widthPx, Bottom = y + heightPx };
 
@@ -1180,6 +1193,7 @@ public partial class IslandWindow
             case HotkeyMicMute: ToggleMicMute(); break;
             case HotkeyPromptApprove: TriggerActivePromptDecision("Approve"); break;
             case HotkeyPromptReject: TriggerActivePromptDecision("Reject"); break;
+            case HotkeyToggleFloat: ToggleFloatingMode(); break;
             case HotkeyQuit: Application.Current.Shutdown(); break;
         }
     }

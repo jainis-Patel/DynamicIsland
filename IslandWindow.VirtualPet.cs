@@ -48,9 +48,16 @@ public partial class IslandWindow
             Category: "followmon"));
     }
 
+    internal void FloatingPiPToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleFloatingMode();
+    }
+
     private void UpdateNotchBezelUI()
     {
         bool notchOn = _settingsService?.Current?.HardwareNotchMode ?? false;
+        bool isDetached = _isDetachedPiP || (_settingsService?.Current.IsDetachedFloating ?? false);
+
         if (NotchBezelToggleText != null)
         {
             NotchBezelToggleText.Text = notchOn ? "Notch On" : "Notch Off";
@@ -62,14 +69,25 @@ public partial class IslandWindow
                 ? ThemeBrushes.GreenBorderActive
                 : Brushes.Transparent;
         }
+        if (FloatingPiPToggleText != null)
+        {
+            FloatingPiPToggleText.Text = isDetached ? "PiP On" : "PiP Off";
+            FloatingPiPToggleText.Foreground = isDetached ? ThemeBrushes.Blue : ThemeBrushes.SecondaryText;
+        }
+        if (FloatingPiPToggleBtn != null)
+        {
+            FloatingPiPToggleBtn.BorderBrush = isDetached
+                ? ThemeBrushes.BlueBorderActive
+                : Brushes.Transparent;
+        }
         if (NotchOffsetSlider != null)
         {
-            NotchOffsetSlider.IsEnabled = !notchOn;
-            NotchOffsetSlider.Opacity = notchOn ? 0.42 : 1.0;
+            NotchOffsetSlider.IsEnabled = !notchOn && !isDetached;
+            NotchOffsetSlider.Opacity = (notchOn || isDetached) ? 0.42 : 1.0;
         }
         if (NotchOffsetText != null)
         {
-            NotchOffsetText.Text = notchOn ? "Locked (Notch)" : $"{_settingsService?.Current?.NotchYOffset ?? 0} px";
+            NotchOffsetText.Text = isDetached ? "PiP Free" : (notchOn ? "Locked (Notch)" : $"{_settingsService?.Current?.NotchYOffset ?? 0} px");
         }
     }
 

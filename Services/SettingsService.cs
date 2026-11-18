@@ -66,6 +66,14 @@ public sealed class AppSettings
     public bool LowMemoryMode { get; set; } = false;
     public string VisualizerStyle { get; set; } = "ClassicBars";
     public bool HardwareNotchMode { get; set; } = false;
+    public double HardwareNotchWidth { get; set; } = 188.0;
+    public double HardwareNotchHeight { get; set; } = 35.0;
+    public double HardwareNotchRadius { get; set; } = 12.0;
+    public string HardwareNotchPreset { get; set; } = "MacBookPro16";
+    public bool IsDetachedFloating { get; set; } = false;
+    public double FloatingX { get; set; } = -1;
+    public double FloatingY { get; set; } = -1;
+    public string FloatingDockTarget { get; set; } = "None";
     public bool FollowActiveMonitor { get; set; } = false;
     public bool EnableVirtualPet { get; set; } = true;
     public string PetSpecies { get; set; } = "Cat";
@@ -209,6 +217,28 @@ internal sealed class SettingsService
 
     public static string NormalizeDockPosition(string? pos) =>
         AvailableDockPositions.FirstOrDefault(d => string.Equals(d, pos?.Trim(), StringComparison.OrdinalIgnoreCase)) ?? "Center";
+
+    public static readonly IReadOnlyList<string> AvailableHardwareNotchPresets = new[]
+    {
+        "MacBookPro16",
+        "MacBookPro14",
+        "MacBookAir",
+        "DellXps",
+        "Custom"
+    };
+
+    public static string NormalizeHardwareNotchPreset(string? preset) =>
+        AvailableHardwareNotchPresets.FirstOrDefault(p => string.Equals(p, preset?.Trim(), StringComparison.OrdinalIgnoreCase)) ?? "MacBookPro16";
+
+    public static (double Width, double Height, double Radius) GetNotchPresetDimensions(string preset) =>
+        NormalizeHardwareNotchPreset(preset) switch
+        {
+            "MacBookPro14" => (172.0, 32.0, 11.0),
+            "MacBookAir" => (160.0, 30.0, 10.0),
+            "DellXps" => (140.0, 26.0, 8.0),
+            "Custom" => (180.0, 34.0, 12.0),
+            _ => (188.0, 35.0, 12.0)
+        };
 
     public static string NormalizeThemeName(string? theme) =>
         string.IsNullOrWhiteSpace(theme) ? "Solar Amber" : theme.Trim();
@@ -425,6 +455,14 @@ internal sealed class SettingsService
             s.LowMemoryMode = false;
             s.VisualizerStyle = "ClassicBars";
             s.HardwareNotchMode = false;
+            s.HardwareNotchWidth = 188.0;
+            s.HardwareNotchHeight = 35.0;
+            s.HardwareNotchRadius = 12.0;
+            s.HardwareNotchPreset = "MacBookPro16";
+            s.IsDetachedFloating = false;
+            s.FloatingX = -1;
+            s.FloatingY = -1;
+            s.FloatingDockTarget = "None";
             s.FollowActiveMonitor = false;
             s.EnableVirtualPet = true;
             s.PetSpecies = "Cat";

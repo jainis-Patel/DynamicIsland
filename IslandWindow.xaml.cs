@@ -82,6 +82,16 @@ public partial class IslandWindow : Window
     /// </summary>
     private PillShape GetIdleShape()
     {
+        bool hardwareNotch = _settingsService?.Current?.HardwareNotchMode ?? false;
+        bool isDetached = _isDetachedPiP || (_settingsService?.Current.IsDetachedFloating ?? false);
+        if (hardwareNotch && !isDetached)
+        {
+            double notchW = _settingsService?.Current?.HardwareNotchWidth ?? 188.0;
+            double notchH = _settingsService?.Current?.HardwareNotchHeight ?? 35.0;
+            double notchR = _settingsService?.Current?.HardwareNotchRadius ?? 12.0;
+            return new PillShape(notchW, notchH, notchR);
+        }
+
         string style = SettingsService.NormalizeClockStyle(_settingsService?.Current?.ClockStyle);
 
         double baseW = style switch
@@ -598,6 +608,7 @@ public partial class IslandWindow : Window
         OnCalendarUpdated(_calendarService.NextEvent);
         OnBrightnessChanged(_brightnessService.BrightnessPercent);
         InitializeVoiceMemoUI();
+        InitializeFloatingState();
         ApplySettings();
         _settingsService.PropertyChanged += OnSettingsPropertyChanged;
         _updateService.StartBackgroundWorker();
@@ -610,30 +621,51 @@ public partial class IslandWindow : Window
 
     private void WireEvents()
     {
-        // Phase 1: Press-Down Tension (Squish before expansion)
+        // Phase 1: Press-Down Tension & Tear-Off Anchor
         Pill.MouseLeftButtonDown += (_, e) =>
         {
             if (_machine.State == IslandState.Expanded) return;
 
-            if (e.ClickCount == 2 && (_settingsService?.Current.EnableQuickTuck ?? true))
+            if (e.ClickCount == 2)
             {
-                TuckIsland();
-                e.Handled = true;
-                return;
+                if (_isDetachedPiP)
+                {
+                    ReDockToBezel();
+                    e.Handled = true;
+                    return;
+                }
+                if (_settingsService?.Current.EnableQuickTuck ?? true)
+                {
+                    TuckIsland();
+                    e.Handled = true;
+                    return;
+                }
             }
 
             _isPillPressed = true;
             Pill.CaptureMouse();
+            try
+            {
+                StartPillDrag(PointToScreen(e.GetPosition(this)));
+            }
+            catch { }
             RefreshTargetGeometry();
             e.Handled = true;
         };
 
-        // Phase 2: Release-to-Expand with Spring Velocity Injection
+        // Phase 2: Release-to-Expand or Settle Floating PiP
         Pill.MouseLeftButtonUp += (_, e) =>
         {
             if (!_isPillPressed) return;
             _isPillPressed = false;
             Pill.ReleaseMouseCapture();
+
+            if (_isPillDragging || _isTearingOff)
+            {
+                EndPillDrag();
+                e.Handled = true;
+                return;
+            }
 
             if (!Pill.IsMouseOver)
             {

@@ -279,6 +279,8 @@ public partial class IslandWindow
     internal System.Windows.Controls.TextBlock NightLightWarmthText => SettingsContainer.NightLightWarmthText;
     internal System.Windows.Controls.Button NotchBezelToggleBtn => SettingsContainer.NotchBezelToggleBtn;
     internal System.Windows.Controls.TextBlock NotchBezelToggleText => SettingsContainer.NotchBezelToggleText;
+    internal System.Windows.Controls.Button FloatingPiPToggleBtn => SettingsContainer.FloatingPiPToggleBtn;
+    internal System.Windows.Controls.TextBlock FloatingPiPToggleText => SettingsContainer.FloatingPiPToggleText;
     internal Slider NotchOffsetSlider => SettingsContainer.NotchOffsetSlider;
     internal TextBlock NotchOffsetText => SettingsContainer.NotchOffsetText;
     internal System.Windows.Controls.Button PetAccessoryBtn => SettingsContainer.PetAccessoryBtn;
