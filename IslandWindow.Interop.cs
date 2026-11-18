@@ -86,6 +86,7 @@ public partial class IslandWindow
             _hwnd = new WindowInteropHelper(this).Handle;
             App.Log($"HWND acquired: {_hwnd}");
             HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc);
+            RegisterTouchpadGestures(_hwnd);
 
             _expandMsg = RegisterWindowMessage("DYNAMIC_ISLAND_EXPAND");
             _quitMsg = RegisterWindowMessage("DYNAMIC_ISLAND_QUIT");
@@ -313,16 +314,37 @@ public partial class IslandWindow
             case WM_MOUSEHWHEEL:
             {
                 short tilt = unchecked((short)((wParam.ToInt64() >> 16) & 0xFFFF));
-                if (_machine.State != IslandState.Expanded)
+                bool isMediaActive = _mediaService.Current != null && !string.IsNullOrWhiteSpace(_mediaService.Current.Title);
+                bool canSeek = _mediaService.Current?.CanSeek ?? false;
+                var res = _touchpadProcessor.ProcessHorizontalScroll(tilt, Environment.TickCount64, isMediaActive, canSeek, _machine.State == IslandState.Expanded);
+                if (res.Kind != GestureActionKind.None)
                 {
-                    if (tilt > 0) _mediaService.Next();
-                    else if (tilt < 0) _mediaService.Previous();
-                    handled = true;
+                    ExecuteGestureResult(res);
                 }
-                else
+                handled = true;
+                break;
+            }
+
+            case WM_GESTURE:
+            {
+                var gi = new GESTUREINFO { cbSize = Marshal.SizeOf<GESTUREINFO>() };
+                if (GetGestureInfo(lParam, ref gi))
                 {
-                    HandleMouseWheelDelta(-tilt);
-                    handled = true;
+                    try
+                    {
+                        bool isMediaActive = _mediaService.Current != null && !string.IsNullOrWhiteSpace(_mediaService.Current.Title);
+                        bool canSeek = _mediaService.Current?.CanSeek ?? false;
+                        var res = _touchpadProcessor.ProcessWin32Gesture(ref gi, _machine.State, isMediaActive, canSeek);
+                        if (res.Kind != GestureActionKind.None)
+                        {
+                            ExecuteGestureResult(res);
+                            handled = true;
+                        }
+                    }
+                    finally
+                    {
+                        CloseGestureInfoHandle(lParam);
+                    }
                 }
                 break;
             }
@@ -389,6 +411,100 @@ public partial class IslandWindow
                 break;
         }
         return IntPtr.Zero;
+    }
+
+    // ── Windows Multi-Touch & Precision Touchpad Gesture Integration ──
+    private void RegisterTouchpadGestures(IntPtr hWnd)
+    {
+        try
+        {
+            var configs = new[]
+            {
+                new GESTURECONFIG
+                {
+                    dwID = 0, // All gestures (Zoom, Pan, Rotate, Two-Finger Tap)
+                    dwWant = GC_ALLGESTURES,
+                    dwBlock = 0
+                }
+            };
+            SetGestureConfig(hWnd, 0, (uint)configs.Length, configs, (uint)Marshal.SizeOf<GESTURECONFIG>());
+            App.Log("[Gesture] Windows Multi-Touch & Precision Touchpad gestures registered successfully.");
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Gesture] SetGestureConfig warning: {ex.Message}");
+        }
+    }
+
+    private void ExecuteGestureResult(GestureResult res)
+    {
+        switch (res.Kind)
+        {
+            case GestureActionKind.NextTrack:
+                _mediaService.Next();
+                TriggerLiquidImpulse(120, -20, 10);
+                TactileFeedback.PlaySnap();
+                break;
+
+            case GestureActionKind.PreviousTrack:
+                _mediaService.Previous();
+                TriggerLiquidImpulse(-120, -20, 10);
+                TactileFeedback.PlaySnap();
+                break;
+
+            case GestureActionKind.Scrub:
+                ScrubActiveMedia(res.ScrubOffset);
+                TactileFeedback.PlayTick();
+                break;
+
+            case GestureActionKind.ExpandPull:
+                if (_machine.State != IslandState.Expanded)
+                {
+                    _machine.ExpandNow();
+                    TriggerLiquidImpulse(20, Math.Min(res.Velocity, 320), 10);
+                    TactileFeedback.PlaySnap();
+                }
+                break;
+
+            case GestureActionKind.CollapsePinch:
+                if (_machine.State == IslandState.Expanded)
+                {
+                    _machine.CollapseNow();
+                    TriggerLiquidImpulse(-20, -Math.Min(res.Velocity, 320), -10);
+                    TactileFeedback.PlaySnap();
+                }
+                break;
+
+            case GestureActionKind.ScrollContent:
+                HandleMouseWheelDelta((int)-res.Delta);
+                break;
+        }
+    }
+
+    private void ScrubActiveMedia(TimeSpan offset)
+    {
+        var media = _mediaService.Current;
+        if (media == null || !media.CanSeek || media.Duration <= TimeSpan.Zero) return;
+
+        var currentPos = media.GetPosition(DateTimeOffset.Now);
+        var newPos = currentPos + offset;
+        if (newPos < TimeSpan.Zero) newPos = TimeSpan.Zero;
+        if (newPos > media.Duration) newPos = media.Duration;
+
+        _mediaService.Seek(newPos);
+
+        string sign = offset >= TimeSpan.Zero ? "+" : "-";
+        string deltaStr = $"{sign}{Math.Abs(offset.TotalSeconds):F0}s";
+        string posStr = $"{(int)newPos.TotalMinutes}:{newPos.Seconds:D2} / {(int)media.Duration.TotalMinutes}:{media.Duration.Seconds:D2}";
+
+        _machine.PushToast(new ToastContent(
+            "\uE768",
+            $"Seek {deltaStr}",
+            posStr,
+            ThemeBrushes.GreenColor,
+            TimeSpan.FromSeconds(1.5),
+            Priority: ToastPriority.Feedback,
+            Category: "media_scrub"));
     }
 
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)

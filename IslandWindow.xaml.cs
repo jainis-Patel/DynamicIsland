@@ -248,6 +248,7 @@ public partial class IslandWindow : Window
     private readonly JiggleBasketService _jiggleBasketService;
     private readonly NotesService _notesService;
     private readonly QuickLauncherService _quickLauncherService;
+    private readonly TouchpadGestureProcessor _touchpadProcessor = new();
     private readonly TermiNotchService _termiNotchService;
     private readonly WindowSnapService _windowSnapService;
     private readonly KeyboardSoundService _keyboardSoundService;

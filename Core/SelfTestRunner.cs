@@ -106,6 +106,7 @@ internal static class SelfTestRunner
         Run("Phase3Visuals: Windows 11 Fluent 2 Mica/Acrylic, WM_DPICHANGED & HDR tone mapping", TestWindows11BackdropAndHdrToneMapping);
         Run("Phase4Ecosystem: Live Activity IPC 2.0 multi-phase pipelines & clipboard secret redaction", TestLiveActivityIpcV2AndClipboardSecretDetection);
         Run("Phase5Packaging: Inno Setup, WinGet manifest specification & v0.5.0 version invariants", TestWinGetManifestAndReleasePackageInvariants);
+        Run("Pillar1PrecisionTouchpad: Fluid trackpad scrubbing, velocity flick skip & multi-touch pinch morphing", TestTouchpadGesturesAndVelocityInvariants);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -3032,5 +3033,108 @@ SSID 3 : Home_Router
             Assert(lContent.Contains("PackageVersion: 0.5.0"), "Locale YAML must specify version 0.5.0");
             Assert(lContent.Contains("PackageName: Dynamic Island for Windows"), "Locale YAML must specify package name");
         }
+    }
+
+    private static void TestTouchpadGesturesAndVelocityInvariants()
+    {
+        var proc = new TouchpadGestureProcessor
+        {
+            FlickVelocityThreshold = 400.0,
+            FlickAccumulatorThreshold = 70.0,
+            ScrubDeltaThreshold = 35.0,
+            VerticalPullThreshold = 90.0,
+            FlickCooldownMs = 300,
+            ExpandCooldownMs = 300
+        };
+
+        long t0 = 10000;
+
+        // 1. High-velocity horizontal flick: NextTrack
+        // Rapid 3 deltas within 30ms (high velocity ~1000 units/s)
+        var res1 = proc.ProcessHorizontalScroll(30, t0, isMediaActive: true, canSeek: true, isExpanded: false);
+        var res2 = proc.ProcessHorizontalScroll(30, t0 + 10, isMediaActive: true, canSeek: true, isExpanded: false);
+        var res3 = proc.ProcessHorizontalScroll(30, t0 + 20, isMediaActive: true, canSeek: true, isExpanded: false);
+
+        Assert(res1.Kind == GestureActionKind.None, "First micro-delta should not prematurely trigger flick");
+        Assert(res3.Kind == GestureActionKind.NextTrack, $"Third rapid delta must trigger NextTrack flick, got {res3.Kind}");
+        Assert(res3.Velocity >= 400.0, $"Flick velocity must exceed threshold, got {res3.Velocity}");
+
+        // 2. Debounce: immediate subsequent delta within cooldown must be suppressed
+        var resDebounced = proc.ProcessHorizontalScroll(30, t0 + 30, isMediaActive: true, canSeek: true, isExpanded: false);
+        Assert(resDebounced.Kind == GestureActionKind.None, "Subsequent delta within cooldown must be debounced");
+
+        // 3. Fast negative flick after cooldown: PreviousTrack
+        long tFlick2 = t0 + 350;
+        proc.ProcessHorizontalScroll(-30, tFlick2, isMediaActive: true, canSeek: true, isExpanded: false);
+        proc.ProcessHorizontalScroll(-30, tFlick2 + 10, isMediaActive: true, canSeek: true, isExpanded: false);
+        var resPrev = proc.ProcessHorizontalScroll(-30, tFlick2 + 20, isMediaActive: true, canSeek: true, isExpanded: false);
+        Assert(resPrev.Kind == GestureActionKind.PreviousTrack, $"Negative flick must trigger PreviousTrack, got {resPrev.Kind}");
+
+        // 4. Smooth Two-Finger Scrubbing (low velocity, below flick threshold)
+        long tScrub = tFlick2 + 400;
+        proc.Reset();
+        // Gentle scrolls 15 units every 50ms (velocity = 300 < 400)
+        var s1 = proc.ProcessHorizontalScroll(15, tScrub, isMediaActive: true, canSeek: true, isExpanded: false);
+        Assert(s1.Kind == GestureActionKind.None, "Sub-threshold delta must accumulate without triggering");
+
+        var s2 = proc.ProcessHorizontalScroll(25, tScrub + 60, isMediaActive: true, canSeek: true, isExpanded: false);
+        // Total accumulated = 40 >= ScrubDeltaThreshold (35)
+        Assert(s2.Kind == GestureActionKind.Scrub, $"Accumulated horizontal drag must emit Scrub action, got {s2.Kind}");
+        Assert(s2.ScrubOffset > TimeSpan.Zero, $"Forward scrub offset must be positive, got {s2.ScrubOffset}");
+
+        // 5. Vertical Pull-to-Expand in Compact State
+        long tVert = tScrub + 500;
+        proc.Reset();
+        // Downward scroll is negative delta
+        proc.ProcessVerticalScroll(-40, tVert, IslandState.Compact);
+        var vExpand = proc.ProcessVerticalScroll(-60, tVert + 15, IslandState.Compact);
+        Assert(vExpand.Kind == GestureActionKind.ExpandPull, $"Downward two-finger pull must emit ExpandPull, got {vExpand.Kind}");
+
+        // 6. Vertical Push-to-Collapse in Expanded State
+        long tVert2 = tVert + 400;
+        proc.Reset();
+        // Upward scroll is positive delta
+        proc.ProcessVerticalScroll(40, tVert2, IslandState.Expanded);
+        var vCollapse = proc.ProcessVerticalScroll(60, tVert2 + 15, IslandState.Expanded);
+        Assert(vCollapse.Kind == GestureActionKind.CollapsePinch, $"Upward two-finger push must emit CollapsePinch, got {vCollapse.Kind}");
+
+        // 7. Multi-Touch Win32 GID_ZOOM Pinch Testing
+        var giBegin = new NativeMethods.GESTUREINFO
+        {
+            dwID = NativeMethods.GID_ZOOM,
+            dwFlags = NativeMethods.GF_BEGIN,
+            ullArguments = 1000
+        };
+        proc.ProcessWin32Gesture(ref giBegin, IslandState.Compact, isMediaActive: false, canSeek: false);
+
+        // Zoom in / Pinch out (distance expands from 1000 to 1350)
+        var giZoomIn = new NativeMethods.GESTUREINFO
+        {
+            dwID = NativeMethods.GID_ZOOM,
+            dwFlags = 0,
+            ullArguments = 1350
+        };
+        var zoomRes = proc.ProcessWin32Gesture(ref giZoomIn, IslandState.Compact, isMediaActive: false, canSeek: false);
+        Assert(zoomRes.Kind == GestureActionKind.ExpandPull, $"Pinch-out zoom ratio 1.35 must trigger ExpandPull, got {zoomRes.Kind}");
+
+        // Zoom out / Pinch in (distance collapses from 1000 to 700) in Expanded state
+        var giZoomOut = new NativeMethods.GESTUREINFO
+        {
+            dwID = NativeMethods.GID_ZOOM,
+            dwFlags = 0,
+            ullArguments = 700
+        };
+        var pinchRes = proc.ProcessWin32Gesture(ref giZoomOut, IslandState.Expanded, isMediaActive: false, canSeek: false);
+        Assert(pinchRes.Kind == GestureActionKind.CollapsePinch, $"Pinch-in zoom ratio 0.70 must trigger CollapsePinch, got {pinchRes.Kind}");
+
+        // 8. Zero-Allocation Invariant: 1,000 gesture calls
+        proc.Reset();
+        long allocBefore = GC.GetAllocatedBytesForCurrentThread();
+        for (int i = 0; i < 1000; i++)
+        {
+            proc.ProcessHorizontalScroll((i % 20) - 10, t0 + i * 10, isMediaActive: true, canSeek: true, isExpanded: false);
+        }
+        long allocAfter = GC.GetAllocatedBytesForCurrentThread();
+        Assert(allocAfter - allocBefore == 0, $"Gesture loop must allocate 0 heap bytes, allocated {allocAfter - allocBefore} bytes");
     }
 }

@@ -347,6 +347,15 @@ public partial class IslandWindow
             return;
         }
 
+        // Fluid downward pull-to-expand gesture via trackpad scroll
+        var pullRes = _touchpadProcessor.ProcessVerticalScroll(e.Delta, Environment.TickCount64, _machine.State);
+        if (pullRes.Kind == GestureActionKind.ExpandPull)
+        {
+            ExecuteGestureResult(pullRes);
+            e.Handled = true;
+            return;
+        }
+
         float delta = e.Delta > 0 ? 0.02f : -0.02f;
         _volumeService.StepVolume(delta);
         e.Handled = true;
