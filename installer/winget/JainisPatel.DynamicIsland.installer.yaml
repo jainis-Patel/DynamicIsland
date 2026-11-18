@@ -13,7 +13,7 @@ Installers:
   - Architecture: x64
     InstallerType: inno
     InstallerUrl: https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.5.0/DynamicIsland-Setup.exe
-    InstallerSha256: 329952E331BE03DEA9B47165342406023E81212A0DF170F5C0E1C7FD04B2F64E
+    InstallerSha256: 8C365EE751B3AC0740CA946A281AEF852E4582D94DFA4C666F8B53C27DE14BDE
     UpgradeBehavior: install
 ManifestType: installer
 ManifestVersion: 1.6.0
