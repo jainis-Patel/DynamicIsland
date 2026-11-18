@@ -25,6 +25,7 @@ DynamicIsland_Memos/
 *.tmp
 *.lnk
 *.cache
+*.zip
 
 # Media & captured assets (ignore screenshots, but keep project assets)
 *.png
