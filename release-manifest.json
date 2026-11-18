@@ -1,20 +1,20 @@
 {
-  "version": "0.5.0",
-  "releaseTag": "v0.5.0",
+  "version": "0.6.0",
+  "releaseTag": "v0.6.0",
   "channel": "stable",
-  "releaseDate": "2026-11-17T18:00:00Z",
+  "releaseDate": "2026-11-19T00:00:00Z",
   "minWindowsBuild": "10.0.19041.0",
-  "changelogUrl": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.5.0",
-  "summary": "Centralized power-aware Choreographer, Windows 11 Mica/Acrylic composition, Live Activity IPC 2.0 streaming, and clipboard secret redaction.",
+  "changelogUrl": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.6.0",
+  "summary": "Flagship release: Precision Touchpad gestures, AI coding agent approvals HUD, detachable floating PiP window, community droplet plugin SDK, and deep GPU hardware telemetry.",
   "isCritical": false,
   "downloads": {
     "installer": {
-      "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.5.0/DynamicIsland-Setup.exe",
-      "sha256": "95359289EBF8557C90999DAAD2738A80C886A6862F7F6AAEBFBB054718EF2367",
-      "sizeBytes": 74163082
+      "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.6.0/DynamicIsland-Setup.exe",
+      "sha256": "EA0880CC97AE18A8155CEB46C2FE37FC4E8F3CFC91AA2A2849FA0CF21C2A3273",
+      "sizeBytes": 74163097
     },
     "portable": {
-      "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.5.0/DynamicIsland-Portable.zip",
+      "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.6.0/DynamicIsland-Portable.zip",
       "sha256": "",
       "sizeBytes": 76000000
     }

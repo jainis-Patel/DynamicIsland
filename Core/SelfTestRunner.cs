@@ -106,7 +106,7 @@ internal static class SelfTestRunner
         Run("SpringAndHaptics: Impulse, Retarget, SnapTo & zero-allocation synthesized RIFF WAVE haptics", TestSpringDynamicsAndTactileHaptics);
         Run("Phase3Visuals: Windows 11 Fluent 2 Mica/Acrylic, WM_DPICHANGED & HDR tone mapping", TestWindows11BackdropAndHdrToneMapping);
         Run("Phase4Ecosystem: Live Activity IPC 2.0 multi-phase pipelines & clipboard secret redaction", TestLiveActivityIpcV2AndClipboardSecretDetection);
-        Run("Phase5Packaging: Inno Setup, WinGet manifest specification & v0.5.0 version invariants", TestWinGetManifestAndReleasePackageInvariants);
+        Run("Phase5Packaging: Inno Setup, WinGet manifest specification & v0.6.0 version invariants", TestWinGetManifestAndReleasePackageInvariants);
         Run("Pillar1PrecisionTouchpad: Fluid trackpad scrubbing, velocity flick skip & multi-touch pinch morphing", TestTouchpadGesturesAndVelocityInvariants);
         Run("Pillar2AiAgentApprovals: Two-way IPC prompt RPC, diff HUD parser & interactive buttons", TestAiAgentInteractiveApprovalsAndDiffViewer);
         Run("Pillar3FloatingPiPAndNotch: Tear-off drag gesture, magnetic corner snapping & hardware notch fillets", TestPillar3DetachableFloatingIslandAndHardwareNotch);
@@ -3006,8 +3006,8 @@ SSID 3 : Home_Router
         if (File.Exists(issPath))
         {
             string issContent = File.ReadAllText(issPath);
-            Assert(issContent.Contains("#define MyAppVersion \"0.5.0\""),
-                "DynamicIsland.iss must define MyAppVersion as '0.5.0'");
+            Assert(issContent.Contains("#define MyAppVersion \"0.6.0\""),
+                "DynamicIsland.iss must define MyAppVersion as '0.6.0'");
         }
 
         // 2. release-manifest.json validation
@@ -3017,8 +3017,8 @@ SSID 3 : Home_Router
             string manifestJson = File.ReadAllText(manifestPath);
             var manifest = System.Text.Json.JsonSerializer.Deserialize<UpdateManifest>(manifestJson);
             Assert(manifest != null, "release-manifest.json must deserialize cleanly");
-            Assert(manifest!.Version == "0.5.0", $"release-manifest.json version must be '0.5.0', got '{manifest.Version}'");
-            Assert(manifest.ReleaseTag == "v0.5.0", $"release-manifest.json releaseTag must be 'v0.5.0', got '{manifest.ReleaseTag}'");
+            Assert(manifest!.Version == "0.6.0", $"release-manifest.json version must be '0.6.0', got '{manifest.Version}'");
+            Assert(manifest.ReleaseTag == "v0.6.0", $"release-manifest.json releaseTag must be 'v0.6.0', got '{manifest.ReleaseTag}'");
         }
 
         // 3. WinGet Manifest Files validation
@@ -3035,14 +3035,14 @@ SSID 3 : Home_Router
 
             string vContent = File.ReadAllText(versionYaml);
             Assert(vContent.Contains("PackageIdentifier: JainisPatel.DynamicIsland"), "Version YAML must specify identifier");
-            Assert(vContent.Contains("PackageVersion: 0.5.0"), "Version YAML must specify version 0.5.0");
+            Assert(vContent.Contains("PackageVersion: 0.6.0"), "Version YAML must specify version 0.6.0");
 
             string iContent = File.ReadAllText(installerYaml);
-            Assert(iContent.Contains("PackageVersion: 0.5.0"), "Installer YAML must specify version 0.5.0");
+            Assert(iContent.Contains("PackageVersion: 0.6.0"), "Installer YAML must specify version 0.6.0");
             Assert(iContent.Contains("Architecture: x64"), "Installer YAML must specify x64 architecture");
 
             string lContent = File.ReadAllText(localeYaml);
-            Assert(lContent.Contains("PackageVersion: 0.5.0"), "Locale YAML must specify version 0.5.0");
+            Assert(lContent.Contains("PackageVersion: 0.6.0"), "Locale YAML must specify version 0.6.0");
             Assert(lContent.Contains("PackageName: Dynamic Island for Windows"), "Locale YAML must specify package name");
         }
     }
