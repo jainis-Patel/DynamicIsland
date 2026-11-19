@@ -160,6 +160,12 @@ public partial class SettingsView : UserControl
     private void PetCompanion_Click(object sender, MouseButtonEventArgs e) =>
         Island?.PetCompanion_Click(sender, e);
 
+    private void OpenPetPlaygroundBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.OpenPetPlaygroundBtn_Click(sender, e);
+
+    private void RoamDesktopBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.RoamDesktopBtn_Click(sender, e);
+
     private void PetHydrateBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.PetHydrateBtn_Click(sender, e);
 

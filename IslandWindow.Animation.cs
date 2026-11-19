@@ -690,9 +690,10 @@ public partial class IslandWindow
         bool glowSettled = UpdateAmbientHalo();
 
         bool petActive = (_petService?.IsEnabled ?? false) && 
-            (_isPetScampering || _petService.CurrentMood == PetMood.Dancing || _petService.CurrentMood == PetMood.Happy || _petService.CurrentMood == PetMood.Eating ||
+            (_isPetScampering || _petService.CurrentMood == PetMood.Dancing || _petService.CurrentMood == PetMood.Happy || _petService.CurrentMood == PetMood.Eating || _petService.CurrentMood == PetMood.Playing ||
              (IdlePetCompanion?.IsAnimatingTrick ?? false) || (CompactPetCompanion?.IsAnimatingTrick ?? false) || (SettingsHeroPet?.IsAnimatingTrick ?? false) ||
-             (_pointerInside && (_machine.State == IslandState.Idle || _machine.State == IslandState.Compact || (SettingsHeroPet?.IsVisible ?? false))));
+             (PetSanctuaryContainer?.StagePet?.IsAnimatingTrick ?? false) || (PetSanctuaryContainer?.StagePet?.IsAnimatingSpecialAction ?? false) ||
+             (_pointerInside && (_machine.State == IslandState.Idle || _machine.State == IslandState.Compact || (SettingsHeroPet?.IsVisible ?? false) || (PetSanctuaryContainer?.IsVisible ?? false))));
 
         bool themeActive = _isNatureThemeActive && !IsReducedMotion && _machine.State != IslandState.Hidden;
 
@@ -970,6 +971,31 @@ public partial class IslandWindow
                 SettingsHeroPet.Dance(bass, treble, t);
             else
                 SettingsHeroPet.UpdateTick(t, heroHover || _pointerInside, heroGazeX, heroGazeY);
+        }
+
+        // Pet Sanctuary Playground Stage Pet animation
+        if (PetSanctuaryContainer != null && PetSanctuaryContainer.IsVisible)
+        {
+            var stagePet = PetSanctuaryContainer.StagePet;
+            if (stagePet != null)
+            {
+                double stageGazeX = 0, stageGazeY = 0;
+                bool stageHover = false;
+                try
+                {
+                    Point stageMouse = System.Windows.Input.Mouse.GetPosition(stagePet);
+                    stageHover = stageMouse.X >= 0 && stageMouse.X <= stagePet.ActualWidth &&
+                                 stageMouse.Y >= 0 && stageMouse.Y <= stagePet.ActualHeight;
+                    stageGazeX = Math.Clamp((stageMouse.X - (stagePet.ActualWidth / 2.0)) / 45.0, -1.0, 1.0);
+                    stageGazeY = Math.Clamp((stageMouse.Y - (stagePet.ActualHeight / 2.0)) / 35.0, -1.0, 1.0);
+                }
+                catch { }
+
+                if (mood == PetMood.Dancing)
+                    stagePet.Dance(bass, treble, t);
+                else
+                    stagePet.UpdateTick(t, stageHover || _pointerInside, stageGazeX, stageGazeY);
+            }
         }
     }
 

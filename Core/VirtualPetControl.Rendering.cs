@@ -807,4 +807,118 @@ public sealed partial class VirtualPetControl
         dc.Pop();
         dc.DrawEllipse(null, RipplePen, new Point(x, y + 4.8), 3.2, 1.2);
     }
+
+    private static void DrawSakuraPetal(DrawingContext dc, double x, double y, double rotDeg)
+    {
+        var m = Matrix.Identity;
+        m.Rotate(rotDeg);
+        m.Translate(x, y);
+        Push(dc, m);
+        dc.DrawGeometry(SakuraPetalBrush, null, SakuraPetalGeo);
+        dc.Pop();
+    }
+
+    private static void DrawBambooLeaf(DrawingContext dc, double x, double y, double rotDeg)
+    {
+        var m = Matrix.Identity;
+        m.Rotate(rotDeg);
+        m.Translate(x, y);
+        Push(dc, m);
+        dc.DrawGeometry(BambooLeafBrush, null, BambooLeafGeo);
+        dc.Pop();
+    }
+
+    private void RenderSpecialAction(DrawingContext dc, double t, double cx, double cy)
+    {
+        double elapsed = t - _specialActionStartTime;
+        const double ActionDuration = 1.8;
+        if (elapsed < 0.0 || elapsed > ActionDuration) return;
+        double p = Math.Clamp(elapsed / ActionDuration, 0.0, 1.0);
+
+        switch (_specialActionKind)
+        {
+            case PetSpecialActionKind.LaserHunt:
+            {
+                // Scurrying red laser pointer dot with glowing outer corona & specular core
+                double lx = cx + Math.Sin(p * 18.0) * 9.5;
+                double ly = 23.5 + Math.Cos(p * 14.0) * 2.2;
+                dc.DrawEllipse(LaserDotBrush, null, new Point(lx, ly), 2.5, 2.0);
+                dc.DrawEllipse(WhiteSpecularBrush, null, new Point(lx, ly), 0.8, 0.65);
+                if (p > 0.45)
+                {
+                    double sparkAlpha = Math.Clamp(1.0 - (p - 0.45) / 0.4, 0.0, 1.0);
+                    DrawStar(dc, lx + 2.0, ly - 2.0, 0.8, sparkAlpha, p * 180.0);
+                }
+                break;
+            }
+            case PetSpecialActionKind.BallFetch:
+            {
+                // Bouncing tennis ball with dynamic parabolic bounce trajectory & felt seams
+                double bx = cx - 13.0 + p * 26.0;
+                double by = p < 0.5 ? 23.0 - Math.Sin(p / 0.5 * Math.PI) * 14.0 : (p < 0.82 ? 18.0 + (p - 0.5) * 8.0 : 24.2);
+                dc.DrawEllipse(TennisBallBrush, GoldBellOutlinePen, new Point(bx, by), 2.3, 2.3);
+                dc.DrawLine(TennisBallSeamPen, new Point(bx - 1.3, by - 1.1), new Point(bx + 1.3, by + 1.1));
+                dc.DrawLine(TennisBallSeamPen, new Point(bx - 1.3, by + 1.1), new Point(bx + 1.3, by - 1.1));
+                break;
+            }
+            case PetSpecialActionKind.BinkyFlip:
+            {
+                // Swirl of pastel sakura blossom petals & hearts celebrating mid-air 180° twist
+                for (int i = 0; i < 4; i++)
+                {
+                    double ang = (i * Math.PI * 0.5) + t * 4.2;
+                    double dist = 7.0 + p * 11.0;
+                    DrawSakuraPetal(dc, cx + Math.Cos(ang) * dist, cy - 2.0 + Math.Sin(ang) * (dist * 0.6), p * 240.0 + i * 45.0);
+                }
+                DrawHeart(dc, cx + 6.0, cy - 7.5, 1.2, 1.0 - p);
+                break;
+            }
+            case PetSpecialActionKind.FoxfireDance:
+            {
+                // 3 ethereal Kitsune spirit flames in 3D orbit around the fox
+                for (int i = 0; i < 3; i++)
+                {
+                    double ang = t * 9.5 + (i * Math.PI * 2.0 / 3.0);
+                    double rx = 13.5 * (1.0 - p * 0.35);
+                    double ry = 6.0 * (1.0 - p * 0.35);
+                    double ox = cx + Math.Cos(ang) * rx;
+                    double oy = cy + Math.Sin(ang) * ry;
+                    dc.DrawEllipse(FoxfireBrush, null, new Point(ox, oy), 2.8, 2.8);
+                    dc.DrawEllipse(WhiteSpecularBrush, null, new Point(ox, oy), 0.8, 0.8);
+                }
+                break;
+            }
+            case PetSpecialActionKind.KungFuRoll:
+            {
+                // Tumbling green bamboo leaves fluttering around the somersaulting panda
+                for (int i = 0; i < 4; i++)
+                {
+                    double lx = cx - 11.0 + (i * 7.5) + Math.Sin(t * 7.0 + i) * 2.5;
+                    double ly = 23.5 - Math.Sin((p + i * 0.22) * Math.PI) * 9.5;
+                    DrawBambooLeaf(dc, lx, ly, p * 360.0 + i * 40.0);
+                }
+                DrawStar(dc, cx + 7.0, cy - 5.5, 0.95, 1.0 - p, p * 120.0);
+                break;
+            }
+            case PetSpecialActionKind.DragonBreath:
+            {
+                // Inhale sparkle then celestial heart stardust flame burst
+                if (p < 0.32)
+                {
+                    DrawStar(dc, cx - 6.0, cy - 4.0, 0.7, p / 0.32, -p * 180.0);
+                }
+                else
+                {
+                    double fp = (p - 0.32) / 0.68;
+                    double fx = cx + 5.0 + fp * 15.0;
+                    double fy = cy - 2.8 + Math.Sin(fp * 8.5) * 1.6;
+                    double fSize = 2.0 + fp * 3.6;
+                    dc.DrawEllipse(DragonFlameBrush, null, new Point(fx, fy), fSize, fSize * 0.72);
+                    DrawStar(dc, fx + 1.4, fy - 0.8, 0.85, 1.0 - fp, fp * 220.0);
+                    DrawStar(dc, fx - 1.0, fy + 1.5, 0.65, 1.0 - fp, -fp * 180.0);
+                }
+                break;
+            }
+        }
+    }
 }

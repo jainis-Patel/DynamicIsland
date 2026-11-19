@@ -1,0 +1,208 @@
+<UserControl x:Class="DynamicIsland.Views.Widgets.PetSanctuaryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:core="clr-namespace:DynamicIsland.Core"
+             mc:Ignorable="d" 
+             d:DesignHeight="210" d:DesignWidth="470">
+    <Grid Margin="0,2,0,2">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Top Header & Actions -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Click="BackToWidgets_Click" Style="{StaticResource IslandButton}" Height="20" Width="20" Padding="0" Margin="0,0,6,0" ToolTipService.ToolTip="Back to Apps &amp; Widgets">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE72B;" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+                <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" Margin="0,0,7,0">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE708;" FontSize="11" Foreground="{DynamicResource PinkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="Pet Sanctuary &amp; Playground" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="PetSpeciesBadgeText" Text="🐾 Interactive Companion" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
+                </Border>
+            </StackPanel>
+
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Click="RoamDesktopBtn_Click" Style="{StaticResource IslandButton}" Height="21" Padding="7,0" Margin="0,0,4,0" ToolTipService.ToolTip="Pop-out floating desktop companion (roam multi-monitors)">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE7C4;" FontSize="9" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Roam Desktop" FontSize="8" FontWeight="Medium" />
+                    </StackPanel>
+                </Button>
+                <Button Click="ClosePlayground_Click" Style="{StaticResource IslandButton}" Height="21" Width="22" Padding="0" ToolTipService.ToolTip="Minimize to pill">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
+                </Button>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Main Body: Big Pet Pedestal Stage + Playground Controls -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="162" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: Large Stage Pedestal Card -->
+            <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.2" CornerRadius="12" Padding="6,6,6,5">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Ambient Pedestal Spotlight -->
+                    <Border Grid.Row="0" Width="120" Height="36" VerticalAlignment="Bottom" Margin="0,0,0,6" CornerRadius="18" Background="#14FFFFFF" IsHitTestVisible="False" />
+
+                    <!-- Big Interactive Pet (135x105 px) -->
+                    <core:VirtualPetControl x:Name="StagePet"
+                                            Grid.Row="0"
+                                            Width="135" Height="105"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                                            Cursor="Hand"
+                                            MouseLeftButtonDown="StagePet_Click"
+                                            MouseRightButtonUp="StagePet_RightClick"
+                                            ToolTipService.ToolTip="Click to pet · Right-click for flip trick!" />
+
+                    <!-- Bottom Info Badge: Name & Mood Status -->
+                    <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,2,0,0">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <TextBlock x:Name="StagePetName" Text="Mochi" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="StageAccessoryTag" Text=" 👑" FontSize="9" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock x:Name="StagePetMoodText" Text="🐾 Cozy &amp; Content" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,1,0,0" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Right: Stats Card + Action Activities + Wellness Tracker -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="6" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="6" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Row 0: Rank, XP Progress & Species Perks -->
+                <Border Grid.Row="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.2" CornerRadius="10" Padding="8,6">
+                    <StackPanel>
+                        <DockPanel LastChildFill="False">
+                            <TextBlock x:Name="StageRankTitle" Text="Level 2 · Playful Friend" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                            <TextBlock x:Name="StageScoreText" DockPanel.Dock="Right" Style="{StaticResource Digits}" Text="85 / 150 ❤️" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
+                        </DockPanel>
+
+                        <!-- XP Progress Track -->
+                        <Border Background="#1AFFFFFF" Height="4" CornerRadius="2" Margin="0,3,0,3">
+                            <Border x:Name="StageProgressBar" HorizontalAlignment="Left" Width="75" Height="4" CornerRadius="2" Background="{DynamicResource AccentBrush}" />
+                        </Border>
+
+                        <!-- Species Signature Perk Line -->
+                        <TextBlock x:Name="StagePerkText" Text="Agile laser hunter · Cozy loaf purr resonance" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Row 2: 2x2 Playground Activities Grid -->
+                <Grid Grid.Row="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="5" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="5" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Activity 1: Pet / Cuddle -->
+                    <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="6,4" Cursor="Hand" MouseLeftButtonDown="PetCuddle_Click">
+                        <DockPanel LastChildFill="False">
+                            <Border Width="20" Height="20" CornerRadius="10" Background="#1AE91E63" Margin="0,0,6,0" VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE76E;" FontSize="9.5" Foreground="{DynamicResource PinkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Cuddle &amp; Pet" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                <TextBlock Text="+3 ❤️ Purr &amp; Wag" FontSize="7" Foreground="{DynamicResource SecondaryBrush}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Activity 2: Species Signature Special Action / Toy -->
+                    <Border Grid.Row="0" Grid.Column="2" x:Name="SpecialActionCard" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.2" CornerRadius="8" Padding="6,4" Cursor="Hand" MouseLeftButtonDown="SpecialAction_Click">
+                        <DockPanel LastChildFill="False">
+                            <Border Width="20" Height="20" CornerRadius="10" Background="#1A00F5D4" Margin="0,0,6,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="SpecialActionGlyph" Style="{StaticResource Glyph}" Text="&#xE734;" FontSize="9.5" Foreground="{DynamicResource CyanBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="SpecialActionTitle" Text="Laser Hunt 🔴" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                <TextBlock Text="+6 ❤️ Signature Move" FontSize="7" Foreground="{DynamicResource SecondaryBrush}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Activity 3: Feed Gourmet Snack -->
+                    <Border Grid.Row="2" Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="6,4" Cursor="Hand" MouseLeftButtonDown="FeedTreat_Click">
+                        <DockPanel LastChildFill="False">
+                            <Border Width="20" Height="20" CornerRadius="10" Background="#1AFF9F0A" Margin="0,0,6,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="TreatIconGlyph" Text="🍣" FontSize="9.5" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="TreatTitleText" Text="Sushi Treat" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                <TextBlock x:Name="TreatCountText" Text="+8 ❤️ Total: 0" FontSize="7" Foreground="{DynamicResource SecondaryBrush}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Activity 4: Acrobatic Flip Trick -->
+                    <Border Grid.Row="2" Grid.Column="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="6,4" Cursor="Hand" MouseLeftButtonDown="PerformTrick_Click">
+                        <DockPanel LastChildFill="False">
+                            <Border Width="20" Height="20" CornerRadius="10" Background="#1ABF5AF2" Margin="0,0,6,0" VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE734;" FontSize="9.5" Foreground="{DynamicResource PurpleBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Acrobatic Stunt" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                <TextBlock Text="+5 ❤️ 360° Jump" FontSize="7" Foreground="{DynamicResource SecondaryBrush}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Row 4: Bottom Quick Controls (Water, Stretch, Switch, Gear) -->
+                <Grid Grid.Row="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="4" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="4" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="4" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0" Click="LogWaterBtn_Click" Style="{StaticResource IslandButton}" Height="21" Padding="4,0" ToolTipService.ToolTip="Log a fresh glass of water">
+                        <TextBlock x:Name="WaterBtnText" Text="💧 Water: 0" FontSize="7.5" FontWeight="Medium" />
+                    </Button>
+
+                    <Button Grid.Column="2" Click="LogStretchBtn_Click" Style="{StaticResource IslandButton}" Height="21" Padding="4,0" ToolTipService.ToolTip="Take a posture stretch break">
+                        <TextBlock x:Name="StretchBtnText" Text="🧘 Stretch: 0" FontSize="7.5" FontWeight="Medium" />
+                    </Button>
+
+                    <Button Grid.Column="4" Click="CycleSpeciesBtn_Click" Style="{StaticResource IslandButton}" Height="21" Padding="4,0" ToolTipService.ToolTip="Switch pet species (Cat, Dog, Bunny, Fox, Panda, Dragon)">
+                        <TextBlock x:Name="SpeciesBtnText" Text="🐾 Species" FontSize="7.5" FontWeight="Medium" />
+                    </Button>
+
+                    <Button Grid.Column="6" Click="CycleAccessoryBtn_Click" Style="{StaticResource IslandButton}" Height="21" Padding="4,0" ToolTipService.ToolTip="Change pet hat or gear">
+                        <TextBlock x:Name="GearBtnText" Text="👑 Gear" FontSize="7.5" FontWeight="Medium" />
+                    </Button>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

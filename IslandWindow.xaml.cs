@@ -56,6 +56,7 @@ public partial class IslandWindow : Window
     private static readonly PillShape AudioExpandedShape      = new(484, 340, 36);
     private static readonly PillShape ShelfExpandedShape      = new(484, 188, 34);
     private static readonly PillShape QuickReplyExpandedShape = new(484, 156, 36);
+    private static readonly PillShape PetExpandedShape        = new(484, 216, 34);
 
     // Tactile interaction constants (WWDC Fluid Interfaces spec)
     private const double HoverWidthSwell = 10.0;
@@ -157,6 +158,7 @@ public partial class IslandWindow : Window
                 ExpandedView.MechSounds    => MechSoundsExpandedShape,
                 ExpandedView.CaptureStudio => CaptureStudioExpandedShape,
                 ExpandedView.QuickReply    => QuickReplyExpandedShape,
+                ExpandedView.Pet           => PetExpandedShape,
                 ExpandedView.Notifications => GetNotificationsExpandedShape(),
                 ExpandedView.Media when _mediaService.Current == null || string.IsNullOrWhiteSpace(_mediaService.Current.Title)
                                            => new PillShape(484, 114, 28),
@@ -346,6 +348,7 @@ public partial class IslandWindow : Window
     private bool _isWifiScannerMode;
 
     public static IslandWindow? Instance { get; private set; }
+    internal VirtualPetService PetService => _petService;
 
     public IslandWindow()
     {
@@ -397,6 +400,7 @@ public partial class IslandWindow : Window
             [ExpandedView.MechSounds]     = (MechSoundsContainer, LauncherButton),
             [ExpandedView.CaptureStudio]  = (CaptureStudioContainer, LauncherButton),
             [ExpandedView.QuickReply]     = (QuickReplyContainer, NotificationsButton),
+            [ExpandedView.Pet]            = (PetSanctuaryContainer, WidgetsGalleryButton),
             [ExpandedView.Settings]       = (SettingsContainer, SettingsButton),
         };
 

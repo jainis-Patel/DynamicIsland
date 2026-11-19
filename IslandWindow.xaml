@@ -511,7 +511,7 @@
                                                 RenderTransformOrigin="0.5,0.5"
                                                 MouseLeftButtonDown="PetCompanion_Click"
                                                 MouseRightButtonUp="PetCompanion_RightClick"
-                                                ToolTip="Virtual Pet Companion · Click to pet · Right-click for 360° flip trick!">
+                                                ToolTip="Virtual Pet Companion · Click to pet · Double-click for Big Playground · Right-click for flip!">
                             <core:VirtualPetControl.RenderTransform>
                                 <TransformGroup>
                                     <ScaleTransform x:Name="IdlePetScale" ScaleX="1" ScaleY="1" />
@@ -645,7 +645,7 @@
                                                 RenderTransformOrigin="0.5,0.5"
                                                 MouseLeftButtonDown="PetCompanion_Click"
                                                 MouseRightButtonUp="PetCompanion_RightClick"
-                                                ToolTip="Virtual Pet Companion · Grooving to the beats! Click to pet · Right-click to flip.">
+                                                ToolTip="Virtual Pet Companion · Click to pet · Double-click for Big Playground · Right-click for flip!">
                             <core:VirtualPetControl.RenderTransform>
                                 <TransformGroup>
                                     <ScaleTransform x:Name="CompactPetScale" ScaleX="1" ScaleY="1" />
@@ -859,6 +859,7 @@
                         <widgets:MechSoundsView x:Name="MechSoundsContainer" Visibility="Collapsed" />
                         <widgets:CaptureStudioView x:Name="CaptureStudioContainer" Visibility="Collapsed" />
                         <widgets:QuickReplyView x:Name="QuickReplyContainer" Visibility="Collapsed" />
+                        <widgets:PetSanctuaryView x:Name="PetSanctuaryContainer" Visibility="Collapsed" />
                     </Grid>
                 </Grid>
             </Grid>

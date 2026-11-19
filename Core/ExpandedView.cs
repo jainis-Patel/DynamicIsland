@@ -27,7 +27,8 @@ public enum ExpandedView
     CaptureStudio,
     Calendar,
     QuickReply,
-    WidgetsGallery
+    WidgetsGallery,
+    Pet
 }
 
 public static class ExpandedViewExtensions
@@ -55,6 +56,7 @@ public static class ExpandedViewExtensions
         ExpandedView.CaptureStudio => "capturestudio",
         ExpandedView.QuickReply => "quickreply",
         ExpandedView.WidgetsGallery => "widgetsgallery",
+        ExpandedView.Pet => "pet",
         _ => "media"
     };
 
@@ -161,6 +163,11 @@ public static class ExpandedViewExtensions
             case "widget":
             case "bento":
                 view = ExpandedView.WidgetsGallery;
+                return true;
+            case "pet":
+            case "companion":
+            case "sanctuary":
+                view = ExpandedView.Pet;
                 return true;
             default:
                 view = ExpandedView.Media;

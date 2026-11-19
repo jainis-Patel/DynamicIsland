@@ -9,6 +9,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using DynamicIsland.Core;
 using DynamicIsland.Services;
+using DynamicIsland.Views;
 using static DynamicIsland.Interop.NativeMethods;
 
 namespace DynamicIsland;
@@ -149,6 +150,15 @@ public partial class IslandWindow
     internal void PetCompanion_Click(object sender, MouseButtonEventArgs e)
     {
         if (_petService == null) return;
+
+        if (e.ClickCount >= 2)
+        {
+            _machine.ExpandNow();
+            SwitchExpandedView(ExpandedView.Pet, true);
+            e.Handled = true;
+            return;
+        }
+
         string msg = _petService.Pet();
         TriggerLiquidImpulse(180, 80, 12);
         IdlePetCompanion?.PetClickImpulse();
@@ -173,7 +183,7 @@ public partial class IslandWindow
                 msg,
                 ThemeBrushes.PinkColor,
                 TimeSpan.FromSeconds(2.5),
-                TargetView: null,
+                TargetView: "pet",
                 Priority: ToastPriority.Feedback));
         }
         UpdatePetSettingsUI();
@@ -198,9 +208,55 @@ public partial class IslandWindow
             msg,
             ThemeBrushes.AmberColor,
             TimeSpan.FromSeconds(2.5),
-            TargetView: null,
+            TargetView: "pet",
             Priority: ToastPriority.Feedback,
             Category: "pet"));
+    }
+
+    private PetFloatWindow? _petFloatWindow;
+
+    internal void TogglePetFloatWindow()
+    {
+        if (_petService == null) return;
+
+        if (_petFloatWindow != null && _petFloatWindow.IsLoaded)
+        {
+            _petFloatWindow.Close();
+            _petFloatWindow = null;
+            _machine.PushToast(new ToastContent(
+                "\uE708",
+                "Desktop Roam Ended",
+                $"{_petService.PetName} returned to Dynamic Island capsule",
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(2.0),
+                TargetView: "pet",
+                Priority: ToastPriority.Feedback));
+            return;
+        }
+
+        _petFloatWindow = new PetFloatWindow(_petService, this);
+        _petFloatWindow.Closed += (_, _) => _petFloatWindow = null;
+        _petFloatWindow.Show();
+
+        _machine.PushToast(new ToastContent(
+            "\uE7C4",
+            "Desktop Roam Active",
+            $"{_petService.PetName} is now roaming your desktop! Drag anywhere.",
+            ThemeBrushes.BlueColor,
+            TimeSpan.FromSeconds(2.5),
+            TargetView: null,
+            Priority: ToastPriority.Feedback));
+    }
+
+    internal void OpenPetPlaygroundBtn_Click(object sender, RoutedEventArgs e)
+    {
+        _machine.ExpandNow();
+        SwitchExpandedView(ExpandedView.Pet, true);
+    }
+
+    internal void RoamDesktopBtn_Click(object sender, RoutedEventArgs e)
+    {
+        TogglePetFloatWindow();
     }
 
     internal void PetToggleBtn_Click(object sender, RoutedEventArgs e)

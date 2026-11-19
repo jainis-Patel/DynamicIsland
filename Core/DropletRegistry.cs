@@ -84,6 +84,7 @@ public sealed class DropletDescriptor : INotifyPropertyChanged
         "termi_notch" => "Snippet",
         "window_snap" => "Snap",
         "mech_sounds" => "Sound",
+        "pet_sanctuary" => "Play",
         _ => "Open"
     };
 
@@ -107,6 +108,7 @@ public sealed class DropletDescriptor : INotifyPropertyChanged
         "termi_notch" => "\uE756",
         "window_snap" => "\uE7C4",
         "mech_sounds" => "\uE765",
+        "pet_sanctuary" => "\uE708",
         _ => "\uE8A7"
     };
 
@@ -415,6 +417,19 @@ public sealed class DropletRegistry
             TargetView = ExpandedView.PhoneBridge,
             DockPinKey = "phonebridge",
             EstimatedRamKb = 16,
+            IsDefaultEnabled = true
+        });
+
+        Register(new DropletDescriptor
+        {
+            Id = "pet_sanctuary",
+            Name = "Pet Sanctuary & Playground",
+            Description = "Interactive desktop companion with unique species toys, tricks, and desktop roam",
+            Glyph = "\uE708",
+            Category = DropletCategory.Productivity,
+            TargetView = ExpandedView.Pet,
+            DockPinKey = "pet",
+            EstimatedRamKb = 28,
             IsDefaultEnabled = true
         });
     }

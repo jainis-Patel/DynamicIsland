@@ -11,7 +11,19 @@ public enum PetMood
     Happy,
     Thirsty,
     Stretch,
-    Eating
+    Eating,
+    Playing
+}
+
+public enum PetSpecialActionKind
+{
+    None,
+    LaserHunt,      // Cat: Glowing red laser pointer hunt & swat
+    BallFetch,      // Dog: Bouncing tennis ball leap & catch
+    BinkyFlip,      // Bunny: 180° mid-air twist binky jump
+    FoxfireDance,   // Fox: 3 orbiting cyan spirit flame orbs
+    KungFuRoll,     // Panda: Backward acrobatic tumble roll
+    DragonBreath    // Dragon: Deep breath & stardust flame puff
 }
 
 public enum WellnessAlertKind
@@ -77,6 +89,7 @@ internal sealed class VirtualPetService : IDisposable
     public event Action<PetMood>? MoodChanged;
     public event Action<WellnessAlert>? WellnessAlertTriggered;
     public event Action<int>? AffectionChanged;
+    public event Action<PetSpecialActionKind>? SpecialActionTriggered;
 
     public VirtualPetService(Dispatcher dispatcher, SettingsService settings)
     {
@@ -89,7 +102,7 @@ internal sealed class VirtualPetService : IDisposable
         _happyResetTimer = new DispatcherTimer(TimeSpan.FromSeconds(3.5), DispatcherPriority.Background, (_, _) =>
         {
             _happyResetTimer?.Stop();
-            if (CurrentMood is PetMood.Happy or PetMood.Eating)
+            if (CurrentMood is PetMood.Happy or PetMood.Eating or PetMood.Playing)
             {
                 CurrentMood = PetMood.Awake;
             }
@@ -213,6 +226,59 @@ internal sealed class VirtualPetService : IDisposable
         };
     }
 
+    public PetSpecialActionKind GetSpeciesSpecialActionKind() => PetSpecies switch
+    {
+        "Dog" => PetSpecialActionKind.BallFetch,
+        "Bunny" => PetSpecialActionKind.BinkyFlip,
+        "Fox" => PetSpecialActionKind.FoxfireDance,
+        "Panda" => PetSpecialActionKind.KungFuRoll,
+        "Dragon" => PetSpecialActionKind.DragonBreath,
+        _ => PetSpecialActionKind.LaserHunt
+    };
+
+    public string GetSpecialActionName() => PetSpecies switch
+    {
+        "Dog" => "Fetch Ball 🎾",
+        "Bunny" => "Binky Hop 🌸",
+        "Fox" => "Foxfire 🔥",
+        "Panda" => "Kung-Fu Roll 🎋",
+        "Dragon" => "Star Breath ✨",
+        _ => "Laser Hunt 🔴"
+    };
+
+    public string GetSpeciesPerkDescription() => PetSpecies switch
+    {
+        "Dog" => "Brisk tail wag syncs to music beat · Joyful barking acrobats",
+        "Bunny" => "High-velocity binky flips · Ultra-responsive squash physics",
+        "Fox" => "Kitsune spirit fire orbs · Evening active night-owl mode",
+        "Panda" => "Zen tumbler · Extra calm metabolism & water celebration (+15 ❤️)",
+        "Dragon" => "Continuous celestial flight hover · Stardust flame puffs",
+        _ => "Agile laser hunter · Cozy sleeping loaf & purr resonance"
+    };
+
+    public string PlaySpecialAction()
+    {
+        var kind = GetSpeciesSpecialActionKind();
+        int newScore = AffectionScore + 6;
+        _settings.Update(s => s.PetAffectionScore = newScore, nameof(AppSettings.PetAffectionScore));
+        _lastHappyTime = DateTime.UtcNow;
+        CurrentMood = PetMood.Playing;
+        _happyResetTimer?.Stop();
+        _happyResetTimer?.Start();
+        AffectionChanged?.Invoke(newScore);
+        SpecialActionTriggered?.Invoke(kind);
+
+        return PetSpecies switch
+        {
+            "Dog" => $"🎾 Threw the tennis ball! {PetName} vaulted mid-air, caught it, and wagged proudly! (+6 ❤️)",
+            "Bunny" => $"🌸 {PetName} performed a spectacular high-flying binky flip with joyful ear twitches! (+6 ❤️)",
+            "Fox" => $"🔥 {PetName} summoned 3 ethereal Kitsune foxfire orbs and danced gracefully through spirit flames! (+6 ❤️)",
+            "Panda" => $"🎋 {PetName} executed an adorable clumsy kung-fu somersault roll and beamed! (+6 ❤️)",
+            "Dragon" => $"✨ {PetName} fluttered cosmic wings and breathed a sparkling stardust heart flame! (+6 ❤️)",
+            _ => $"🔴 {PetName} locked onto the red laser dot, pounced, and swatted with lightning speed! (+6 ❤️)"
+        };
+    }
+
     public string LogWater()
     {
         int count = WaterCount + 1;
@@ -332,7 +398,10 @@ internal sealed class VirtualPetService : IDisposable
 
         if (now - _lastHappyTime < TimeSpan.FromSeconds(3.5))
         {
-            CurrentMood = PetMood.Happy;
+            if (CurrentMood != PetMood.Playing)
+            {
+                CurrentMood = PetMood.Happy;
+            }
             return;
         }
 

@@ -20,6 +20,7 @@ public partial class IslandWindow
     // =================================================================
 
     internal void ExpandNow() => _machine.ExpandNow();
+    internal void CollapseNow() => _machine.CollapseNow();
 
     private DateTime _lastViewSwitchTime = DateTime.MinValue;
 
@@ -149,6 +150,11 @@ public partial class IslandWindow
         else if (view == ExpandedView.CaptureStudio)
         {
             CaptureStudioContainer?.UpdatePinnedCountBadge();
+        }
+        else if (view == ExpandedView.Pet)
+        {
+            PetSanctuaryContainer?.RefreshUI();
+            EnsureRendering();
         }
 
         if (view == ExpandedView.Settings && previousView != ExpandedView.Settings)

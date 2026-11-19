@@ -301,6 +301,19 @@ public sealed partial class VirtualPetControl : FrameworkElement
     private static readonly RadialGradientBrush TreatSalmonBrush =
         Radial(0.4, 0.4, 0.4, 0.4, 0.6, (C(0xFFA685), 0.0), (C(0xFF6347), 0.7), (C(0xC8371D), 1.0));
 
+    // Species Unique Toys & Particles Palette
+    private static readonly RadialGradientBrush TennisBallBrush =
+        Radial(0.38, 0.32, 0.35, 0.30, 0.65, (C(0xEEFF41), 0.0), (C(0xC6FF00), 0.55), (C(0x76FF03), 1.0));
+    private static readonly Pen TennisBallSeamPen = MakePen(Solid(0xFFFFFF, 230), 0.45);
+    private static readonly RadialGradientBrush FoxfireBrush =
+        Radial(0.5, 0.5, 0.5, 0.5, 0.5, (C(0xFFFFFF), 0.0), (C(0x00F5D4), 0.45), (C(0x0A84FF, 180), 0.75), (C(0x0A84FF, 0), 1.0));
+    private static readonly RadialGradientBrush DragonFlameBrush =
+        Radial(0.4, 0.4, 0.4, 0.4, 0.6, (C(0xFFFFFF), 0.0), (C(0xFFD60A), 0.4), (C(0xFF453A, 220), 0.75), (C(0xBF5AF2, 0), 1.0));
+    private static readonly LinearGradientBrush SakuraPetalBrush =
+        Linear(0, 0, 1, 1, (C(0xFFFFFF), 0.0), (C(0xFFAEC2), 0.55), (C(0xEA728E), 1.0));
+    private static readonly LinearGradientBrush BambooLeafBrush =
+        Linear(0, 0, 1, 1, (C(0x81C784), 0.0), (C(0x388E3C), 0.6), (C(0x1B5E20), 1.0));
+
     // Universal face & paw bits
     private static readonly SolidColorBrush DeepPupilBrush = Solid(0x141018);
     private static readonly SolidColorBrush WhiteSpecularBrush = Solid(0xFFFFFF);
@@ -747,6 +760,22 @@ public sealed partial class VirtualPetControl : FrameworkElement
         c.QuadraticBezierTo(new Point(2.5, 0), new Point(0, -4.2), true, false);
     });
 
+    private static readonly StreamGeometry SakuraPetalGeo = Geo(c =>
+    {
+        c.BeginFigure(new Point(0, -2.5), true, true);
+        c.QuadraticBezierTo(new Point(1.6, -1.0), new Point(1.4, 1.6), true, false);
+        c.QuadraticBezierTo(new Point(0, 2.4), new Point(-1.4, 1.6), true, false);
+        c.QuadraticBezierTo(new Point(-1.6, -1.0), new Point(0, -2.5), true, false);
+    });
+
+    private static readonly StreamGeometry BambooLeafGeo = Geo(c =>
+    {
+        c.BeginFigure(new Point(0, -3.2), true, true);
+        c.QuadraticBezierTo(new Point(1.3, -0.5), new Point(0.8, 2.6), true, false);
+        c.QuadraticBezierTo(new Point(0, 3.4), new Point(-0.8, 2.6), true, false);
+        c.QuadraticBezierTo(new Point(-1.3, -0.5), new Point(0, -3.2), true, false);
+    });
+
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Runtime state
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -761,6 +790,13 @@ public sealed partial class VirtualPetControl : FrameworkElement
     private double _trickStartTime;
 
     public bool IsAnimatingTrick => _isDoingTrick;
+
+    // Species special signature action state
+    private bool _isDoingSpecialAction;
+    private double _specialActionStartTime;
+    private PetSpecialActionKind _specialActionKind = PetSpecialActionKind.None;
+
+    public bool IsAnimatingSpecialAction => _isDoingSpecialAction;
 
     // Ear & secondary head motion state
     private double _earAng, _earVel, _earTwitch, _earFlick;
@@ -803,6 +839,23 @@ public sealed partial class VirtualPetControl : FrameworkElement
         InvalidateVisual();
     }
 
+    public void TriggerSpecialAction(PetSpecialActionKind kind = PetSpecialActionKind.None)
+    {
+        _specialActionKind = kind != PetSpecialActionKind.None ? kind : (Species switch
+        {
+            "Dog" => PetSpecialActionKind.BallFetch,
+            "Bunny" => PetSpecialActionKind.BinkyFlip,
+            "Fox" => PetSpecialActionKind.FoxfireDance,
+            "Panda" => PetSpecialActionKind.KungFuRoll,
+            "Dragon" => PetSpecialActionKind.DragonBreath,
+            _ => PetSpecialActionKind.LaserHunt
+        });
+        _isDoingSpecialAction = true;
+        _specialActionStartTime = _time;
+        _squashVelocity = -0.42;
+        InvalidateVisual();
+    }
+
     public void Dance(float bass, float treble, double t)
     {
         _bass = bass;
@@ -821,7 +874,7 @@ public sealed partial class VirtualPetControl : FrameworkElement
         _treble = 0f;
 
         // Frame-pace slow sleeping breathing to ~15 FPS when undisturbed, keeping full refresh rate for active moods
-        if (Mood == PetMood.Sleeping && !isNearCursor && !IsScampering && !IsPeeking && !_isDoingTrick &&
+        if (Mood == PetMood.Sleeping && !isNearCursor && !IsScampering && !IsPeeking && !_isDoingTrick && !_isDoingSpecialAction &&
             Math.Abs(_squashOffset) < 0.002 && Math.Abs(_squashVelocity) < 0.002)
         {
             if (t - _lastInvalidatedTime < 0.065)
@@ -980,6 +1033,15 @@ public sealed partial class VirtualPetControl : FrameworkElement
                     rotateAngle = Math.Sin(t * 9.0) * 3.5;
                     break;
                 }
+                case PetMood.Playing:
+                {
+                    double hop = Math.Abs(Math.Sin(t * 16.0));
+                    petOffsetY = -hop * 2.8;
+                    rotateAngle = Math.Sin(t * 14.0) * 5.5;
+                    scaleY += 0.06 * (1.0 - hop);
+                    scaleX += -0.04 * (1.0 - hop);
+                    break;
+                }
             }
         }
 
@@ -998,6 +1060,84 @@ public sealed partial class VirtualPetControl : FrameworkElement
             else
             {
                 _isDoingTrick = false;
+            }
+        }
+
+        // Species unique signature action choreography
+        if (_isDoingSpecialAction)
+        {
+            double actionElapsed = t - _specialActionStartTime;
+            const double ActionDuration = 1.8;
+            if (actionElapsed >= 0.0 && actionElapsed < ActionDuration)
+            {
+                double p = actionElapsed / ActionDuration;
+                switch (_specialActionKind)
+                {
+                    case PetSpecialActionKind.LaserHunt:
+                        if (p < 0.45)
+                        {
+                            petOffsetY += 0.8;
+                            scaleX += 0.06;
+                            scaleY -= 0.05;
+                            _targetGazeX = Math.Sin(p * 14.0) * 0.9;
+                            _targetGazeY = 0.65;
+                        }
+                        else
+                        {
+                            double leap = Math.Sin((p - 0.45) / 0.55 * Math.PI);
+                            petOffsetY -= Math.Max(0, leap) * 4.2;
+                            rotateAngle = Math.Sin(p * 18.0) * 8.0;
+                            _targetGazeX = 0.4;
+                            _targetGazeY = 0.2;
+                        }
+                        break;
+                    case PetSpecialActionKind.BallFetch:
+                        double ballArc = Math.Sin(p * Math.PI);
+                        petOffsetY -= ballArc * 5.8;
+                        rotateAngle = Math.Sin(p * Math.PI * 2.0) * 12.0;
+                        _targetGazeX = Math.Sin(p * Math.PI) * 0.8;
+                        _targetGazeY = -0.4;
+                        break;
+                    case PetSpecialActionKind.BinkyFlip:
+                        double binkyArc = Math.Sin(p * Math.PI);
+                        petOffsetY -= binkyArc * 8.2;
+                        rotateAngle += p * 360.0;
+                        scaleY += 0.12 * (1.0 - binkyArc);
+                        break;
+                    case PetSpecialActionKind.FoxfireDance:
+                        double foxArc = Math.Sin(p * Math.PI);
+                        petOffsetY -= foxArc * 4.8;
+                        rotateAngle = Math.Sin(p * Math.PI * 4.0) * 14.0;
+                        _targetGazeX = Math.Cos(p * Math.PI * 2.0) * 0.7;
+                        _targetGazeY = Math.Sin(p * Math.PI * 2.0) * 0.5;
+                        break;
+                    case PetSpecialActionKind.KungFuRoll:
+                        double rollArc = Math.Sin(p * Math.PI);
+                        petOffsetY -= rollArc * 3.8;
+                        rotateAngle -= p * 360.0;
+                        break;
+                    case PetSpecialActionKind.DragonBreath:
+                        petOffsetY = -4.5 + Math.Sin(t * 12.0) * 1.5;
+                        if (p < 0.35)
+                        {
+                            double inh = p / 0.35;
+                            scaleX += inh * 0.16;
+                            scaleY += inh * 0.12;
+                            _targetGazeY = -0.5;
+                        }
+                        else
+                        {
+                            scaleX -= 0.08;
+                            scaleY -= 0.05;
+                            _targetGazeX = 0.8;
+                            _targetGazeY = 0.1;
+                        }
+                        break;
+                }
+            }
+            else
+            {
+                _isDoingSpecialAction = false;
             }
         }
 
@@ -1103,6 +1243,11 @@ public sealed partial class VirtualPetControl : FrameworkElement
         dc.Pop(); // body
 
         RenderParticles(dc, mood, t, cx, cy, scampering, peeking);
+
+        if (_isDoingSpecialAction)
+        {
+            RenderSpecialAction(dc, t, cx, cy);
+        }
 
         dc.Pop(); // root
     }
