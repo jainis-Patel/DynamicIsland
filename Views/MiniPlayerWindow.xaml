@@ -143,12 +143,15 @@
 
                             <!-- Badge Strip: Source App + Live Equalizer Wave -->
                             <StackPanel Orientation="Horizontal" Margin="0,5,0,0" VerticalAlignment="Center">
-                                <!-- Source App Badge with Cycle Support -->
+                                <!-- Source App Badge with Brand Logo & Cycle Support -->
                                 <Border x:Name="SourceAppBadge" CornerRadius="6" Background="#18FFFFFF"
                                         BorderBrush="#25FFFFFF" BorderThickness="1" Padding="6,1.5" Cursor="Hand"
                                         MouseLeftButtonDown="SourceBadge_Click"
                                         ToolTipService.ToolTip="Click to cycle active media players">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Viewbox x:Name="SourceAppLogoBox" Width="9.5" Height="9.5" Margin="0,0,3.5,0" VerticalAlignment="Center" Visibility="Collapsed">
+                                            <Path x:Name="SourceAppLogoPath" Stretch="Uniform" Fill="{DynamicResource AccentBrush}" />
+                                        </Viewbox>
                                         <TextBlock x:Name="SourceAppIcon" Style="{StaticResource Glyph}"
                                                    Text="&#xE8D6;" FontSize="8.5"
                                                    Foreground="{DynamicResource AccentBrush}" Margin="0,0,3.5,0" />
@@ -222,7 +225,10 @@
                                    VerticalAlignment="Center" Text="0:00" />
 
                         <Slider x:Name="MiniTimelineSlider" Grid.Column="1" Style="{StaticResource IslandSlider}"
-                                Margin="6,0" Minimum="0" Maximum="100" Value="0" />
+                                Margin="6,0" Minimum="0" Maximum="100" Value="0"
+                                PreviewMouseLeftButtonDown="MiniTimelineSlider_PreviewMouseDown"
+                                PreviewMouseMove="MiniTimelineSlider_PreviewMouseMove"
+                                PreviewMouseLeftButtonUp="MiniTimelineSlider_PreviewMouseUp" />
 
                         <TextBlock x:Name="MiniDurText" Grid.Column="2" Style="{StaticResource Digits}"
                                    FontSize="9.5" Foreground="{DynamicResource SecondaryBrush}"
@@ -474,13 +480,19 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Mini 28x28 Artwork -->
+                    <!-- Mini 28x28 Artwork with Brand Pip -->
                     <Border Grid.Column="0" Width="28" Height="28" CornerRadius="8"
                             Background="#18FFFFFF" ClipToBounds="True" VerticalAlignment="Center">
                         <Grid>
                             <TextBlock Style="{StaticResource Glyph}" Text="&#xE8D6;" FontSize="11"
                                        Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             <Image x:Name="CompactArtImage" Stretch="UniformToFill" />
+                            <Border x:Name="CompactBrandPip" Width="10" Height="10" CornerRadius="5" Background="#D5000000"
+                                    HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,1,1" Visibility="Collapsed">
+                                <Viewbox Width="6.5" Height="6.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Path x:Name="CompactBrandPath" Stretch="Uniform" Fill="{DynamicResource AccentBrush}" />
+                                </Viewbox>
+                            </Border>
                         </Grid>
                     </Border>
 

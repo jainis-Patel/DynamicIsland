@@ -79,6 +79,7 @@ public sealed class DropletDescriptor : INotifyPropertyChanged
         "caffeine" => "Sleep",
         "file_converter" => "Convert",
         "phone_bridge" => "Share",
+        "widgets_gallery" => "Widgets",
         "quick_launcher" => "Launch",
         "termi_notch" => "Snippet",
         "window_snap" => "Snap",
@@ -101,6 +102,7 @@ public sealed class DropletDescriptor : INotifyPropertyChanged
         "caffeine" => "\uEC32",
         "file_converter" => "\uEA90",
         "phone_bridge" => "\uE8EA",
+        "widgets_gallery" => "\uE74C",
         "quick_launcher" => "\uE71D",
         "termi_notch" => "\uE756",
         "window_snap" => "\uE7C4",
@@ -130,6 +132,7 @@ public sealed class DropletDescriptor : INotifyPropertyChanged
         "system_hud" => "Vitals Telemetry",
         "peripherals" => "Bluetooth HUD",
         "notes" => "Markdown Scratch",
+        "widgets_gallery" => "Bento Dashboard",
         "quick_launcher" => "App Runner",
         "termi_notch" => "Shell Snippets",
         "window_snap" => "Smart Halves",
@@ -325,6 +328,19 @@ public sealed class DropletRegistry
             TargetView = ExpandedView.Notes,
             DockPinKey = "notes",
             EstimatedRamKb = 24,
+            IsDefaultEnabled = true
+        });
+
+        Register(new DropletDescriptor
+        {
+            Id = "widgets_gallery",
+            Name = "Widgets Gallery",
+            Description = "Bento-style live dashboard with system vitals, battery, network and media glanceables",
+            Glyph = "\uE74C",
+            Category = DropletCategory.System,
+            TargetView = ExpandedView.WidgetsGallery,
+            DockPinKey = "widgets",
+            EstimatedRamKb = 28,
             IsDefaultEnabled = true
         });
 

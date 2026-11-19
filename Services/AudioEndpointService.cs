@@ -51,13 +51,29 @@ public sealed class AudioEndpointInfo : INotifyPropertyChanged
     public bool IsDefault
     {
         get => _isDefault;
-        set { if (_isDefault != value) { _isDefault = value; OnPropertyChanged(); } }
+        set
+        {
+            if (_isDefault != value)
+            {
+                _isDefault = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ActiveBadgeVisibility));
+            }
+        }
     }
 
     public float Volume
     {
         get => _volume;
-        set { if (Math.Abs(_volume - value) > 0.001f) { _volume = value; OnPropertyChanged(); } }
+        set
+        {
+            if (Math.Abs(_volume - value) > 0.001f)
+            {
+                _volume = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(VolumePercentText));
+            }
+        }
     }
 
     public bool IsMuted
@@ -79,8 +95,22 @@ public sealed class AudioEndpointInfo : INotifyPropertyChanged
     public int? BatteryPercent
     {
         get => _batteryPercent;
-        set { if (_batteryPercent != value) { _batteryPercent = value; OnPropertyChanged(); } }
+        set
+        {
+            if (_batteryPercent != value)
+            {
+                _batteryPercent = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(BatteryBadgeVisibility));
+                OnPropertyChanged(nameof(BatteryText));
+            }
+        }
     }
+
+    public System.Windows.Visibility ActiveBadgeVisibility => _isDefault ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+    public System.Windows.Visibility BatteryBadgeVisibility => _batteryPercent.HasValue ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+    public string BatteryText => _batteryPercent.HasValue ? $"{_batteryPercent.Value}%" : "";
+    public string VolumePercentText => $"{Math.Round(_volume * 100)}%";
 
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnPropertyChanged([CallerMemberName] string? prop = null) =>
@@ -96,6 +126,11 @@ public sealed class AppAudioSessionInfo : INotifyPropertyChanged
     public string AppName { get; init; } = "";
     public string Subtitle { get; init; } = "App Audio";
     public string Glyph { get; init; } = "\uE8D6";
+    public System.Windows.Media.ImageSource? AppIcon { get; set; }
+    public bool HasIcon => AppIcon != null;
+    public System.Windows.Visibility IconVisibility => AppIcon != null ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+    public System.Windows.Visibility FallbackIconVisibility => AppIcon == null ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+    public bool IsActiveStream => Subtitle == "Playing Audio";
 
     public float Volume
     {
@@ -106,9 +141,12 @@ public sealed class AppAudioSessionInfo : INotifyPropertyChanged
             {
                 _volume = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(VolumePercentText));
             }
         }
     }
+
+    public string VolumePercentText => $"{Math.Round(_volume * 100)}%";
 
     public bool IsMuted
     {
@@ -378,12 +416,23 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
                         string appName = ResolveAppName(pid, s.DisplayName);
                         if (string.IsNullOrWhiteSpace(appName)) continue;
 
+                        string? exePath = null;
+                        try
+                        {
+                            using var proc = Process.GetProcessById((int)pid);
+                            exePath = proc.MainModule?.FileName;
+                        }
+                        catch { }
+
+                        var appIcon = !string.IsNullOrEmpty(exePath) ? Views.Widgets.LauncherView.GetAppIcon(exePath) : null;
+
                         byPid[pid] = new AppAudioSessionInfo
                         {
                             ProcessId = pid,
                             AppName = appName,
                             Subtitle = s.State == AudioSessionState.AudioSessionStateActive ? "Playing Audio" : "Idle Session",
                             Glyph = GlyphForAppAudio(appName),
+                            AppIcon = appIcon,
                             Volume = vol,
                             IsMuted = muted
                         };

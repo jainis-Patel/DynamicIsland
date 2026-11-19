@@ -139,6 +139,19 @@
                                 <Ellipse Width="5.5" Height="5.5" Fill="#FF9F0A" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Grid>
 
+                            <!-- Update Available Dot (iOS Vibrant Blue / Green) -->
+                            <Grid x:Name="UpdateAvailableDot" Margin="0,0,4,0" Visibility="Collapsed" VerticalAlignment="Center" ToolTip="Update Available · Click to open Settings" Cursor="Hand" MouseLeftButtonDown="UpdateAvailableDot_Click">
+                                <Ellipse Width="10" Height="10">
+                                    <Ellipse.Fill>
+                                        <RadialGradientBrush>
+                                            <GradientStop x:Name="UpdateDotGlowStop" Color="#800A84FF" Offset="0" />
+                                            <GradientStop Color="#000A84FF" Offset="1" />
+                                        </RadialGradientBrush>
+                                    </Ellipse.Fill>
+                                </Ellipse>
+                                <Ellipse x:Name="UpdateDotCore" Width="5.5" Height="5.5" Fill="#0A84FF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Grid>
+
                             <!-- Recessed TrueDepth Camera Lens Ring when idle -->
                             <Grid x:Name="IdleSensorDot" VerticalAlignment="Center">
                                 <Ellipse Width="8.5" Height="8.5" Fill="#0A0A0F" Stroke="#282836" StrokeThickness="1" />
@@ -839,6 +852,7 @@
                         <widgets:NotificationsView x:Name="NotificationsContainer" Visibility="Collapsed" />
                         <widgets:SystemHudView x:Name="SystemHudContainer" Visibility="Collapsed" />
                         <widgets:ConverterView x:Name="ConverterContainer" Visibility="Collapsed" />
+                        <widgets:WidgetsGalleryView x:Name="WidgetsGalleryContainer" Visibility="Collapsed" />
                         <widgets:LauncherView x:Name="LauncherContainer" Visibility="Collapsed" />
                         <widgets:TermiNotchView x:Name="TermiContainer" Visibility="Collapsed" />
                         <widgets:PhoneBridgeView x:Name="PhoneBridgeContainer" Visibility="Collapsed" />
@@ -874,7 +888,7 @@
         <!-- ── Floating Bottom Navigation Dock (Apple Fluid Capsule) ────────────────── -->
         <Border x:Name="FloatingDockHost"
                 HorizontalAlignment="Center" VerticalAlignment="Top"
-                Height="40" MaxWidth="484"
+                Height="40" MaxWidth="512"
                 Margin="0,0,0,0"
                 CornerRadius="20"
                 Background="{DynamicResource FloatingDockBackgroundBrush}"
@@ -925,14 +939,19 @@
                     </Grid>
                 </Button>
 
-                <!-- 5. Media & Sound (Image 2) -->
-                <Button x:Name="AudioButton" AutomationProperties.Name="Audio and Music" Style="{StaticResource DockIconButton}" ToolTip="Music &amp; Audio (Ctrl+5)">
-                    <TextBlock Style="{StaticResource Glyph}" FontSize="12.5" Text="&#xE8D6;" />
+                <!-- 5. ❖ Widgets Gallery (Live Bento Dashboard) -->
+                <Button x:Name="WidgetsGalleryButton" AutomationProperties.Name="Widgets Gallery" Style="{StaticResource DockIconButton}" ToolTip="Widgets Gallery · Bento Dashboard (Ctrl+5)">
+                    <TextBlock Style="{StaticResource Glyph}" FontSize="12.5" Text="&#xE74C;" />
                 </Button>
 
-                <!-- 6. All Apps & Widgets Grid Launcher (Image 2) -->
-                <Button x:Name="LauncherButton" AutomationProperties.Name="Apps and Widgets" Style="{StaticResource DockIconButton}" ToolTip="Apps &amp; Widgets Panel (Ctrl+6)">
+                <!-- 6. ⊞ Apps Launchpad (Pinned Apps & Tools) -->
+                <Button x:Name="LauncherButton" AutomationProperties.Name="Apps Launchpad" Style="{StaticResource DockIconButton}" ToolTip="Apps Launchpad · Pinned Apps &amp; Tools (Ctrl+6)">
                     <TextBlock Style="{StaticResource Glyph}" FontSize="13" Text="&#xF0E2;" />
+                </Button>
+
+                <!-- 7. Media & Sound Endpoints -->
+                <Button x:Name="AudioButton" AutomationProperties.Name="Audio and Music" Style="{StaticResource DockIconButton}" ToolTip="Music &amp; Audio Endpoints (Ctrl+7)">
+                    <TextBlock Style="{StaticResource Glyph}" FontSize="12.5" Text="&#xE8D6;" />
                 </Button>
 
                 <!-- Subtle Vertical Apple Divider -->
@@ -945,7 +964,12 @@
                 </Button>
                 <Button x:Name="SettingsButton" AutomationProperties.Name="Appearance and Settings"
                         Style="{StaticResource FloatingDockUtilityButton}" Margin="0,0,2,0" ToolTip="Appearance &amp; Settings (Ctrl+Alt+S)">
-                    <TextBlock Style="{StaticResource Glyph}" FontSize="11.5" Text="&#xE713;" />
+                    <Grid>
+                        <TextBlock Style="{StaticResource Glyph}" FontSize="11.5" Text="&#xE713;" />
+                        <Border x:Name="SettingsUpdateBadgeDot" Width="6" Height="6" CornerRadius="3"
+                                Background="#30D158" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Margin="0,-2,-3,0" Visibility="Collapsed" IsHitTestVisible="False" />
+                    </Grid>
                 </Button>
                 <Button x:Name="CollapseButton" AutomationProperties.Name="Collapse Dynamic Island" Click="CollapseButton_Click"
                         Style="{StaticResource FloatingDockUtilityButton}" Margin="0" ToolTip="Collapse (Esc)">

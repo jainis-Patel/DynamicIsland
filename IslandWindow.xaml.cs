@@ -45,6 +45,7 @@ public partial class IslandWindow : Window
     private static readonly PillShape SystemHudExpandedShape  = new(484, 232, 34);
     private static readonly PillShape LyricsExpandedShape     = new(484, 216, 34);
     private static readonly PillShape ConverterExpandedShape  = new(484, 232, 36);
+    private static readonly PillShape WidgetsGalleryExpandedShape = new(484, 340, 36);
     private static readonly PillShape LauncherExpandedShape   = new(484, 320, 36);
     private static readonly PillShape TermiExpandedShape      = new(484, 232, 36);
     private static readonly PillShape PhoneBridgeExpandedShape = new(490, 252, 36);
@@ -52,7 +53,7 @@ public partial class IslandWindow : Window
     private static readonly PillShape CaptureStudioExpandedShape = new(484, 232, 36);
     private static readonly PillShape CalendarExpandedShape   = new(484, 256, 36);
     private static readonly PillShape NotesExpandedShape      = new(484, 240, 36);
-    private static readonly PillShape AudioExpandedShape      = new(484, 216, 34);
+    private static readonly PillShape AudioExpandedShape      = new(484, 340, 36);
     private static readonly PillShape ShelfExpandedShape      = new(484, 188, 34);
     private static readonly PillShape QuickReplyExpandedShape = new(484, 156, 36);
 
@@ -149,6 +150,7 @@ public partial class IslandWindow : Window
                 ExpandedView.Battery       => BatteryExpandedShape,
                 ExpandedView.SystemHud     => SystemHudExpandedShape,
                 ExpandedView.Converter     => ConverterExpandedShape,
+                ExpandedView.WidgetsGallery => WidgetsGalleryExpandedShape,
                 ExpandedView.Launcher      => LauncherExpandedShape,
                 ExpandedView.Termi         => TermiExpandedShape,
                 ExpandedView.PhoneBridge   => PhoneBridgeExpandedShape,
@@ -275,6 +277,8 @@ public partial class IslandWindow : Window
 
     internal SystemPerformanceService? SystemPerfServiceInstance => _systemPerfService;
     internal NetworkService? NetworkServiceInstance => _networkService;
+    internal MediaSessionService? MediaServiceInstance => _mediaService;
+    internal PowerPlanService? PowerPlanServiceInstance => _powerPlanService;
     internal DropShelfService? DropShelfServiceInstance => _shelfService;
     internal CalendarService? CalendarServiceInstance => _calendarService;
     internal TaskService? TaskServiceInstance => _taskService;
@@ -372,27 +376,28 @@ public partial class IslandWindow : Window
 
         _viewRegistry = new Dictionary<ExpandedView, (FrameworkElement, Button)>
         {
-            [ExpandedView.Media]         = (MediaContainer, MediaHomeButton),
-            [ExpandedView.Calendar]      = (CalendarContainer, CalendarButton),
-            [ExpandedView.Shelf]         = (ShelfContainer, ShelfButton),
-            [ExpandedView.Clipboard]     = (ClipboardContainer, ShelfButton),
-            [ExpandedView.Audio]         = (AudioContainer, AudioButton),
-            [ExpandedView.Launcher]      = (LauncherContainer, LauncherButton),
-            [ExpandedView.Calc]          = (CalcContainer, LauncherButton),
-            [ExpandedView.Notes]         = (NotesContainer, LauncherButton),
-            [ExpandedView.VoiceMemo]     = (VoiceMemoContainer, LauncherButton),
-            [ExpandedView.Network]       = (NetworkContainer, LauncherButton),
-            [ExpandedView.Peripherals]   = (PeripheralsContainer, LauncherButton),
-            [ExpandedView.Battery]       = (BatteryContainer, LauncherButton),
-            [ExpandedView.SystemHud]     = (SystemHudContainer, LauncherButton),
-            [ExpandedView.Converter]     = (ConverterContainer, LauncherButton),
-            [ExpandedView.Termi]         = (TermiContainer, LauncherButton),
-            [ExpandedView.PhoneBridge]   = (PhoneBridgeContainer, LauncherButton),
-            [ExpandedView.MechSounds]    = (MechSoundsContainer, LauncherButton),
-            [ExpandedView.CaptureStudio] = (CaptureStudioContainer, LauncherButton),
-            [ExpandedView.QuickReply]    = (QuickReplyContainer, NotificationsButton),
-            [ExpandedView.Notifications] = (NotificationsContainer, NotificationsButton),
-            [ExpandedView.Settings]      = (SettingsContainer, SettingsButton),
+            [ExpandedView.Media]          = (MediaContainer, MediaHomeButton),
+            [ExpandedView.Calendar]       = (CalendarContainer, CalendarButton),
+            [ExpandedView.Shelf]          = (ShelfContainer, ShelfButton),
+            [ExpandedView.Notifications]  = (NotificationsContainer, NotificationsButton),
+            [ExpandedView.WidgetsGallery] = (WidgetsGalleryContainer, WidgetsGalleryButton),
+            [ExpandedView.Launcher]       = (LauncherContainer, LauncherButton),
+            [ExpandedView.Audio]          = (AudioContainer, AudioButton),
+            [ExpandedView.Clipboard]      = (ClipboardContainer, ShelfButton),
+            [ExpandedView.SystemHud]      = (SystemHudContainer, WidgetsGalleryButton),
+            [ExpandedView.Battery]        = (BatteryContainer, WidgetsGalleryButton),
+            [ExpandedView.Network]        = (NetworkContainer, WidgetsGalleryButton),
+            [ExpandedView.Peripherals]    = (PeripheralsContainer, WidgetsGalleryButton),
+            [ExpandedView.Calc]           = (CalcContainer, LauncherButton),
+            [ExpandedView.Notes]          = (NotesContainer, LauncherButton),
+            [ExpandedView.VoiceMemo]      = (VoiceMemoContainer, LauncherButton),
+            [ExpandedView.Converter]      = (ConverterContainer, LauncherButton),
+            [ExpandedView.Termi]          = (TermiContainer, LauncherButton),
+            [ExpandedView.PhoneBridge]    = (PhoneBridgeContainer, LauncherButton),
+            [ExpandedView.MechSounds]     = (MechSoundsContainer, LauncherButton),
+            [ExpandedView.CaptureStudio]  = (CaptureStudioContainer, LauncherButton),
+            [ExpandedView.QuickReply]     = (QuickReplyContainer, NotificationsButton),
+            [ExpandedView.Settings]       = (SettingsContainer, SettingsButton),
         };
 
         _orderedViews = _viewRegistry.Keys.ToList();
@@ -805,11 +810,12 @@ public partial class IslandWindow : Window
             else
                 SwitchExpandedView(ExpandedView.Shelf, true);
         };
-        ClearShelfButton.Click    += (_, _) => _shelfService.Clear();
-        NotificationsButton.Click += (_, _) => SwitchExpandedView(ExpandedView.Notifications, true);
-        AudioButton.Click         += (_, _) => SwitchExpandedView(ExpandedView.Audio, true);
-        LauncherButton.Click      += (_, _) => SwitchExpandedView(ExpandedView.Launcher, true);
-        SettingsButton.Click      += (_, _) => SwitchExpandedView(ExpandedView.Settings, true);
+        ClearShelfButton.Click     += (_, _) => _shelfService.Clear();
+        NotificationsButton.Click  += (_, _) => SwitchExpandedView(ExpandedView.Notifications, true);
+        WidgetsGalleryButton.Click += (_, _) => SwitchExpandedView(ExpandedView.WidgetsGallery, true);
+        LauncherButton.Click       += (_, _) => SwitchExpandedView(ExpandedView.Launcher, true);
+        AudioButton.Click          += (_, _) => SwitchExpandedView(ExpandedView.Audio, true);
+        SettingsButton.Click       += (_, _) => SwitchExpandedView(ExpandedView.Settings, true);
         PreviewKeyDown            += IslandWindow_PreviewKeyDown;
 
         if (FloatingDockHost != null)
@@ -885,7 +891,7 @@ public partial class IslandWindow : Window
             return;
         }
 
-        _miniPlayerWindow = new Views.MiniPlayerWindow(_mediaService, _lyricsService, _volumeService, _mediaSongListService);
+        _miniPlayerWindow = new Views.MiniPlayerWindow(_mediaService, _lyricsService, _volumeService, _mediaSongListService, _audioSpectrum);
         _miniPlayerWindow.Closed += (_, _) => _miniPlayerWindow = null;
 
         double scale = DpiScaleValue;

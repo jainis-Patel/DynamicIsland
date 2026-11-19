@@ -16,7 +16,7 @@ namespace DynamicIsland;
 public partial class IslandWindow
 {
     // =================================================================
-    //  Audio Output & Bluetooth Quick-Switcher
+    //  Sound & Audio Output Center
     // =================================================================
 
     private void OnAudioEndpointsChanged(IReadOnlyList<AudioEndpointInfo> endpoints)
@@ -27,6 +27,7 @@ public partial class IslandWindow
         {
             AudioButtonGlyph.Text = cur.Glyph;
         }
+        SyncHeroActiveDeviceUI();
     }
 
     private void OnDefaultAudioEndpointChanged(AudioEndpointInfo newDef)
@@ -34,6 +35,8 @@ public partial class IslandWindow
         AudioButtonGlyph.Text = newDef.Glyph;
         _volumeService.ReattachDefaultEndpoint();
         _audioSpectrum.NotifyDefaultDeviceChanged();
+        SyncHeroActiveDeviceUI(newDef);
+        SyncMasterVolumeUI();
         _machine.PushToast(new ToastContent(
             newDef.Glyph,
             "Audio Output Switched",
@@ -67,6 +70,11 @@ public partial class IslandWindow
         if (sender is Slider { Tag: string deviceId, IsMouseCaptureWithin: true })
         {
             _audioEndpointService.SetEndpointVolume(deviceId, (float)e.NewValue);
+            var cur = _audioEndpointService.CurrentDefault;
+            if (cur != null && string.Equals(cur.Id, deviceId, StringComparison.OrdinalIgnoreCase))
+            {
+                SyncMasterVolumeUI((float)e.NewValue, _volumeService.IsMuted);
+            }
         }
     }
 
@@ -79,26 +87,130 @@ public partial class IslandWindow
         }
     }
 
-    internal void AudioModeToggleBtn_Click(object sender, RoutedEventArgs e)
+    internal void AudioModeOutputsBtn_Click(object sender, RoutedEventArgs e)
     {
-        _isAudioAppMixerMode = !_isAudioAppMixerMode;
-        if (AudioSectionTitle != null)
+        _isAudioAppMixerMode = false;
+        SyncAudioModeSwitcherUI();
+    }
+
+    internal void AudioModeMixerBtn_Click(object sender, RoutedEventArgs e)
+    {
+        _isAudioAppMixerMode = true;
+        _audioEndpointService.RefreshAppSessions();
+        SyncAudioModeSwitcherUI();
+    }
+
+    internal void HardwareMicBtn_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleMicMute();
+    }
+
+    internal void HeroMasterMuteBtn_Click(object sender, RoutedEventArgs e)
+    {
+        _volumeService.ToggleMute();
+        SyncMasterVolumeUI();
+    }
+
+    internal void HeroMasterVolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (sender is Slider { IsMouseCaptureWithin: true })
         {
-            AudioSectionTitle.Text = _isAudioAppMixerMode ? "Per-App Volume Mixer" : "Audio Output";
+            _volumeService.SetVolume((float)e.NewValue);
+            SyncMasterVolumeUI((float)e.NewValue, _volumeService.IsMuted);
         }
-        if (AudioModeToggleText != null)
+    }
+
+    internal void AudioView_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        var sv = _isAudioAppMixerMode ? AudioAppMixerScrollViewer : AudioEndpointsScrollViewer;
+        if (sv != null)
         {
-            AudioModeToggleText.Text = _isAudioAppMixerMode ? "Output Devices" : "App Mixer";
-            AudioModeToggleText.Foreground = _isAudioAppMixerMode ? ThemeBrushes.Green : ThemeBrushes.Blue;
+            SmoothScrollVertical(sv, -e.Delta * 0.85);
+            e.Handled = true;
         }
+    }
+
+    private void SyncHeroActiveDeviceUI(AudioEndpointInfo? target = null)
+    {
+        var def = target ?? _audioEndpointService.CurrentDefault ?? _audioEndpoints.FirstOrDefault(x => x.IsDefault);
+        if (def != null)
+        {
+            if (HeroDeviceNameText != null) HeroDeviceNameText.Text = def.Name;
+            if (HeroDeviceGlyph != null) HeroDeviceGlyph.Text = def.Glyph;
+            if (HeroDeviceTypeText != null) HeroDeviceTypeText.Text = $"{def.DeviceType} \u00B7 Active Output";
+            if (HeroDeviceBatteryBadge != null)
+            {
+                HeroDeviceBatteryBadge.Visibility = def.BatteryPercent.HasValue ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (HeroDeviceBatteryText != null && def.BatteryPercent.HasValue)
+            {
+                HeroDeviceBatteryText.Text = $"{def.BatteryPercent.Value}%";
+            }
+        }
+    }
+
+    internal void SyncMasterVolumeUI(float? volume = null, bool? muted = null)
+    {
+        float vol = volume ?? _volumeService.CurrentVolume;
+        bool isMuted = muted ?? _volumeService.IsMuted;
+
+        if (HeroMasterVolumeSlider != null && !HeroMasterVolumeSlider.IsMouseCaptureWithin)
+        {
+            HeroMasterVolumeSlider.Value = vol;
+        }
+
+        if (HeroMasterVolumePercentText != null)
+        {
+            HeroMasterVolumePercentText.Text = isMuted ? "0%" : $"{Math.Round(vol * 100)}%";
+        }
+
+        if (HeroSpeakerIcon != null)
+        {
+            HeroSpeakerIcon.Text = isMuted ? "\uE74F" : (vol > 0.66f ? "\uE767" : vol > 0.33f ? "\uE994" : "\uE993");
+            HeroSpeakerIcon.Foreground = isMuted ? ThemeBrushes.Red : ThemeBrushes.SecondaryText;
+        }
+
+        if (HeroMasterMuteGlyph != null)
+        {
+            HeroMasterMuteGlyph.Text = isMuted ? "\uE74F" : "\uE767";
+            HeroMasterMuteGlyph.Foreground = isMuted ? ThemeBrushes.Red : ThemeBrushes.PrimaryText;
+        }
+    }
+
+    private void SyncAudioModeSwitcherUI()
+    {
+        if (AudioModeOutputsBtn != null && AudioModeMixerBtn != null)
+        {
+            if (!_isAudioAppMixerMode)
+            {
+                AudioModeOutputsBtn.Background = ThemeBrushes.FilterPillActiveBg;
+                AudioModeOutputsBtn.Foreground = ThemeBrushes.PrimaryText;
+                AudioModeOutputsBtn.BorderBrush = ThemeBrushes.DockActiveBorder;
+
+                AudioModeMixerBtn.Background = ThemeBrushes.FilterPillInactiveBg;
+                AudioModeMixerBtn.Foreground = ThemeBrushes.SecondaryText;
+                AudioModeMixerBtn.BorderBrush = ThemeBrushes.FilterPillInactiveBorder;
+            }
+            else
+            {
+                AudioModeMixerBtn.Background = ThemeBrushes.FilterPillActiveBg;
+                AudioModeMixerBtn.Foreground = ThemeBrushes.PrimaryText;
+                AudioModeMixerBtn.BorderBrush = ThemeBrushes.DockActiveBorder;
+
+                AudioModeOutputsBtn.Background = ThemeBrushes.FilterPillInactiveBg;
+                AudioModeOutputsBtn.Foreground = ThemeBrushes.SecondaryText;
+                AudioModeOutputsBtn.BorderBrush = ThemeBrushes.FilterPillInactiveBorder;
+            }
+        }
+
         if (AudioEndpointsScrollViewer != null && AudioAppMixerScrollViewer != null)
         {
             AudioEndpointsScrollViewer.Visibility = _isAudioAppMixerMode ? Visibility.Collapsed : Visibility.Visible;
             AudioAppMixerScrollViewer.Visibility = _isAudioAppMixerMode ? Visibility.Visible : Visibility.Collapsed;
         }
+
         if (_isAudioAppMixerMode)
         {
-            _audioEndpointService.RefreshAppSessions();
             if (AudioAppMixerEmptyPlaceholder != null)
             {
                 AudioAppMixerEmptyPlaceholder.Visibility = _audioAppSessions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -107,6 +219,18 @@ public partial class IslandWindow
         else if (AudioAppMixerEmptyPlaceholder != null)
         {
             AudioAppMixerEmptyPlaceholder.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void RefreshAudioView()
+    {
+        SyncMasterVolumeUI();
+        SyncHeroActiveDeviceUI();
+        SyncAudioModeSwitcherUI();
+        UpdateMicMuteUI();
+        if (_isAudioAppMixerMode)
+        {
+            _audioEndpointService.RefreshAppSessions();
         }
     }
 
@@ -137,5 +261,4 @@ public partial class IslandWindow
             _audioEndpointService.RefreshAppSessions();
         }
     }
-
 }

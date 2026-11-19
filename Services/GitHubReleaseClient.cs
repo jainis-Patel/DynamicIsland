@@ -21,15 +21,41 @@ internal sealed class GitHubReleaseClient : IDisposable
     public const string DefaultOwner = "jainis-Patel";
     public const string DefaultRepo = "DynamicIsland";
 
-    public GitHubReleaseClient(HttpClient? client = null)
+    public GitHubReleaseClient(HttpClient? client = null, string? appVersion = null, string? gitHubToken = null)
     {
+        string ver = !string.IsNullOrWhiteSpace(appVersion) ? appVersion : InstallerService.AppVersion;
+        if (!ProductInfoHeaderValue.TryParse($"DynamicIsland/{ver}", out var productHeader))
+        {
+            productHeader = new ProductInfoHeaderValue("DynamicIsland", "0.6.0");
+        }
+
         _http = client ?? new HttpClient();
         _http.Timeout = TimeSpan.FromSeconds(15);
-        _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("DynamicIsland", "0.4.0"));
+        _http.DefaultRequestHeaders.UserAgent.Add(productHeader);
 
         _downloadHttp = new HttpClient();
         _downloadHttp.Timeout = TimeSpan.FromMinutes(10);
-        _downloadHttp.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("DynamicIsland", "0.4.0"));
+        _downloadHttp.DefaultRequestHeaders.UserAgent.Add(productHeader);
+
+        if (!string.IsNullOrWhiteSpace(gitHubToken))
+        {
+            SetToken(gitHubToken);
+        }
+    }
+
+    /// <summary>
+    /// Updates or clears the GitHub Personal Access Token authorization header.
+    /// </summary>
+    public void SetToken(string? token)
+    {
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Trim());
+        }
+        else
+        {
+            _http.DefaultRequestHeaders.Authorization = null;
+        }
     }
 
     /// <summary>
@@ -171,7 +197,7 @@ internal sealed class GitHubReleaseClient : IDisposable
                     using var fDoc = await JsonDocument.ParseAsync(fStream, cancellationToken: ct).ConfigureAwait(false);
                     if (fDoc.RootElement.ValueKind == JsonValueKind.Array && fDoc.RootElement.GetArrayLength() > 0)
                     {
-                        return ParseReleaseElement(fDoc.RootElement[0]);
+                        return await TryParseOrFetchReleaseAsync(fDoc.RootElement[0], ct).ConfigureAwait(false);
                     }
                 }
                 return null;
@@ -185,13 +211,121 @@ internal sealed class GitHubReleaseClient : IDisposable
 
             using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);
-            return ParseReleaseElement(doc.RootElement);
+            return await TryParseOrFetchReleaseAsync(doc.RootElement, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             App.Log($"[GitHubClient] GitHub Releases API query failed: {ex.Message}");
             return null;
         }
+    }
+
+    private async Task<UpdateManifest?> TryParseOrFetchReleaseAsync(JsonElement root, CancellationToken ct)
+    {
+        string? manifestAssetUrl = null;
+        string? checksumsAssetUrl = null;
+
+        if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var asset in assets.EnumerateArray())
+            {
+                string name = asset.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+                if (string.Equals(name, "release-manifest.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    manifestAssetUrl = asset.TryGetProperty("browser_download_url", out var dl) ? dl.GetString() : null;
+                }
+                else if (string.Equals(name, "checksums.sha256", StringComparison.OrdinalIgnoreCase))
+                {
+                    checksumsAssetUrl = asset.TryGetProperty("browser_download_url", out var dl) ? dl.GetString() : null;
+                }
+            }
+        }
+
+        // 1. Download the exact release-manifest.json published as a release asset
+        if (!string.IsNullOrEmpty(manifestAssetUrl))
+        {
+            try
+            {
+                using var mResp = await _http.GetAsync(manifestAssetUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                if (mResp.IsSuccessStatusCode)
+                {
+                    string json = await mResp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                    var manifest = JsonSerializer.Deserialize<UpdateManifest>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    if (manifest != null && !string.IsNullOrWhiteSpace(manifest.Version))
+                    {
+                        return manifest;
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                App.Log($"[GitHubClient] Could not fetch release-manifest.json asset: {ex.Message}");
+            }
+        }
+
+        // 2. Parse from GitHub Release metadata
+        var fallbackManifest = ParseReleaseElement(root);
+
+        // 3. Populate SHA-256 hashes from checksums.sha256 if available
+        if (!string.IsNullOrEmpty(checksumsAssetUrl) && fallbackManifest.Downloads.Installer != null)
+        {
+            try
+            {
+                string checksums = await _http.GetStringAsync(checksumsAssetUrl, ct).ConfigureAwait(false);
+                string? hash = ExtractHashFromChecksumsText(checksums, "DynamicIsland-Setup.exe") ??
+                               ExtractHashFromChecksumsText(checksums, ".exe");
+                if (!string.IsNullOrEmpty(hash))
+                {
+                    fallbackManifest.Downloads.Installer.Sha256 = hash;
+                }
+
+                if (fallbackManifest.Downloads.Portable != null)
+                {
+                    string? portHash = ExtractHashFromChecksumsText(checksums, "DynamicIsland-Portable.zip") ??
+                                       ExtractHashFromChecksumsText(checksums, ".zip");
+                    if (!string.IsNullOrEmpty(portHash))
+                    {
+                        fallbackManifest.Downloads.Portable.Sha256 = portHash;
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                App.Log($"[GitHubClient] Could not parse checksums.sha256 asset: {ex.Message}");
+            }
+        }
+
+        return fallbackManifest;
+    }
+
+    /// <summary>
+    /// Parses a sha256 checksums file text to extract the 64-character hash for a specific file name or extension.
+    /// </summary>
+    public static string? ExtractHashFromChecksumsText(string checksumsContent, string fileNameOrExt)
+    {
+        if (string.IsNullOrWhiteSpace(checksumsContent)) return null;
+
+        using var reader = new StringReader(checksumsContent);
+        string? line;
+        while ((line = reader.ReadLine()) != null)
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            var parts = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2)
+            {
+                string hash = parts[0].Trim();
+                string file = parts[1].Trim();
+                if (hash.Length == 64 && (file.Contains(fileNameOrExt, StringComparison.OrdinalIgnoreCase) ||
+                                          fileNameOrExt.Contains(file, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return hash;
+                }
+            }
+        }
+        return null;
     }
 
     private static UpdateManifest ParseReleaseElement(JsonElement root)
@@ -274,6 +408,8 @@ internal sealed class GitHubReleaseClient : IDisposable
                 bool isPreRelease = release.TryGetProperty("prerelease", out var pre) && pre.GetBoolean();
 
                 string? installerUrl = null;
+                string? checksumsUrl = null;
+                string? manifestUrl = null;
                 long size = 0;
 
                 if (release.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
@@ -285,7 +421,14 @@ internal sealed class GitHubReleaseClient : IDisposable
                         {
                             installerUrl = asset.TryGetProperty("browser_download_url", out var dl) ? dl.GetString() : null;
                             size = asset.TryGetProperty("size", out var s) ? s.GetInt64() : 0;
-                            break;
+                        }
+                        else if (name.Equals("checksums.sha256", StringComparison.OrdinalIgnoreCase))
+                        {
+                            checksumsUrl = asset.TryGetProperty("browser_download_url", out var dl) ? dl.GetString() : null;
+                        }
+                        else if (name.Equals("release-manifest.json", StringComparison.OrdinalIgnoreCase))
+                        {
+                            manifestUrl = asset.TryGetProperty("browser_download_url", out var dl) ? dl.GetString() : null;
                         }
                     }
                 }
@@ -299,7 +442,9 @@ internal sealed class GitHubReleaseClient : IDisposable
                     IsPreRelease: isPreRelease,
                     InstallerUrl: installerUrl,
                     InstallerSha256: null,
-                    SizeBytes: size));
+                    SizeBytes: size,
+                    ChecksumsUrl: checksumsUrl,
+                    ManifestUrl: manifestUrl));
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -308,6 +453,68 @@ internal sealed class GitHubReleaseClient : IDisposable
         }
 
         return items;
+    }
+
+    /// <summary>
+    /// Resolves the expected cryptographic SHA-256 for a historical release asset by querying
+    /// its release-manifest.json, checksums.sha256, or release body.
+    /// </summary>
+    public async Task<string?> FetchExpectedSha256Async(
+        ReleaseHistoryItem item,
+        string targetFileName,
+        CancellationToken ct = default)
+    {
+        if (!string.IsNullOrWhiteSpace(item.InstallerSha256))
+        {
+            return item.InstallerSha256;
+        }
+
+        // 1. Try manifestUrl asset
+        if (!string.IsNullOrWhiteSpace(item.ManifestUrl))
+        {
+            try
+            {
+                using var resp = await _http.GetAsync(item.ManifestUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                if (resp.IsSuccessStatusCode)
+                {
+                    string json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                    var manifest = JsonSerializer.Deserialize<UpdateManifest>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    string? hash = manifest?.Downloads?.Installer?.Sha256;
+                    if (!string.IsNullOrWhiteSpace(hash)) return hash;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                App.Log($"[GitHubClient] Could not fetch manifest for rollback hash: {ex.Message}");
+            }
+        }
+
+        // 2. Try checksums.sha256 asset
+        if (!string.IsNullOrWhiteSpace(item.ChecksumsUrl))
+        {
+            try
+            {
+                string text = await _http.GetStringAsync(item.ChecksumsUrl, ct).ConfigureAwait(false);
+                string? hash = ExtractHashFromChecksumsText(text, targetFileName) ?? ExtractHashFromChecksumsText(text, ".exe");
+                if (!string.IsNullOrWhiteSpace(hash)) return hash;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                App.Log($"[GitHubClient] Could not fetch checksums for rollback hash: {ex.Message}");
+            }
+        }
+
+        // 3. Fallback: search body for 64-char hex string
+        if (!string.IsNullOrWhiteSpace(item.Summary))
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(item.Summary, @"\b[0-9a-fA-F]{64}\b");
+            if (match.Success)
+            {
+                return match.Value;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

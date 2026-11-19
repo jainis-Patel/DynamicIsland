@@ -76,13 +76,13 @@ public partial class LauncherView : UserControl
 
     private static readonly Dictionary<string, ImageSource?> _iconCache = new(StringComparer.OrdinalIgnoreCase);
 
-    private enum LauncherFilterMode { All, Pinned, Widgets }
+    private enum LauncherFilterMode { All, Pinned, Folders }
     private LauncherFilterMode _currentFilter = LauncherFilterMode.All;
     private string _searchQuery = "";
 
     private List<LauncherDisplayItem> _allCombined = new();
     private List<LauncherDisplayItem> _pinnedOnly = new();
-    private List<LauncherDisplayItem> _widgetsOnly = new();
+    private List<LauncherDisplayItem> _foldersOnly = new();
 
     #region Win32 Shell Icon Extraction Interop
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
@@ -167,7 +167,7 @@ public partial class LauncherView : UserControl
 
     private void TabWidgets_Click(object sender, RoutedEventArgs e)
     {
-        _currentFilter = LauncherFilterMode.Widgets;
+        _currentFilter = LauncherFilterMode.Folders;
         ApplyFilter();
     }
 
@@ -189,8 +189,8 @@ public partial class LauncherView : UserControl
     {
         IEnumerable<LauncherDisplayItem> source = _currentFilter switch
         {
-            LauncherFilterMode.Pinned => _pinnedOnly,
-            LauncherFilterMode.Widgets => _widgetsOnly,
+            LauncherFilterMode.Pinned => _pinnedOnly.Where(i => i.Subtitle != "Folder").ToList(),
+            LauncherFilterMode.Folders => _foldersOnly,
             _ => _allCombined
         };
 
@@ -207,7 +207,7 @@ public partial class LauncherView : UserControl
 
         bool hasSearch = !string.IsNullOrWhiteSpace(_searchQuery);
         EmptySearchPrompt.Visibility = (hasSearch && list.Count == 0) ? Visibility.Visible : Visibility.Collapsed;
-        EmptyAppsPrompt.Visibility = (!hasSearch && _currentFilter == LauncherFilterMode.Pinned && _pinnedOnly.Count == 0)
+        EmptyAppsPrompt.Visibility = (!hasSearch && _pinnedOnly.Count == 0)
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -224,8 +224,8 @@ public partial class LauncherView : UserControl
         TabPinnedBtn.Background = _currentFilter == LauncherFilterMode.Pinned ? TabActiveBg : TabInactiveBg;
         TabPinnedBtn.Foreground = _currentFilter == LauncherFilterMode.Pinned ? TabActiveFg : TabInactiveFg;
 
-        TabWidgetsBtn.Background = _currentFilter == LauncherFilterMode.Widgets ? TabActiveBg : TabInactiveBg;
-        TabWidgetsBtn.Foreground = _currentFilter == LauncherFilterMode.Widgets ? TabActiveFg : TabInactiveFg;
+        TabWidgetsBtn.Background = _currentFilter == LauncherFilterMode.Folders ? TabActiveBg : TabInactiveBg;
+        TabWidgetsBtn.Foreground = _currentFilter == LauncherFilterMode.Folders ? TabActiveFg : TabInactiveFg;
     }
 
     public static ImageSource? GetAppIcon(string targetPath)
@@ -330,23 +330,6 @@ public partial class LauncherView : UserControl
 
     public void RefreshItems()
     {
-        var builtInWidgets = new List<LauncherDisplayItem>
-        {
-            new() { Id = "island:calc", Name = "Calculator", Subtitle = "Math & Units", Glyph = "\uE8EF", TargetPath = "island:calc", AccentBrush = GreenAccent, IconBgBrush = GreenBg, IconBorderBrush = GreenBorder, FriendlyDescription = "Fast arithmetic, percentages & unit conversions", ActionHint = "Click to open · Right-click for options" },
-            new() { Id = "island:converter", Name = "File Converter", Subtitle = "PDF & Images", Glyph = "\uEA90", TargetPath = "island:converter", AccentBrush = BlueAccent, IconBgBrush = BlueBg, IconBorderBrush = BlueBorder, FriendlyDescription = "Batch convert PNG, JPG, WebP & merge PDFs", ActionHint = "Click to open · Right-click for options" },
-            new() { Id = "island:notes", Name = "Quick Notes", Subtitle = "Scratchpad", Glyph = "\uE70B", TargetPath = "island:notes", AccentBrush = YellowAccent, IconBgBrush = YellowBg, IconBorderBrush = YellowBorder, FriendlyDescription = "Markdown scratchpad, pinned checklists & notes", ActionHint = "Click to open · Right-click for options" },
-            new() { Id = "island:termi", Name = "Termi-Notch", Subtitle = "Console & Scripts", Glyph = "\uE756", TargetPath = "island:termi", AccentBrush = PurpleAccent, IconBgBrush = PurpleBg, IconBorderBrush = PurpleBorder, FriendlyDescription = "Command runner & quick terminal snippets", ActionHint = "Click to open · Right-click for options" },
-            new() { Id = "island:network", Name = "Wi-Fi Hub", Subtitle = "Speed & Networks", Glyph = "\uE701", TargetPath = "island:network", AccentBrush = BlueAccent, IconBgBrush = BlueBg, IconBorderBrush = BlueBorder, FriendlyDescription = "Live bandwidth, Wi-Fi toggles & network diagnostics", ActionHint = "Click to open · Right-click for options" },
-            new() { Id = "island:systemhud", Name = "System HUD", Subtitle = "CPU, RAM & Vitals", Glyph = "\uE9D9", TargetPath = "island:systemhud", AccentBrush = OrangeAccent, IconBgBrush = OrangeBg, IconBorderBrush = OrangeBorder, FriendlyDescription = "Hardware monitor, CPU/RAM delta & top processes", ActionHint = "Click to open · Right-click for options" },
-            new() { Id = "island:phonebridge", Name = "Phone Bridge", Subtitle = "LAN QuickShare", Glyph = "\uE8EA", TargetPath = "island:phonebridge", AccentBrush = GreenAccent, IconBgBrush = GreenBg, IconBorderBrush = GreenBorder, FriendlyDescription = "Wireless LAN file transfer & clipboard bridge", ActionHint = "Click to open · Right-click for options" },
-            new() { Id = "island:capturestudio", Name = "Capture Studio", Subtitle = "OCR & Snip", Glyph = "\uE924", TargetPath = "island:capturestudio", AccentBrush = CyanAccent, IconBgBrush = CyanBg, IconBorderBrush = CyanBorder, FriendlyDescription = "Screen capture, OCR text extraction & pin overlays", ActionHint = "Click to open · Right-click for options" },
-            new() { Id = "island:mechsounds", Name = "Mech Sounds", Subtitle = "Tactile Studio", Glyph = "\uE765", TargetPath = "island:mechsounds", AccentBrush = PinkAccent, IconBgBrush = PinkBg, IconBorderBrush = PinkBorder, FriendlyDescription = "Mechanical keyboard audio feedback & volume studio", ActionHint = "Click to open · Right-click for options" },
-            new() { Id = "island:battery", Name = "Battery & Power", Subtitle = "Energy Profiles", Glyph = "\uE945", TargetPath = "island:battery", AccentBrush = GreenAccent, IconBgBrush = GreenBg, IconBorderBrush = GreenBorder, FriendlyDescription = "Power plans, health telemetry & battery runtime", ActionHint = "Click to open · Right-click for options" },
-            new() { Id = "island:voicememo", Name = "Voice Memos", Subtitle = "Audio Recorder", Glyph = "\uE7C8", TargetPath = "island:voicememo", AccentBrush = RedAccent, IconBgBrush = RedBg, IconBorderBrush = RedBorder, FriendlyDescription = "High quality microphone audio recording & memos", ActionHint = "Click to open · Right-click for options" },
-        };
-
-        _widgetsOnly = builtInWidgets;
-
         if (Island?.QuickLauncherServiceInstance is { } svc)
         {
             _pinnedOnly = svc.Items.Select(i =>
@@ -376,12 +359,13 @@ public partial class LauncherView : UserControl
             _pinnedOnly = new List<LauncherDisplayItem>();
         }
 
-        // Unified layout: Pinned apps seamlessly flow first, followed directly by island widgets
-        _allCombined = _pinnedOnly.Concat(_widgetsOnly).ToList();
+        // Pure desktop application items only (all widgets migrated to Bento Widget Gallery)
+        _allCombined = _pinnedOnly;
+        _foldersOnly = _pinnedOnly.Where(i => i.Subtitle == "Folder").ToList();
 
         TabAllBtn.Content = $"All ({_allCombined.Count})";
-        TabPinnedBtn.Content = $"Pinned ({_pinnedOnly.Count})";
-        TabWidgetsBtn.Content = $"Widgets ({_widgetsOnly.Count})";
+        TabPinnedBtn.Content = $"Apps ({_pinnedOnly.Count - _foldersOnly.Count})";
+        TabWidgetsBtn.Content = $"Folders ({_foldersOnly.Count})";
 
         ApplyFilter();
     }

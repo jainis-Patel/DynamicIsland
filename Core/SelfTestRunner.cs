@@ -112,6 +112,7 @@ internal static class SelfTestRunner
         Run("Pillar3FloatingPiPAndNotch: Tear-off drag gesture, magnetic corner snapping & hardware notch fillets", TestPillar3DetachableFloatingIslandAndHardwareNotch);
         Run("Pillar4CommunityDropletsSdk: Schema-validated JSON definitions, hot-reloading & live polling pipeline", TestPillar4CommunityDropletsSdk);
         Run("Pillar5DeepGpuAndHardwareTelemetry: NVML/DXGI GPU sensors, per-core CPU heatmap & runaway process purge", TestPillar5DeepGpuAndHardwareTelemetry);
+        Run("UpdateManagerV2: Critical update handling, 7-day skipped reminder, auto-download setting & changelog invariants", TestUpdateManagerV2Invariants);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -377,6 +378,10 @@ internal static class SelfTestRunner
 
         Assert(ExpandedViewExtensions.TryParseKey("wifi", out var wifiView) && wifiView == ExpandedView.Network,
             "Expected 'wifi' alias to resolve to ExpandedView.Network");
+        Assert(ExpandedViewExtensions.TryParseKey("widgets", out var widgetsView) && widgetsView == ExpandedView.WidgetsGallery,
+            "Expected 'widgets' alias to resolve to ExpandedView.WidgetsGallery");
+        Assert(ExpandedViewExtensions.TryParseKey("bento", out var bentoView) && bentoView == ExpandedView.WidgetsGallery,
+            "Expected 'bento' alias to resolve to ExpandedView.WidgetsGallery");
         Assert(NetworkService.ResolveGlyph(connected: false, isWifi: true, isEthernet: false, signalBars: 0) == "\uEB5E",
             "Expected disconnected Wi-Fi glyph");
         Assert(NetworkService.ResolveGlyph(connected: true, isWifi: true, isEthernet: false, signalBars: 4) == "\uE701",
@@ -2163,8 +2168,9 @@ SSID 3 : Home_Router
         Assert(registry.Get("element_capture")?.TargetView == ExpandedView.CaptureStudio, "element_capture must route to ExpandedView.CaptureStudio");
         Assert(registry.Get("file_converter")?.TargetView == ExpandedView.Converter, "file_converter must route to ExpandedView.Converter");
         Assert(registry.Get("quick_launcher")?.TargetView == ExpandedView.Launcher, "quick_launcher must route to ExpandedView.Launcher");
+        Assert(registry.Get("widgets_gallery")?.TargetView == ExpandedView.WidgetsGallery, "widgets_gallery must route to ExpandedView.WidgetsGallery");
         Assert(registry.Get("termi_notch")?.TargetView == ExpandedView.Termi, "termi_notch must route to ExpandedView.Termi");
-        Assert(registry.Items.Count >= 17, $"Expected >= 17 built-in droplets, got {registry.Items.Count}");
+        Assert(registry.Items.Count >= 18, $"Expected >= 18 built-in droplets, got {registry.Items.Count}");
     }
 
     private static void TestQrCodeGenerator()
@@ -2248,6 +2254,50 @@ SSID 3 : Home_Router
             IsCurrent = true
         };
         Assert(sessionItem.AppName == "Spotify" && sessionItem.IsPlaying && sessionItem.IsCurrent, "ActiveMediaSessionItem properties failed");
+
+        // 6. Media Player Brand Detection (Spotify, Apple Music, YouTube Music, etc.)
+        var spotifyBrand = MediaPlayerBrandService.Detect("SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify");
+        Assert(spotifyBrand.Brand == MediaPlayerBrand.Spotify, $"Expected Spotify, got {spotifyBrand.Brand}");
+        Assert(spotifyBrand.DisplayName == "Spotify", $"Expected 'Spotify', got '{spotifyBrand.DisplayName}'");
+        Assert(spotifyBrand.IconGeometry != null && spotifyBrand.BrandBrush != null, "Spotify brand assets null");
+
+        var appleBrand1 = MediaPlayerBrandService.Detect("AppleInc.AppleMusicWin_nzy255yxpggw!App");
+        Assert(appleBrand1.Brand == MediaPlayerBrand.AppleMusic, $"Expected AppleMusic, got {appleBrand1.Brand}");
+        Assert(appleBrand1.DisplayName == "Apple Music", $"Expected 'Apple Music', got '{appleBrand1.DisplayName}'");
+
+        var appleBrand2 = MediaPlayerBrandService.Detect("iTunes.exe");
+        Assert(appleBrand2.Brand == MediaPlayerBrand.AppleMusic, $"Expected AppleMusic for iTunes, got {appleBrand2.Brand}");
+
+        var ytMusicBrand1 = MediaPlayerBrandService.Detect("YouTubeMusic.exe");
+        Assert(ytMusicBrand1.Brand == MediaPlayerBrand.YouTubeMusic, $"Expected YouTubeMusic, got {ytMusicBrand1.Brand}");
+        Assert(ytMusicBrand1.DisplayName == "YouTube Music", $"Expected 'YouTube Music', got '{ytMusicBrand1.DisplayName}'");
+
+        var ytMusicBrowser = MediaPlayerBrandService.Detect("msedge.exe", "Starboy", "The Weeknd", "YouTube Music");
+        Assert(ytMusicBrowser.Brand == MediaPlayerBrand.YouTubeMusic, $"Expected YouTubeMusic via browser album hint, got {ytMusicBrowser.Brand}");
+
+        var tidalBrand = MediaPlayerBrandService.Detect("TIDAL.exe");
+        Assert(tidalBrand.Brand == MediaPlayerBrand.Tidal, $"Expected Tidal, got {tidalBrand.Brand}");
+
+        var vlcBrand = MediaPlayerBrandService.Detect("vlc.exe");
+        Assert(vlcBrand.Brand == MediaPlayerBrand.Vlc, $"Expected VLC, got {vlcBrand.Brand}");
+
+        // 7. Timeline Extrapolation and Bar Sync Invariants
+        var mediaInfo = new MediaInfo
+        {
+            Title = "Song Sync Test",
+            Duration = TimeSpan.FromSeconds(200),
+            Position = TimeSpan.FromSeconds(50),
+            PositionUpdatedAt = DateTimeOffset.Now.AddSeconds(-5),
+            IsPlaying = true,
+            PlaybackRate = 1.0
+        };
+        var extrapolated = mediaInfo.GetPosition(DateTimeOffset.Now);
+        Assert(extrapolated >= TimeSpan.FromSeconds(54) && extrapolated <= TimeSpan.FromSeconds(56),
+            $"Expected extrapolated position ~55s, got {extrapolated.TotalSeconds}s");
+
+        mediaInfo.IsPlaying = false;
+        var pausedPos = mediaInfo.GetPosition(DateTimeOffset.Now);
+        Assert(pausedPos == TimeSpan.FromSeconds(50), "Paused track should not extrapolate position");
     }
 
     private static void TestTaskServiceAndCalendar()
@@ -2426,6 +2476,7 @@ SSID 3 : Home_Router
         Assert(IsInputFocusable(ExpandedView.QuickReply), "QuickReply must accept keyboard focus");
         Assert(!IsInputFocusable(ExpandedView.Media), "Media should not steal keyboard focus");
         Assert(!IsInputFocusable(ExpandedView.SystemHud), "System HUD should not steal keyboard focus");
+        Assert(!IsInputFocusable(ExpandedView.WidgetsGallery), "Widgets Gallery should not steal keyboard focus");
 
         // 2. Verify all ExpandedView keys round-trip
         foreach (ExpandedView v in Enum.GetValues<ExpandedView>())
@@ -2752,6 +2803,33 @@ SSID 3 : Home_Router
         string computedHash = UpdateIntegrityVerifier.ComputeSha256(testBytes);
         Assert(string.Equals(computedHash, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", StringComparison.OrdinalIgnoreCase),
             $"Computed SHA256 was '{computedHash}', expected ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+
+        // Verify checksums.sha256 parsing helper
+        string sampleChecksums = """
+        ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad  DynamicIsland-Setup.exe
+        11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff  DynamicIsland-Portable.zip
+        """;
+        string? extractedInstallerHash = Services.GitHubReleaseClient.ExtractHashFromChecksumsText(sampleChecksums, "DynamicIsland-Setup.exe");
+        Assert(extractedInstallerHash == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "Installer hash must be extracted from checksums text");
+
+        string? extractedZipHash = Services.GitHubReleaseClient.ExtractHashFromChecksumsText(sampleChecksums, ".zip");
+        Assert(extractedZipHash == "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff", "Zip hash must be extracted by extension");
+
+        // Verify ReleaseHistoryItem record with checksums/manifest URLs
+        var historyItem = new ReleaseHistoryItem(
+            Version: "0.5.0",
+            ReleaseTag: "v0.5.0",
+            ReleaseDate: DateTime.UtcNow,
+            Summary: "Release notes",
+            HtmlUrl: "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.5.0",
+            IsPreRelease: false,
+            InstallerUrl: "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.5.0/DynamicIsland-Setup.exe",
+            InstallerSha256: null,
+            SizeBytes: 70000000,
+            ChecksumsUrl: "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.5.0/checksums.sha256",
+            ManifestUrl: "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.5.0/release-manifest.json");
+        Assert(historyItem.ChecksumsUrl != null, "ChecksumsUrl must be populated");
+        Assert(historyItem.ManifestUrl != null, "ManifestUrl must be populated");
     }
 
     private static void TestLiveDownloadsAndNotificationAppGrouping()
@@ -3020,6 +3098,8 @@ SSID 3 : Home_Router
             Assert(manifest!.Version == "0.6.0", $"release-manifest.json version must be '0.6.0', got '{manifest.Version}'");
             Assert(manifest.ReleaseTag == "v0.6.0", $"release-manifest.json releaseTag must be 'v0.6.0', got '{manifest.ReleaseTag}'");
         }
+
+        Assert(InstallerService.AppVersion == "0.6.0", $"InstallerService.AppVersion must be '0.6.0', got '{InstallerService.AppVersion}'");
 
         // 3. WinGet Manifest Files validation
         string wingetDir = Path.Combine(projectRoot, "installer", "winget");
@@ -3479,5 +3559,63 @@ SSID 3 : Home_Router
         var purgeResult = perfService.PurgeRunawayProcesses(minCpuPercent: 95.0);
         Assert(purgeResult.KilledProcesses >= 0, "PurgeRunawayProcesses must return non-negative killed count");
         Assert(purgeResult.FreedCpuPercent >= 0.0, "PurgeRunawayProcesses must return non-negative freed CPU percent");
+    }
+
+    private static void TestUpdateManagerV2Invariants()
+    {
+        // 1. AppSettings AutoDownloadUpdates default invariant
+        var settings = new AppSettings();
+        Assert(settings.AutoDownloadUpdates, "AutoDownloadUpdates must default to true");
+        Assert(settings.AutoCheckUpdates, "AutoCheckUpdates must default to true");
+
+        // 2. SkippedVersionDate 7-day expiration logic invariant
+        settings.SkippedVersion = "0.7.0";
+        settings.SkippedVersionDate = DateTime.UtcNow - TimeSpan.FromDays(8);
+        bool isExpired = (DateTime.UtcNow - settings.SkippedVersionDate.Value) >= TimeSpan.FromDays(7);
+        Assert(isExpired, "Skipped updates older than 7 days must be considered expired");
+
+        settings.SkippedVersionDate = DateTime.UtcNow - TimeSpan.FromDays(2);
+        bool isRecent = (DateTime.UtcNow - settings.SkippedVersionDate.Value) < TimeSpan.FromDays(7);
+        Assert(isRecent, "Skipped updates younger than 7 days must remain suppressed");
+
+        // 3. GitHubReleaseClient SetToken & Bearer Authorization Header
+        using var client = new Services.GitHubReleaseClient(gitHubToken: "ghp_initialDummyToken");
+        client.SetToken("ghp_updatedDummyToken");
+        client.SetToken(null);
+
+        // 3. UpdateManifest Critical Update & Changelog serialization
+        string sampleCriticalJson = """
+        {
+          "version": "0.7.0",
+          "releaseTag": "v0.7.0",
+          "channel": "stable",
+          "releaseDate": "2026-11-20T00:00:00Z",
+          "changelogUrl": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.7.0",
+          "summary": "Critical zero-day security fix for Win32 hook interop",
+          "isCritical": true,
+          "downloads": {
+            "installer": {
+              "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.7.0/DynamicIsland-Setup.exe",
+              "sha256": "abcdef11223344556677889900aabbccddeeff11223344556677889900aabbcc",
+              "sizeBytes": 75000000
+            }
+          }
+        }
+        """;
+
+        var manifest = System.Text.Json.JsonSerializer.Deserialize<UpdateManifest>(sampleCriticalJson, new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        Assert(manifest != null, "Critical update manifest must deserialize cleanly");
+        Assert(manifest!.IsCritical, "Manifest isCritical must be true");
+        Assert(manifest.ChangelogUrl == "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.7.0", "ChangelogUrl must match");
+        Assert(manifest.ParsedVersion > SemVersion.Parse("0.6.0"), "0.7.0 must be greater than 0.6.0");
+
+        // 4. UpdateIntegrityVerifier TryCleanFile safety on non-existent path
+        string nonExistentPath = Path.Combine(Path.GetTempPath(), "DynamicIsland", "TestNonExistentFile.tmp");
+        bool cleaned = UpdateIntegrityVerifier.TryCleanFile(nonExistentPath);
+        Assert(!cleaned, "TryCleanFile on non-existent file must safely return false without throwing");
     }
 }

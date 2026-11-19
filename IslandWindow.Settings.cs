@@ -149,6 +149,7 @@ public partial class IslandWindow
                 break;
 
             case nameof(AppSettings.AutoCheckUpdates):
+            case nameof(AppSettings.AutoDownloadUpdates):
             case nameof(AppSettings.UpdateChannel):
             case nameof(AppSettings.LastUpdateCheckTime):
                 UpdateSettingsVersionAndStatusUI();
@@ -1536,6 +1537,7 @@ public partial class IslandWindow
         ApplyPin("calc", CalcButton, DockPinCalcBtn, DockPinCalcText);
         ApplyPin("notes", NotesButton, DockPinNotesBtn, DockPinNotesText);
         ApplyPin("converter", ConverterButton, DockPinConverterBtn, DockPinConverterText);
+        ApplyPin("widgets", WidgetsGalleryButton, null, null);
         ApplyPin("launcher", LauncherButton, DockPinLauncherBtn, DockPinLauncherText);
         ApplyPin("termi", TermiButton, DockPinTermiBtn, DockPinTermiText);
         ApplyPin("phonebridge", PhoneBridgeButton, DockPinPhoneBridgeBtn, DockPinPhoneBridgeText);
@@ -2482,21 +2484,49 @@ public partial class IslandWindow
 
     private void OnUpdateAvailable(UpdateManifest manifest)
     {
-        _machine.PushToast(new ToastContent(
-            Glyph: "\uE896",
-            Title: $"Dynamic Island v{manifest.Version} Available",
-            Subtitle: string.IsNullOrWhiteSpace(manifest.Summary) ? "Click to open settings and install" : manifest.Summary,
-            Accent: Color.FromRgb(0x0A, 0x84, 0xFF),
-            Duration: TimeSpan.FromSeconds(6.0),
-            TargetView: "settings",
-            Priority: ToastPriority.Feedback
-        ));
+        if (manifest.IsCritical)
+        {
+            _machine.PushToast(new ToastContent(
+                Glyph: "\uE7BA",
+                Title: $"⚠️ Critical Update: v{manifest.Version}",
+                Subtitle: string.IsNullOrWhiteSpace(manifest.Summary) ? "Mandatory security update required. Click to install." : manifest.Summary,
+                Accent: Color.FromRgb(0xFF, 0x45, 0x3A),
+                Duration: TimeSpan.FromSeconds(10.0),
+                TargetView: "settings",
+                Priority: ToastPriority.Critical
+            ));
+        }
+        else
+        {
+            _machine.PushToast(new ToastContent(
+                Glyph: "\uE896",
+                Title: $"Dynamic Island v{manifest.Version} Available",
+                Subtitle: string.IsNullOrWhiteSpace(manifest.Summary) ? "Click to open settings and install" : manifest.Summary,
+                Accent: Color.FromRgb(0x0A, 0x84, 0xFF),
+                Duration: TimeSpan.FromSeconds(6.0),
+                TargetView: "settings",
+                Priority: ToastPriority.Feedback
+            ));
+        }
 
         UpdateSettingsVersionAndStatusUI();
     }
 
     private void OnUpdateStatusChanged(UpdateStatus status, string? message)
     {
+        if (status == UpdateStatus.ReadyToInstall && _updateService.LatestManifest != null)
+        {
+            _machine.PushToast(new ToastContent(
+                Glyph: "\uE73E",
+                Title: $"Dynamic Island v{_updateService.LatestManifest.Version} Ready",
+                Subtitle: "Update downloaded & verified. Click to restart and update.",
+                Accent: ThemeBrushes.GreenColor,
+                Duration: TimeSpan.FromSeconds(7.0),
+                TargetView: "settings",
+                Priority: ToastPriority.Feedback
+            ));
+        }
+
         UpdateSettingsVersionAndStatusUI();
     }
 
@@ -2540,6 +2570,18 @@ public partial class IslandWindow
             AutoCheckToggleText.Foreground = auto ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
         }
 
+        if (AutoDownloadToggleText != null)
+        {
+            bool autoDl = _settingsService.Current.AutoDownloadUpdates;
+            AutoDownloadToggleText.Text = autoDl ? "On" : "Off";
+            AutoDownloadToggleText.Foreground = autoDl ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
+        }
+
+        if (GitHubTokenBox != null && !GitHubTokenBox.IsFocused)
+        {
+            GitHubTokenBox.Text = _settingsService.Current.GitHubToken ?? "";
+        }
+
         if (LastCheckTimestampText != null)
         {
             var last = _settingsService.Current.LastUpdateCheckTime;
@@ -2574,7 +2616,9 @@ public partial class IslandWindow
             {
                 if (UpdateVersionTitleText != null)
                 {
-                    UpdateVersionTitleText.Text = $"v{_updateService.LatestManifest.Version} Available";
+                    UpdateVersionTitleText.Text = _updateService.LatestManifest.IsCritical
+                        ? $"⚠️ v{_updateService.LatestManifest.Version} Critical Update"
+                        : $"v{_updateService.LatestManifest.Version} Available";
                 }
 
                 if (UpdateSummaryText != null)
@@ -2582,6 +2626,12 @@ public partial class IslandWindow
                     UpdateSummaryText.Text = string.IsNullOrWhiteSpace(_updateService.LatestManifest.Summary)
                         ? "New release published on GitHub."
                         : _updateService.LatestManifest.Summary;
+                }
+
+                if (ViewChangelogBtn != null)
+                {
+                    bool hasChangelog = !string.IsNullOrWhiteSpace(_updateService.LatestManifest.ChangelogUrl);
+                    ViewChangelogBtn.Visibility = hasChangelog ? Visibility.Visible : Visibility.Collapsed;
                 }
 
                 if (InstallUpdateBtnText != null)
@@ -2595,6 +2645,66 @@ public partial class IslandWindow
                         _ => "Install & Restart"
                     };
                 }
+            }
+        }
+
+        // Update notification badges (Island Pill dot & Dock Settings icon badge)
+        bool hasUpdateDot = _updateService.Status == UpdateStatus.UpdateAvailable ||
+                            _updateService.Status == UpdateStatus.ReadyToInstall;
+
+        if (SettingsUpdateBadgeDot != null)
+        {
+            SettingsUpdateBadgeDot.Visibility = hasUpdateDot ? Visibility.Visible : Visibility.Collapsed;
+            if (hasUpdateDot)
+            {
+                SettingsUpdateBadgeDot.Background = _updateService.Status == UpdateStatus.ReadyToInstall
+                    ? ThemeBrushes.Green
+                    : ThemeBrushes.Blue;
+            }
+        }
+
+        if (UpdateAvailableDot != null)
+        {
+            UpdateAvailableDot.Visibility = hasUpdateDot ? Visibility.Visible : Visibility.Collapsed;
+            if (hasUpdateDot)
+            {
+                bool isReady = _updateService.Status == UpdateStatus.ReadyToInstall;
+                if (UpdateDotCore != null)
+                {
+                    UpdateDotCore.Fill = isReady ? ThemeBrushes.Green : ThemeBrushes.Blue;
+                }
+                if (UpdateDotGlowStop != null)
+                {
+                    UpdateDotGlowStop.Color = isReady
+                        ? Color.FromArgb(0x80, 0x30, 0xD1, 0x58)
+                        : Color.FromArgb(0x80, 0x0A, 0x84, 0xFF);
+                }
+                UpdateAvailableDot.ToolTip = isReady
+                    ? $"Dynamic Island v{_updateService.LatestManifest?.Version} Ready to Install · Click to open Settings"
+                    : $"Dynamic Island v{_updateService.LatestManifest?.Version} Available · Click to open Settings";
+            }
+        }
+    }
+
+    internal void UpdateAvailableDot_Click(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        _machine.ExpandNow();
+        SwitchExpandedView(ExpandedView.Settings, true);
+    }
+
+    internal void ViewChangelogBtn_Click(object sender, RoutedEventArgs e)
+    {
+        string? url = _updateService.LatestManifest?.ChangelogUrl;
+        if (!string.IsNullOrWhiteSpace(url))
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Settings] Failed to launch changelog URL: {ex.Message}");
             }
         }
     }
@@ -2697,6 +2807,35 @@ public partial class IslandWindow
         UpdateSettingsVersionAndStatusUI();
     }
 
+    internal void AutoDownloadToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        bool next = !_settingsService.Current.AutoDownloadUpdates;
+        _settingsService.Update(s => s.AutoDownloadUpdates = next, nameof(AppSettings.AutoDownloadUpdates));
+        UpdateSettingsVersionAndStatusUI();
+    }
+
+    internal void GitHubTokenBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (GitHubTokenBox != null)
+        {
+            string? token = string.IsNullOrWhiteSpace(GitHubTokenBox.Text) ? null : GitHubTokenBox.Text.Trim();
+            if (_settingsService.Current.GitHubToken != token)
+            {
+                _settingsService.Update(s => s.GitHubToken = token, nameof(AppSettings.GitHubToken));
+                _updateService.SetGitHubToken(token);
+                _machine.PushToast(new ToastContent(
+                    Glyph: "\uE73E",
+                    Title: "GitHub Token Saved",
+                    Subtitle: string.IsNullOrEmpty(token) ? "Token cleared (standard 60 req/hr rate limit)" : "Token activated (5,000 req/hr rate limit)",
+                    Accent: ThemeBrushes.GreenColor,
+                    Duration: TimeSpan.FromSeconds(2.5),
+                    TargetView: "settings",
+                    Priority: ToastPriority.Feedback
+                ));
+            }
+        }
+    }
+
     internal async void ToggleVersionHistoryBtn_Click(object sender, RoutedEventArgs e)
     {
         if (VersionHistoryContainer == null) return;
@@ -2769,41 +2908,132 @@ public partial class IslandWindow
 
             if (!isCurrent && !string.IsNullOrEmpty(item.InstallerUrl))
             {
+                string actionText = SemVersion.TryParse(item.Version, out var v) && v > _updateService.CurrentVersion ? "Upgrade" : "Rollback";
+                var btnLabel = new TextBlock
+                {
+                    Text = actionText,
+                    FontSize = 7.5,
+                    FontWeight = FontWeights.Medium
+                };
+
                 var rollbackBtn = new Button
                 {
-                    Content = new TextBlock
-                    {
-                        Text = SemVersion.TryParse(item.Version, out var v) && v > _updateService.CurrentVersion ? "Upgrade" : "Rollback",
-                        FontSize = 7.5,
-                        FontWeight = FontWeights.Medium
-                    },
+                    Content = btnLabel,
                     Height = 18,
                     Padding = new Thickness(6, 0, 6, 0),
                     Style = (Style)FindResource("IslandButton"),
                     Tag = item
                 };
                 DockPanel.SetDock(rollbackBtn, Dock.Right);
+
                 rollbackBtn.Click += async (s, e) =>
                 {
-                    if (s is Button { Tag: ReleaseHistoryItem targetRelease } && !string.IsNullOrEmpty(targetRelease.InstallerUrl))
+                    if (s is not Button btn || btn.Tag is not ReleaseHistoryItem targetRelease || string.IsNullOrEmpty(targetRelease.InstallerUrl))
+                    {
+                        return;
+                    }
+
+                    string originalAction = actionText;
+                    btn.IsEnabled = false;
+                    btnLabel.Text = "Starting...";
+
+                    string tempDir = Path.Combine(Path.GetTempPath(), "DynamicIsland", "Updates");
+                    Directory.CreateDirectory(tempDir);
+                    string ext = Path.GetExtension(targetRelease.InstallerUrl) ?? ".exe";
+                    string targetFileName = $"DynamicIsland-{targetRelease.Version}{ext}";
+                    string dest = Path.Combine(tempDir, targetFileName);
+
+                    try
                     {
                         _machine.PushToast(new ToastContent(
                             "\uE896",
-                            "Downloading Release",
-                            $"Fetching {targetRelease.ReleaseTag} from GitHub...",
+                            $"{originalAction} Started",
+                            $"Downloading {targetRelease.ReleaseTag} from GitHub...",
                             ThemeBrushes.BlueColor,
+                            TimeSpan.FromSeconds(3.5),
+                            TargetView: "settings",
+                            Priority: ToastPriority.Feedback
+                        ));
+
+                        var progress = new Progress<UpdateProgressInfo>(info =>
+                        {
+                            Dispatcher.InvokeAsync(() =>
+                            {
+                                btnLabel.Text = $"{info.Percent:0}%";
+                                if (UpdateProgressBar != null)
+                                {
+                                    UpdateProgressBar.Visibility = Visibility.Visible;
+                                    UpdateProgressBar.Value = info.Percent;
+                                }
+                                if (UpdateProgressText != null)
+                                {
+                                    UpdateProgressText.Visibility = Visibility.Visible;
+                                    UpdateProgressText.Text = $"{originalAction} {targetRelease.ReleaseTag}: {info.Percent:0}%";
+                                }
+                            });
+                        });
+
+                        // 1. Fetch expected cryptographic SHA-256 hash from release metadata/checksums
+                        btnLabel.Text = "Resolving...";
+                        string? expectedHash = await _updateService.FetchSha256ForReleaseAsync(targetRelease, targetFileName).ConfigureAwait(true);
+
+                        // 2. Download package with real-time percentage progress
+                        btnLabel.Text = "Downloading...";
+                        using var client = new GitHubReleaseClient(appVersion: _updateService.CurrentVersionString);
+                        await client.DownloadFileWithProgressAsync(targetRelease.InstallerUrl, dest, progress).ConfigureAwait(true);
+
+                        // 3. Cryptographic SHA-256 integrity verification
+                        btnLabel.Text = "Verifying...";
+                        if (!string.IsNullOrWhiteSpace(expectedHash))
+                        {
+                            bool verified = await UpdateIntegrityVerifier.VerifyFileAsync(dest, expectedHash).ConfigureAwait(true);
+                            if (!verified)
+                            {
+                                UpdateIntegrityVerifier.TryCleanFile(dest);
+                                _machine.PushToast(new ToastContent(
+                                    "\uE783",
+                                    "Integrity Check Failed",
+                                    $"SHA-256 mismatch for {targetRelease.ReleaseTag}. Package was discarded for security.",
+                                    ThemeBrushes.AmberColor,
+                                    TimeSpan.FromSeconds(5.0),
+                                    TargetView: "settings",
+                                    Priority: ToastPriority.Feedback
+                                ));
+                                btnLabel.Text = originalAction;
+                                btn.IsEnabled = true;
+                                return;
+                            }
+                        }
+
+                        // 4. Verification passed: launch installer handoff and restart
+                        btnLabel.Text = "Launching...";
+                        _machine.PushToast(new ToastContent(
+                            "\uE73E",
+                            $"{originalAction} Ready",
+                            $"Launching {targetRelease.ReleaseTag} installer...",
+                            ThemeBrushes.GreenColor,
                             TimeSpan.FromSeconds(3.0),
                             TargetView: "settings",
                             Priority: ToastPriority.Feedback
                         ));
 
-                        string tempDir = Path.Combine(Path.GetTempPath(), "DynamicIsland", "Updates");
-                        string ext = Path.GetExtension(targetRelease.InstallerUrl) ?? ".exe";
-                        string dest = Path.Combine(tempDir, $"DynamicIsland-{targetRelease.Version}{ext}");
-
-                        using var client = new GitHubReleaseClient();
-                        await client.DownloadFileWithProgressAsync(targetRelease.InstallerUrl, dest);
                         UpdateHandoffEngine.ExecuteHandoff(dest, isInstaller: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        UpdateIntegrityVerifier.TryCleanFile(dest);
+                        App.Log($"[UpdateManager] {originalAction} failed: {ex.Message}");
+                        _machine.PushToast(new ToastContent(
+                            "\uE783",
+                            $"{originalAction} Failed",
+                            ex.Message,
+                            ThemeBrushes.AmberColor,
+                            TimeSpan.FromSeconds(4.5),
+                            TargetView: "settings",
+                            Priority: ToastPriority.Feedback
+                        ));
+                        btnLabel.Text = originalAction;
+                        btn.IsEnabled = true;
                     }
                 };
                 dock.Children.Add(rollbackBtn);

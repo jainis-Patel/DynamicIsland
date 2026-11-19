@@ -254,6 +254,10 @@ public partial class IslandWindow
             {
                 _networkService?.SetExpanded(false);
             }
+            else if (_currentExpandedView == ExpandedView.WidgetsGallery)
+            {
+                WidgetsGalleryContainer?.SetExpanded(false);
+            }
             _currentExpandedView = ExpandedView.Media;
             SetKeyboardFocusable(false);
             UpdatePinExpandedUI();

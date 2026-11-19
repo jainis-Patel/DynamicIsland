@@ -101,9 +101,12 @@ public sealed class AppSettings
     public bool EnableFastSwipeGuard { get; set; } = true;
     public bool EnableQuickTuck { get; set; } = true;
     public bool AutoCheckUpdates { get; set; } = true;
+    public bool AutoDownloadUpdates { get; set; } = true;
     public string UpdateChannel { get; set; } = "Stable";
     public DateTime? LastUpdateCheckTime { get; set; }
     public string? SkippedVersion { get; set; }
+    public DateTime? SkippedVersionDate { get; set; }
+    public string? GitHubToken { get; set; }
 }
 
 public sealed record ThemePalette(string Name, Color Accent, Color Glow, Color? LightAccent = null, Color? LightGlow = null)

@@ -5,158 +5,331 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:core="clr-namespace:DynamicIsland.Core"
              mc:Ignorable="d"
-             d:DesignHeight="150" d:DesignWidth="464">
-    <Grid>
+             d:DesignHeight="340" d:DesignWidth="470"
+             PreviewMouseWheel="AudioView_PreviewMouseWheel">
+    <UserControl.Resources>
+        <!-- Filter Pill Button Style (Segmented Capsule Switcher) -->
+        <Style x:Key="SegmentedPillButton" TargetType="Button">
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Padding" Value="9,0" />
+            <Setter Property="FontSize" Value="8.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource SecondaryBrush}" />
+            <Setter Property="Background" Value="{DynamicResource ChipBgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ChipBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="PillBorder" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="11" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="PillBorder" Property="Background" Value="{DynamicResource DockActiveBgBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Bento Card Base Style -->
+        <Style x:Key="AudioBentoCard" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CardBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="9,7" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+
+        <!-- Category Tag Badge Style -->
+        <Style x:Key="AudioTagBadge" TargetType="Border">
+            <Setter Property="Height" Value="16" />
+            <Setter Property="Padding" Value="6,0" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Background" Value="{DynamicResource ChipBgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource ChipBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="0,1,0,2">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
-            <TextBlock x:Name="AudioSectionTitle" Style="{StaticResource SectionTitle}" Text="Audio Output" />
-            <Button Click="AudioModeToggleBtn_Click" x:Name="AudioModeToggleBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0" ToolTipService.ToolTip="Switch between Output Devices and Per-App Volume Mixer">
-                <TextBlock x:Name="AudioModeToggleText" Text="App Mixer" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
-            </Button>
+
+        <!-- ── Top Header Toolbar & Segmented Switcher ──────────────── -->
+        <DockPanel Grid.Row="0" Margin="2,0,2,8" LastChildFill="False">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Left">
+                <Border Width="24" Height="24" CornerRadius="8" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" Margin="0,0,8,0">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8D6;" FontSize="11.5" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="AudioSectionTitle" Text="Sound &amp; Audio Center" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                    <TextBlock Text="Master volume, endpoints &amp; per-app mixer" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,1,0,0" />
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Segmented Capsule Switcher: [Outputs] [App Mixer] -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
+                    <Button x:Name="AudioModeOutputsBtn" Content="Outputs" Click="AudioModeOutputsBtn_Click" Style="{StaticResource SegmentedPillButton}" />
+                    <Button x:Name="AudioModeMixerBtn" Content="App Mixer" Click="AudioModeMixerBtn_Click" Style="{StaticResource SegmentedPillButton}" Margin="3,0,0,0" />
+                </StackPanel>
+
+                <!-- Hardware Microphone Mute Pill Button -->
+                <Button x:Name="HardwareMicBtn" Click="HardwareMicBtn_Click" Style="{StaticResource SegmentedPillButton}" ToolTipService.ToolTip="Toggle Hardware Microphone Mute">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="HardwareMicGlyph" Style="{StaticResource Glyph}" Text="&#xE720;" FontSize="9" Foreground="#30D158" Margin="0,0,4,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="HardwareMicText" Text="Mic: Active" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
         </DockPanel>
-        <Grid Grid.Row="1">
-            <ScrollViewer PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel" x:Name="AudioEndpointsScrollViewer" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly">
-                <ItemsControl x:Name="AudioEndpointsControl">
 
+        <!-- ── Hero Master Volume Card (Apple Control Center Spec) ────── -->
+        <Border Grid.Row="1" Margin="0,0,0,8" Padding="12,9" CornerRadius="14"
+                Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal" />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Width="154" Height="82" Margin="0,0,8,0" CornerRadius="10"
-                                                            BorderThickness="1" Padding="10,7" Cursor="Hand" MouseLeftButtonDown="AudioEndpointCard_Click">
-                                                        <Border.Style>
-                                                            <Style TargetType="Border">
-                                                                <Setter Property="Background" Value="{StaticResource CardSurfaceBrush}" />
-                                                                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
-                                                                <Style.Triggers>
-                                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                                        <Setter Property="BorderBrush" Value="#38FFFFFF" />
-                                                                        <Setter Property="Background" Value="#1A1A22" />
-                                                                    </Trigger>
-                                                                    <DataTrigger Binding="{Binding IsDefault}" Value="True">
-                                                                        <Setter Property="BorderBrush" Value="#4830D158" />
-                                                                        <Setter Property="Background" Value="#142219" />
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </Border.Style>
-                                                        <Grid>
-                                                            <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto" />
-                                                                <RowDefinition Height="*" />
-                                                                <RowDefinition Height="Auto" />
-                                                            </Grid.RowDefinitions>
+                <!-- Active Endpoint Hero Info -->
+                <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Left">
+                        <Border Width="26" Height="26" CornerRadius="8" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" Margin="0,0,8,0">
+                            <TextBlock x:Name="HeroDeviceGlyph" Style="{StaticResource Glyph}" Text="&#xE7F6;" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock x:Name="HeroDeviceNameText" Text="Speakers (Realtek Audio)" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" MaxWidth="240" />
+                            <TextBlock x:Name="HeroDeviceTypeText" Text="Active Output Device · Stereo" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,1,0,0" />
+                        </StackPanel>
+                    </StackPanel>
 
-                                                            <DockPanel Grid.Row="0" LastChildFill="False">
-                                                                <Button Tag="{Binding Id}" Click="EndpointMuteBtn_Click" Style="{StaticResource CircleButton}" Width="22" Height="22" VerticalAlignment="Center" ToolTip="Mute / Unmute Output Device">
-                                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding DisplayGlyph}" FontSize="11" Foreground="#F5F5F7" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                                </Button>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Right">
+                        <Border x:Name="HeroDeviceBatteryBadge" Style="{StaticResource AudioTagBadge}" Margin="0,0,6,0" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE945;" FontSize="8" Foreground="#30D158" Margin="0,0,3,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="HeroDeviceBatteryText" Text="85%" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            </StackPanel>
+                        </Border>
+                        <Button x:Name="HeroMasterMuteBtn" Click="HeroMasterMuteBtn_Click" Style="{StaticResource CircleButton}" Width="24" Height="24" ToolTip="Mute / Unmute System Volume">
+                            <TextBlock x:Name="HeroMasterMuteGlyph" Style="{StaticResource Glyph}" Text="&#xE767;" FontSize="11" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+                    </StackPanel>
+                </DockPanel>
 
-                                                                <Border DockPanel.Dock="Right" Visibility="{Binding IsDefault, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                                        Background="#2430D158" CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
-                                                                    <TextBlock Text="Active" FontSize="9" FontWeight="SemiBold" Foreground="#30D158" />
-                                                                </Border>
+                <!-- Tactile Master Volume Slider Track -->
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                                                                <Border DockPanel.Dock="Right" Visibility="{Binding BatteryPercent, Converter={StaticResource NullToVisibilityConverter}}"
-                                                                        Background="#18FFFFFF" CornerRadius="4" Padding="4,1" Margin="0,0,4,0" VerticalAlignment="Center">
-                                                                    <TextBlock Text="{Binding BatteryPercent, StringFormat='{}{0}%'}" Style="{StaticResource Digits}" FontSize="9" Foreground="{StaticResource SecondaryBrush}" />
-                                                                </Border>
-                                                            </DockPanel>
+                    <TextBlock x:Name="HeroSpeakerIcon" Style="{StaticResource Glyph}" Text="&#xE994;" FontSize="12" Foreground="{DynamicResource SecondaryBrush}"
+                               VerticalAlignment="Center" Margin="0,0,8,0" />
 
-                                                            <StackPanel Grid.Row="1" VerticalAlignment="Center">
-                                                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7"
-                                                                           TextTrimming="CharacterEllipsis" />
-                                                                <TextBlock Text="{Binding DeviceType}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" />
-                                                            </StackPanel>
+                    <Slider Grid.Column="1" x:Name="HeroMasterVolumeSlider" Minimum="0" Maximum="1"
+                            Style="{StaticResource IslandSlider}"
+                            ValueChanged="HeroMasterVolumeSlider_ValueChanged"
+                            VerticalAlignment="Center" />
 
-                                                            <Grid Grid.Row="2">
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="*" />
-                                                                    <ColumnDefinition Width="Auto" />
-                                                                </Grid.ColumnDefinitions>
-                                                                <Slider Style="{StaticResource IslandSlider}" Minimum="0" Maximum="1"
-                                                                        Value="{Binding Volume, Mode=OneWay}"
-                                                                        Tag="{Binding Id}"
-                                                                        ValueChanged="EndpointSlider_ValueChanged"
-                                                                        VerticalAlignment="Center" />
-                                                                <TextBlock Grid.Column="1" Margin="6,0,0,0" Style="{StaticResource Digits}" FontSize="9.5"
-                                                                           Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center"
-                                                                           Text="{Binding Volume, Converter={StaticResource VolumePercentConverter}}" />
-                                                            </Grid>
-                                                        </Grid>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                    <TextBlock Grid.Column="2" x:Name="HeroMasterVolumePercentText" Text="74%"
+                               Style="{StaticResource Digits}" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}"
+                               VerticalAlignment="Center" Margin="8,0,2,0" Width="28" TextAlignment="Right" />
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- ── Sub-View Surfaces ──────────────────────────────────────── -->
+        <Grid Grid.Row="2">
+            <!-- Surface A: Output Endpoints Bento Grid -->
+            <ScrollViewer x:Name="AudioEndpointsScrollViewer"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto"
+                          CanContentScroll="False"
+                          Focusable="False"
+                          PanningMode="VerticalOnly"
+                          PreviewMouseWheel="AudioView_PreviewMouseWheel">
+                <StackPanel Margin="0,0,2,14">
+                    <TextBlock Text="AVAILABLE OUTPUT DEVICES (CLICK TO SWITCH)" FontSize="7" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" Margin="2,0,0,6" />
+                    <ItemsControl x:Name="AudioEndpointsControl">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="2" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Width="223" Height="78" Margin="0,0,6,6"
+                                        MouseLeftButtonDown="AudioEndpointCard_Click">
+                                    <Border.Style>
+                                        <Style TargetType="Border" BasedOn="{StaticResource AudioBentoCard}">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource DockActiveBgBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                                </Trigger>
+                                                <DataTrigger Binding="{Binding IsDefault}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="#4830D158" />
+                                                    <Setter Property="Background" Value="#1830D158" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Top Row: Icon, Active Tag & Battery -->
+                                        <DockPanel Grid.Row="0" LastChildFill="False">
+                                            <Border Width="20" Height="20" CornerRadius="6" Background="{DynamicResource ChipBgBrush}" VerticalAlignment="Center" Margin="0,0,6,0">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="10" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+
+                                            <Border DockPanel.Dock="Right" Visibility="{Binding ActiveBadgeVisibility}"
+                                                    Background="#2430D158" CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
+                                                <TextBlock Text="Active" FontSize="7.5" FontWeight="Bold" Foreground="#30D158" />
+                                            </Border>
+
+                                            <Border DockPanel.Dock="Right" Visibility="{Binding BatteryBadgeVisibility}"
+                                                    Background="#18FFFFFF" CornerRadius="4" Padding="4,1" Margin="0,0,4,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding BatteryText}" Style="{StaticResource Digits}" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                                            </Border>
+                                        </DockPanel>
+
+                                        <!-- Middle: Device Name & Type -->
+                                        <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,1,0,3">
+                                            <TextBlock Text="{Binding Name}" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding DeviceType}" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+
+                                        <!-- Bottom: Mini Slider & Mute -->
+                                        <Grid Grid.Row="2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Slider Style="{StaticResource IslandSlider}" Minimum="0" Maximum="1"
+                                                    Value="{Binding Volume, Mode=OneWay}"
+                                                    Tag="{Binding Id}"
+                                                    ValueChanged="EndpointSlider_ValueChanged"
+                                                    VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Margin="5,0,4,0" Style="{StaticResource Digits}" FontSize="8"
+                                                       Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center"
+                                                       Text="{Binding VolumePercentText}" />
+                                            <Button Grid.Column="2" Tag="{Binding Id}" Click="EndpointMuteBtn_Click" Style="{StaticResource CircleButton}" Width="16" Height="16" VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="{Binding DisplayGlyph}" FontSize="8" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Button>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
             </ScrollViewer>
-            <ScrollViewer PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel" x:Name="AudioAppMixerScrollViewer" Visibility="Collapsed" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly">
-                <ItemsControl x:Name="AudioAppSessionsControl">
 
+            <!-- Surface B: Per-App Volume Mixer Grid -->
+            <ScrollViewer x:Name="AudioAppMixerScrollViewer"
+                          Visibility="Collapsed"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto"
+                          CanContentScroll="False"
+                          Focusable="False"
+                          PanningMode="VerticalOnly"
+                          PreviewMouseWheel="AudioView_PreviewMouseWheel">
+                <StackPanel Margin="0,0,2,14">
+                    <TextBlock Text="PER-APP ACTIVE AUDIO STREAMS" FontSize="7" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" Margin="2,0,0,6" />
+                    <ItemsControl x:Name="AudioAppSessionsControl">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="2" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource AudioBentoCard}" Width="223" Height="78" Margin="0,0,6,6">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
 
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal" />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Width="146" Height="82" Margin="0,0,8,0" CornerRadius="10"
-                                                            Background="{StaticResource CardSurfaceBrush}" BorderBrush="{StaticResource CardBorderBrush}"
-                                                            BorderThickness="1" Padding="10,7">
-                                                        <Grid>
-                                                            <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto" />
-                                                                <RowDefinition Height="*" />
-                                                                <RowDefinition Height="Auto" />
-                                                            </Grid.RowDefinitions>
-
-                                                            <DockPanel Grid.Row="0" LastChildFill="False">
-                                                                <Border Width="22" Height="22" CornerRadius="11" Background="#1AFFFFFF" VerticalAlignment="Center">
-                                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="11" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                                </Border>
-                                                                <Button DockPanel.Dock="Right" Tag="{Binding ProcessId}" Click="AppSessionMuteBtn_Click"
-                                                                        Style="{StaticResource CircleButton}" Width="20" Height="20" ToolTip="Mute / Unmute App">
-                                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding MuteGlyph}" FontSize="9.5" Foreground="#F5F5F7" />
-                                                                </Button>
-                                                            </DockPanel>
-
-                                                            <StackPanel Grid.Row="1" VerticalAlignment="Center">
-                                                                <TextBlock Text="{Binding AppName}" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" />
-                                                                <TextBlock Text="{Binding Subtitle}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                            </StackPanel>
-
-                                                            <Grid Grid.Row="2">
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="*" />
-                                                                    <ColumnDefinition Width="Auto" />
-                                                                </Grid.ColumnDefinitions>
-                                                                <Slider Style="{StaticResource IslandSlider}" Minimum="0" Maximum="1"
-                                                                        Value="{Binding Volume, Mode=OneWay}"
-                                                                        Tag="{Binding ProcessId}"
-                                                                        ValueChanged="AppSessionSlider_ValueChanged"
-                                                                        VerticalAlignment="Center" />
-                                                                <TextBlock Grid.Column="1" Margin="6,0,0,0" Style="{StaticResource Digits}" FontSize="9.5"
-                                                                           Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center"
-                                                                           Text="{Binding Volume, Converter={StaticResource VolumePercentConverter}}" />
-                                                            </Grid>
-                                                        </Grid>
+                                        <!-- Top Row: App Icon & Mute -->
+                                        <DockPanel Grid.Row="0" LastChildFill="False">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Left">
+                                                <Grid Width="20" Height="20" Margin="0,0,6,0" VerticalAlignment="Center">
+                                                    <Image Source="{Binding AppIcon}" Width="18" Height="18" RenderOptions.BitmapScalingMode="HighQuality"
+                                                           Visibility="{Binding IconVisibility}" />
+                                                    <Border Width="20" Height="20" CornerRadius="6" Background="{DynamicResource ChipBgBrush}"
+                                                            Visibility="{Binding FallbackIconVisibility}">
+                                                        <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="9.5" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                     </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                                                </Grid>
+                                                <TextBlock Text="{Binding AppName}" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" MaxWidth="120" VerticalAlignment="Center" />
+                                            </StackPanel>
+
+                                            <Button DockPanel.Dock="Right" Tag="{Binding ProcessId}" Click="AppSessionMuteBtn_Click"
+                                                    Style="{StaticResource CircleButton}" Width="16" Height="16" VerticalAlignment="Center">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="{Binding MuteGlyph}" FontSize="8" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                            </Button>
+                                        </DockPanel>
+
+                                        <!-- Middle: Subtitle & Status -->
+                                        <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,1,0,3">
+                                            <TextBlock Text="{Binding Subtitle}" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+
+                                        <!-- Bottom: App Volume Slider -->
+                                        <Grid Grid.Row="2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Slider Style="{StaticResource IslandSlider}" Minimum="0" Maximum="1"
+                                                    Value="{Binding Volume, Mode=OneWay}"
+                                                    Tag="{Binding ProcessId}"
+                                                    ValueChanged="AppSessionSlider_ValueChanged"
+                                                    VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Margin="6,0,0,0" Style="{StaticResource Digits}" FontSize="8"
+                                                       Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center"
+                                                       Text="{Binding VolumePercentText}" />
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
             </ScrollViewer>
-            <Border x:Name="AudioAppMixerEmptyPlaceholder" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18,10">
+
+            <!-- Empty App Audio Placeholder -->
+            <Border x:Name="AudioAppMixerEmptyPlaceholder" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="12" Padding="20,12">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE767;" FontSize="14" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,3" />
-                    <TextBlock Text="No Active App Audio" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
-                    <TextBlock Text="Apps playing sound will appear here for individual volume control" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,1,0,0" />
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE767;" FontSize="16" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,4" />
+                    <TextBlock Text="No Active Audio Streams" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Text="Apps playing sound will appear here for volume mixing" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,2,0,0" />
                 </StackPanel>
             </Border>
         </Grid>

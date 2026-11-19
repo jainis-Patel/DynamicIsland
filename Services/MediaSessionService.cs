@@ -14,6 +14,7 @@ public sealed class ActiveMediaSessionItem
 {
     public string Aumid { get; init; } = "";
     public string AppName { get; init; } = "";
+    public MediaPlayerBrandInfo? BrandInfo { get; init; }
     public string Title { get; init; } = "";
     public string Artist { get; init; } = "";
     public bool IsPlaying { get; init; }
@@ -27,6 +28,7 @@ internal sealed class MediaInfo
     public string Title { get; set; } = "";
     public string Artist { get; set; } = "";
     public string Source { get; set; } = "";
+    public MediaPlayerBrandInfo BrandInfo { get; set; } = null!;
     public BitmapSource? Artwork { get; set; }
     public Color? Accent { get; set; }
     public Color? SecondaryAccent { get; set; }
@@ -246,10 +248,12 @@ internal sealed class MediaSessionService : IDisposable
                     }
                     catch { }
 
+                    var brand = MediaPlayerBrandService.Detect(aumid, title, artist);
                     list.Add(new ActiveMediaSessionItem
                     {
                         Aumid = aumid,
-                        AppName = string.IsNullOrWhiteSpace(name) ? "Player" : name,
+                        AppName = string.IsNullOrWhiteSpace(brand.DisplayName) ? (string.IsNullOrWhiteSpace(name) ? "Player" : name) : brand.DisplayName,
+                        BrandInfo = brand,
                         Title = string.IsNullOrWhiteSpace(title) ? "Audio Playing" : title,
                         Artist = string.IsNullOrWhiteSpace(artist) ? name : artist,
                         IsPlaying = isPlaying,
@@ -356,15 +360,16 @@ internal sealed class MediaSessionService : IDisposable
     {
         string combined = $"{source} {aumid}".ToLowerInvariant();
         if (combined.Contains("spotify")) return "Spotify";
+        if (combined.Contains("applemusic") || combined.Contains("itunes")) return "AppleMusic";
+        if (combined.Contains("youtubemusic") || combined.Contains("youtube music") || combined.Contains("ytmdesktop")) return "YouTube Music";
         if (combined.Contains("msedge") || combined.Contains("edge")) return "msedge";
         if (combined.Contains("chrome")) return "chrome";
         if (combined.Contains("firefox") || combined.Contains("308046b0af4a39cb")) return "firefox";
         if (combined.Contains("brave")) return "brave";
         if (combined.Contains("opera")) return "opera";
         if (combined.Contains("vlc")) return "vlc";
-        if (combined.Contains("itunes")) return "iTunes";
-        if (combined.Contains("applemusic")) return "AppleMusic";
         if (combined.Contains("tidal")) return "TIDAL";
+        if (combined.Contains("amazon")) return "Amazon Music";
         if (combined.Contains("foobar")) return "foobar2000";
         return source ?? "";
     }
@@ -420,9 +425,11 @@ internal sealed class MediaSessionService : IDisposable
         }
 
         string? newId = session.SourceAppUserModelId;
+        var initialBrand = MediaPlayerBrandService.Detect(newId);
         Current = new MediaInfo
         {
-            Source = FriendlyAppName(newId),
+            Source = initialBrand.DisplayName,
+            BrandInfo = initialBrand,
             SourceAppUserModelId = newId ?? "",
             ActiveSessionCount = sessionCount
         };
@@ -496,8 +503,10 @@ internal sealed class MediaSessionService : IDisposable
         catch { return; }
 
         media.StartTime = timeline.StartTime;
-        media.Duration = timeline.EndTime - timeline.StartTime;
-        media.Position = timeline.Position - timeline.StartTime;
+        var dur = timeline.EndTime - timeline.StartTime;
+        media.Duration = dur > TimeSpan.Zero ? dur : TimeSpan.Zero;
+        var pos = timeline.Position - timeline.StartTime;
+        media.Position = pos > TimeSpan.Zero ? pos : TimeSpan.Zero;
         media.PositionUpdatedAt = timeline.LastUpdatedTime.Year < 2000 ? DateTimeOffset.Now : timeline.LastUpdatedTime;
         Changed?.Invoke();
     }
@@ -524,6 +533,15 @@ internal sealed class MediaSessionService : IDisposable
         media.AlbumTitle = album;
         media.TrackNumber = properties.TrackNumber;
         media.AlbumTrackCount = properties.AlbumTrackCount;
+
+        // Refine brand detection using full track metadata (e.g. YouTube Music / Apple Music tab in browsers)
+        var refinedBrand = MediaPlayerBrandService.Detect(media.SourceAppUserModelId, title, artist, album);
+        if (refinedBrand.Brand != MediaPlayerBrand.Unknown)
+        {
+            media.BrandInfo = refinedBrand;
+            media.Source = refinedBrand.DisplayName;
+        }
+
         if (trackChanged && properties.Thumbnail is null)
         {
             media.Artwork = null;
@@ -576,16 +594,17 @@ internal sealed class MediaSessionService : IDisposable
     internal static string FriendlyAppName(string? aumid)
     {
         if (string.IsNullOrEmpty(aumid)) return "";
+        var brand = MediaPlayerBrandService.Detect(aumid);
+        if (brand.Brand != MediaPlayerBrand.Unknown && brand.Brand != MediaPlayerBrand.Browser)
+            return brand.DisplayName;
+
         string id = aumid.ToLowerInvariant();
-        if (id.Contains("spotify")) return "Spotify";
         if (id.Contains("msedge")) return "Edge";
         if (id.Contains("chrome")) return "Chrome";
         if (id.Contains("firefox") || id.Contains("308046b0af4a39cb")) return "Firefox";
         if (id.Contains("brave")) return "Brave";
         if (id.Contains("opera")) return "Opera";
-        if (id.Contains("zunemusic")) return "Media Player";
         if (id.Contains("zunevideo")) return "Movies & TV";
-        if (id.Contains("vlc")) return "VLC";
 
         string name = aumid;
         int bang = name.LastIndexOf('!');

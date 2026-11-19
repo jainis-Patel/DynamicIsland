@@ -40,7 +40,6 @@ internal sealed class UpdateManagerService : IDisposable
         Dispatcher? dispatcher = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
-        _client = client ?? new GitHubReleaseClient();
         _dispatcher = dispatcher;
 
         // Extract version from executing assembly, fallback to InstallerService.AppVersion
@@ -53,6 +52,16 @@ internal sealed class UpdateManagerService : IDisposable
             parsed = new SemVersion(0, 4, 0);
         }
         CurrentVersion = parsed;
+
+        _client = client ?? new GitHubReleaseClient(appVersion: CurrentVersionString, gitHubToken: _settingsService.Current.GitHubToken);
+    }
+
+    /// <summary>
+    /// Configures or clears the GitHub Personal Access Token for higher rate limits.
+    /// </summary>
+    public void SetGitHubToken(string? token)
+    {
+        _client.SetToken(token);
     }
 
     /// <summary>
@@ -139,15 +148,45 @@ internal sealed class UpdateManagerService : IDisposable
             // Compare version against currently executing binary
             if (manifest.ParsedVersion > CurrentVersion)
             {
-                // Verify user hasn't chosen to skip this version during silent background checks
-                if (silent && string.Equals(_settingsService.Current.SkippedVersion, manifest.Version, StringComparison.OrdinalIgnoreCase))
+                // Verify user hasn't chosen to skip this version during silent background checks (critical updates cannot be skipped)
+                if (silent && !manifest.IsCritical && string.Equals(_settingsService.Current.SkippedVersion, manifest.Version, StringComparison.OrdinalIgnoreCase))
                 {
-                    SetStatus(UpdateStatus.UpToDate, $"Skipped version {manifest.Version}.");
-                    return null;
+                    var skipDate = _settingsService.Current.SkippedVersionDate;
+                    if (skipDate.HasValue && (DateTime.UtcNow - skipDate.Value) < TimeSpan.FromDays(7))
+                    {
+                        SetStatus(UpdateStatus.UpToDate, $"Skipped version {manifest.Version}.");
+                        return null;
+                    }
+
+                    // 7 days elapsed: reset skip state so user is reminded
+                    _settingsService.Update(s =>
+                    {
+                        s.SkippedVersion = null;
+                        s.SkippedVersionDate = null;
+                    }, nameof(AppSettings.SkippedVersion));
                 }
 
-                SetStatus(UpdateStatus.UpdateAvailable, $"Update {manifest.Version} is available.");
+                SetStatus(UpdateStatus.UpdateAvailable, manifest.IsCritical
+                    ? $"Critical security update {manifest.Version} is available!"
+                    : $"Update {manifest.Version} is available.");
                 Dispatch(() => UpdateAvailable?.Invoke(manifest));
+
+                // Auto-download update package silently in background if enabled
+                if (_settingsService.Current.AutoDownloadUpdates && Status != UpdateStatus.ReadyToInstall && Status != UpdateStatus.Downloading)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await DownloadUpdateAsync(ct).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            App.Log($"[UpdateManager] Background auto-download failed: {ex.Message}");
+                        }
+                    }, ct);
+                }
+
                 return manifest;
             }
             else
@@ -292,13 +331,32 @@ internal sealed class UpdateManagerService : IDisposable
     }
 
     /// <summary>
-    /// Skips notifications for the current available version.
+    /// Resolves the expected cryptographic SHA-256 for a historical release item.
+    /// </summary>
+    public Task<string?> FetchSha256ForReleaseAsync(ReleaseHistoryItem item, string targetFileName, CancellationToken ct = default)
+    {
+        return _client.FetchExpectedSha256Async(item, targetFileName, ct);
+    }
+
+    /// <summary>
+    /// Skips notifications for the current available version for 7 days (unless it is a critical security update).
     /// </summary>
     public void SkipCurrentVersion()
     {
         if (LatestManifest != null && !string.IsNullOrWhiteSpace(LatestManifest.Version))
         {
-            _settingsService.Update(s => s.SkippedVersion = LatestManifest.Version, nameof(AppSettings.SkippedVersion));
+            if (LatestManifest.IsCritical)
+            {
+                // Critical updates cannot be skipped
+                return;
+            }
+
+            _settingsService.Update(s =>
+            {
+                s.SkippedVersion = LatestManifest.Version;
+                s.SkippedVersionDate = DateTime.UtcNow;
+            }, nameof(AppSettings.SkippedVersion));
+
             SetStatus(UpdateStatus.UpToDate, $"Skipped version {LatestManifest.Version}.");
         }
     }

@@ -270,8 +270,10 @@ public sealed record ReleaseHistoryItem(
     string HtmlUrl,
     bool IsPreRelease,
     string? InstallerUrl,
-    string? InstallerSha256,
-    long SizeBytes);
+    string? InstallerSha256 = null,
+    long SizeBytes = 0,
+    string? ChecksumsUrl = null,
+    string? ManifestUrl = null);
 
 /// <summary>
 /// Progress reporting snapshot during file download and hash verification.

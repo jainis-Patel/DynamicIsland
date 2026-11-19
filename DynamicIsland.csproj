@@ -25,6 +25,8 @@
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <NuGetAudit>false</NuGetAudit>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>

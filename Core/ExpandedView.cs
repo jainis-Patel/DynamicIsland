@@ -26,7 +26,8 @@ public enum ExpandedView
     MechSounds,
     CaptureStudio,
     Calendar,
-    QuickReply
+    QuickReply,
+    WidgetsGallery
 }
 
 public static class ExpandedViewExtensions
@@ -53,6 +54,7 @@ public static class ExpandedViewExtensions
         ExpandedView.MechSounds => "mechsounds",
         ExpandedView.CaptureStudio => "capturestudio",
         ExpandedView.QuickReply => "quickreply",
+        ExpandedView.WidgetsGallery => "widgetsgallery",
         _ => "media"
     };
 
@@ -153,6 +155,12 @@ public static class ExpandedViewExtensions
             case "quickreply":
             case "reply":
                 view = ExpandedView.QuickReply;
+                return true;
+            case "widgetsgallery":
+            case "widgets":
+            case "widget":
+            case "bento":
+                view = ExpandedView.WidgetsGallery;
                 return true;
             default:
                 view = ExpandedView.Media;

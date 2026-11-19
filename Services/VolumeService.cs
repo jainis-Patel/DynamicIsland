@@ -86,6 +86,24 @@ internal sealed class VolumeService : IDisposable
         _ui.InvokeAsync(() => VolumeChanged?.Invoke(vol, mute));
     }
 
+    public void SetVolume(float scalar)
+    {
+        try
+        {
+            if (_volume == null) AttachEndpoint();
+            if (_volume == null) return;
+
+            float target = Math.Clamp(scalar, 0f, 1f);
+            if (_volume.Mute && target > 0) _volume.Mute = false;
+            _volume.MasterVolumeLevelScalar = target;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[VolumeService] SetVolume failed: {ex.Message}");
+            AttachEndpoint();
+        }
+    }
+
     public void StepVolume(float delta)
     {
         try

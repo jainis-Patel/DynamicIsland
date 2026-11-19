@@ -116,6 +116,16 @@ public partial class IslandWindow
             _networkService?.SetExpanded(false);
         }
 
+        if (view == ExpandedView.WidgetsGallery)
+        {
+            WidgetsGalleryContainer?.SetExpanded(true);
+            WidgetsGalleryContainer?.RefreshAllWidgets();
+        }
+        else if (previousView == ExpandedView.WidgetsGallery)
+        {
+            WidgetsGalleryContainer?.SetExpanded(false);
+        }
+
         if (view == ExpandedView.Launcher)
         {
             LauncherContainer?.RefreshItems();
@@ -184,9 +194,9 @@ public partial class IslandWindow
                 NotesContainer?.FocusEditor();
             }));
         }
-        else if (view == ExpandedView.Audio && _isAudioAppMixerMode)
+        else if (view == ExpandedView.Audio)
         {
-            _audioEndpointService.RefreshAppSessions();
+            RefreshAudioView();
         }
         else if (view == ExpandedView.Peripherals)
         {
@@ -472,6 +482,12 @@ public partial class IslandWindow
             return;
         }
 
+        if (_currentExpandedView == ExpandedView.WidgetsGallery && WidgetsGalleryContainer?.WidgetsScrollViewer != null)
+        {
+            SmoothScrollVertical(WidgetsGalleryContainer.WidgetsScrollViewer, -delta * 0.85);
+            return;
+        }
+
         if (_currentExpandedView == ExpandedView.Launcher && LauncherContainer?.LauncherScrollViewer != null)
         {
             SmoothScrollVertical(LauncherContainer.LauncherScrollViewer, -delta * 0.85);
@@ -502,11 +518,20 @@ public partial class IslandWindow
             return;
         }
 
+        if (_currentExpandedView == ExpandedView.Audio)
+        {
+            var sv = _isAudioAppMixerMode ? AudioAppMixerScrollViewer : AudioEndpointsScrollViewer;
+            if (sv != null)
+            {
+                SmoothScrollVertical(sv, -delta * 0.85);
+                return;
+            }
+        }
+
         ScrollViewer? targetSv = _currentExpandedView switch
         {
             ExpandedView.Clipboard => ClipboardScrollViewer,
             ExpandedView.Shelf => ShelfScrollViewer,
-            ExpandedView.Audio => AudioAppMixerScrollViewer?.Visibility == Visibility.Visible ? AudioAppMixerScrollViewer : AudioEndpointsScrollViewer,
             ExpandedView.Peripherals => PeripheralsScrollViewer,
             ExpandedView.Network => WifiNetworksScrollViewer,
             ExpandedView.Calc => CalcContainer?.CalcHistoryScrollViewer,
@@ -724,18 +749,22 @@ public partial class IslandWindow
         {
             int targetIdx = e.Key - Key.D1;
             int currentVisibleIdx = 0;
+            var seenButtons = new HashSet<Button>();
             for (int i = 0; i < _orderedViews.Count; i++)
             {
                 var v = _orderedViews[i];
                 if (_viewRegistry.TryGetValue(v, out var entry) && entry.DockButton?.Visibility == Visibility.Visible)
                 {
-                    if (currentVisibleIdx == targetIdx)
+                    if (seenButtons.Add(entry.DockButton))
                     {
-                        SwitchExpandedView(v);
-                        e.Handled = true;
-                        return;
+                        if (currentVisibleIdx == targetIdx)
+                        {
+                            SwitchExpandedView(v);
+                            e.Handled = true;
+                            return;
+                        }
+                        currentVisibleIdx++;
                     }
-                    currentVisibleIdx++;
                 }
             }
         }
@@ -807,6 +836,22 @@ public partial class IslandWindow
                     e.Handled = true;
                     return;
                 }
+            }
+        }
+
+        if (_machine.State == IslandState.Expanded && _currentExpandedView == ExpandedView.WidgetsGallery && WidgetsGalleryContainer?.WidgetsScrollViewer != null)
+        {
+            if (e.Key == Key.Up || e.Key == Key.PageUp)
+            {
+                SmoothScrollVertical(WidgetsGalleryContainer.WidgetsScrollViewer, e.Key == Key.PageUp ? -180 : -64);
+                e.Handled = true;
+                return;
+            }
+            if (e.Key == Key.Down || e.Key == Key.PageDown)
+            {
+                SmoothScrollVertical(WidgetsGalleryContainer.WidgetsScrollViewer, e.Key == Key.PageDown ? 180 : 64);
+                e.Handled = true;
+                return;
             }
         }
     }

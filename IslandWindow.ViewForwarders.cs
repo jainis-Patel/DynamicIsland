@@ -42,6 +42,8 @@ public partial class IslandWindow
     internal Grid ExpandedMediaHeader => MediaContainer.ExpandedMediaHeader;
     internal TextBlock ExpandedMiniClock => MediaContainer.ExpandedMiniClock;
     internal TextBlock ExpandedSourceApp => MediaContainer.ExpandedSourceApp;
+    internal Viewbox ExpandedSourceLogoBox => MediaContainer.ExpandedSourceLogoBox;
+    internal System.Windows.Shapes.Path ExpandedSourceLogoPath => MediaContainer.ExpandedSourceLogoPath;
     internal TextBlock ExpandedTimer => MediaContainer.ExpandedTimer;
     internal TextBlock ExpandedTimerModeLabel => MediaContainer.ExpandedTimerModeLabel;
     internal TextBlock ExpandedTitle => MediaContainer.ExpandedTitle;
@@ -424,12 +426,16 @@ public partial class IslandWindow
     internal Border UpdateAvailableBanner => SettingsContainer.UpdateAvailableBanner;
     internal TextBlock UpdateVersionTitleText => SettingsContainer.UpdateVersionTitleText;
     internal TextBlock UpdateSummaryText => SettingsContainer.UpdateSummaryText;
+    internal Button ViewChangelogBtn => SettingsContainer.ViewChangelogBtn;
     internal Button InstallUpdateBtn => SettingsContainer.InstallUpdateBtn;
     internal TextBlock InstallUpdateBtnText => SettingsContainer.InstallUpdateBtnText;
     internal ProgressBar UpdateProgressBar => SettingsContainer.UpdateProgressBar;
     internal TextBlock UpdateProgressText => SettingsContainer.UpdateProgressText;
     internal Button AutoCheckToggleBtn => SettingsContainer.AutoCheckToggleBtn;
     internal TextBlock AutoCheckToggleText => SettingsContainer.AutoCheckToggleText;
+    internal Button AutoDownloadToggleBtn => SettingsContainer.AutoDownloadToggleBtn;
+    internal TextBlock AutoDownloadToggleText => SettingsContainer.AutoDownloadToggleText;
+    internal TextBox GitHubTokenBox => SettingsContainer.GitHubTokenBox;
     internal TextBlock LastCheckTimestampText => SettingsContainer.LastCheckTimestampText;
     internal Button ToggleVersionHistoryBtn => SettingsContainer.ToggleVersionHistoryBtn;
     internal TextBlock ToggleVersionHistoryText => SettingsContainer.ToggleVersionHistoryText;
@@ -444,9 +450,22 @@ public partial class IslandWindow
     internal ItemsControl AudioAppSessionsControl => AudioContainer.AudioAppSessionsControl;
     internal ItemsControl AudioEndpointsControl => AudioContainer.AudioEndpointsControl;
     internal ScrollViewer AudioEndpointsScrollViewer => AudioContainer.AudioEndpointsScrollViewer;
-    internal Button AudioModeToggleBtn => AudioContainer.AudioModeToggleBtn;
-    internal TextBlock AudioModeToggleText => AudioContainer.AudioModeToggleText;
     internal TextBlock AudioSectionTitle => AudioContainer.AudioSectionTitle;
+    internal Button AudioModeOutputsBtn => AudioContainer.AudioModeOutputsBtn;
+    internal Button AudioModeMixerBtn => AudioContainer.AudioModeMixerBtn;
+    internal Button HardwareMicBtn => AudioContainer.HardwareMicBtn;
+    internal TextBlock HardwareMicGlyph => AudioContainer.HardwareMicGlyph;
+    internal TextBlock HardwareMicText => AudioContainer.HardwareMicText;
+    internal TextBlock HeroDeviceGlyph => AudioContainer.HeroDeviceGlyph;
+    internal TextBlock HeroDeviceNameText => AudioContainer.HeroDeviceNameText;
+    internal TextBlock HeroDeviceTypeText => AudioContainer.HeroDeviceTypeText;
+    internal Border HeroDeviceBatteryBadge => AudioContainer.HeroDeviceBatteryBadge;
+    internal TextBlock HeroDeviceBatteryText => AudioContainer.HeroDeviceBatteryText;
+    internal Button HeroMasterMuteBtn => AudioContainer.HeroMasterMuteBtn;
+    internal TextBlock HeroMasterMuteGlyph => AudioContainer.HeroMasterMuteGlyph;
+    internal TextBlock HeroSpeakerIcon => AudioContainer.HeroSpeakerIcon;
+    internal Slider HeroMasterVolumeSlider => AudioContainer.HeroMasterVolumeSlider;
+    internal TextBlock HeroMasterVolumePercentText => AudioContainer.HeroMasterVolumePercentText;
 
     // -------------------------------------------------------------------------
     //  Battery View Forwarders (BatteryContainer)

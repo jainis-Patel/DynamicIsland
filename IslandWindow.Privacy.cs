@@ -127,6 +127,13 @@ public partial class IslandWindow
             CompactMicToggleBtn.BorderBrush = muted ? ThemeBrushes.AlertRedBorder : ThemeBrushes.PlanSaverActiveBorder;
             CompactMicToggleBtn.ToolTip = muted ? "Microphone Muted \u00B7 Click to unmute (Ctrl+Alt+K)" : "Microphone Active \u00B7 Click to mute (Ctrl+Alt+K)";
         }
+
+        if (HardwareMicGlyph != null && HardwareMicText != null)
+        {
+            HardwareMicGlyph.Text = muted ? "\uE74F" : "\uE720";
+            HardwareMicGlyph.Foreground = muted ? ThemeBrushes.Red : ThemeBrushes.Green;
+            HardwareMicText.Text = muted ? "Mic: Muted" : "Mic: Active";
+        }
     }
 
     internal void CompactMicToggleBtn_Click(object sender, MouseButtonEventArgs e)

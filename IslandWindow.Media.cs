@@ -117,10 +117,18 @@ public partial class IslandWindow
 
             ExpandedTitle.Text = media.Title;
             ExpandedArtist.Text = string.IsNullOrWhiteSpace(media.Artist) ? "Unknown Artist" : media.Artist;
-            string sourceLabel = string.IsNullOrWhiteSpace(media.Source) ? "Media" : media.Source;
+            var brand = media.BrandInfo ?? MediaPlayerBrandService.Detect(media.SourceAppUserModelId, media.Title, media.Artist, media.AlbumTitle);
+            string sourceLabel = string.IsNullOrWhiteSpace(brand.DisplayName) ? "Media" : brand.DisplayName;
             ExpandedSourceApp.Text = media.ActiveSessionCount > 1
                 ? $"{sourceLabel} \u00B7 1/{media.ActiveSessionCount}"
                 : sourceLabel;
+
+            if (ExpandedSourceLogoPath != null && ExpandedSourceLogoBox != null)
+            {
+                ExpandedSourceLogoPath.Data = brand.IconGeometry;
+                ExpandedSourceLogoPath.Fill = brand.BrandBrush;
+                ExpandedSourceLogoBox.Visibility = Visibility.Visible;
+            }
 
             PlayPauseGlyph.Text = media.IsPlaying ? "\uE769" : "\uE768";
             PrevButton.IsEnabled = media.CanPrevious;
@@ -444,6 +452,7 @@ public partial class IslandWindow
 
     private void OnVolumeChanged(float vol, bool isMuted)
     {
+        SyncMasterVolumeUI(vol, isMuted);
         if (_machine.State == IslandState.Expanded) return;
 
         string glyph = isMuted ? "\uE74F" : (vol > 0.66f ? "\uE767" : vol > 0.33f ? "\uE994" : "\uE993");

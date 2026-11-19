@@ -22,6 +22,8 @@ public partial class MiniPlayerWindow : Window
     private readonly LyricsService _lyricsService;
     private readonly VolumeService _volumeService;
     private readonly MediaSongListService _songListService;
+    private readonly AudioSpectrum? _spectrum;
+    private readonly float[] _spectrumBands = new float[AudioSpectrum.BandCount];
 
     private readonly DispatcherTimer _posTimer;
     private readonly DispatcherTimer _eqTimer;
@@ -37,6 +39,7 @@ public partial class MiniPlayerWindow : Window
     private AlbumTracklistResult? _currentFetchedAlbum;
     private CancellationTokenSource? _fetchCts;
     private string _lastFetchedTrackKey = "";
+    private string _lastFetchedAlbumKey = "";
 
     private const double FullWidth = 408;
     private const double FullHeightBase = 240;
@@ -48,12 +51,14 @@ public partial class MiniPlayerWindow : Window
         MediaSessionService mediaService,
         LyricsService lyricsService,
         VolumeService volumeService,
-        MediaSongListService songListService)
+        MediaSongListService songListService,
+        AudioSpectrum? spectrum = null)
     {
         _mediaService = mediaService;
         _lyricsService = lyricsService;
         _volumeService = volumeService;
         _songListService = songListService;
+        _spectrum = spectrum;
 
         InitializeComponent();
 
@@ -87,7 +92,7 @@ public partial class MiniPlayerWindow : Window
 
         _posTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
         {
-            Interval = TimeSpan.FromMilliseconds(500)
+            Interval = TimeSpan.FromMilliseconds(200)
         };
         _posTimer.Tick += (_, _) => UpdatePosition();
 
@@ -104,6 +109,7 @@ public partial class MiniPlayerWindow : Window
         _lyricsService.LyricsLoaded += OnLyricsLoaded;
         _volumeService.VolumeChanged += OnVolumeChanged;
         _songListService.HistoryChanged += OnHistoryChanged;
+        ThemeManager.ThemeChanged += OnThemeChanged;
 
         // Scrubber thumb drag handling
         MiniTimelineSlider.AddHandler(Thumb.DragStartedEvent, new DragStartedEventHandler((_, _) => _isUserSeeking = true));
@@ -115,6 +121,12 @@ public partial class MiniPlayerWindow : Window
 
         MiniVolumeSlider.AddHandler(Thumb.DragStartedEvent, new DragStartedEventHandler((_, _) => _isUserVolumeSeeking = true));
         MiniVolumeSlider.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler((_, _) => _isUserVolumeSeeking = false));
+        MiniVolumeSlider.PreviewMouseWheel += (_, e) =>
+        {
+            float step = e.Delta > 0 ? 0.02f : -0.02f;
+            _volumeService.StepVolume(step);
+            e.Handled = true;
+        };
 
         // Window drag & snap handlers
         RootCard.MouseLeftButtonDown += RootCard_MouseLeftButtonDown;
@@ -142,7 +154,72 @@ public partial class MiniPlayerWindow : Window
             _lyricsService.LyricsLoaded -= OnLyricsLoaded;
             _volumeService.VolumeChanged -= OnVolumeChanged;
             _songListService.HistoryChanged -= OnHistoryChanged;
+            ThemeManager.ThemeChanged -= OnThemeChanged;
         };
+    }
+
+    private void OnThemeChanged(AppTheme theme)
+    {
+        Dispatcher.InvokeAsync(() =>
+        {
+            if (ThemeManager.IsLiquidGlass)
+            {
+                DynamicIsland.LiquidGlass.GlassHost.Attach(RootCard, DynamicIsland.LiquidGlass.GlassPresets.Regular);
+                DynamicIsland.LiquidGlass.GlassHost.ForceRender(RootCard);
+            }
+            else
+            {
+                DynamicIsland.LiquidGlass.GlassHost.Detach(RootCard);
+            }
+            RefreshAll();
+        });
+    }
+
+    private void MiniTimelineSlider_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        _isUserSeeking = true;
+        double mouseX = e.GetPosition(MiniTimelineSlider).X;
+        double width = MiniTimelineSlider.ActualWidth;
+        if (width > 0)
+        {
+            double fraction = Math.Clamp(mouseX / width, 0.0, 1.0);
+            MiniTimelineSlider.Value = fraction * 100.0;
+            var s = _mediaService.Current;
+            if (s != null && s.Duration > TimeSpan.Zero)
+            {
+                var previewPos = TimeSpan.FromSeconds(s.Duration.TotalSeconds * fraction);
+                MiniPosText.Text = FormatTime(previewPos);
+            }
+        }
+    }
+
+    private void MiniTimelineSlider_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_isUserSeeking && e.LeftButton == MouseButtonState.Pressed)
+        {
+            double mouseX = e.GetPosition(MiniTimelineSlider).X;
+            double width = MiniTimelineSlider.ActualWidth;
+            if (width > 0)
+            {
+                double fraction = Math.Clamp(mouseX / width, 0.0, 1.0);
+                MiniTimelineSlider.Value = fraction * 100.0;
+                var s = _mediaService.Current;
+                if (s != null && s.Duration > TimeSpan.Zero)
+                {
+                    var previewPos = TimeSpan.FromSeconds(s.Duration.TotalSeconds * fraction);
+                    MiniPosText.Text = FormatTime(previewPos);
+                }
+            }
+        }
+    }
+
+    private void MiniTimelineSlider_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_isUserSeeking)
+        {
+            _isUserSeeking = false;
+            CommitSeek();
+        }
     }
 
     // ── Drag & Drop Snap-to-Island ────────────────────────────────────
@@ -190,9 +267,12 @@ public partial class MiniPlayerWindow : Window
             CompactPlayPauseGlyph.Text = "\uE768";
 
             SourceAppText.Text = "Media";
+            SourceAppLogoBox.Visibility = Visibility.Collapsed;
+            SourceAppIcon.Visibility = Visibility.Visible;
             SourceCycleIcon.Visibility = Visibility.Collapsed;
             TrackIndexBadge.Visibility = Visibility.Collapsed;
             MiniAmbientStop.Color = ThemeBrushes.AmberColor;
+            if (CompactBrandPip != null) CompactBrandPip.Visibility = Visibility.Collapsed;
 
             ResetEqualizerBars();
             return;
@@ -226,9 +306,23 @@ public partial class MiniPlayerWindow : Window
         var accentColor = s.Accent ?? ThemeBrushes.AmberColor;
         MiniAmbientStop.Color = accentColor;
 
-        // Source badge & multi-session indicator
-        SourceAppText.Text = string.IsNullOrWhiteSpace(s.Source) ? "Player" : s.Source;
+        // Source brand badge with authentic brand vector logo
+        var brand = s.BrandInfo ?? MediaPlayerBrandService.Detect(s.SourceAppUserModelId, s.Title, s.Artist, s.AlbumTitle);
+        SourceAppText.Text = brand.DisplayName;
+        SourceAppLogoPath.Data = brand.IconGeometry;
+        SourceAppLogoPath.Fill = brand.BrandBrush;
+        SourceAppLogoBox.Visibility = Visibility.Visible;
+        SourceAppIcon.Visibility = Visibility.Collapsed;
+        SourceAppBadge.ToolTip = $"Playing on {brand.DisplayName} · Click to cycle active media players";
         SourceCycleIcon.Visibility = s.ActiveSessionCount > 1 ? Visibility.Visible : Visibility.Collapsed;
+
+        // Compact pill brand indicator
+        if (CompactBrandPath != null && CompactBrandPip != null)
+        {
+            CompactBrandPath.Data = brand.IconGeometry;
+            CompactBrandPath.Fill = brand.BrandBrush;
+            CompactBrandPip.Visibility = Visibility.Visible;
+        }
 
         // Track number if available from album metadata
         if (s.TrackNumber > 0)
@@ -292,22 +386,48 @@ public partial class MiniPlayerWindow : Window
     private void UpdatePosition()
     {
         var s = _mediaService.Current;
-        if (s == null || _isUserSeeking) return;
+        if (s == null)
+        {
+            if (!_isUserSeeking && MiniTimelineSlider.Value != 0)
+            {
+                MiniTimelineSlider.Value = 0;
+                MiniPosText.Text = "0:00";
+                MiniDurText.Text = "0:00";
+            }
+            return;
+        }
 
-        var pos = s.Position;
         var dur = s.Duration;
+        MiniDurText.Text = dur > TimeSpan.Zero ? FormatTime(dur) : "0:00";
 
+        if (_isUserSeeking)
+        {
+            if (dur > TimeSpan.Zero)
+            {
+                var previewPos = TimeSpan.FromSeconds(dur.TotalSeconds * (MiniTimelineSlider.Value / 100.0));
+                MiniPosText.Text = FormatTime(previewPos);
+            }
+            return;
+        }
+
+        var pos = s.GetPosition(DateTimeOffset.Now);
         MiniPosText.Text = FormatTime(pos);
-        MiniDurText.Text = FormatTime(dur);
 
         if (dur > TimeSpan.Zero)
         {
-            MiniTimelineSlider.Value = Math.Clamp((pos.TotalSeconds / dur.TotalSeconds) * 100.0, 0, 100);
+            double pct = Math.Clamp((pos.TotalSeconds / dur.TotalSeconds) * 100.0, 0, 100);
+            if (Math.Abs(MiniTimelineSlider.Value - pct) > 0.05)
+            {
+                MiniTimelineSlider.Value = pct;
+            }
         }
         else
         {
-            MiniTimelineSlider.Value = 0;
+            if (MiniTimelineSlider.Value != 0) MiniTimelineSlider.Value = 0;
         }
+
+        // Keep lyrics continuous and synced even if Dynamic Island is collapsed
+        _lyricsService.UpdatePosition(pos);
     }
 
     private void CommitSeek()
@@ -319,8 +439,13 @@ public partial class MiniPlayerWindow : Window
         _mediaService.Seek(target);
     }
 
-    private static string FormatTime(TimeSpan t) =>
-        t.TotalHours >= 1 ? t.ToString(@"h\:mm\:ss") : t.ToString(@"m\:ss");
+    private static string FormatTime(TimeSpan span)
+    {
+        if (span < TimeSpan.Zero) span = TimeSpan.Zero;
+        return span.TotalHours >= 1
+            ? $"{(int)span.TotalHours}:{span.Minutes:D2}:{span.Seconds:D2}"
+            : $"{span.Minutes}:{span.Seconds:D2}";
+    }
 
     // ── Volume Handling ──────────────────────────────────────────────
 
@@ -358,14 +483,10 @@ public partial class MiniPlayerWindow : Window
 
     private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (IsLoaded && MiniVolumeSlider.IsMouseOver)
+        if (IsLoaded && (MiniVolumeSlider.IsMouseOver || _isUserVolumeSeeking))
         {
-            float targetScalar = (float)(MiniVolumeSlider.Value / 100.0);
-            float delta = targetScalar - _volumeService.CurrentVolume;
-            if (Math.Abs(delta) > 0.01f)
-            {
-                _volumeService.StepVolume(delta);
-            }
+            float targetScalar = (float)Math.Clamp(MiniVolumeSlider.Value / 100.0, 0.0, 1.0);
+            _volumeService.SetVolume(targetScalar);
         }
     }
 
@@ -383,10 +504,21 @@ public partial class MiniPlayerWindow : Window
             return;
         }
 
-        EqBar0.Height = 3 + _rng.Next(0, 6);
-        EqBar1.Height = 4 + _rng.Next(0, 8);
-        EqBar2.Height = 4 + _rng.Next(0, 7);
-        EqBar3.Height = 3 + _rng.Next(0, 6);
+        if (_spectrum != null)
+        {
+            _spectrum.ReadBands(_spectrumBands);
+            EqBar0.Height = Math.Clamp(3 + (int)(_spectrumBands[0] * 12f), 3, 14);
+            EqBar1.Height = Math.Clamp(3 + (int)(_spectrumBands[1] * 14f), 3, 16);
+            EqBar2.Height = Math.Clamp(3 + (int)(_spectrumBands[2] * 13f), 3, 15);
+            EqBar3.Height = Math.Clamp(3 + (int)(_spectrumBands[3] * 11f), 3, 13);
+        }
+        else
+        {
+            EqBar0.Height = 3 + _rng.Next(0, 6);
+            EqBar1.Height = 4 + _rng.Next(0, 8);
+            EqBar2.Height = 4 + _rng.Next(0, 7);
+            EqBar3.Height = 3 + _rng.Next(0, 6);
+        }
     }
 
     private void ResetEqualizerBars()
@@ -565,28 +697,8 @@ public partial class MiniPlayerWindow : Window
         var s = _mediaService.Current;
         if (s == null || string.IsNullOrWhiteSpace(s.Title)) return;
 
-        string query = Uri.EscapeDataString($"{s.Title} {s.Artist}".Trim());
-        try
-        {
-            // Search on Spotify or web
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = $"https://open.spotify.com/search/{query}",
-                UseShellExecute = true
-            });
-        }
-        catch
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = $"https://www.youtube.com/results?search_query={query}",
-                    UseShellExecute = true
-                });
-            }
-            catch { }
-        }
+        var brand = s.BrandInfo ?? MediaPlayerBrandService.Detect(s.SourceAppUserModelId, s.Title, s.Artist, s.AlbumTitle);
+        MediaPlayerBrandService.OpenTrackInActiveService(brand, s.Title, s.Artist);
     }
 
     // ═════════════════════════════════════════════════════════════════
@@ -756,10 +868,33 @@ public partial class MiniPlayerWindow : Window
             return;
         }
 
-        string key = $"{s.Title}::{s.Artist}::{s.AlbumTitle}".ToLowerInvariant();
-        if (_currentFetchedAlbum != null && key == _lastFetchedTrackKey)
+        string cleanArtist = MediaSongListService.CleanArtist(s.Artist, s.Title);
+        string cleanAlbum = string.IsNullOrWhiteSpace(s.AlbumTitle) ? "" : s.AlbumTitle.Trim();
+        string albumKey = $"{cleanArtist}::{cleanAlbum}".ToLowerInvariant();
+        string trackKey = $"{s.Title}::{s.Artist}::{s.AlbumTitle}".ToLowerInvariant();
+
+        // If the current album is already loaded, avoid destructive re-fetch and smoothly sync queue highlight
+        if (_currentFetchedAlbum != null && !string.IsNullOrWhiteSpace(cleanAlbum) && albumKey == _lastFetchedAlbumKey)
         {
-            if (AlbumTracksListHost.Children.Count == 0)
+            if (AlbumTracksListHost.Children.Count > 0)
+            {
+                UpdateActiveQueueHighlight();
+                return;
+            }
+            else
+            {
+                RenderAlbumTracks(_currentFetchedAlbum);
+                return;
+            }
+        }
+
+        if (_currentFetchedAlbum != null && trackKey == _lastFetchedTrackKey)
+        {
+            if (AlbumTracksListHost.Children.Count > 0)
+            {
+                UpdateActiveQueueHighlight();
+            }
+            else
             {
                 RenderAlbumTracks(_currentFetchedAlbum);
             }
@@ -780,7 +915,8 @@ public partial class MiniPlayerWindow : Window
             {
                 _ = Dispatcher.InvokeAsync(() =>
                 {
-                    _lastFetchedTrackKey = key;
+                    _lastFetchedAlbumKey = albumKey;
+                    _lastFetchedTrackKey = trackKey;
                     _currentFetchedAlbum = result;
                     RenderAlbumTracks(result);
                 });
@@ -802,13 +938,15 @@ public partial class MiniPlayerWindow : Window
         AlbumSummaryText.Text = $"{result.AlbumName} • {result.Tracks.Count} songs ({typeLabel})";
 
         var currentTitle = _mediaService.Current?.Title ?? "";
+        var activeBrand = _mediaService.Current?.BrandInfo ?? MediaPlayerBrandService.Detect(_mediaService.Current?.SourceAppUserModelId);
 
         foreach (var track in result.Tracks)
         {
-            bool isCurrent = string.Equals(track.Title, currentTitle, StringComparison.OrdinalIgnoreCase);
+            bool isCurrent = IsMatchingTrack(track.Title, currentTitle);
 
             var itemBorder = new Border
             {
+                Tag = track,
                 Background = isCurrent
                     ? new SolidColorBrush(Color.FromArgb(0x28, 0xFF, 0x9F, 0x0A))
                     : new SolidColorBrush(Color.FromArgb(0x0C, 0xFF, 0xFF, 0xFF)),
@@ -876,31 +1014,90 @@ public partial class MiniPlayerWindow : Window
 
             itemBorder.Child = grid;
 
-            // Click action: search track online / copy
+            // Click action: open in user's active media service (Spotify, YouTube Music, Apple Music)
             itemBorder.MouseLeftButtonDown += (_, e) =>
             {
-                string searchQ = Uri.EscapeDataString($"{track.Title} {track.Artist}");
-                try
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = $"https://open.spotify.com/search/{searchQ}",
-                        UseShellExecute = true
-                    });
-                }
-                catch { }
+                var curBrand = _mediaService.Current?.BrandInfo ?? MediaPlayerBrandService.Detect(_mediaService.Current?.SourceAppUserModelId);
+                MediaPlayerBrandService.OpenTrackInActiveService(curBrand, track.Title, track.Artist);
                 e.Handled = true;
             };
 
-            itemBorder.ToolTip = $"Click to search and play \"{track.Title}\" on Spotify/Web";
+            itemBorder.ToolTip = $"Click to play \"{track.Title}\" on {activeBrand.DisplayName}";
 
             AlbumTracksListHost.Children.Add(itemBorder);
+
+            if (isCurrent)
+            {
+                itemBorder.BringIntoView();
+            }
         }
 
         if (_activeDrawer == DrawerState.Songs && _activeSongsTab == SongsTab.AlbumTracks)
         {
             AnimateWindowSize(FullWidth, CalculateDrawerTargetHeight());
         }
+    }
+
+    private void UpdateActiveQueueHighlight()
+    {
+        var currentTitle = _mediaService.Current?.Title ?? "";
+        if (string.IsNullOrWhiteSpace(currentTitle)) return;
+
+        foreach (UIElement child in AlbumTracksListHost.Children)
+        {
+            if (child is Border itemBorder && itemBorder.Tag is SongTrackItem track)
+            {
+                bool isCurrent = IsMatchingTrack(track.Title, currentTitle);
+
+                itemBorder.Background = isCurrent
+                    ? new SolidColorBrush(Color.FromArgb(0x28, 0xFF, 0x9F, 0x0A))
+                    : new SolidColorBrush(Color.FromArgb(0x0C, 0xFF, 0xFF, 0xFF));
+                itemBorder.BorderBrush = isCurrent
+                    ? (Brush)FindResource("AccentBrush")
+                    : new SolidColorBrush(Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF));
+
+                if (itemBorder.Child is Grid grid && grid.Children.Count >= 2)
+                {
+                    if (grid.Children[0] is TextBlock numText)
+                    {
+                        numText.Text = isCurrent ? "♪" : track.DisplayTrackNumber;
+                        numText.FontSize = isCurrent ? 11 : 9.5;
+                        numText.FontWeight = isCurrent ? FontWeights.Bold : FontWeights.Normal;
+                        numText.Foreground = isCurrent ? (Brush)FindResource("AccentBrush") : (Brush)FindResource("SecondaryBrush");
+                    }
+                    if (grid.Children[1] is StackPanel sp && sp.Children.Count > 0 && sp.Children[0] is TextBlock titleText)
+                    {
+                        titleText.FontWeight = isCurrent ? FontWeights.Bold : FontWeights.SemiBold;
+                        titleText.Foreground = isCurrent ? (Brush)FindResource("AccentBrush") : (Brush)FindResource("PrimaryTextBrush");
+                    }
+                }
+
+                if (isCurrent)
+                {
+                    itemBorder.BringIntoView();
+                }
+            }
+        }
+    }
+
+    private static bool IsMatchingTrack(string itemTitle, string currentTitle)
+    {
+        if (string.Equals(itemTitle, currentTitle, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        string cleanItem = MediaSongListService.CleanMetadata(itemTitle).ToLowerInvariant();
+        string cleanCurr = MediaSongListService.CleanMetadata(currentTitle).ToLowerInvariant();
+
+        if (string.Equals(cleanItem, cleanCurr, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (cleanItem.Length > 2 && cleanCurr.Length > 2)
+        {
+            if (cleanItem.Contains(cleanCurr) || cleanCurr.Contains(cleanItem))
+                return true;
+        }
+
+        return false;
     }
 
     // ── 2. Active Windows Players Listing ─────────────────────────────
@@ -924,6 +1121,8 @@ public partial class MiniPlayerWindow : Window
 
         foreach (var sess in sessions)
         {
+            var brand = sess.BrandInfo ?? MediaPlayerBrandService.Detect(sess.Aumid, sess.Title, sess.Artist);
+
             var item = new Border
             {
                 Background = sess.IsCurrent
@@ -944,7 +1143,7 @@ public partial class MiniPlayerWindow : Window
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            // Artwork / App Icon
+            // Artwork / App Brand Icon
             var artBorder = new Border
             {
                 Width = 28,
@@ -954,21 +1153,34 @@ public partial class MiniPlayerWindow : Window
                 ClipToBounds = true,
                 VerticalAlignment = VerticalAlignment.Center
             };
+
             if (sess.Artwork != null)
             {
-                artBorder.Child = new Image { Source = sess.Artwork, Stretch = Stretch.UniformToFill };
+                var artGrid = new Grid();
+                artGrid.Children.Add(new Image { Source = sess.Artwork, Stretch = Stretch.UniformToFill });
+
+                var pip = new Border
+                {
+                    Width = 10,
+                    Height = 10,
+                    CornerRadius = new CornerRadius(5),
+                    Background = new SolidColorBrush(Color.FromArgb(0xD5, 0x00, 0x00, 0x00)),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    Margin = new Thickness(0, 0, 1, 1)
+                };
+                var pipVb = new Viewbox { Width = 6.5, Height = 6.5, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+                pipVb.Child = new System.Windows.Shapes.Path { Data = brand.IconGeometry, Fill = brand.BrandBrush, Stretch = Stretch.Uniform };
+                pip.Child = pipVb;
+                artGrid.Children.Add(pip);
+
+                artBorder.Child = artGrid;
             }
             else
             {
-                artBorder.Child = new TextBlock
-                {
-                    Text = "\uE8D6",
-                    FontFamily = (FontFamily)FindResource("IconFont"),
-                    FontSize = 12,
-                    Foreground = (Brush)FindResource("SecondaryBrush"),
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
+                var vb = new Viewbox { Width = 14, Height = 14, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+                vb.Child = new System.Windows.Shapes.Path { Data = brand.IconGeometry, Fill = brand.BrandBrush, Stretch = Stretch.Uniform };
+                artBorder.Child = vb;
             }
             Grid.SetColumn(artBorder, 0);
             grid.Children.Add(artBorder);
@@ -985,7 +1197,7 @@ public partial class MiniPlayerWindow : Window
             };
             var app = new TextBlock
             {
-                Text = $"{sess.AppName} • {sess.Artist}",
+                Text = $"{brand.DisplayName} • {sess.Artist}",
                 FontSize = 9,
                 Foreground = (Brush)FindResource("SecondaryBrush"),
                 TextTrimming = TextTrimming.CharacterEllipsis,
@@ -1188,5 +1400,6 @@ public partial class MiniPlayerWindow : Window
         _lyricsService.LyricsLoaded -= OnLyricsLoaded;
         _volumeService.VolumeChanged -= OnVolumeChanged;
         _songListService.HistoryChanged -= OnHistoryChanged;
+        ThemeManager.ThemeChanged -= OnThemeChanged;
     }
 }

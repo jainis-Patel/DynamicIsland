@@ -280,9 +280,18 @@ public partial class SettingsView : UserControl
     private void InstallUpdateBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.InstallUpdateBtn_Click(sender, e);
 
+    private void ViewChangelogBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.ViewChangelogBtn_Click(sender, e);
+
     private void AutoCheckToggleBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.AutoCheckToggleBtn_Click(sender, e);
 
+    private void AutoDownloadToggleBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.AutoDownloadToggleBtn_Click(sender, e);
+
     private void ToggleVersionHistoryBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.ToggleVersionHistoryBtn_Click(sender, e);
+
+    private void GitHubTokenBox_LostFocus(object sender, RoutedEventArgs e) =>
+        Island?.GitHubTokenBox_LostFocus(sender, e);
 }

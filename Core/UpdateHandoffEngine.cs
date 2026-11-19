@@ -59,6 +59,7 @@ public static class UpdateHandoffEngine
         {
             // Give installer a moment to spin up, then exit current instance gracefully
             Program.SignalStopOnDefaultDesktop();
+            Thread.Sleep(300);
             Environment.Exit(0);
             return true;
         }
@@ -81,32 +82,76 @@ public static class UpdateHandoffEngine
         string currentExeEscaped = currentExe.Replace("/", "\\");
         string newBinaryEscaped = newBinaryPath.Replace("/", "\\");
         string backupExeEscaped = (currentExe + BackupExtension).Replace("/", "\\");
+        int currentPid = Environment.ProcessId;
 
-        // Atomic script: waits for current PID to exit, backs up current exe, moves new exe, relaunches with --updated
+        // Atomic script: waits for current PID to exit, backs up current exe with retry,
+        // moves new exe with retry, auto-rolls back if replace fails, relaunches with --updated
         string scriptContent = $@"@echo off
-setlocal
+setlocal enabledelayedexpansion
 chcp 65001 >nul
 
-set TARGET=""{currentExeEscaped}""
-set NEWFILE=""{newBinaryEscaped}""
-set BAK=""{backupExeEscaped}""
+set TARGET={currentExeEscaped}
+set NEWFILE={newBinaryEscaped}
+set BAK={backupExeEscaped}
+set PID={currentPid}
 
-rem Wait 1 second for the running Dynamic Island process to terminate
-timeout /t 1 /nobreak >nul
-
-rem Backup existing binary for rollback safety
-if exist %TARGET% (
-    move /y %TARGET% %BAK% >nul
+rem 1. Wait up to 30 seconds for the running process (PID %PID%) to terminate
+set WAITCOUNT=0
+:wait_process
+tasklist /fi ""PID eq %PID%"" 2>nul | findstr /i ""%PID%"" >nul
+if not errorlevel 1 (
+    set /a WAITCOUNT+=1
+    if !WAITCOUNT! geq 30 (
+        goto abort_and_restore
+    )
+    timeout /t 1 /nobreak >nul
+    goto wait_process
 )
 
-rem Move newly downloaded binary into place
-move /y %NEWFILE% %TARGET% >nul
+rem Brief delay to allow Windows to release file locks completely
+timeout /t 1 /nobreak >nul
 
-rem Relaunch updated application
-start """" %TARGET% --updated
+rem 2. Backup existing binary for rollback safety (with retry up to 5 times)
+set RETRY=0
+:try_backup
+move /y ""!TARGET!"" ""!BAK!"" >nul 2>&1
+if errorlevel 1 (
+    set /a RETRY+=1
+    if !RETRY! lss 5 (
+        timeout /t 1 /nobreak >nul
+        goto try_backup
+    )
+    goto abort_and_restore
+)
 
-rem Clean up handoff script
-del ""%~f0""
+rem 3. Move newly downloaded binary into place (with retry up to 5 times)
+set RETRY=0
+:try_replace
+move /y ""!NEWFILE!"" ""!TARGET!"" >nul 2>&1
+if errorlevel 1 (
+    set /a RETRY+=1
+    if !RETRY! lss 5 (
+        timeout /t 1 /nobreak >nul
+        goto try_replace
+    )
+    rem Failed to install new binary! Automatically roll back from backup
+    goto abort_and_restore
+)
+
+rem 4. Relaunch updated application
+start """" ""!TARGET!"" --updated
+goto cleanup
+
+:abort_and_restore
+if not exist ""!TARGET!"" (
+    if exist ""!BAK!"" move /y ""!BAK!"" ""!TARGET!"" >nul 2>&1
+)
+if exist ""!TARGET!"" (
+    start """" ""!TARGET!""
+)
+
+:cleanup
+(goto) 2>nul & del ""%~f0""
 ";
 
         File.WriteAllText(scriptPath, scriptContent);
@@ -125,6 +170,7 @@ del ""%~f0""
         if (proc != null)
         {
             Program.SignalStopOnDefaultDesktop();
+            Thread.Sleep(300);
             Environment.Exit(0);
             return true;
         }
