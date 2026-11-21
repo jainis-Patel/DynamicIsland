@@ -38,6 +38,7 @@ internal static class DisplayTopologyService
     {
         var result = new List<MonitorCardInfo>();
         var handles = new List<IntPtr>();
+        var edidNames = TryGetEdidFriendlyNames();
 
         EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (IntPtr hMon, IntPtr _, ref RECT _, IntPtr _) =>
         {
@@ -81,10 +82,18 @@ internal static class DisplayTopologyService
                 dpiPercent = (int)Math.Round((dpiX / 96.0) * 100);
             }
 
-            // Friendly name
-            string friendly = isPrimary
-                ? $"Display {i + 1} (Main)"
-                : $"Display {i + 1} (External)";
+            // Friendly name (prefer hardware EDID name via QueryDisplayConfig when available)
+            string friendly;
+            if (edidNames.TryGetValue(devName, out string? edidName) && !string.IsNullOrWhiteSpace(edidName))
+            {
+                friendly = isPrimary ? $"{edidName} (Main)" : edidName;
+            }
+            else
+            {
+                friendly = isPrimary
+                    ? $"Display {i + 1} (Main)"
+                    : $"Display {i + 1} (External)";
+            }
 
             result.Add(new MonitorCardInfo(
                 Index: i,
@@ -100,6 +109,64 @@ internal static class DisplayTopologyService
         }
 
         return result;
+    }
+
+    private static Dictionary<string, string> TryGetEdidFriendlyNames()
+    {
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, out uint pathCount, out uint modeCount) != 0 ||
+                pathCount == 0)
+            {
+                return map;
+            }
+
+            var paths = new DISPLAYCONFIG_PATH_INFO[pathCount];
+            var modes = new DISPLAYCONFIG_MODE_INFO[modeCount];
+            if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, ref pathCount, paths, ref modeCount, modes, IntPtr.Zero) != 0)
+            {
+                return map;
+            }
+
+            uint sourceSize = (uint)Marshal.SizeOf<DISPLAYCONFIG_SOURCE_DEVICE_NAME>();
+            uint targetSize = (uint)Marshal.SizeOf<DISPLAYCONFIG_TARGET_DEVICE_NAME>();
+
+            for (int i = 0; i < pathCount; i++)
+            {
+                var src = new DISPLAYCONFIG_SOURCE_DEVICE_NAME
+                {
+                    header = new DISPLAYCONFIG_DEVICE_INFO_HEADER
+                    {
+                        type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME,
+                        size = sourceSize,
+                        adapterId = paths[i].sourceInfo.adapterId,
+                        id = paths[i].sourceInfo.id
+                    }
+                };
+
+                if (DisplayConfigGetDeviceInfo(ref src) != 0 || string.IsNullOrWhiteSpace(src.viewGdiDeviceName))
+                    continue;
+
+                var tgt = new DISPLAYCONFIG_TARGET_DEVICE_NAME
+                {
+                    header = new DISPLAYCONFIG_DEVICE_INFO_HEADER
+                    {
+                        type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME,
+                        size = targetSize,
+                        adapterId = paths[i].targetInfo.adapterId,
+                        id = paths[i].targetInfo.id
+                    }
+                };
+
+                if (DisplayConfigGetDeviceInfo(ref tgt) == 0 && !string.IsNullOrWhiteSpace(tgt.monitorFriendlyDeviceName))
+                {
+                    map[src.viewGdiDeviceName] = tgt.monitorFriendlyDeviceName.Trim();
+                }
+            }
+        }
+        catch { }
+        return map;
     }
 
     /// <summary>
@@ -156,8 +223,8 @@ internal static class DisplayTopologyService
                 double t = (kelvin - 2000.0) / 4000.0; // 0 = warm amber, 1 = neutral
 
                 double redFactor = 1.0;
-                double greenFactor = 0.78 + (0.22 * t);
-                double blueFactor = 0.45 + (0.55 * t);
+                double greenFactor = Math.Clamp(0.78 + (0.22 * t), 0.75, 1.0);
+                double blueFactor = Math.Clamp(0.50 + (0.50 * t), 0.50, 1.0);
 
                 for (int i = 0; i < 256; i++)
                 {

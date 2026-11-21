@@ -356,20 +356,29 @@ public partial class IslandWindow
                 }
             }
             // Fallback to first visible third-party window process
-            foreach (var p in Process.GetProcesses())
+            Process[] procs = Process.GetProcesses();
+            try
             {
-                try
+                foreach (var p in procs)
                 {
-                    if (p.Id != Environment.ProcessId && p.MainWindowHandle != IntPtr.Zero && !string.IsNullOrWhiteSpace(p.ProcessName))
+                    try
                     {
-                        pid = p.Id;
-                        appName = p.ProcessName;
-                        p.Dispose();
-                        return;
+                        if (p.Id != Environment.ProcessId && p.MainWindowHandle != IntPtr.Zero && !string.IsNullOrWhiteSpace(p.ProcessName))
+                        {
+                            pid = p.Id;
+                            appName = p.ProcessName;
+                            return;
+                        }
                     }
+                    catch { }
                 }
-                catch { }
-                finally { p.Dispose(); }
+            }
+            finally
+            {
+                foreach (var p in procs)
+                {
+                    try { p.Dispose(); } catch { }
+                }
             }
         }
         catch { }

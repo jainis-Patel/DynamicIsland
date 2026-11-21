@@ -34,9 +34,6 @@ internal static class LiquidUiEngine
     {
         if (_initialized) return;
 
-        _frostedGrainActive = CreateFrostedGrainBrush();
-        _pointerGlareActive = CreatePointerGlareBrush();
-
         var res = resources ?? Application.Current?.Resources;
         if (res != null)
         {

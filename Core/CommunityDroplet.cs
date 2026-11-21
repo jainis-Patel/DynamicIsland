@@ -86,12 +86,17 @@ public static class CommunityDropletSchemaValidator
             errors.Add("Droplet 'name' cannot exceed 100 characters.");
         }
 
-        if (!Enum.TryParse<DropletCategory>(def.Category, ignoreCase: true, out _))
+        if (!Enum.TryParse<DropletCategory>(def.Category, ignoreCase: true, out var parsedCategory) ||
+            !Enum.IsDefined(parsedCategory))
         {
             errors.Add($"Invalid category: '{def.Category}'. Must be Productivity, Media, System, or Capture.");
         }
 
-        if (def.RefreshIntervalSec > 0 && def.RefreshIntervalSec < 5)
+        if (def.RefreshIntervalSec < 0)
+        {
+            errors.Add($"'refreshIntervalSec' cannot be negative (got {def.RefreshIntervalSec}).");
+        }
+        else if (def.RefreshIntervalSec > 0 && def.RefreshIntervalSec < 5)
         {
             errors.Add($"'refreshIntervalSec' cannot be less than 5 seconds (got {def.RefreshIntervalSec}).");
         }
@@ -114,6 +119,11 @@ public static class CommunityDropletSchemaValidator
             for (int i = 0; i < def.Actions.Count; i++)
             {
                 var action = def.Actions[i];
+                if (action == null)
+                {
+                    errors.Add($"Action[{i}] cannot be null.");
+                    continue;
+                }
                 if (string.IsNullOrWhiteSpace(action.Label))
                 {
                     errors.Add($"Action[{i}] missing required 'label'.");
@@ -121,6 +131,30 @@ public static class CommunityDropletSchemaValidator
                 if (string.IsNullOrWhiteSpace(action.Command))
                 {
                     errors.Add($"Action[{i}] missing required 'command'.");
+                }
+
+                string rawType = string.IsNullOrWhiteSpace(action.Type) ? "OpenUrl" : action.Type.Trim();
+                if (!Enum.TryParse<CommunityActionType>(rawType, ignoreCase: true, out var actType) ||
+                    !Enum.IsDefined(actType))
+                {
+                    errors.Add($"Action[{i}] has invalid 'type': '{action.Type}'.");
+                }
+                else if (actType is CommunityActionType.OpenUrl or CommunityActionType.HttpRequest)
+                {
+                    if (!Uri.TryCreate(action.Command, UriKind.Absolute, out var actionUri) ||
+                        (actionUri.Scheme != Uri.UriSchemeHttp && actionUri.Scheme != Uri.UriSchemeHttps))
+                    {
+                        errors.Add($"Action[{i}] '{actType}' command must be an absolute http:// or https:// URL.");
+                    }
+
+                    if (actType == CommunityActionType.HttpRequest && !string.IsNullOrWhiteSpace(action.Method))
+                    {
+                        string m = action.Method.Trim().ToUpperInvariant();
+                        if (m is not ("GET" or "POST" or "PUT" or "DELETE" or "PATCH"))
+                        {
+                            errors.Add($"Action[{i}] has unsupported HTTP method '{action.Method}'.");
+                        }
+                    }
                 }
             }
         }

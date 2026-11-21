@@ -63,6 +63,7 @@ public sealed class IslandNatureThemeControl : FrameworkElement
     private double _cachedBloomDensity = -1;
     private List<VinePoint[]>? _cachedVines;
     private List<BranchData>? _cachedBranches;
+    private readonly List<FlowerData> _flowersBuffer = new(64);
 
     public IslandNatureThemeControl()
     {
@@ -155,6 +156,30 @@ public sealed class IslandNatureThemeControl : FrameworkElement
     private static readonly LinearGradientBrush PoppyPetal1Brush;
     private static readonly LinearGradientBrush PoppyPetal2Brush;
 
+    private static readonly SolidColorBrush[] GoldenPollenAlphaBrushes;
+    private static readonly Pen[] IvyLeafOutlinePens;
+    private static readonly StreamGeometry UnitIvyLeafGeometry;
+    private static readonly StreamGeometry MorningGloryGeometry;
+    private static readonly StreamGeometry UnitSmoothPetalGeometry;
+    private static readonly StreamGeometry UnitNotchedPetalGeometry;
+    private static readonly StreamGeometry ButterflyForewingGeometry;
+    private static readonly StreamGeometry ButterflyHindwingGeometry;
+    private static readonly StreamGeometry ButterflyAntennaeGeometry;
+
+    private static readonly double[] ButterflySpeeds = { 11.0, 13.0, 9.0, 12.0 };
+    private static readonly double[] ButterflyScales = { 1.0, 0.9, 0.8, 0.85 };
+    private static readonly Brush[] ButterflyWingBrushes;
+    private static readonly Pen[] ButterflyWingPens;
+    private static readonly Brush[] ButterflySpotBrushes;
+    private static readonly Point[] ButterflyVeinEnds =
+    {
+        new(17, -14), new(22, -8), new(20, -1), new(14, 12), new(10, 16)
+    };
+    private static readonly (double px, double py, double r)[] ButterflySpots =
+    {
+        (19, -12, 1.3), (22, -7, 1.1), (20, -3, 0.9), (15, 12, 1.0), (11, 16, 1.0)
+    };
+
     static IslandNatureThemeControl()
     {
         T Freeze<T>(T obj) where T : Freezable { obj.Freeze(); return obj; }
@@ -225,6 +250,104 @@ public sealed class IslandNatureThemeControl : FrameworkElement
         DaisyPetal2Brush = Freeze(new LinearGradientBrush(Color.FromRgb(0xE4, 0xE2, 0xD0), Color.FromRgb(0xFF, 0xFF, 0xFF), new Point(0, 0), new Point(1, 0)));
         PoppyPetal1Brush = Freeze(new LinearGradientBrush(Color.FromRgb(0x5C, 0x08, 0x08), Color.FromRgb(0xF0, 0x40, 0x2A), new Point(0, 0), new Point(1, 0)));
         PoppyPetal2Brush = Freeze(new LinearGradientBrush(Color.FromRgb(0x7A, 0x0E, 0x0E), Color.FromRgb(0xE0, 0x30, 0x1C), new Point(0, 0), new Point(1, 0)));
+
+        ButterflyWingBrushes = new Brush[] { MonarchWingBrush, BlueMorphoWingBrush, SwallowtailWingBrush, BlueMorphoWingBrush };
+        ButterflyWingPens = new Pen[] { ButterflyMonarchPen, ButterflyBluePen, ButterflyWhitePen, ButterflyBluePen };
+        ButterflySpotBrushes = new Brush[] { MonarchSpotBrush, BlueMorphoSpotBrush, SwallowtailSpotBrush, BlueMorphoSpotBrush };
+
+        GoldenPollenAlphaBrushes = new SolidColorBrush[16];
+        for (int i = 0; i < GoldenPollenAlphaBrushes.Length; i++)
+        {
+            double alpha = (i + 1) / 16.0 * 0.55;
+            GoldenPollenAlphaBrushes[i] = Freeze(new SolidColorBrush(Color.FromArgb((byte)Math.Clamp((int)Math.Round(alpha * 255.0), 1, 255), 0xF4, 0xD3, 0x5E)));
+        }
+
+        var ivyOutlineColor = Freeze(new SolidColorBrush(Color.FromArgb(100, 225, 255, 195)));
+        IvyLeafOutlinePens = new Pen[24];
+        for (int i = 0; i < IvyLeafOutlinePens.Length; i++)
+        {
+            IvyLeafOutlinePens[i] = Freeze(new Pen(ivyOutlineColor, 0.7 / (i + 1)));
+        }
+
+        // Unit ivy leaf (length = 1.0, half-width w = 0.55)
+        var unitLeaf = new StreamGeometry();
+        using (var ctx = unitLeaf.Open())
+        {
+            const double w = 0.55;
+            ctx.BeginFigure(new Point(0, 0), isFilled: true, isClosed: true);
+            ctx.QuadraticBezierTo(new Point(-0.08, -w * 0.6), new Point(0.35, -w), isStroked: true, isSmoothJoin: true);
+            ctx.QuadraticBezierTo(new Point(0.45, -w * 0.35), new Point(0.62, -w * 0.28), isStroked: true, isSmoothJoin: true);
+            ctx.QuadraticBezierTo(new Point(0.82, -w * 0.12), new Point(1.0, 0), isStroked: true, isSmoothJoin: true);
+            ctx.QuadraticBezierTo(new Point(0.82, w * 0.12), new Point(0.62, w * 0.28), isStroked: true, isSmoothJoin: true);
+            ctx.QuadraticBezierTo(new Point(0.45, w * 0.35), new Point(0.35, w), isStroked: true, isSmoothJoin: true);
+            ctx.QuadraticBezierTo(new Point(-0.08, w * 0.6), new Point(0, 0), isStroked: true, isSmoothJoin: true);
+        }
+        UnitIvyLeafGeometry = Freeze(unitLeaf);
+
+        var glory = new StreamGeometry();
+        using (var ctx = glory.Open())
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                double a0 = i * 1.2566;
+                double am = a0 + 0.6283;
+                double a1 = a0 + 1.2566;
+                Point p0 = new(Math.Cos(a0) * 9.0, Math.Sin(a0) * 9.0);
+                Point pm = new(Math.Cos(am) * 13.5, Math.Sin(am) * 13.5);
+                Point p1 = new(Math.Cos(a1) * 9.0, Math.Sin(a1) * 9.0);
+                if (i == 0) ctx.BeginFigure(p0, isFilled: true, isClosed: true);
+                ctx.QuadraticBezierTo(pm, p1, isStroked: true, isSmoothJoin: true);
+            }
+        }
+        MorningGloryGeometry = Freeze(glory);
+
+        var smoothPetal = new StreamGeometry();
+        using (var ctx = smoothPetal.Open())
+        {
+            ctx.BeginFigure(new Point(0, 0), isFilled: true, isClosed: true);
+            ctx.BezierTo(new Point(0.3, -1.0), new Point(0.85, -0.7), new Point(1.0, 0), isStroked: true, isSmoothJoin: true);
+            ctx.BezierTo(new Point(0.85, 0.7), new Point(0.3, 1.0), new Point(0, 0), isStroked: true, isSmoothJoin: true);
+        }
+        UnitSmoothPetalGeometry = Freeze(smoothPetal);
+
+        var notchedPetal = new StreamGeometry();
+        using (var ctx = notchedPetal.Open())
+        {
+            ctx.BeginFigure(new Point(0, 0), isFilled: true, isClosed: true);
+            ctx.BezierTo(new Point(0.3, -1.0), new Point(0.95, -0.95), new Point(1.0, -0.2), isStroked: true, isSmoothJoin: true);
+            ctx.LineTo(new Point(0.88, 0), isStroked: true, isSmoothJoin: true);
+            ctx.LineTo(new Point(1.0, 0.2), isStroked: true, isSmoothJoin: true);
+            ctx.BezierTo(new Point(0.95, 0.95), new Point(0.3, 1.0), new Point(0, 0), isStroked: true, isSmoothJoin: true);
+        }
+        UnitNotchedPetalGeometry = Freeze(notchedPetal);
+
+        var forewing = new StreamGeometry();
+        using (var ctx = forewing.Open())
+        {
+            ctx.BeginFigure(new Point(0, -1), isFilled: true, isClosed: true);
+            ctx.BezierTo(new Point(3, -15), new Point(18, -19), new Point(23, -10), isStroked: true, isSmoothJoin: true);
+            ctx.BezierTo(new Point(25, -3), new Point(14, 2), new Point(0, 3), isStroked: true, isSmoothJoin: true);
+        }
+        ButterflyForewingGeometry = Freeze(forewing);
+
+        var hindwing = new StreamGeometry();
+        using (var ctx = hindwing.Open())
+        {
+            ctx.BeginFigure(new Point(0, 2), isFilled: true, isClosed: true);
+            ctx.BezierTo(new Point(13, 1), new Point(22, 10), new Point(15, 18), isStroked: true, isSmoothJoin: true);
+            ctx.BezierTo(new Point(9, 21), new Point(2, 13), new Point(0, 6), isStroked: true, isSmoothJoin: true);
+        }
+        ButterflyHindwingGeometry = Freeze(hindwing);
+
+        var antennae = new StreamGeometry();
+        using (var ctx = antennae.Open())
+        {
+            ctx.BeginFigure(new Point(-0.6, -8), isFilled: false, isClosed: false);
+            ctx.QuadraticBezierTo(new Point(-4, -15), new Point(-7, -16), isStroked: true, isSmoothJoin: true);
+            ctx.BeginFigure(new Point(0.6, -8), isFilled: false, isClosed: false);
+            ctx.QuadraticBezierTo(new Point(4, -15), new Point(7, -16), isStroked: true, isSmoothJoin: true);
+        }
+        ButterflyAntennaeGeometry = Freeze(antennae);
     }
 
     // =========================================================================
@@ -491,33 +614,41 @@ public sealed class IslandNatureThemeControl : FrameworkElement
         }
 
         // ---------------------------------------------------------------------
-        // Vine 2: Continuous Under-Pill Trellis & Left-Center Cascade (Eliminates the empty gap!)
+        // Vine 2a & 2b: Under-Pill Trellis + Separate Left-Center Cascade
+        // Split so the trellis does not draw a diagonal chord back to 32% width.
         // ---------------------------------------------------------------------
         {
-            var pts = new List<Point>();
             double o = 3.5 * _scale;
 
-            // 1. Runs completely across the bottom edge of the pill from left to right
+            // 2a. Runs completely across the bottom edge of the pill from left to right
+            var trellisPts = new List<Point>();
             for (double x = cxL - 6.0; x <= cxR + 6.0; x += 3.5)
             {
                 double wave = Math.Sin(x * 0.08) * 2.0;
-                pts.Add(new Point(x, botY + o + wave));
+                trellisPts.Add(new Point(x, botY + o + wave));
             }
+            var wobbledTrellis = new List<Point>(trellisPts.Count);
+            for (int i = 0; i < trellisPts.Count; i++)
+            {
+                wobbledTrellis.Add(new Point(trellisPts[i].X + Math.Sin(i * 0.28) * 1.4, trellisPts[i].Y));
+            }
+            vineList.Add(Fin(wobbledTrellis));
 
-            // 2. Cascades downward from 32% width
+            // 2b. Cascades downward from 32% width
+            var cascadePts = new List<Point>();
             double detachX = p.X + p.Width * 0.32;
             double cascadeDrop = _dropLength * 1.15;
             for (double y = botY + o; y <= botY + o + cascadeDrop; y += 3.4)
             {
                 double frac = (y - (botY + o)) / Math.Max(1.0, cascadeDrop);
                 double wave = Math.Sin(frac * Math.PI * 2.0 + 0.8) * (14.0 * _scale);
-                pts.Add(new Point(detachX + wave, y));
+                cascadePts.Add(new Point(detachX + wave, y));
             }
 
-            // 3. Spiral curl
-            if (pts.Count > 0)
+            // Spiral curl at cascade tip
+            if (cascadePts.Count > 0)
             {
-                var last = pts[^1];
+                var last = cascadePts[^1];
                 double tx = last.X, ty = last.Y;
                 double curAng = Math.PI * 0.5;
                 for (int k = 0; k < 10; k++)
@@ -525,16 +656,16 @@ public sealed class IslandNatureThemeControl : FrameworkElement
                     curAng += 0.40;
                     tx += Math.Cos(curAng) * (1.6 * _scale);
                     ty += Math.Sin(curAng) * (1.6 * _scale);
-                    pts.Add(new Point(tx, ty));
+                    cascadePts.Add(new Point(tx, ty));
                 }
             }
 
-            var wobbled = new List<Point>(pts.Count);
-            for (int i = 0; i < pts.Count; i++)
+            var wobbledCascade = new List<Point>(cascadePts.Count);
+            for (int i = 0; i < cascadePts.Count; i++)
             {
-                wobbled.Add(new Point(pts[i].X + Math.Sin(i * 0.28) * 1.4, pts[i].Y));
+                wobbledCascade.Add(new Point(cascadePts[i].X + Math.Sin(i * 0.28) * 1.4, cascadePts[i].Y));
             }
-            vineList.Add(Fin(wobbled));
+            vineList.Add(Fin(wobbledCascade));
         }
 
         // ---------------------------------------------------------------------
@@ -670,7 +801,7 @@ public sealed class IslandNatureThemeControl : FrameworkElement
 
         if (fade < 0.99) dc.PushOpacity(fade);
 
-        var flowers = new List<FlowerData>();
+        _flowersBuffer.Clear();
         int[] ks = new int[_cachedVines.Count];
         for (int j = 0; j < _cachedVines.Count; j++)
         {
@@ -682,7 +813,7 @@ public sealed class IslandNatureThemeControl : FrameworkElement
         {
             if (ks[j] > 2)
             {
-                DrawVine(dc, _cachedVines[j], ks[j], j > 1 ? 1.8 : 2.6, t, flowers, j, isBranch: false);
+                DrawVine(dc, _cachedVines[j], ks[j], j > 1 ? 1.8 : 2.6, t, _flowersBuffer, j, isBranch: false);
             }
         }
 
@@ -692,12 +823,12 @@ public sealed class IslandNatureThemeControl : FrameworkElement
             int n = (int)(b.Points.Length * Clamp((ks[b.ParentIdx] - b.AttachIdx) / 32.0));
             if (n > 2)
             {
-                DrawVine(dc, b.Points, n, 1.4, t, flowers, q + 9, isBranch: true);
+                DrawVine(dc, b.Points, n, 1.4, t, _flowersBuffer, q + 9, isBranch: true);
             }
         }
 
         // Draw botanical blooms along ivy vines
-        foreach (var fl in flowers)
+        foreach (var fl in _flowersBuffer)
         {
             DrawFlower(dc, fl.X, fl.Y, fl.S, fl.R, fl.Ty);
         }
@@ -785,27 +916,21 @@ public sealed class IslandNatureThemeControl : FrameworkElement
 
     private static void DrawIvyLeaf(DrawingContext dc, double x, double y, double ang, double len, bool isLight)
     {
-        var geom = new StreamGeometry();
+        if (len <= 0.1) return;
         double w = len * 0.55;
-        using (var ctx = geom.Open())
-        {
-            ctx.BeginFigure(new Point(0, 0), isFilled: true, isClosed: true);
-            // 3-lobed ivy leaf bezier outline
-            ctx.QuadraticBezierTo(new Point(-len * 0.08, -w * 0.6), new Point(len * 0.35, -w), isStroked: true, isSmoothJoin: true);
-            ctx.QuadraticBezierTo(new Point(len * 0.45, -w * 0.35), new Point(len * 0.62, -w * 0.28), isStroked: true, isSmoothJoin: true);
-            ctx.QuadraticBezierTo(new Point(len * 0.82, -w * 0.12), new Point(len, 0), isStroked: true, isSmoothJoin: true);
-            ctx.QuadraticBezierTo(new Point(len * 0.82, w * 0.12), new Point(len * 0.62, w * 0.28), isStroked: true, isSmoothJoin: true);
-            ctx.QuadraticBezierTo(new Point(len * 0.45, w * 0.35), new Point(len * 0.35, w), isStroked: true, isSmoothJoin: true);
-            ctx.QuadraticBezierTo(new Point(-len * 0.08, w * 0.6), new Point(0, 0), isStroked: true, isSmoothJoin: true);
-        }
-        geom.Freeze();
 
         var mat = Matrix.Identity;
         mat.Rotate(ang * 180.0 / Math.PI);
         mat.Translate(x, y);
 
         dc.PushTransform(new MatrixTransform(mat));
-        dc.DrawGeometry(isLight ? IvyLeafLightBrush : IvyLeafDarkBrush, IvyLeafVeinPen, geom);
+
+        var scaleMat = Matrix.Identity;
+        scaleMat.Scale(len, len);
+        dc.PushTransform(new MatrixTransform(scaleMat));
+        int penIdx = Math.Clamp((int)Math.Round(len) - 1, 0, IvyLeafOutlinePens.Length - 1);
+        dc.DrawGeometry(isLight ? IvyLeafLightBrush : IvyLeafDarkBrush, IvyLeafOutlinePens[penIdx], UnitIvyLeafGeometry);
+        dc.Pop();
 
         // Draw delicate palmate veins
         dc.DrawLine(IvyLeafVeinPen, new Point(0, 0), new Point(len * 0.9, 0));
@@ -819,6 +944,7 @@ public sealed class IslandNatureThemeControl : FrameworkElement
 
     private static void DrawFlower(DrawingContext dc, double x, double y, double s, double r, int ty)
     {
+        if (s <= 0.02) return;
         switch (ty)
         {
             case 0: DrawMorningGlory(dc, x, y, s, r); break;
@@ -831,32 +957,15 @@ public sealed class IslandNatureThemeControl : FrameworkElement
 
     private static void DrawMorningGlory(DrawingContext dc, double x, double y, double s, double r)
     {
+        if (s <= 0.02) return;
+
         var mat = Matrix.Identity;
         mat.Scale(s, s);
         mat.Rotate(r * 180.0 / Math.PI);
         mat.Translate(x, y);
 
         dc.PushTransform(new MatrixTransform(mat));
-
-        var geom = new StreamGeometry();
-        using (var ctx = geom.Open())
-        {
-            for (int i = 0; i < 5; i++)
-            {
-                double a0 = i * 1.2566;
-                double am = a0 + 0.6283;
-                double a1 = a0 + 1.2566;
-                Point p0 = new(Math.Cos(a0) * 9.0, Math.Sin(a0) * 9.0);
-                Point pm = new(Math.Cos(am) * 13.5, Math.Sin(am) * 13.5);
-                Point p1 = new(Math.Cos(a1) * 9.0, Math.Sin(a1) * 9.0);
-
-                if (i == 0) ctx.BeginFigure(p0, isFilled: true, isClosed: true);
-                ctx.QuadraticBezierTo(pm, p1, isStroked: true, isSmoothJoin: true);
-            }
-        }
-        geom.Freeze();
-
-        dc.DrawGeometry(GloryRadialBrush, null, geom);
+        dc.DrawGeometry(GloryRadialBrush, null, MorningGloryGeometry);
 
         for (int i = 0; i < 5; i++)
         {
@@ -870,6 +979,8 @@ public sealed class IslandNatureThemeControl : FrameworkElement
 
     private static void DrawJasmine(DrawingContext dc, double x, double y, double s, double r)
     {
+        if (s <= 0.02) return;
+
         var mat = Matrix.Identity;
         mat.Scale(s, s);
         mat.Rotate(r * 180.0 / Math.PI);
@@ -928,30 +1039,19 @@ public sealed class IslandNatureThemeControl : FrameworkElement
 
     private static void DrawPetal(DrawingContext dc, double len, double wd, Brush brush, double rot, bool notched)
     {
-        var geom = new StreamGeometry();
-        using (var ctx = geom.Open())
-        {
-            ctx.BeginFigure(new Point(0, 0), isFilled: true, isClosed: true);
-            if (notched)
-            {
-                ctx.BezierTo(new Point(len * 0.3, -wd), new Point(len * 0.95, -wd * 0.95), new Point(len, -wd * 0.2), isStroked: true, isSmoothJoin: true);
-                ctx.LineTo(new Point(len * 0.88, 0), isStroked: true, isSmoothJoin: true);
-                ctx.LineTo(new Point(len, wd * 0.2), isStroked: true, isSmoothJoin: true);
-                ctx.BezierTo(new Point(len * 0.95, wd * 0.95), new Point(len * 0.3, wd), new Point(0, 0), isStroked: true, isSmoothJoin: true);
-            }
-            else
-            {
-                ctx.BezierTo(new Point(len * 0.3, -wd), new Point(len * 0.85, -wd * 0.7), new Point(len, 0), isStroked: true, isSmoothJoin: true);
-                ctx.BezierTo(new Point(len * 0.85, wd * 0.7), new Point(len * 0.3, wd), new Point(0, 0), isStroked: true, isSmoothJoin: true);
-            }
-        }
-        geom.Freeze();
+        if (len <= 0.05 || wd <= 0.05) return;
 
         var mat = Matrix.Identity;
         mat.Rotate(rot * 180.0 / Math.PI);
 
         dc.PushTransform(new MatrixTransform(mat));
-        dc.DrawGeometry(brush, null, geom);
+
+        var scaleMat = Matrix.Identity;
+        scaleMat.Scale(len, wd);
+        dc.PushTransform(new MatrixTransform(scaleMat));
+        dc.DrawGeometry(brush, null, notched ? UnitNotchedPetalGeometry : UnitSmoothPetalGeometry);
+        dc.Pop();
+
         dc.DrawLine(PetalSepPen, new Point(len * 0.1, 0), new Point(len * 0.8, 0));
         dc.Pop();
     }
@@ -966,12 +1066,11 @@ public sealed class IslandNatureThemeControl : FrameworkElement
             {
                 double px = p.X - 35.0 + (((j * 97) % 100) / 100.0) * (p.Width + 70.0) + Math.Sin(t * 0.5 + j) * 12.0;
                 double py = p.Y + p.Height + 10.0 + (((j * 53) % 100) / 100.0) * 110.0 - ((t * 6.0 + j * 8.0) % 40.0);
-                double alpha = 0.55 * Math.Abs(Math.Sin(t + j));
-                if (alpha > 0.04)
+                double rawSin = Math.Abs(Math.Sin(t + j));
+                if (rawSin * 0.55 > 0.04)
                 {
-                    dc.PushOpacity(alpha);
-                    dc.DrawEllipse(GoldenPollenBrush, null, new Point(px, py), 1.5 * _scale, 1.5 * _scale);
-                    dc.Pop();
+                    int alphaIdx = Math.Clamp((int)(rawSin * GoldenPollenAlphaBrushes.Length) - 1, 0, GoldenPollenAlphaBrushes.Length - 1);
+                    dc.DrawEllipse(GoldenPollenAlphaBrushes[alphaIdx], null, new Point(px, py), 1.5 * _scale, 1.5 * _scale);
                 }
             }
         }
@@ -980,12 +1079,6 @@ public sealed class IslandNatureThemeControl : FrameworkElement
         int count = Math.Clamp(_butterflyCount, 0, 4);
         if (count > 0)
         {
-            double[] speeds = { 11.0, 13.0, 9.0, 12.0 };
-            double[] scales = { 1.0, 0.9, 0.8, 0.85 };
-            Brush[] wingBrushes = { MonarchWingBrush, BlueMorphoWingBrush, SwallowtailWingBrush, BlueMorphoWingBrush };
-            Pen[] wingPens = { ButterflyMonarchPen, ButterflyBluePen, ButterflyWhitePen, ButterflyBluePen };
-            Brush[] spotBrushes = { MonarchSpotBrush, BlueMorphoSpotBrush, SwallowtailSpotBrush, BlueMorphoSpotBrush };
-
             for (int i = 0; i < count; i++)
             {
                 Point FlightPath(double u)
@@ -1016,7 +1109,7 @@ public sealed class IslandNatureThemeControl : FrameworkElement
                 Point ptB = FlightPath(t + 0.05);
                 double ang = Math.Atan2(ptB.X - ptA.X, -(ptB.Y - ptA.Y));
 
-                DrawButterfly(dc, ptA.X, ptA.Y, t + i, ang, scales[i] * _scale, speeds[i], wingBrushes[i], wingPens[i], spotBrushes[i]);
+                DrawButterfly(dc, ptA.X, ptA.Y, t + i, ang, ButterflyScales[i] * _scale, ButterflySpeeds[i], ButterflyWingBrushes[i], ButterflyWingPens[i], ButterflySpotBrushes[i]);
             }
         }
     }
@@ -1024,6 +1117,8 @@ public sealed class IslandNatureThemeControl : FrameworkElement
     private static void DrawButterfly(DrawingContext dc, double x, double y, double t, double ang, double scale, double speed,
         Brush wingBrush, Pen wingPen, Brush spotBrush)
     {
+        if (scale <= 0.02) return;
+
         var mat = Matrix.Identity;
         mat.Scale(scale, scale);
         mat.Rotate(ang * 180.0 / Math.PI);
@@ -1040,38 +1135,15 @@ public sealed class IslandNatureThemeControl : FrameworkElement
             wingMat.Scale(sx * flap, 1.0);
             dc.PushTransform(new MatrixTransform(wingMat));
 
-            // Forewing
-            var forewing = new StreamGeometry();
-            using (var ctx = forewing.Open())
-            {
-                ctx.BeginFigure(new Point(0, -1), isFilled: true, isClosed: true);
-                ctx.BezierTo(new Point(3, -15), new Point(18, -19), new Point(23, -10), isStroked: true, isSmoothJoin: true);
-                ctx.BezierTo(new Point(25, -3), new Point(14, 2), new Point(0, 3), isStroked: true, isSmoothJoin: true);
-            }
-            forewing.Freeze();
-            dc.DrawGeometry(wingBrush, wingPen, forewing);
+            dc.DrawGeometry(wingBrush, wingPen, ButterflyForewingGeometry);
+            dc.DrawGeometry(wingBrush, wingPen, ButterflyHindwingGeometry);
 
-            // Hindwing
-            var hindwing = new StreamGeometry();
-            using (var ctx = hindwing.Open())
-            {
-                ctx.BeginFigure(new Point(0, 2), isFilled: true, isClosed: true);
-                ctx.BezierTo(new Point(13, 1), new Point(22, 10), new Point(15, 18), isStroked: true, isSmoothJoin: true);
-                ctx.BezierTo(new Point(9, 21), new Point(2, 13), new Point(0, 6), isStroked: true, isSmoothJoin: true);
-            }
-            hindwing.Freeze();
-            dc.DrawGeometry(wingBrush, wingPen, hindwing);
-
-            // Delicate wing veins
-            Point[] veinEnds = { new(17, -14), new(22, -8), new(20, -1), new(14, 12), new(10, 16) };
-            foreach (var ve in veinEnds)
+            foreach (var ve in ButterflyVeinEnds)
             {
                 dc.DrawLine(ButterflyVeinPen, new Point(1, 1), ve);
             }
 
-            // Spotted outer wing margin
-            (double px, double py, double r)[] spots = { (19, -12, 1.3), (22, -7, 1.1), (20, -3, 0.9), (15, 12, 1.0), (11, 16, 1.0) };
-            foreach (var sp in spots)
+            foreach (var sp in ButterflySpots)
             {
                 dc.DrawEllipse(spotBrush, null, new Point(sp.px, sp.py), sp.r, sp.r);
             }
@@ -1084,16 +1156,7 @@ public sealed class IslandNatureThemeControl : FrameworkElement
         dc.DrawEllipse(ButterflyBodyBrush, null, new Point(0, -7), 1.9, 1.9);
 
         // Curved antennae
-        var antGeom = new StreamGeometry();
-        using (var ctx = antGeom.Open())
-        {
-            ctx.BeginFigure(new Point(-0.6, -8), isFilled: false, isClosed: false);
-            ctx.QuadraticBezierTo(new Point(-4, -15), new Point(-7, -16), isStroked: true, isSmoothJoin: true);
-            ctx.BeginFigure(new Point(0.6, -8), isFilled: false, isClosed: false);
-            ctx.QuadraticBezierTo(new Point(4, -15), new Point(7, -16), isStroked: true, isSmoothJoin: true);
-        }
-        antGeom.Freeze();
-        dc.DrawGeometry(null, ButterflyBodyPen, antGeom);
+        dc.DrawGeometry(null, ButterflyBodyPen, ButterflyAntennaeGeometry);
 
         dc.Pop();
     }
@@ -1178,6 +1241,7 @@ public sealed class IslandNatureThemeControl : FrameworkElement
 
     private static void DrawDaisy(DrawingContext dc, double x, double y, double s, double t, double ph)
     {
+        if (s <= 0.02) return;
         var mat = Matrix.Identity;
         mat.Scale(s, s);
         mat.Rotate((Math.Sin(t + ph) * 0.06) * 180.0 / Math.PI);
@@ -1210,6 +1274,7 @@ public sealed class IslandNatureThemeControl : FrameworkElement
 
     private static void DrawPoppy(DrawingContext dc, double x, double y, double s, double t, double ph)
     {
+        if (s <= 0.02) return;
         var mat = Matrix.Identity;
         mat.Scale(s, s);
         mat.Rotate(ph * 180.0 / Math.PI);
@@ -1240,6 +1305,7 @@ public sealed class IslandNatureThemeControl : FrameworkElement
 
     private static void DrawLavender(DrawingContext dc, double x, double y, double s, double t, double ph)
     {
+        if (s <= 0.02) return;
         var mat = Matrix.Identity;
         mat.Scale(s, s);
         mat.Translate(x, y);

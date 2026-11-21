@@ -14,8 +14,10 @@ public partial class PinnedCaptureWindow : Window
         _bitmap = bitmap;
         InitializeComponent();
         CaptureImage.Source = bitmap;
-        Width = Math.Clamp(bitmap.PixelWidth + 16, 160, 640);
-        Height = Math.Clamp(bitmap.PixelHeight + 16, 100, 480);
+        double dipW = bitmap.DpiX > 0 ? bitmap.PixelWidth * 96.0 / bitmap.DpiX : bitmap.PixelWidth;
+        double dipH = bitmap.DpiY > 0 ? bitmap.PixelHeight * 96.0 / bitmap.DpiY : bitmap.PixelHeight;
+        Width = Math.Clamp(dipW + 16, 160, 640);
+        Height = Math.Clamp(dipH + 16, 100, 480);
 
         KeyDown += (_, e) =>
         {

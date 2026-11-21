@@ -16,16 +16,38 @@ internal sealed class BluetoothMonitor : IDisposable
     private static readonly TimeSpan DuplicateWindow = TimeSpan.FromSeconds(4);
     private static readonly Color Blue = Color.FromRgb(0x0A, 0x84, 0xFF);
     private static readonly Color Grey = Color.FromRgb(0xAE, 0xAE, 0xB2);
-    private static readonly string[] AudioHints = { "airpods", "buds", "headphone", "headset", "earbud", "wh-", "wf-", "beats", "bose", "jbl" };
 
     private readonly Dispatcher _ui;
+    private readonly DispatcherTimer _devicesChangedDebounce;
     private readonly List<DeviceWatcher> _watchers = new();
     private readonly Dictionary<string, (string Name, bool Connected)> _devices = new();
     private readonly Dictionary<string, DateTime> _recentAlerts = new();
+    private int _completedWatchers;
+    private bool _initialEnumerationCompleted;
+    private bool _disposed;
 
     public event Action<ToastContent>? Alert;
+    public event Action? DevicesChanged;
 
-    public BluetoothMonitor(Dispatcher ui) => _ui = ui;
+    public BluetoothMonitor(Dispatcher ui)
+    {
+        _ui = ui;
+        _devicesChangedDebounce = new DispatcherTimer(TimeSpan.FromMilliseconds(400), DispatcherPriority.Background, (_, _) =>
+        {
+            _devicesChangedDebounce!.Stop();
+            if (!_disposed)
+            {
+                DevicesChanged?.Invoke();
+            }
+        }, _ui);
+    }
+
+    private void ScheduleDevicesChanged()
+    {
+        if (_disposed || !_initialEnumerationCompleted) return;
+        _devicesChangedDebounce.Stop();
+        _devicesChangedDebounce.Start();
+    }
 
     public void Start()
     {
@@ -35,6 +57,7 @@ internal sealed class BluetoothMonitor : IDisposable
             BluetoothLEDevice.GetDeviceSelectorFromPairingState(true),
         };
 
+        int expectedWatchers = selectors.Length;
         foreach (string selector in selectors)
         {
             try
@@ -43,7 +66,11 @@ internal sealed class BluetoothMonitor : IDisposable
                     DeviceInformationKind.AssociationEndpoint);
                 watcher.Added += (_, info) => _ui.InvokeAsync(() =>
                 {
-                    try { _devices[info.Id] = (info.Name, ReadConnected(info.Properties)); }
+                    try
+                    {
+                        _devices[info.Id] = (info.Name, ReadConnected(info.Properties));
+                        ScheduleDevicesChanged();
+                    }
                     catch { }
                 });
                 watcher.Updated += (_, update) => _ui.InvokeAsync(() =>
@@ -53,8 +80,22 @@ internal sealed class BluetoothMonitor : IDisposable
                 });
                 watcher.Removed += (_, update) => _ui.InvokeAsync(() =>
                 {
-                    try { _devices.Remove(update.Id); }
+                    try
+                    {
+                        if (_devices.Remove(update.Id))
+                        {
+                            ScheduleDevicesChanged();
+                        }
+                    }
                     catch { }
+                });
+                watcher.EnumerationCompleted += (_, _) => _ui.InvokeAsync(() =>
+                {
+                    _completedWatchers++;
+                    if (_completedWatchers >= expectedWatchers)
+                    {
+                        _initialEnumerationCompleted = true;
+                    }
                 });
                 watcher.Start();
                 _watchers.Add(watcher);
@@ -73,6 +114,7 @@ internal sealed class BluetoothMonitor : IDisposable
             if (!update.Properties.ContainsKey(IsConnectedKey) || update.Properties[IsConnectedKey] is not bool connected) return;
             if (!_devices.TryGetValue(update.Id, out var device) || device.Connected == connected) return;
             _devices[update.Id] = (device.Name, connected);
+            ScheduleDevicesChanged();
 
             string key = $"{device.Name}|{connected}";
             var now = DateTime.UtcNow;
@@ -80,7 +122,7 @@ internal sealed class BluetoothMonitor : IDisposable
             _recentAlerts[key] = now;
 
             string name = string.IsNullOrWhiteSpace(device.Name) ? "Bluetooth device" : device.Name;
-            bool isAudio = AudioHints.Any(h => name.Contains(h, StringComparison.OrdinalIgnoreCase));
+            bool isAudio = DeviceClassifier.IsAudioDeviceName(name);
             string glyph = isAudio ? "\uE7F6" : "\uE702";
 
             Alert?.Invoke(connected
@@ -107,6 +149,8 @@ internal sealed class BluetoothMonitor : IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
+        _devicesChangedDebounce.Stop();
         foreach (var watcher in _watchers)
         {
             try

@@ -25,6 +25,8 @@ public sealed class VisualBackdrop : IBackdropProvider
     private bool _isDirty = true;
     private int _width;
     private int _height;
+    private int _texPixelWidth;
+    private int _texPixelHeight;
     private double _dpiScale = 1.0;
 
     public event EventHandler? FrameReady;
@@ -32,8 +34,8 @@ public sealed class VisualBackdrop : IBackdropProvider
     public ID3D11ShaderResourceView? CurrentFrameSRV => _srv;
     public ID3D11ShaderResourceView? BlurredFrameSRV => null;
     public bool IsCapturing => _isCapturing;
-    public int FrameWidth => _width;
-    public int FrameHeight => _height;
+    public int FrameWidth => _texPixelWidth > 0 ? _texPixelWidth : (int)Math.Max(_width * _dpiScale, 1);
+    public int FrameHeight => _texPixelHeight > 0 ? _texPixelHeight : (int)Math.Max(_height * _dpiScale, 1);
 
     public VisualBackdrop(ID3D11Device device, ID3D11DeviceContext context, Visual sourceVisual, int width, int height, double dpiScale = 1.0)
     {
@@ -119,10 +121,14 @@ public sealed class VisualBackdrop : IBackdropProvider
 
     private void UpdateGpuTexture(byte[] pixels, int width, int height, int stride)
     {
-        if (_texture == null || _width != width || _height != height)
+        if (_texture == null || _texPixelWidth != width || _texPixelHeight != height)
         {
             _srv?.Dispose();
             _texture?.Dispose();
+            _srv = null;
+            _texture = null;
+            _texPixelWidth = width;
+            _texPixelHeight = height;
 
             var desc = new Texture2DDescription
             {

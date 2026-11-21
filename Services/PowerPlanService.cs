@@ -55,11 +55,12 @@ internal sealed class PowerPlanService : IDisposable
     private bool _lastAcOnline;
     private int _lastPercent = -1;
     private bool _initialized;
+    private bool _isRefreshing;
     private bool _disposed;
     private int? _cachedHealth;
     private int? _cachedDesignMWh;
     private int? _cachedFullMWh;
-    private DateTime _lastWmiCheck = DateTime.MinValue;
+    private DateTime _lastHealthCheck = DateTime.MinValue;
 
     public PowerStatusInfo Current { get; private set; } = new();
 
@@ -80,6 +81,8 @@ internal sealed class PowerPlanService : IDisposable
             {
                 PowerManager.PowerSupplyStatusChanged += OnWinRTPowerSupplyChanged;
                 PowerManager.RemainingChargePercentChanged += OnWinRTRemainingPercentChanged;
+                PowerManager.BatteryStatusChanged += OnWinRTPowerSupplyChanged;
+                PowerManager.EnergySaverStatusChanged += OnWinRTPowerSupplyChanged;
             }
         }
         catch { }
@@ -88,13 +91,42 @@ internal sealed class PowerPlanService : IDisposable
         _initialized = true;
     }
 
+    public void SetExpanded(bool expanded)
+    {
+        if (_disposed) return;
+        if (expanded)
+        {
+            Refresh();
+            if (!_pollTimer.IsEnabled)
+            {
+                _pollTimer.Start();
+            }
+        }
+        else
+        {
+            _pollTimer.Stop();
+        }
+    }
+
     private void OnWinRTPowerSupplyChanged(object? sender, object e) => _ui.InvokeAsync(Refresh);
     private void OnWinRTRemainingPercentChanged(object? sender, object e) => _ui.InvokeAsync(Refresh);
 
     public void Refresh()
     {
-        if (_disposed) return;
+        if (_disposed || _isRefreshing) return;
+        _isRefreshing = true;
+        try
+        {
+            RefreshCore();
+        }
+        finally
+        {
+            _isRefreshing = false;
+        }
+    }
 
+    private void RefreshCore()
+    {
         bool hasStatus = GetSystemPowerStatus(out var status);
         Guid activeGuid = GetCurrentActiveGuid();
 
@@ -135,11 +167,24 @@ internal sealed class PowerPlanService : IDisposable
             }
         }
 
-        // Query Battery Health via WMI (cached for 15 minutes)
-        if (hasBattery && (DateTime.UtcNow - _lastWmiCheck).TotalMinutes >= 15)
+        int? liveChargeRateMw = null;
+        if (hasBattery)
         {
-            QueryBatteryHealthWmi();
-            _lastWmiCheck = DateTime.UtcNow;
+            bool needHealthRefresh = (DateTime.UtcNow - _lastHealthCheck).TotalMinutes >= 15;
+            if (TryReadWinRtBatteryReport(needHealthRefresh, out int? rateMw))
+            {
+                liveChargeRateMw = rateMw;
+                if (needHealthRefresh && _cachedDesignMWh.HasValue && _cachedFullMWh.HasValue)
+                {
+                    _lastHealthCheck = DateTime.UtcNow;
+                }
+            }
+
+            if (needHealthRefresh && (!_cachedDesignMWh.HasValue || !_cachedFullMWh.HasValue))
+            {
+                QueryBatteryHealthWmi();
+                _lastHealthCheck = DateTime.UtcNow;
+            }
         }
 
         string timeEstimate;
@@ -152,8 +197,12 @@ internal sealed class PowerPlanService : IDisposable
             if (isCharging)
             {
                 subtitle = percent >= 100 ? "Fully Charged" : "Connected to AC • Fast Charging";
-                watts = percent >= 100 ? 5.0 : Math.Round(45.0 + ((100 - percent) * 0.25), 1);
-                wattageText = percent >= 100 ? "Float Charge • 5W" : $"+{watts:0.#}W Fast Charge";
+                watts = liveChargeRateMw is > 0
+                    ? Math.Round(Math.Abs(liveChargeRateMw.Value) / 1000.0, 1)
+                    : (percent >= 100 ? 5.0 : Math.Round(45.0 + ((100 - percent) * 0.25), 1));
+                wattageText = percent >= 100 && liveChargeRateMw is null or <= 0
+                    ? "Float Charge • 5W"
+                    : $"+{watts:0.#}W Fast Charge";
 
                 if (percent >= 100)
                 {
@@ -171,7 +220,9 @@ internal sealed class PowerPlanService : IDisposable
             else
             {
                 subtitle = "On Battery Power";
-                watts = Math.Round(10.0 + (schemeKey == "Performance" ? 6.5 : (schemeKey == "PowerSaver" ? -2.0 : 0.0)), 1);
+                watts = liveChargeRateMw is not null and not 0
+                    ? Math.Round(Math.Abs(liveChargeRateMw.Value) / 1000.0, 1)
+                    : Math.Round(10.0 + (schemeKey == "Performance" ? 6.5 : (schemeKey == "PowerSaver" ? -2.0 : 0.0)), 1);
                 wattageText = $"-{watts:0.#}W Discharge";
 
                 if (status.BatteryLifeTime > 0)
@@ -216,12 +267,18 @@ internal sealed class PowerPlanService : IDisposable
             RecentBatteryHistory = _recentHistory.ToArray()
         };
 
+        // Capture previous baselines and commit new state BEFORE invoking events/auto-switchers to prevent recursion
+        bool prevAcOnline = _lastAcOnline;
+        int prevPercent = _lastPercent;
+        _lastAcOnline = isAcOnline;
+        _lastPercent = percent;
+
         // Detect charger connection/disconnection transitions & Low Battery
         if (_initialized)
         {
             int threshold = _settings?.Current.LowBatteryAlertThreshold ?? 20;
 
-            if (!_lastAcOnline && isAcOnline && hasBattery)
+            if (!prevAcOnline && isAcOnline && hasBattery)
             {
                 if (_settings?.Current.EnableChargingPulse ?? true)
                 {
@@ -231,62 +288,126 @@ internal sealed class PowerPlanService : IDisposable
                 // Automated Power Scheme on AC connect
                 if (_settings?.Current.AutoPowerPlanOnAc ?? false)
                 {
-                    if (schemeKey == "PowerSaver")
+                    if (schemeKey == "PowerSaver" && SetActiveSchemeCore("Balanced", triggerRefresh: false))
                     {
-                        SetActiveScheme("Balanced");
+                        Current.ActiveSchemeKey = "Balanced";
+                        Current.ActiveSchemeName = "Balanced";
                     }
                 }
             }
-            else if (_lastAcOnline && !isAcOnline && hasBattery)
+            else if (prevAcOnline && !isAcOnline && hasBattery)
             {
                 DisconnectedTriggered?.Invoke(percent, timeEstimate);
 
                 // Automated Power Scheme on Battery disconnect
                 if (_settings?.Current.AutoPowerPlanOnBattery ?? false)
                 {
-                    SetActiveScheme("PowerSaver");
+                    if (schemeKey != "PowerSaver" && SetActiveSchemeCore("PowerSaver", triggerRefresh: false))
+                    {
+                        Current.ActiveSchemeKey = "PowerSaver";
+                        Current.ActiveSchemeName = "Power Saver";
+                    }
                 }
             }
 
-            if (!isAcOnline && hasBattery && _lastPercent > threshold && percent <= threshold && threshold > 0)
+            if (!isAcOnline && hasBattery && prevPercent > threshold && percent <= threshold && threshold > 0)
             {
                 LowBatteryTriggered?.Invoke(percent);
 
                 if (_settings?.Current.AutoPowerPlanOnBattery ?? false)
                 {
-                    SetActiveScheme("PowerSaver");
+                    if (Current.ActiveSchemeKey != "PowerSaver" && SetActiveSchemeCore("PowerSaver", triggerRefresh: false))
+                    {
+                        Current.ActiveSchemeKey = "PowerSaver";
+                        Current.ActiveSchemeName = "Power Saver";
+                    }
                 }
             }
         }
 
-        _lastAcOnline = isAcOnline;
-        _lastPercent = percent;
-
         StatusChanged?.Invoke(Current);
+    }
+
+    private bool TryReadWinRtBatteryReport(bool readCapacities, out int? chargeRateMw)
+    {
+        chargeRateMw = null;
+        try
+        {
+            var report = Windows.Devices.Power.Battery.AggregateBattery.GetReport();
+            if (report == null) return false;
+
+            chargeRateMw = report.ChargeRateInMilliwatts;
+
+            if (readCapacities)
+            {
+                if (report.DesignCapacityInMilliwattHours is int design && design > 0)
+                    _cachedDesignMWh = design;
+                if (report.FullChargeCapacityInMilliwattHours is int full && full > 0)
+                    _cachedFullMWh = full;
+
+                if (_cachedDesignMWh.HasValue && _cachedFullMWh.HasValue && _cachedDesignMWh.Value > 0)
+                {
+                    _cachedHealth = (int)Math.Clamp(
+                        Math.Round(((double)_cachedFullMWh.Value / _cachedDesignMWh.Value) * 100),
+                        10, 100);
+                }
+            }
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void ReleaseCom(object? obj)
+    {
+        if (obj != null && Marshal.IsComObject(obj))
+        {
+            try { Marshal.FinalReleaseComObject(obj); } catch { }
+        }
     }
 
     private void QueryBatteryHealthWmi()
     {
+        object? locator = null;
+        object? service = null;
+        object? staticItems = null;
+        object? fullItems = null;
         try
         {
             var locatorType = Type.GetTypeFromProgID("WbemScripting.SWbemLocator");
             if (locatorType == null) return;
-            dynamic? locator = Activator.CreateInstance(locatorType);
+            locator = Activator.CreateInstance(locatorType);
             if (locator == null) return;
 
-            dynamic service = locator.ConnectServer(".", @"root\wmi");
-            dynamic staticItems = service.ExecQuery("SELECT DesignedCapacity FROM BatteryStaticData");
-            foreach (dynamic item in staticItems)
+            service = ((dynamic)locator).ConnectServer(".", @"root\wmi");
+            staticItems = ((dynamic)service).ExecQuery("SELECT DesignedCapacity FROM BatteryStaticData");
+            foreach (dynamic item in (dynamic)staticItems)
             {
-                _cachedDesignMWh = Convert.ToInt32(item.DesignedCapacity);
-                break;
+                try
+                {
+                    _cachedDesignMWh = Convert.ToInt32(item.DesignedCapacity);
+                    break;
+                }
+                finally
+                {
+                    ReleaseCom(item);
+                }
             }
 
-            dynamic fullItems = service.ExecQuery("SELECT FullChargedCapacity FROM BatteryFullChargedCapacity");
-            foreach (dynamic item in fullItems)
+            fullItems = ((dynamic)service).ExecQuery("SELECT FullChargedCapacity FROM BatteryFullChargedCapacity");
+            foreach (dynamic item in (dynamic)fullItems)
             {
-                _cachedFullMWh = Convert.ToInt32(item.FullChargedCapacity);
-                break;
+                try
+                {
+                    _cachedFullMWh = Convert.ToInt32(item.FullChargedCapacity);
+                    break;
+                }
+                finally
+                {
+                    ReleaseCom(item);
+                }
             }
 
             if (_cachedDesignMWh.HasValue && _cachedFullMWh.HasValue && _cachedDesignMWh.Value > 0)
@@ -296,16 +417,25 @@ internal sealed class PowerPlanService : IDisposable
             }
             else
             {
-                _cachedHealth = 98; // Fallback typical healthy laptop
+                _cachedHealth ??= 98; // Fallback typical healthy laptop
             }
         }
         catch
         {
             _cachedHealth ??= 98;
         }
+        finally
+        {
+            ReleaseCom(fullItems);
+            ReleaseCom(staticItems);
+            ReleaseCom(service);
+            ReleaseCom(locator);
+        }
     }
 
-    public bool SetActiveScheme(string schemeKey)
+    public bool SetActiveScheme(string schemeKey) => SetActiveSchemeCore(schemeKey, triggerRefresh: true);
+
+    private bool SetActiveSchemeCore(string schemeKey, bool triggerRefresh)
     {
         try
         {
@@ -320,7 +450,10 @@ internal sealed class PowerPlanService : IDisposable
             if (res == 0)
             {
                 App.Log($"[PowerPlanService] Switched power scheme to: {schemeKey}");
-                Refresh();
+                if (triggerRefresh)
+                {
+                    Refresh();
+                }
                 return true;
             }
             else
@@ -380,6 +513,8 @@ internal sealed class PowerPlanService : IDisposable
         {
             PowerManager.PowerSupplyStatusChanged -= OnWinRTPowerSupplyChanged;
             PowerManager.RemainingChargePercentChanged -= OnWinRTRemainingPercentChanged;
+            PowerManager.BatteryStatusChanged -= OnWinRTPowerSupplyChanged;
+            PowerManager.EnergySaverStatusChanged -= OnWinRTPowerSupplyChanged;
         }
         catch { }
     }

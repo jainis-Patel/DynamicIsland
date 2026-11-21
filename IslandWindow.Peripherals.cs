@@ -68,6 +68,7 @@ public partial class IslandWindow
         try
         {
             await _peripheralService.RefreshAsync();
+            if (_isClosing) return;
             _machine.PushToast(new ToastContent(
                 "\uE72C",
                 "Peripherals Refreshed",
@@ -94,37 +95,45 @@ public partial class IslandWindow
         if (sender is not FrameworkElement { DataContext: PeripheralDeviceInfo dev }) return;
         e.Handled = true;
 
-        // Check if this Bluetooth device matches an audio output endpoint
-        var audioMatch = _audioEndpointService.Endpoints.FirstOrDefault(ep =>
-            ep.Name.Contains(dev.Name, StringComparison.OrdinalIgnoreCase) ||
-            dev.Name.Contains(ep.Name, StringComparison.OrdinalIgnoreCase));
-
-        if (audioMatch != null && !audioMatch.IsDefault)
+        try
         {
-            _audioEndpointService.SetDefaultEndpoint(audioMatch.Id);
+            // Check if this Bluetooth device matches an audio output endpoint
+            var audioMatch = _audioEndpointService.Endpoints.FirstOrDefault(ep =>
+                ep.Name.Contains(dev.Name, StringComparison.OrdinalIgnoreCase) ||
+                dev.Name.Contains(ep.Name, StringComparison.OrdinalIgnoreCase));
+
+            if (audioMatch != null && !audioMatch.IsDefault)
+            {
+                _audioEndpointService.SetDefaultEndpoint(audioMatch.Id);
+                _machine.PushToast(new ToastContent(
+                    dev.Glyph,
+                    "Audio Routed",
+                    $"Switched output to {dev.Name}",
+                    ThemeBrushes.GreenColor,
+                    TimeSpan.FromSeconds(2.2),
+                    TargetView: "peripherals",
+                    Priority: ToastPriority.Feedback,
+                    Category: "audiodevice"));
+                return;
+            }
+
             _machine.PushToast(new ToastContent(
                 dev.Glyph,
-                "Audio Routed",
-                $"Switched output to {dev.Name}",
-                ThemeBrushes.GreenColor,
+                dev.IsConnected ? dev.Name : $"Connecting {dev.Name}...",
+                dev.IsConnected ? dev.BatteryStatusText : "Waking paired Bluetooth peripheral",
+                ThemeBrushes.BlueColor,
                 TimeSpan.FromSeconds(2.2),
                 TargetView: "peripherals",
                 Priority: ToastPriority.Feedback,
-                Category: "audiodevice"));
-            return;
+                Category: "peripherals"));
+
+            await _peripheralService.ConnectDeviceAsync(dev);
+            if (_isClosing) return;
         }
-
-        _machine.PushToast(new ToastContent(
-            dev.Glyph,
-            dev.IsConnected ? dev.Name : $"Connecting {dev.Name}...",
-            dev.IsConnected ? dev.BatteryStatusText : "Waking paired Bluetooth peripheral",
-            ThemeBrushes.BlueColor,
-            TimeSpan.FromSeconds(2.2),
-            TargetView: "peripherals",
-            Priority: ToastPriority.Feedback,
-            Category: "peripherals"));
-
-        await _peripheralService.ConnectDeviceAsync(dev);
+        catch (Exception ex)
+        {
+            App.Log($"[Peripherals] PeripheralCard failed: {ex.Message}");
+        }
     }
 
 }

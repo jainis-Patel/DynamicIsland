@@ -77,7 +77,7 @@ internal sealed class IslandMemoryManager : IDisposable
             App.LogMemorySnapshot("Pre-Idle-Trim");
 
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect(2, GCCollectionMode.Forced, blocking: false, compacting: true);
+            GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
 
             // Reclaim unreferenced startup, JIT, and driver pages from working set via Win32 pseudo-handle
             IntPtr proc = NativeMethods.GetCurrentProcess();

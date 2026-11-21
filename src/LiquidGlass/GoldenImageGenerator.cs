@@ -12,7 +12,7 @@ namespace DynamicIsland.LiquidGlass;
 /// </summary>
 public static class GoldenImageGenerator
 {
-    public static int GenerateGoldenImages()
+    public static int GenerateGoldenImages(string? outputDir = null)
     {
         Console.WriteLine("[LiquidGlass] Starting GPU Golden-Image Refraction Test...");
 
@@ -25,7 +25,9 @@ public static class GoldenImageGenerator
             int height = 720;
             backdrop.GenerateTestPattern(width, height);
 
-            string workspaceDir = Path.Combine(Environment.CurrentDirectory, "docs", "liquid-glass");
+            string workspaceDir = string.IsNullOrWhiteSpace(outputDir)
+                ? Path.Combine(Environment.CurrentDirectory, "docs", "liquid-glass")
+                : outputDir;
             Directory.CreateDirectory(workspaceDir);
 
             // 1. Export Backdrop Benchmark

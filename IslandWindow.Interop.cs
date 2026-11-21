@@ -157,45 +157,48 @@ public partial class IslandWindow
 
             _trayIcon = new TrayIconService(
                 _hwnd,
-                onExpand: () => Dispatcher.InvokeAsync(() => _machine.ExpandNow()),
-                onAudioSwitch: () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Audio)),
-                onPower: () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Battery)),
-                onVoiceMemo: () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.VoiceMemo)),
-                onPeripherals: () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Peripherals)),
-                onSettings: () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Settings)),
-                onTestToast: () => Dispatcher.InvokeAsync(ShowNextDemoToast),
-                onToggleStopwatch: () => Dispatcher.InvokeAsync(ToggleStopwatch),
-                onExit: () => Dispatcher.InvokeAsync(() => Application.Current.Shutdown()),
-                onSystemHud: () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.SystemHud)),
-                onShelf: () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Shelf)),
-                onClipboard: () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Clipboard)),
-                onNotes: () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Notes)),
-                isCaffeineEnabled: () => _isCaffeineActive,
-                setCaffeineEnabled: enabled => Dispatcher.InvokeAsync(() =>
+                new TrayIconOptions
                 {
-                    _isCaffeineActive = enabled;
-                    ApplyCaffeineMode(enabled);
-                }),
-                isDndEnabled: () => _settingsService.Current.DoNotDisturb,
-                setDndEnabled: enabled => Dispatcher.InvokeAsync(() => SetDoNotDisturb(enabled)),
-                isReplaceBannersEnabled: () => _settingsService.Current.ReplaceWindowsBanners,
-                setReplaceBannersEnabled: enabled => Dispatcher.InvokeAsync(() =>
-                    _settingsService.Update(s => s.ReplaceWindowsBanners = enabled, nameof(AppSettings.ReplaceWindowsBanners))),
-                isNetworkSpeedEnabled: () => _settingsService.Current.ShowNetworkSpeedInIdle,
-                setNetworkSpeedEnabled: enabled => Dispatcher.InvokeAsync(() =>
-                    _settingsService.Update(s => s.ShowNetworkSpeedInIdle = enabled, nameof(AppSettings.ShowNetworkSpeedInIdle))),
-                getThemeMode: () => _settingsService.Current.ThemeMode,
-                setThemeMode: mode => Dispatcher.InvokeAsync(() =>
-                    _settingsService.Update(s => s.ThemeMode = mode, nameof(AppSettings.ThemeMode))),
-                isEdgeBorderEnabled: () => _settingsService.Current.ShowEdgeBorder,
-                setEdgeBorderEnabled: enabled => Dispatcher.InvokeAsync(() =>
-                    _settingsService.Update(s => s.ShowEdgeBorder = enabled, nameof(AppSettings.ShowEdgeBorder))),
-                getThemeStyle: () => _settingsService.Current.ThemeStyle,
-                setThemeStyle: style => Dispatcher.InvokeAsync(() =>
-                    _settingsService.Update(s => s.ThemeStyle = style, nameof(AppSettings.ThemeStyle))),
-                getIslandTheme: () => _settingsService.Current.IslandTheme,
-                setIslandTheme: theme => Dispatcher.InvokeAsync(() =>
-                    _settingsService.Update(s => s.IslandTheme = theme, nameof(AppSettings.IslandTheme))));
+                    OnExpand = () => Dispatcher.InvokeAsync(() => _machine.ExpandNow()),
+                    OnAudioSwitch = () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Audio)),
+                    OnPower = () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Battery)),
+                    OnVoiceMemo = () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.VoiceMemo)),
+                    OnPeripherals = () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Peripherals)),
+                    OnSettings = () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Settings)),
+                    OnTestToast = () => Dispatcher.InvokeAsync(ShowNextDemoToast),
+                    OnToggleStopwatch = () => Dispatcher.InvokeAsync(ToggleStopwatch),
+                    OnExit = () => Dispatcher.InvokeAsync(() => Application.Current.Shutdown()),
+                    OnSystemHud = () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.SystemHud)),
+                    OnShelf = () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Shelf)),
+                    OnClipboard = () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Clipboard)),
+                    OnNotes = () => Dispatcher.InvokeAsync(() => SwitchExpandedView(ExpandedView.Notes)),
+                    IsCaffeineEnabled = () => _isCaffeineActive,
+                    SetCaffeineEnabled = enabled => Dispatcher.InvokeAsync(() =>
+                    {
+                        _isCaffeineActive = enabled;
+                        ApplyCaffeineMode(enabled);
+                    }),
+                    IsDndEnabled = () => _settingsService.Current.DoNotDisturb,
+                    SetDndEnabled = enabled => Dispatcher.InvokeAsync(() => SetDoNotDisturb(enabled)),
+                    IsReplaceBannersEnabled = () => _settingsService.Current.ReplaceWindowsBanners,
+                    SetReplaceBannersEnabled = enabled => Dispatcher.InvokeAsync(() =>
+                        _settingsService.Update(s => s.ReplaceWindowsBanners = enabled, nameof(AppSettings.ReplaceWindowsBanners))),
+                    IsNetworkSpeedEnabled = () => _settingsService.Current.ShowNetworkSpeedInIdle,
+                    SetNetworkSpeedEnabled = enabled => Dispatcher.InvokeAsync(() =>
+                        _settingsService.Update(s => s.ShowNetworkSpeedInIdle = enabled, nameof(AppSettings.ShowNetworkSpeedInIdle))),
+                    GetThemeMode = () => _settingsService.Current.ThemeMode,
+                    SetThemeMode = mode => Dispatcher.InvokeAsync(() =>
+                        _settingsService.Update(s => s.ThemeMode = mode, nameof(AppSettings.ThemeMode))),
+                    IsEdgeBorderEnabled = () => _settingsService.Current.ShowEdgeBorder,
+                    SetEdgeBorderEnabled = enabled => Dispatcher.InvokeAsync(() =>
+                        _settingsService.Update(s => s.ShowEdgeBorder = enabled, nameof(AppSettings.ShowEdgeBorder))),
+                    GetThemeStyle = () => _settingsService.Current.ThemeStyle,
+                    SetThemeStyle = style => Dispatcher.InvokeAsync(() =>
+                        _settingsService.Update(s => s.ThemeStyle = style, nameof(AppSettings.ThemeStyle))),
+                    GetIslandTheme = () => _settingsService.Current.IslandTheme,
+                    SetIslandTheme = theme => Dispatcher.InvokeAsync(() =>
+                        _settingsService.Update(s => s.IslandTheme = theme, nameof(AppSettings.IslandTheme)))
+                });
 
             await _mediaService.InitializeAsync();
             UpdateSpectrumActivity();
@@ -275,6 +278,7 @@ public partial class IslandWindow
                                               or ExpandedView.Converter
                                               or ExpandedView.Calendar
                                               or ExpandedView.QuickReply
+                                              or ExpandedView.Settings
                                            || _recordingHotkeyAction != null;
                 return new IntPtr(isInteractiveInput && _machine.State == IslandState.Expanded
                     ? MA_ACTIVATE
@@ -379,7 +383,6 @@ public partial class IslandWindow
                 }
                 _cachedTargetMonitor = IntPtr.Zero;
                 Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(PositionWindow));
-                handled = true;
                 break;
             }
 
@@ -610,7 +613,10 @@ public partial class IslandWindow
         _dpiScale = scale;
 
         string dock = _settingsService?.Current.DockPosition ?? "Center";
-        double pillMarginInsideWindow = Math.Max(0, (CanvasWidthDip - 484) / 2.0);
+        double refWidth = _machine.State == IslandState.Expanded
+            ? GetTargetShape(IslandState.Expanded).Width
+            : 484.0;
+        double pillMarginInsideWindow = Math.Max(0, (CanvasWidthDip - refWidth) / 2.0);
 
         int widthPx = (int)Math.Round(CanvasWidthDip * scale);
         int heightPx = (int)Math.Round(CanvasHeightDip * scale);
@@ -622,7 +628,7 @@ public partial class IslandWindow
         int y;
         bool isDetached = _isDetachedPiP || (_settingsService?.Current.IsDetachedFloating ?? false);
 
-        if (isDetached && _floatingCenterX > 0 && _floatingCenterY > 0)
+        if (isDetached && !double.IsNaN(_floatingCenterX) && !double.IsNaN(_floatingCenterY))
         {
             x = (int)Math.Round((_floatingCenterX - (CanvasWidthDip / 2.0)) * scale);
             y = (int)Math.Round((_floatingCenterY - (Pill?.Height ?? 30.0) / 2.0) * scale);
@@ -1015,7 +1021,6 @@ public partial class IslandWindow
 
     private void UnregisterAllHotKeys()
     {
-        UninstallVolumeKeyHook();
         if (_hwnd == IntPtr.Zero) return;
         foreach (var (id, _, _) in HotKeyBindings)
         {
@@ -1067,10 +1072,18 @@ public partial class IslandWindow
                 {
                     _ = Dispatcher.InvokeAsync(async () =>
                     {
-                        await Task.Delay(35);
-                        if (_machine.State != IslandState.Expanded && (_settingsService?.Current.EnableVolumeKeyOsd ?? false))
+                        try
                         {
-                            OnVolumeChanged(_volumeService.CurrentVolume, _volumeService.IsMuted);
+                            await Task.Delay(35);
+                            if (_isClosing) return;
+                            if (_machine.State != IslandState.Expanded && (_settingsService?.Current.EnableVolumeKeyOsd ?? false))
+                            {
+                                OnVolumeChanged(_volumeService.CurrentVolume, _volumeService.IsMuted);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            App.Log($"[KeyboardHook] Volume OSD dispatch error: {ex.Message}");
                         }
                     });
                 }
@@ -1082,8 +1095,16 @@ public partial class IslandWindow
                 {
                     _ = Dispatcher.InvokeAsync(async () =>
                     {
-                        await Task.Delay(15);
-                        OnLockKeyToggled(vkCode);
+                        try
+                        {
+                            await Task.Delay(15);
+                            if (_isClosing) return;
+                            OnLockKeyToggled(vkCode);
+                        }
+                        catch (Exception ex)
+                        {
+                            App.Log($"[KeyboardHook] Lock key HUD dispatch error: {ex.Message}");
+                        }
                     });
                 }
             }
@@ -1283,12 +1304,16 @@ public partial class IslandWindow
             _isSessionLocked = true;
             Dispatcher.InvokeAsync(() =>
             {
+                StopRendering();
+                UpdateNatureThemeTimerState();
                 _clockTimer.Stop();
                 _topmostTimer.Stop();
                 _cursor.SetSuspended(true);
+                _fullscreen.SetSuspended(true);
                 _networkService.SetSuspended(true);
                 _privacyService.SetSuspended(true);
                 _peripheralService.SetSuspended(true);
+                _choreographer.SetSuspended(true);
                 _systemPerfService.SetFullscreenSuspended(true);
                 IslandMemoryManager.ExecuteConservativeTrim();
             });
@@ -1304,11 +1329,14 @@ public partial class IslandWindow
                 _clockTimer.Start();
                 _topmostTimer.Start();
                 _cursor.SetSuspended(false);
+                _fullscreen.SetSuspended(false);
                 _networkService.SetSuspended(false);
                 _privacyService.SetSuspended(false);
                 _peripheralService.SetSuspended(false);
+                _choreographer.SetSuspended(false);
                 _systemPerfService.SetFullscreenSuspended(false);
                 UpdateClockAndTimeline();
+                UpdateNatureThemeTimerState();
             });
             _ = Task.Delay(400).ContinueWith(_ => Dispatcher.InvokeAsync(() =>
             {

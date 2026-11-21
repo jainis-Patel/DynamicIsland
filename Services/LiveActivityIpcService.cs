@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 using System.IO.Pipes;
 using System.Text;
@@ -83,15 +84,36 @@ public sealed class ActivityIpcResponse
 internal sealed class LiveActivityIpcService : IDisposable
 {
     public const string PipeName = "DynamicIsland.Activities";
+    private const int MaxConcurrentClients = 16;
+    private const int MaxLineBytes = 262_144; // 256 KB
+    private static readonly TimeSpan ClientReadTimeout = TimeSpan.FromSeconds(10);
+
+    private sealed record PendingPromptEntry(TaskCompletionSource<string> Tcs, long Sequence);
 
     private readonly LiveActivityHub _hub;
     private readonly CancellationTokenSource _cts = new();
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, TaskCompletionSource<string>> _pendingPrompts = new(StringComparer.OrdinalIgnoreCase);
-    private bool _disposed;
+    private readonly SemaphoreSlim _clientGate = new(MaxConcurrentClients, MaxConcurrentClients);
+    private readonly ConcurrentDictionary<string, PendingPromptEntry> _pendingPrompts = new(StringComparer.OrdinalIgnoreCase);
+    private Task? _listenTask;
+    private long _promptSequence;
+    private volatile bool _disposed;
 
     public bool HasPendingPrompts => !_pendingPrompts.IsEmpty;
 
-    public string? GetLatestPendingPromptId() => _pendingPrompts.Keys.LastOrDefault();
+    public string? GetLatestPendingPromptId()
+    {
+        string? latestId = null;
+        long maxSeq = -1;
+        foreach (var kvp in _pendingPrompts)
+        {
+            if (kvp.Value.Sequence > maxSeq)
+            {
+                maxSeq = kvp.Value.Sequence;
+                latestId = kvp.Key;
+            }
+        }
+        return latestId;
+    }
 
     public LiveActivityIpcService(LiveActivityHub hub)
     {
@@ -100,19 +122,44 @@ internal sealed class LiveActivityIpcService : IDisposable
 
     public void Start()
     {
-        Task.Run(ListenLoopAsync);
+        if (_disposed || _listenTask != null) return;
+        _listenTask = Task.Run(ListenLoopAsync);
     }
 
     public bool ResolvePrompt(string id, string chosenButton)
     {
         if (string.IsNullOrWhiteSpace(id)) return false;
-        if (_pendingPrompts.TryRemove(id.Trim(), out var tcs))
+        string key = id.Trim();
+        if (_pendingPrompts.TryRemove(key, out var entry))
         {
-            bool ok = tcs.TrySetResult(chosenButton);
-            _hub.Complete(id.Trim());
+            bool ok = entry.Tcs.TrySetResult(chosenButton);
+            _hub.Complete(key);
             return ok;
         }
         return false;
+    }
+
+    private void RegisterPendingPrompt(string promptId, PendingPromptEntry entry)
+    {
+        _pendingPrompts.AddOrUpdate(
+            promptId,
+            entry,
+            (_, existing) =>
+            {
+                existing.Tcs.TrySetResult("superseded");
+                return entry;
+            });
+    }
+
+    private void CancelAllPendingPrompts()
+    {
+        foreach (var kvp in _pendingPrompts)
+        {
+            if (_pendingPrompts.TryRemove(kvp.Key, out var entry))
+            {
+                entry.Tcs.TrySetCanceled();
+            }
+        }
     }
 
     private async Task ListenLoopAsync()
@@ -120,8 +167,12 @@ internal sealed class LiveActivityIpcService : IDisposable
         while (!_cts.IsCancellationRequested && !_disposed)
         {
             NamedPipeServerStream? server = null;
+            bool gateAcquired = false;
             try
             {
+                await _clientGate.WaitAsync(_cts.Token);
+                gateAcquired = true;
+
                 server = new NamedPipeServerStream(
                     PipeName,
                     PipeDirection.InOut,
@@ -130,18 +181,55 @@ internal sealed class LiveActivityIpcService : IDisposable
                     PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
 
                 await server.WaitForConnectionAsync(_cts.Token);
-                _ = Task.Run(() => HandleClientAsync(server, _cts.Token));
+                var connectedServer = server;
+                server = null;
+
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await HandleClientAsync(connectedServer, _cts.Token);
+                    }
+                    finally
+                    {
+                        try { _clientGate.Release(); } catch (ObjectDisposedException) { }
+                    }
+                }, CancellationToken.None);
             }
             catch (OperationCanceledException)
             {
                 server?.Dispose();
+                if (gateAcquired)
+                {
+                    try { _clientGate.Release(); } catch (ObjectDisposedException) { }
+                }
+                break;
+            }
+            catch (ObjectDisposedException)
+            {
+                server?.Dispose();
+                if (gateAcquired)
+                {
+                    try { _clientGate.Release(); } catch (ObjectDisposedException) { }
+                }
                 break;
             }
             catch (Exception ex)
             {
                 server?.Dispose();
+                if (gateAcquired)
+                {
+                    try { _clientGate.Release(); } catch (ObjectDisposedException) { }
+                }
                 App.Log($"[LiveActivityIpc] Pipe server accept error: {ex.Message}");
-                await Task.Delay(250, _cts.Token);
+                try
+                {
+                    await Task.Delay(250, _cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
             }
         }
     }
@@ -150,12 +238,14 @@ internal sealed class LiveActivityIpcService : IDisposable
     {
         using (stream)
         {
-            using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
             using var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true) { AutoFlush = true };
 
             try
             {
-                string? line = await reader.ReadLineAsync(ct);
+                using var readCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                readCts.CancelAfter(ClientReadTimeout);
+
+                string? line = await ReadBoundedLineAsync(stream, MaxLineBytes, readCts.Token);
                 if (string.IsNullOrWhiteSpace(line)) return;
 
                 var req = JsonSerializer.Deserialize<ActivityIpcRequest>(line);
@@ -170,6 +260,15 @@ internal sealed class LiveActivityIpcService : IDisposable
                 string jsonResp = JsonSerializer.Serialize(resp);
                 await writer.WriteLineAsync(jsonResp);
             }
+            catch (OperationCanceledException)
+            {
+                try
+                {
+                    var timeoutResp = new ActivityIpcResponse { Ok = false, Error = "IPC request timed out or cancelled." };
+                    await writer.WriteLineAsync(JsonSerializer.Serialize(timeoutResp));
+                }
+                catch { }
+            }
             catch (Exception ex)
             {
                 try
@@ -179,6 +278,39 @@ internal sealed class LiveActivityIpcService : IDisposable
                 }
                 catch { }
             }
+        }
+    }
+
+    private static async Task<string?> ReadBoundedLineAsync(Stream stream, int maxBytes, CancellationToken ct)
+    {
+        using var ms = new MemoryStream(Math.Min(4096, maxBytes));
+        byte[] single = new byte[1];
+        bool anyByte = false;
+
+        while (true)
+        {
+            int read = await stream.ReadAsync(single.AsMemory(0, 1), ct);
+            if (read == 0)
+            {
+                return anyByte ? Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length) : null;
+            }
+
+            anyByte = true;
+            byte b = single[0];
+            if (b == (byte)'\n')
+            {
+                int len = (int)ms.Length;
+                if (len > 0 && ms.GetBuffer()[len - 1] == (byte)'\r')
+                    len--;
+                return Encoding.UTF8.GetString(ms.GetBuffer(), 0, len);
+            }
+
+            if (ms.Length >= maxBytes)
+            {
+                throw new InvalidDataException($"IPC payload line exceeded maximum limit of {maxBytes} bytes.");
+            }
+
+            ms.WriteByte(b);
         }
     }
 
@@ -193,7 +325,8 @@ internal sealed class LiveActivityIpcService : IDisposable
 
         string promptId = req.Id.Trim();
         var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _pendingPrompts[promptId] = tcs;
+        var entry = new PendingPromptEntry(tcs, Interlocked.Increment(ref _promptSequence));
+        RegisterPendingPrompt(promptId, entry);
 
         int timeoutSec = Math.Clamp(req.TimeoutSec ?? 60, 5, 300);
         using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSec));
@@ -319,8 +452,10 @@ internal sealed class LiveActivityIpcService : IDisposable
         }
         finally
         {
-            _pendingPrompts.TryRemove(promptId, out _);
-            _hub.Complete(promptId);
+            if (_pendingPrompts.TryRemove(KeyValuePair.Create(promptId, entry)))
+            {
+                _hub.Complete(promptId);
+            }
         }
     }
 
@@ -494,6 +629,7 @@ internal sealed class LiveActivityIpcService : IDisposable
 
             case "clear":
             {
+                CancelAllPendingPrompts();
                 _hub.ClearAll();
                 return new ActivityIpcResponse { Ok = true, Message = "Cleared all live activities." };
             }
@@ -508,7 +644,8 @@ internal sealed class LiveActivityIpcService : IDisposable
 
                 string promptId = req.Id.Trim();
                 var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-                _pendingPrompts[promptId] = tcs;
+                var entry = new PendingPromptEntry(tcs, Interlocked.Increment(ref _promptSequence));
+                RegisterPendingPrompt(promptId, entry);
 
                 var actions = new List<LiveActivityAction>();
                 string[] buttons = req.Buttons != null && req.Buttons.Length > 0 ? req.Buttons : new[] { "Approve", "Reject" };
@@ -554,12 +691,12 @@ internal sealed class LiveActivityIpcService : IDisposable
             using var cts = new CancellationTokenSource(timeoutMs);
 
             await client.ConnectAsync(cts.Token);
-            using var reader = new StreamReader(client, Encoding.UTF8);
-            using var writer = new StreamWriter(client, new UTF8Encoding(false)) { AutoFlush = true };
+            using var reader = new StreamReader(client, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
+            using var writer = new StreamWriter(client, new UTF8Encoding(false), bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
 
             request.Action = "prompt";
             string json = JsonSerializer.Serialize(request);
-            await writer.WriteLineAsync(json);
+            await writer.WriteLineAsync(json.AsMemory(), cts.Token);
 
             string? line = await reader.ReadLineAsync(cts.Token);
             if (string.IsNullOrWhiteSpace(line))
@@ -571,6 +708,14 @@ internal sealed class LiveActivityIpcService : IDisposable
             if (resp == null) return (false, "", "Invalid response from prompt service.");
 
             return (resp.Ok, resp.SelectedButton ?? "", resp.Message ?? resp.Error ?? "");
+        }
+        catch (TimeoutException)
+        {
+            return (false, "", "Timed out connecting to Dynamic Island prompt service. Is Dynamic Island running?");
+        }
+        catch (OperationCanceledException)
+        {
+            return (false, "", "Timed out waiting for Dynamic Island prompt service. Is Dynamic Island running?");
         }
         catch (Exception ex)
         {
@@ -586,11 +731,11 @@ internal sealed class LiveActivityIpcService : IDisposable
             using var cts = new CancellationTokenSource(timeoutMs);
 
             await client.ConnectAsync(cts.Token);
-            using var reader = new StreamReader(client, Encoding.UTF8);
-            using var writer = new StreamWriter(client, new UTF8Encoding(false)) { AutoFlush = true };
+            using var reader = new StreamReader(client, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
+            using var writer = new StreamWriter(client, new UTF8Encoding(false), bufferSize: 4096, leaveOpen: true) { AutoFlush = true };
 
             string json = JsonSerializer.Serialize(request);
-            await writer.WriteLineAsync(json);
+            await writer.WriteLineAsync(json.AsMemory(), cts.Token);
 
             string? line = await reader.ReadLineAsync(cts.Token);
             if (string.IsNullOrWhiteSpace(line))
@@ -604,6 +749,10 @@ internal sealed class LiveActivityIpcService : IDisposable
             return (resp.Ok, resp.Message ?? resp.Error ?? (resp.Ok ? "OK" : "Error"));
         }
         catch (TimeoutException)
+        {
+            return (false, "Could not connect to Dynamic Island: timed out. Is Dynamic Island running?");
+        }
+        catch (OperationCanceledException)
         {
             return (false, "Could not connect to Dynamic Island: timed out. Is Dynamic Island running?");
         }
@@ -694,7 +843,10 @@ Options:
     {
         if (_disposed) return;
         _disposed = true;
-        _cts.Cancel();
-        _cts.Dispose();
+        try { _cts.Cancel(); } catch { }
+        CancelAllPendingPrompts();
+        try { _listenTask?.Wait(500); } catch { }
+        try { _cts.Dispose(); } catch { }
+        try { _clientGate.Dispose(); } catch { }
     }
 }

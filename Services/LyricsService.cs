@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -34,18 +35,21 @@ public sealed class TrackLyrics
 /// </summary>
 internal sealed class LyricsService : IDisposable
 {
-    private static readonly HttpClient Http = new()
+    private static readonly HttpClient Http = CreateLrcLibHttpClient();
+
+    private static HttpClient CreateLrcLibHttpClient()
     {
-        Timeout = TimeSpan.FromSeconds(5.0),
-        DefaultRequestHeaders =
-        {
-            { "User-Agent", "DynamicIsland/0.4.0 (https://github.com/jainis-Patel/DynamicIsland)" },
-            { "L-User-Agent", "DynamicIsland/0.4.0 (https://github.com/jainis-Patel/DynamicIsland)" }
-        }
-    };
+        var client = SharedHttpClient.CreateClient(
+            TimeSpan.FromSeconds(5.0),
+            $"DynamicIsland/{InstallerService.AppVersion} (https://github.com/jainis-Patel/DynamicIsland)");
+        client.DefaultRequestHeaders.TryAddWithoutValidation(
+            "L-User-Agent",
+            $"DynamicIsland/{InstallerService.AppVersion} (https://github.com/jainis-Patel/DynamicIsland)");
+        return client;
+    }
 
     private static readonly Regex LrcTimestampRegex = new(
-        @"^\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]\s*(.*)$",
+        @"^\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]",
         RegexOptions.Compiled);
 
     private static readonly HashSet<string> GenericArtists = new(StringComparer.OrdinalIgnoreCase)
@@ -76,9 +80,11 @@ internal sealed class LyricsService : IDisposable
     private readonly Dispatcher _ui;
     private readonly string _diskCachePath;
     private readonly ConcurrentDictionary<string, TrackLyrics> _cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly DebouncedJsonStore<List<CachedLyricsEntry>> _diskCacheStore;
     private CancellationTokenSource? _fetchCts;
     private string _currentTrackKey = "";
     private int _lastActiveIndex = -2;
+    private volatile bool _disposed;
 
     public TrackLyrics? CurrentTrack { get; private set; }
     public bool IsLoading { get; private set; }
@@ -106,6 +112,7 @@ internal sealed class LyricsService : IDisposable
     {
         _ui = ui;
         _diskCachePath = Path.Combine(AppPaths.DataDirectory, "lyrics_cache.json");
+        _diskCacheStore = new DebouncedJsonStore<List<CachedLyricsEntry>>(_diskCachePath, BuildDiskCacheSnapshot, delayMs: 500);
         _ = Task.Run(LoadDiskCache);
     }
 
@@ -149,7 +156,10 @@ internal sealed class LyricsService : IDisposable
         if (!forceRetry && _cache.TryGetValue(cacheKey, out var cached))
         {
             IsLoading = false;
-            SetCurrentTrack(cached);
+            TrackLyrics? effective = (cached.HasSyncedLyrics || cached.IsInstrumental || !string.IsNullOrEmpty(cached.PlainLyrics))
+                ? cached
+                : null;
+            SetCurrentTrack(effective);
             return;
         }
 
@@ -160,26 +170,34 @@ internal sealed class LyricsService : IDisposable
         _ = Task.Run(async () =>
         {
             TrackLyrics? result = null;
+            bool gotServerResponse = false;
             try
             {
-                result = await FetchFromLrcLibAsync(cleanTitle, cleanArtist, duration, ct);
+                (result, gotServerResponse) = await FetchFromLrcLibAsync(cleanTitle, cleanArtist, duration, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 App.Log($"[Lyrics] Fetch error for '{cleanTitle}' by '{cleanArtist}': {ex.Message}");
             }
 
-            if (!ct.IsCancellationRequested)
+            if (!ct.IsCancellationRequested && !_disposed)
             {
-                if (result != null && result.HasSyncedLyrics)
+                if (result != null || gotServerResponse)
                 {
-                    _cache[cacheKey] = result;
-                    _ = Task.Run(SaveDiskCache);
+                    _cache[cacheKey] = result ?? new TrackLyrics
+                    {
+                        Title = cleanTitle,
+                        Artist = cleanArtist
+                    };
+                    if (result is { HasSyncedLyrics: true })
+                    {
+                        _diskCacheStore.ScheduleSave();
+                    }
                 }
 
                 _ = _ui.InvokeAsync(() =>
                 {
-                    if (!ct.IsCancellationRequested && string.Equals(_currentTrackKey, cacheKey, StringComparison.OrdinalIgnoreCase))
+                    if (!ct.IsCancellationRequested && !_disposed && string.Equals(_currentTrackKey, cacheKey, StringComparison.OrdinalIgnoreCase))
                     {
                         IsLoading = false;
                         SetCurrentTrack(result);
@@ -237,26 +255,30 @@ internal sealed class LyricsService : IDisposable
     }
 
     /// <summary>
-    /// Locates the active line index for a given playback position with a 120ms singing lead-in.
+    /// Locates the active line index for a given playback position with a 120ms singing lead-in via binary search.
     /// </summary>
     public static int FindCurrentIndex(IReadOnlyList<LrcLine>? lines, TimeSpan position)
     {
         if (lines == null || lines.Count == 0) return -1;
         var effectivePos = position + TimeSpan.FromMilliseconds(120);
 
-        int index = -1;
-        for (int i = 0; i < lines.Count; i++)
+        int lo = 0;
+        int hi = lines.Count - 1;
+        int answer = -1;
+        while (lo <= hi)
         {
-            if (lines[i].Timestamp <= effectivePos)
+            int mid = lo + ((hi - lo) >> 1);
+            if (lines[mid].Timestamp <= effectivePos)
             {
-                index = i;
+                answer = mid;
+                lo = mid + 1;
             }
             else
             {
-                break;
+                hi = mid - 1;
             }
         }
-        return index;
+        return answer;
     }
 
     public void Reset() => Clear();
@@ -297,7 +319,7 @@ internal sealed class LyricsService : IDisposable
     /// Fires Tier 1 (/api/get), Tier 2 (/api/search by fields), and Tier 3 (/api/search?q=...) simultaneously
     /// so browser/YouTube/Spotify tracks resolve in a single network round-trip (~250-450ms) instead of 3-5 sequential timeouts.
     /// </summary>
-    private static async Task<TrackLyrics?> FetchFromLrcLibAsync(string title, string artist, TimeSpan duration, CancellationToken ct)
+    private static async Task<(TrackLyrics? Track, bool ServerResponded)> FetchFromLrcLibAsync(string title, string artist, TimeSpan duration, CancellationToken ct)
     {
         bool hasArtist = !string.IsNullOrWhiteSpace(artist);
         using var tier1Cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -306,8 +328,8 @@ internal sealed class LyricsService : IDisposable
         string query = hasArtist ? $"{artist} {title}".Trim() : title.Trim();
         string searchUrl = $"https://lrclib.net/api/search?q={Uri.EscapeDataString(query)}";
 
-        Task<TrackLyrics?>? directTask = null;
-        Task<TrackLyrics?>? fieldTask = null;
+        Task<(TrackLyrics? Track, bool ServerResponded)>? directTask = null;
+        Task<(TrackLyrics? Track, bool ServerResponded)>? fieldTask = null;
 
         if (hasArtist)
         {
@@ -317,41 +339,47 @@ internal sealed class LyricsService : IDisposable
             fieldTask = QueryLrcLibArrayAsync(fieldSearchUrl, title, artist, duration, tierToken);
         }
 
-        Task<TrackLyrics?> queryTask = QueryLrcLibArrayAsync(searchUrl, title, artist, duration, tierToken);
+        Task<(TrackLyrics? Track, bool ServerResponded)> queryTask = QueryLrcLibArrayAsync(searchUrl, title, artist, duration, tierToken);
 
         TrackLyrics? direct = null;
         TrackLyrics? fieldMatch = null;
+        bool anyServerResponse = false;
 
         if (directTask != null)
         {
-            direct = await directTask;
+            bool responded;
+            (direct, responded) = await directTask;
+            anyServerResponse |= responded;
             if (direct?.HasSyncedLyrics == true)
             {
                 tier1Cts.Cancel();
-                return direct;
+                return (direct, true);
             }
         }
 
         if (fieldTask != null)
         {
-            fieldMatch = await fieldTask;
+            bool responded;
+            (fieldMatch, responded) = await fieldTask;
+            anyServerResponse |= responded;
             if (fieldMatch?.HasSyncedLyrics == true)
             {
                 tier1Cts.Cancel();
-                return fieldMatch;
+                return (fieldMatch, true);
             }
         }
 
-        var queryMatch = await queryTask;
+        var (queryMatch, queryResponded) = await queryTask;
+        anyServerResponse |= queryResponded;
         if (queryMatch?.HasSyncedLyrics == true)
         {
-            return queryMatch;
+            return (queryMatch, true);
         }
 
         // Secondary fallback wave: Collaboration artist & title-only search launched in parallel
         using var tier2Cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var tier2Token = tier2Cts.Token;
-        Task<TrackLyrics?>? collabSearchTask = null;
+        Task<(TrackLyrics? Track, bool ServerResponded)>? collabSearchTask = null;
 
         if (hasArtist && (artist.Contains('&') || artist.Contains(',') || artist.Contains("feat", StringComparison.OrdinalIgnoreCase)))
         {
@@ -369,18 +397,20 @@ internal sealed class LyricsService : IDisposable
 
         if (collabSearchTask != null)
         {
-            var collabMatch = await collabSearchTask;
+            var (collabMatch, collabResponded) = await collabSearchTask;
+            anyServerResponse |= collabResponded;
             if (collabMatch?.HasSyncedLyrics == true)
             {
                 tier2Cts.Cancel();
-                return collabMatch;
+                return (collabMatch, true);
             }
         }
 
-        var titleMatch = await titleOnlyTask;
+        var (titleMatch, titleResponded) = await titleOnlyTask;
+        anyServerResponse |= titleResponded;
         if (titleMatch?.HasSyncedLyrics == true)
         {
-            return titleMatch;
+            return (titleMatch, true);
         }
 
         // Secondary Fallback: Strip any remaining bracketed or parenthesized tags (e.g. "(Sped up)", "[Lyrics]")
@@ -389,10 +419,11 @@ internal sealed class LyricsService : IDisposable
         {
             string strippedQuery = hasArtist ? $"{artist} {strippedTitle}".Trim() : strippedTitle;
             string strippedUrl = $"https://lrclib.net/api/search?q={Uri.EscapeDataString(strippedQuery)}";
-            var strippedMatch = await QueryLrcLibArrayAsync(strippedUrl, strippedTitle, artist, duration, ct);
+            var (strippedMatch, strippedResponded) = await QueryLrcLibArrayAsync(strippedUrl, strippedTitle, artist, duration, ct);
+            anyServerResponse |= strippedResponded;
             if (strippedMatch?.HasSyncedLyrics == true)
             {
-                return strippedMatch;
+                return (strippedMatch, true);
             }
         }
 
@@ -402,44 +433,48 @@ internal sealed class LyricsService : IDisposable
         {
             string punctQuery = hasArtist ? $"{artist} {punctStrippedTitle}".Trim() : punctStrippedTitle;
             string punctUrl = $"https://lrclib.net/api/search?q={Uri.EscapeDataString(punctQuery)}";
-            var punctMatch = await QueryLrcLibArrayAsync(punctUrl, punctStrippedTitle, artist, duration, ct);
+            var (punctMatch, punctResponded) = await QueryLrcLibArrayAsync(punctUrl, punctStrippedTitle, artist, duration, ct);
+            anyServerResponse |= punctResponded;
             if (punctMatch?.HasSyncedLyrics == true)
             {
-                return punctMatch;
+                return (punctMatch, true);
             }
         }
 
-        return direct ?? fieldMatch ?? queryMatch ?? titleMatch;
+        return (direct ?? fieldMatch ?? queryMatch ?? titleMatch, anyServerResponse);
     }
 
-    private static async Task<TrackLyrics?> QueryLrcLibSingleAsync(string url, string fallbackTitle, string fallbackArtist, TimeSpan duration, CancellationToken ct)
+    private static async Task<(TrackLyrics? Track, bool ServerResponded)> QueryLrcLibSingleAsync(string url, string fallbackTitle, string fallbackArtist, TimeSpan duration, CancellationToken ct)
     {
         try
         {
             using var reqCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             reqCts.CancelAfter(TimeSpan.FromSeconds(3.2));
             using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, reqCts.Token);
+            bool responded = response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound;
             if (response.IsSuccessStatusCode)
             {
                 using var stream = await response.Content.ReadAsStreamAsync(reqCts.Token);
                 using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: reqCts.Token);
-                return ParseLrcLibJson(doc.RootElement, fallbackTitle, fallbackArtist, duration);
+                return (ParseLrcLibJson(doc.RootElement, fallbackTitle, fallbackArtist, duration), true);
             }
+            return (null, responded);
         }
         catch
         {
             // Network or parsing failures handled gracefully
+            return (null, false);
         }
-        return null;
     }
 
-    private static async Task<TrackLyrics?> QueryLrcLibArrayAsync(string url, string fallbackTitle, string fallbackArtist, TimeSpan duration, CancellationToken ct)
+    private static async Task<(TrackLyrics? Track, bool ServerResponded)> QueryLrcLibArrayAsync(string url, string fallbackTitle, string fallbackArtist, TimeSpan duration, CancellationToken ct)
     {
         try
         {
             using var reqCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             reqCts.CancelAfter(TimeSpan.FromSeconds(3.5));
             using var searchResp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, reqCts.Token);
+            bool responded = searchResp.IsSuccessStatusCode || searchResp.StatusCode == HttpStatusCode.NotFound;
             if (searchResp.IsSuccessStatusCode)
             {
                 using var searchStream = await searchResp.Content.ReadAsStreamAsync(reqCts.Token);
@@ -454,7 +489,7 @@ internal sealed class LyricsService : IDisposable
 
                     if (best.ValueKind != JsonValueKind.Undefined)
                     {
-                        return ParseLrcLibJson(best, fallbackTitle, fallbackArtist, duration);
+                        return (ParseLrcLibJson(best, fallbackTitle, fallbackArtist, duration), true);
                     }
 
                     // Fallback to plain lyrics if synced not available
@@ -465,16 +500,17 @@ internal sealed class LyricsService : IDisposable
 
                     if (plain.ValueKind != JsonValueKind.Undefined)
                     {
-                        return ParseLrcLibJson(plain, fallbackTitle, fallbackArtist, duration);
+                        return (ParseLrcLibJson(plain, fallbackTitle, fallbackArtist, duration), true);
                     }
                 }
             }
+            return (null, responded);
         }
         catch
         {
             // Network or parsing failures handled gracefully
+            return (null, false);
         }
-        return null;
     }
 
     private static TrackLyrics ParseLrcLibJson(JsonElement el, string fallbackTitle, string fallbackArtist, TimeSpan duration)
@@ -567,36 +603,30 @@ internal sealed class LyricsService : IDisposable
         catch { }
     }
 
-    private void SaveDiskCache()
+    private List<CachedLyricsEntry> BuildDiskCacheSnapshot()
     {
-        try
-        {
-            var entries = _cache
-                .Where(kv => kv.Value.HasSyncedLyrics)
-                .Take(MaxDiskCacheEntries)
-                .Select(kv => new CachedLyricsEntry(
-                    kv.Key,
-                    kv.Value.Title,
-                    kv.Value.Artist,
-                    kv.Value.IsInstrumental,
-                    kv.Value.SyncedLines.Select(l => new CachedLineDto(l.Timestamp.Ticks, l.Text)).ToList()))
-                .ToList();
-
-            string json = JsonSerializer.Serialize(entries);
-            File.WriteAllText(_diskCachePath, json);
-        }
-        catch { }
+        return _cache
+            .Where(kv => kv.Value.HasSyncedLyrics)
+            .Take(MaxDiskCacheEntries)
+            .Select(kv => new CachedLyricsEntry(
+                kv.Key,
+                kv.Value.Title,
+                kv.Value.Artist,
+                kv.Value.IsInstrumental,
+                kv.Value.SyncedLines.Select(l => new CachedLineDto(l.Timestamp.Ticks, l.Text)).ToList()))
+            .ToList();
     }
 
     /// <summary>
     /// Parses LRC content into ordered timestamps and cleaned line strings.
-    /// Filters out metadata tags (e.g. [ar:], [al:]) and preserves only timed lyrics.
+    /// Supports multi-timestamp lines (e.g. [00:10.00][00:30.00]Text) and filters out metadata tags.
     /// </summary>
     public static List<LrcLine> ParseLrc(string? lrcContent)
     {
         var result = new List<LrcLine>();
         if (string.IsNullOrWhiteSpace(lrcContent)) return result;
 
+        var timestamps = new List<TimeSpan>(2);
         using var reader = new StringReader(lrcContent);
         string? rawLine;
         while ((rawLine = reader.ReadLine()) != null)
@@ -604,27 +634,38 @@ internal sealed class LyricsService : IDisposable
             string line = rawLine.Trim();
             if (string.IsNullOrEmpty(line)) continue;
 
-            var match = LrcTimestampRegex.Match(line);
-            if (!match.Success) continue;
-
-            if (int.TryParse(match.Groups[1].Value, out int minutes) &&
-                int.TryParse(match.Groups[2].Value, out int seconds))
+            timestamps.Clear();
+            while (true)
             {
-                int millis = 0;
-                if (match.Groups[3].Success)
+                var match = LrcTimestampRegex.Match(line);
+                if (!match.Success) break;
+
+                if (int.TryParse(match.Groups[1].Value, out int minutes) &&
+                    int.TryParse(match.Groups[2].Value, out int seconds))
                 {
-                    string msStr = match.Groups[3].Value;
-                    if (msStr.Length == 2) millis = int.Parse(msStr) * 10;
-                    else if (msStr.Length == 3) millis = int.Parse(msStr);
-                    else if (msStr.Length == 1) millis = int.Parse(msStr) * 100;
+                    int millis = 0;
+                    if (match.Groups[3].Success)
+                    {
+                        string msStr = match.Groups[3].Value;
+                        if (msStr.Length == 2) millis = int.Parse(msStr) * 10;
+                        else if (msStr.Length == 3) millis = int.Parse(msStr);
+                        else if (msStr.Length == 1) millis = int.Parse(msStr) * 100;
+                    }
+
+                    timestamps.Add(new TimeSpan(0, 0, minutes, seconds, millis));
                 }
 
-                var timestamp = new TimeSpan(0, 0, minutes, seconds, millis);
-                string text = match.Groups[4].Value.Trim();
+                line = line[match.Length..];
+            }
 
-                if (!string.IsNullOrWhiteSpace(text))
+            if (timestamps.Count == 0) continue;
+
+            string text = line.Trim();
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                foreach (var ts in timestamps)
                 {
-                    result.Add(new LrcLine(timestamp, text));
+                    result.Add(new LrcLine(ts, text));
                 }
             }
         }
@@ -710,9 +751,8 @@ internal sealed class LyricsService : IDisposable
                 }
                 else
                 {
-                    // Fall back to left as artist if left contains letters and detectedArtist looks like a generic YouTube channel
-                    detectedArtist = left;
-                    detectedTitle = right;
+                    // Preserve known non-generic artist and keep full title (e.g. "Song - Remastered 2017")
+                    detectedTitle = workingTitle;
                 }
             }
         }
@@ -774,8 +814,11 @@ internal sealed class LyricsService : IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         _fetchCts?.Cancel();
         _fetchCts?.Dispose();
+        _diskCacheStore.Dispose();
         _cache.Clear();
     }
 }

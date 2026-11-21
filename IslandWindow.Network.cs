@@ -151,42 +151,58 @@ public partial class IslandWindow
 
     internal async void WifiToggleCard_Click(object sender, MouseButtonEventArgs e)
     {
-        TriggerLiquidImpulse(180, -70, 22);
-        bool toggled = await _networkService.ToggleWifiRadioAsync();
-        if (toggled)
-        {
-            bool on = _networkService.Current.IsWifiRadioOn;
-            _machine.PushToast(new ToastContent(
-                on ? "\uE701" : "\uEB5E",
-                on ? "Wi-Fi Enabled" : "Wi-Fi Disabled",
-                on ? "Scanning for networks..." : "Wireless radio turned off",
-                on ? ThemeBrushes.GreenColor : ThemeBrushes.AmberColor,
-                TimeSpan.FromSeconds(2.0),
-                TargetView: "network",
-                Priority: ToastPriority.Feedback,
-                Category: "wifi"));
-        }
         e.Handled = true;
+        try
+        {
+            TriggerLiquidImpulse(180, -70, 22);
+            bool toggled = await _networkService.ToggleWifiRadioAsync();
+            if (_isClosing) return;
+            if (toggled)
+            {
+                bool on = _networkService.Current.IsWifiRadioOn;
+                _machine.PushToast(new ToastContent(
+                    on ? "\uE701" : "\uEB5E",
+                    on ? "Wi-Fi Enabled" : "Wi-Fi Disabled",
+                    on ? "Scanning for networks..." : "Wireless radio turned off",
+                    on ? ThemeBrushes.GreenColor : ThemeBrushes.AmberColor,
+                    TimeSpan.FromSeconds(2.0),
+                    TargetView: "network",
+                    Priority: ToastPriority.Feedback,
+                    Category: "wifi"));
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Network] WifiToggleCard failed: {ex.Message}");
+        }
     }
 
     internal async void BtToggleCard_Click(object sender, MouseButtonEventArgs e)
     {
-        TriggerLiquidImpulse(180, -70, 22);
-        bool toggled = await _networkService.ToggleBluetoothRadioAsync();
-        if (toggled)
-        {
-            bool on = _networkService.Current.IsBluetoothRadioOn;
-            _machine.PushToast(new ToastContent(
-                "\uE702",
-                on ? "Bluetooth Enabled" : "Bluetooth Disabled",
-                on ? "Wireless radio active" : "Bluetooth radio turned off",
-                on ? ThemeBrushes.BlueColor : ThemeBrushes.AmberColor,
-                TimeSpan.FromSeconds(2.0),
-                TargetView: "network",
-                Priority: ToastPriority.Feedback,
-                Category: "bluetooth"));
-        }
         e.Handled = true;
+        try
+        {
+            TriggerLiquidImpulse(180, -70, 22);
+            bool toggled = await _networkService.ToggleBluetoothRadioAsync();
+            if (_isClosing) return;
+            if (toggled)
+            {
+                bool on = _networkService.Current.IsBluetoothRadioOn;
+                _machine.PushToast(new ToastContent(
+                    "\uE702",
+                    on ? "Bluetooth Enabled" : "Bluetooth Disabled",
+                    on ? "Wireless radio active" : "Bluetooth radio turned off",
+                    on ? ThemeBrushes.BlueColor : ThemeBrushes.AmberColor,
+                    TimeSpan.FromSeconds(2.0),
+                    TargetView: "network",
+                    Priority: ToastPriority.Feedback,
+                    Category: "bluetooth"));
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Network] BtToggleCard failed: {ex.Message}");
+        }
     }
 
     internal void WifiNetworksCard_Click(object sender, MouseButtonEventArgs e)
@@ -202,45 +218,53 @@ public partial class IslandWindow
 
     private async void SetWifiScannerMode(bool scannerMode)
     {
-        _isWifiScannerMode = scannerMode;
-        if (NetworkSectionTitle != null)
+        try
         {
-            NetworkSectionTitle.Text = _isWifiScannerMode ? "Available Wi-Fi Networks" : "Wi-Fi & Connectivity";
-        }
-        if (ScanWifiModeText != null)
-        {
-            ScanWifiModeText.Text = _isWifiScannerMode ? "\u2190 Overview" : "Scan SSIDs";
-        }
-        if (NetworkOverviewHost != null && WifiScannerHost != null)
-        {
-            NetworkOverviewHost.Visibility = _isWifiScannerMode ? Visibility.Collapsed : Visibility.Visible;
-            WifiScannerHost.Visibility = _isWifiScannerMode ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        if (_isWifiScannerMode)
-        {
-            if (WifiScannerStatusPlaceholder != null && _wifiNetworks.Count == 0)
+            _isWifiScannerMode = scannerMode;
+            if (NetworkSectionTitle != null)
             {
-                if (WifiScannerStatusTitle != null) WifiScannerStatusTitle.Text = "Scanning Wi-Fi...";
-                if (WifiScannerStatusSubtitle != null) WifiScannerStatusSubtitle.Text = "Searching for nearby wireless networks";
-                WifiScannerStatusPlaceholder.Visibility = Visibility.Visible;
+                NetworkSectionTitle.Text = _isWifiScannerMode ? "Available Wi-Fi Networks" : "Wi-Fi & Connectivity";
+            }
+            if (ScanWifiModeText != null)
+            {
+                ScanWifiModeText.Text = _isWifiScannerMode ? "\u2190 Overview" : "Scan SSIDs";
+            }
+            if (NetworkOverviewHost != null && WifiScannerHost != null)
+            {
+                NetworkOverviewHost.Visibility = _isWifiScannerMode ? Visibility.Collapsed : Visibility.Visible;
+                WifiScannerHost.Visibility = _isWifiScannerMode ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            await _networkService.ScanWifiNetworksAsync();
-
-            if (_isWifiScannerMode && WifiScannerStatusPlaceholder != null)
+            if (_isWifiScannerMode)
             {
-                if (_wifiNetworks.Count == 0)
+                if (WifiScannerStatusPlaceholder != null && _wifiNetworks.Count == 0)
                 {
-                    if (WifiScannerStatusTitle != null) WifiScannerStatusTitle.Text = "No Wi-Fi Networks Found";
-                    if (WifiScannerStatusSubtitle != null) WifiScannerStatusSubtitle.Text = "Check that Wi-Fi radio and Windows Location are enabled";
+                    if (WifiScannerStatusTitle != null) WifiScannerStatusTitle.Text = "Scanning Wi-Fi...";
+                    if (WifiScannerStatusSubtitle != null) WifiScannerStatusSubtitle.Text = "Searching for nearby wireless networks";
                     WifiScannerStatusPlaceholder.Visibility = Visibility.Visible;
                 }
-                else
+
+                await _networkService.ScanWifiNetworksAsync();
+                if (_isClosing) return;
+
+                if (_isWifiScannerMode && WifiScannerStatusPlaceholder != null)
                 {
-                    WifiScannerStatusPlaceholder.Visibility = Visibility.Collapsed;
+                    if (_wifiNetworks.Count == 0)
+                    {
+                        if (WifiScannerStatusTitle != null) WifiScannerStatusTitle.Text = "No Wi-Fi Networks Found";
+                        if (WifiScannerStatusSubtitle != null) WifiScannerStatusSubtitle.Text = "Check that Wi-Fi radio and Windows Location are enabled";
+                        WifiScannerStatusPlaceholder.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        WifiScannerStatusPlaceholder.Visibility = Visibility.Collapsed;
+                    }
                 }
             }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Network] SetWifiScannerMode failed: {ex.Message}");
         }
     }
 
@@ -260,16 +284,24 @@ public partial class IslandWindow
         if (sender is not FrameworkElement { DataContext: WifiNetworkInfo net }) return;
         e.Handled = true;
 
-        var (ok, msg) = await _networkService.ConnectWifiNetworkAsync(net);
-        _machine.PushToast(new ToastContent(
-            net.Glyph,
-            ok ? net.Ssid : "Wi-Fi Authentication",
-            msg,
-            ok ? ThemeBrushes.GreenColor : ThemeBrushes.AmberColor,
-            TimeSpan.FromSeconds(2.5),
-            TargetView: "network",
-            Priority: ToastPriority.Feedback,
-            Category: "wifi"));
+        try
+        {
+            var (ok, msg) = await _networkService.ConnectWifiNetworkAsync(net);
+            if (_isClosing) return;
+            _machine.PushToast(new ToastContent(
+                net.Glyph,
+                ok ? net.Ssid : "Wi-Fi Authentication",
+                msg,
+                ok ? ThemeBrushes.GreenColor : ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(2.5),
+                TargetView: "network",
+                Priority: ToastPriority.Feedback,
+                Category: "wifi"));
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Network] WifiNetworkCard connect failed: {ex.Message}");
+        }
     }
 
     internal void HotspotCard_Click(object sender, MouseButtonEventArgs e)

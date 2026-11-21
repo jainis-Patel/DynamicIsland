@@ -68,6 +68,9 @@ public partial class IslandWindow
                 GlassFrostingStatusText.Text = DynamicIsland.Core.ThemeManager.IsLiquidGlass ? "Active" : "OLED Mode";
             }
 
+            ThemeManager.SetThemeMode(SettingsService.NormalizeThemeMode(cur.ThemeMode));
+            ThemeManager.SetThemeStyle(SettingsService.NormalizeThemeStyle(cur.ThemeStyle));
+            ApplyTheme(cur.ThemeName);
             UpdateDockButtonsUI();
             UpdateExpandTriggerUI();
             UpdateGhostModifierUI();
@@ -94,9 +97,6 @@ public partial class IslandWindow
             SwitchSettingsTab(_currentSettingsTab, false);
             ApplyClockStyle(cur.ClockStyle);
             ApplyVisualizerStyle(cur.VisualizerStyle);
-            ThemeManager.SetThemeMode(SettingsService.NormalizeThemeMode(cur.ThemeMode));
-            ThemeManager.SetThemeStyle(SettingsService.NormalizeThemeStyle(cur.ThemeStyle));
-            ApplyTheme(cur.ThemeName);
             ApplyIslandTheme(cur.IslandTheme);
             UpdateThemeModeUI();
             UpdateThemeStyleUI();
@@ -193,7 +193,7 @@ public partial class IslandWindow
             case nameof(AppSettings.EnableNightLightSim):
             case nameof(AppSettings.NightLightWarmthKelvin):
                 UpdateDisplayAndBatterySettingsUI();
-            UpdateNotifSettingsUI();
+                UpdateNotifSettingsUI();
                 break;
 
             case nameof(AppSettings.VisualizerStyle):
@@ -202,6 +202,7 @@ public partial class IslandWindow
 
             case nameof(AppSettings.ShowNetworkSpeedInIdle):
                 UpdateNetSpeedIdleUI();
+                _networkService?.UpdatePollingState();
                 if (_machine.State == IslandState.Idle)
                 {
                     var targetIdle = GetIdleShape();
@@ -378,6 +379,18 @@ public partial class IslandWindow
                 UpdateHotkeysUI();
                 break;
 
+            case nameof(AppSettings.GitHubToken):
+                _updateService?.SetGitHubToken(cur.GitHubToken);
+                break;
+
+            case nameof(AppSettings.WeatherCityOverride):
+                _ = _weatherService?.RefreshAsync();
+                break;
+
+            case nameof(AppSettings.MutedNotificationApps):
+                UpdateNotifSettingsUI();
+                break;
+
             default:
                 ApplySettings();
                 break;
@@ -441,6 +454,44 @@ public partial class IslandWindow
         EnsureRendering();
     }
 
+    private static void StyleAccentToggleButton(
+        Button? btn,
+        bool active,
+        Brush accent,
+        Brush defaultBg,
+        Brush defaultBorder,
+        TextBlock? label = null,
+        Brush? inactiveLabelBrush = null,
+        bool boldWhenActive = false)
+    {
+        if (btn == null) return;
+        btn.Background = active ? accent : defaultBg;
+        btn.Foreground = active ? ThemeBrushes.DarkInk : ThemeBrushes.PrimaryText;
+        btn.BorderBrush = active ? accent : defaultBorder;
+        if (label != null)
+        {
+            label.Foreground = active ? ThemeBrushes.DarkInk : (inactiveLabelBrush ?? ThemeBrushes.PrimaryText);
+            if (boldWhenActive)
+                label.FontWeight = active ? FontWeights.Bold : FontWeights.SemiBold;
+        }
+    }
+
+    private static void StyleCardOptionButton(
+        Button? btn,
+        bool active,
+        Brush accent,
+        Brush activeBg,
+        Brush defaultBg,
+        Brush defaultBorder,
+        bool dimInactive = false)
+    {
+        if (btn == null) return;
+        btn.BorderBrush = active ? accent : defaultBorder;
+        btn.Background = active ? activeBg : defaultBg;
+        if (dimInactive)
+            btn.Opacity = active ? 1.0 : 0.72;
+    }
+
     private void UpdateDockButtonsUI()
     {
         if (DockLeftBtn == null || DockCenterBtn == null || DockRightBtn == null) return;
@@ -449,16 +500,9 @@ public partial class IslandWindow
         var defaultBorder = (Brush)FindResource("CardBorderBrush");
         var defaultBg = (Brush)FindResource("CardSurfaceBrush");
 
-        void StyleDockBtn(Button btn, bool active)
-        {
-            btn.Background = active ? accent : defaultBg;
-            btn.Foreground = active ? ThemeBrushes.DarkInk : ThemeBrushes.PrimaryText;
-            btn.BorderBrush = active ? accent : defaultBorder;
-        }
-
-        StyleDockBtn(DockLeftBtn, dock == "Left");
-        StyleDockBtn(DockCenterBtn, dock == "Center");
-        StyleDockBtn(DockRightBtn, dock == "Right");
+        StyleAccentToggleButton(DockLeftBtn, dock == "Left", accent, defaultBg, defaultBorder);
+        StyleAccentToggleButton(DockCenterBtn, dock == "Center", accent, defaultBg, defaultBorder);
+        StyleAccentToggleButton(DockRightBtn, dock == "Right", accent, defaultBg, defaultBorder);
     }
 
     private void UpdateExpandTriggerUI()
@@ -469,16 +513,9 @@ public partial class IslandWindow
         var defaultBorder = (Brush)FindResource("CardBorderBrush");
         var defaultBg = (Brush)FindResource("CardSurfaceBrush");
 
-        void StyleBtn(Button btn, bool active)
-        {
-            btn.Background = active ? accent : defaultBg;
-            btn.Foreground = active ? ThemeBrushes.DarkInk : ThemeBrushes.PrimaryText;
-            btn.BorderBrush = active ? accent : defaultBorder;
-        }
-
-        StyleBtn(ExpandTriggerClickBtn, trigger == "ClickOnly");
-        StyleBtn(ExpandTriggerSnappyBtn, trigger == "HoverSnappy");
-        StyleBtn(ExpandTriggerRelaxedBtn, trigger == "HoverRelaxed");
+        StyleAccentToggleButton(ExpandTriggerClickBtn, trigger == "ClickOnly", accent, defaultBg, defaultBorder);
+        StyleAccentToggleButton(ExpandTriggerSnappyBtn, trigger == "HoverSnappy", accent, defaultBg, defaultBorder);
+        StyleAccentToggleButton(ExpandTriggerRelaxedBtn, trigger == "HoverRelaxed", accent, defaultBg, defaultBorder);
     }
 
     private void UpdateGhostModifierUI()
@@ -489,16 +526,9 @@ public partial class IslandWindow
         var defaultBorder = (Brush)FindResource("CardBorderBrush");
         var defaultBg = (Brush)FindResource("CardSurfaceBrush");
 
-        void StyleBtn(Button btn, bool active)
-        {
-            btn.Background = active ? accent : defaultBg;
-            btn.Foreground = active ? ThemeBrushes.DarkInk : ThemeBrushes.PrimaryText;
-            btn.BorderBrush = active ? accent : defaultBorder;
-        }
-
-        StyleBtn(GhostModCtrlBtn, string.Equals(mod, "Ctrl", StringComparison.OrdinalIgnoreCase));
-        StyleBtn(GhostModAltBtn, string.Equals(mod, "Alt", StringComparison.OrdinalIgnoreCase));
-        StyleBtn(GhostModNoneBtn, string.Equals(mod, "None", StringComparison.OrdinalIgnoreCase));
+        StyleAccentToggleButton(GhostModCtrlBtn, string.Equals(mod, "Ctrl", StringComparison.OrdinalIgnoreCase), accent, defaultBg, defaultBorder);
+        StyleAccentToggleButton(GhostModAltBtn, string.Equals(mod, "Alt", StringComparison.OrdinalIgnoreCase), accent, defaultBg, defaultBorder);
+        StyleAccentToggleButton(GhostModNoneBtn, string.Equals(mod, "None", StringComparison.OrdinalIgnoreCase), accent, defaultBg, defaultBorder);
     }
 
     private void UpdateQuickTuckUI()
@@ -509,11 +539,15 @@ public partial class IslandWindow
         var defaultBorder = (Brush)FindResource("CardBorderBrush");
         var defaultBg = (Brush)FindResource("CardSurfaceBrush");
 
-        QuickTuckToggleBtn.Background = enabled ? accent : defaultBg;
-        QuickTuckToggleBtn.Foreground = enabled ? ThemeBrushes.DarkInk : ThemeBrushes.PrimaryText;
-        QuickTuckToggleBtn.BorderBrush = enabled ? accent : defaultBorder;
+        StyleAccentToggleButton(
+            QuickTuckToggleBtn,
+            enabled,
+            accent,
+            defaultBg,
+            defaultBorder,
+            QuickTuckToggleText,
+            ThemeBrushes.SecondaryText);
         QuickTuckToggleText.Text = enabled ? "Tuck Enabled" : "Tuck Disabled";
-        QuickTuckToggleText.Foreground = enabled ? ThemeBrushes.DarkInk : ThemeBrushes.SecondaryText;
     }
 
     internal void ExpandTriggerBtn_Click(object sender, RoutedEventArgs e)
@@ -521,8 +555,6 @@ public partial class IslandWindow
         if (sender is FrameworkElement { Tag: string mode })
         {
             _settingsService.Update(s => s.ExpandTrigger = mode, nameof(AppSettings.ExpandTrigger));
-            ApplyExpandTrigger(mode);
-            UpdateExpandTriggerUI();
             _machine.PushToast(new ToastContent(
                 "\uE713",
                 "Expand Trigger",
@@ -546,7 +578,6 @@ public partial class IslandWindow
         if (sender is FrameworkElement { Tag: string key })
         {
             _settingsService.Update(s => s.GhostModifierKey = key, nameof(AppSettings.GhostModifierKey));
-            UpdateGhostModifierUI();
             _machine.PushToast(new ToastContent(
                 "\uE713",
                 "Ghost Click-Through",
@@ -563,7 +594,6 @@ public partial class IslandWindow
     {
         bool next = !_settingsService.Current.EnableQuickTuck;
         _settingsService.Update(s => s.EnableQuickTuck = next, nameof(AppSettings.EnableQuickTuck));
-        UpdateQuickTuckUI();
         _machine.PushToast(new ToastContent(
             "\uE713",
             "Quick Tuck Gesture",
@@ -638,22 +668,14 @@ public partial class IslandWindow
         var activeBg = ThemeBrushes.PillToggleActiveBg;
         var defaultBg = (Brush)FindResource("CardSurfaceBrush");
 
-        void StyleBtn(Button? btn, bool active)
-        {
-            if (btn == null) return;
-            btn.BorderBrush = active ? accentBrush : defaultBorder;
-            btn.Background = active ? activeBg : defaultBg;
-            btn.Opacity = active ? 1.0 : 0.72;
-        }
-
-        StyleBtn(ClockStyleMinimalBtn, style == "Minimal");
-        StyleBtn(ClockStyleSecondsBtn, style == "Seconds");
-        StyleBtn(ClockStyleDateBtn, style == "DateBadge");
-        StyleBtn(ClockStyleAnalogBtn, style == "Analog");
-        StyleBtn(ClockStyleNeonBtn, style == "Neon");
-        StyleBtn(ClockStyleFlipBtn, style == "Flip");
-        StyleBtn(ClockStyleMatrixBtn, style == "Matrix");
-        StyleBtn(ClockStyleJumpHourBtn, style == "JumpHour");
+        StyleCardOptionButton(ClockStyleMinimalBtn, style == "Minimal", accentBrush, activeBg, defaultBg, defaultBorder, dimInactive: true);
+        StyleCardOptionButton(ClockStyleSecondsBtn, style == "Seconds", accentBrush, activeBg, defaultBg, defaultBorder, dimInactive: true);
+        StyleCardOptionButton(ClockStyleDateBtn, style == "DateBadge", accentBrush, activeBg, defaultBg, defaultBorder, dimInactive: true);
+        StyleCardOptionButton(ClockStyleAnalogBtn, style == "Analog", accentBrush, activeBg, defaultBg, defaultBorder, dimInactive: true);
+        StyleCardOptionButton(ClockStyleNeonBtn, style == "Neon", accentBrush, activeBg, defaultBg, defaultBorder, dimInactive: true);
+        StyleCardOptionButton(ClockStyleFlipBtn, style == "Flip", accentBrush, activeBg, defaultBg, defaultBorder, dimInactive: true);
+        StyleCardOptionButton(ClockStyleMatrixBtn, style == "Matrix", accentBrush, activeBg, defaultBg, defaultBorder, dimInactive: true);
+        StyleCardOptionButton(ClockStyleJumpHourBtn, style == "JumpHour", accentBrush, activeBg, defaultBg, defaultBorder, dimInactive: true);
 
         ActiveClockStyleLabel.Text = style switch
         {
@@ -753,17 +775,10 @@ public partial class IslandWindow
         var activeBg = ThemeBrushes.PillToggleActiveBg;
         var defaultBg = (Brush)FindResource("CardSurfaceBrush");
 
-        void StyleBtn(Button btn, bool active)
-        {
-            if (btn == null) return;
-            btn.BorderBrush = active ? accentBrush : defaultBorder;
-            btn.Background = active ? activeBg : defaultBg;
-        }
-
-        StyleBtn(VisualizerStyleBarsBtn, style == "ClassicBars");
-        StyleBtn(VisualizerStyleBlobBtn, style == "LiquidBlob");
-        StyleBtn(VisualizerStyleAuroraBtn, style == "NeonAurora");
-        StyleBtn(VisualizerStyleSiriBtn, style == "SiriOrb");
+        StyleCardOptionButton(VisualizerStyleBarsBtn, style == "ClassicBars", accentBrush, activeBg, defaultBg, defaultBorder);
+        StyleCardOptionButton(VisualizerStyleBlobBtn, style == "LiquidBlob", accentBrush, activeBg, defaultBg, defaultBorder);
+        StyleCardOptionButton(VisualizerStyleAuroraBtn, style == "NeonAurora", accentBrush, activeBg, defaultBg, defaultBorder);
+        StyleCardOptionButton(VisualizerStyleSiriBtn, style == "SiriOrb", accentBrush, activeBg, defaultBg, defaultBorder);
 
         ActiveVisualizerStyleLabel.Text = style switch
         {
@@ -1039,8 +1054,6 @@ public partial class IslandWindow
 
         GlassBlurText.Text = $"{pct}%";
         _settingsService.Update(s => s.GlassBlurIntensity = normalized, nameof(AppSettings.GlassBlurIntensity));
-        DynamicIsland.Core.LiquidGlassTheme.GlobalBlurScale = (float)normalized;
-        ForceRefreshGlassSurfaces();
     }
 
     internal void GlassRefractionSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1052,8 +1065,6 @@ public partial class IslandWindow
 
         GlassRefractionText.Text = $"{pct}%";
         _settingsService.Update(s => s.GlassRefractionIntensity = normalized, nameof(AppSettings.GlassRefractionIntensity));
-        DynamicIsland.Core.LiquidGlassTheme.GlobalThicknessScale = (float)normalized;
-        ForceRefreshGlassSurfaces();
     }
 
     private void ForceRefreshGlassSurfaces()
@@ -1439,7 +1450,6 @@ public partial class IslandWindow
     internal void DockPinAllBtn_Click(object sender, RoutedEventArgs e)
     {
         _settingsService.Update(s => s.HiddenDockViews.Clear(), nameof(AppSettings.HiddenDockViews));
-        UpdateDockVisibilityUI();
         TriggerLiquidImpulse(30, -10, 4);
         _machine.PushToast(new ToastContent(
             "\uE718",
@@ -1465,7 +1475,6 @@ public partial class IslandWindow
             s.HiddenDockViews.Clear();
             s.HiddenDockViews.AddRange(toHide);
         }, nameof(AppSettings.HiddenDockViews));
-        UpdateDockVisibilityUI();
         TriggerLiquidImpulse(30, -10, 4);
         _machine.PushToast(new ToastContent(
             "\uE718",
@@ -1481,7 +1490,6 @@ public partial class IslandWindow
     internal void DockPinResetBtn_Click(object sender, RoutedEventArgs e)
     {
         _settingsService.Update(s => s.HiddenDockViews.Clear(), nameof(AppSettings.HiddenDockViews));
-        UpdateDockVisibilityUI();
         TriggerLiquidImpulse(30, -10, 4);
         _machine.PushToast(new ToastContent(
             "\uE777",
@@ -1509,7 +1517,7 @@ public partial class IslandWindow
         }
 
         int visibleCount = 0;
-        int totalTools = 18;
+        int totalTools = 19;
 
         void ApplyPin(string key, Button? dockBtn, Button? pinBtn, TextBlock? statusText = null)
         {
@@ -1970,9 +1978,6 @@ public partial class IslandWindow
         if (sender is FrameworkElement { Tag: string mode })
         {
             _settingsService.Update(s => s.ThemeMode = mode, nameof(AppSettings.ThemeMode));
-            ThemeManager.SetThemeMode(SettingsService.NormalizeThemeMode(mode));
-            UpdateThemeModeUI();
-            ApplyTheme(_settingsService.Current.ThemeName);
             _machine.PushToast(new ToastContent(
                 mode == "Light" ? "\uE706" : (mode == "Dark" ? "\uE708" : "\uE770"),
                 "Theme Mode",
@@ -1993,21 +1998,11 @@ public partial class IslandWindow
         var accentBrush = (Brush)Resources["AccentBrush"];
         var defaultBorder = (Brush)FindResource("CardBorderBrush");
         var defaultBg = (Brush)FindResource("IslandButtonBgBrush");
+        var primaryText = (Brush)FindResource("PrimaryTextBrush");
 
-        void StyleModeBtn(Button btn, TextBlock? text, bool active)
-        {
-            btn.Background = active ? accentBrush : defaultBg;
-            btn.BorderBrush = active ? accentBrush : defaultBorder;
-            if (text != null)
-            {
-                text.Foreground = active ? ThemeBrushes.DarkInk : (Brush)FindResource("PrimaryTextBrush");
-                text.FontWeight = active ? FontWeights.Bold : FontWeights.SemiBold;
-            }
-        }
-
-        StyleModeBtn(ThemeModeSystemBtn, ThemeModeSystemText, current == "System");
-        StyleModeBtn(ThemeModeDarkBtn, ThemeModeDarkText, current == "Dark");
-        StyleModeBtn(ThemeModeLightBtn, ThemeModeLightText, current == "Light");
+        StyleAccentToggleButton(ThemeModeSystemBtn, current == "System", accentBrush, defaultBg, defaultBorder, ThemeModeSystemText, primaryText, boldWhenActive: true);
+        StyleAccentToggleButton(ThemeModeDarkBtn, current == "Dark", accentBrush, defaultBg, defaultBorder, ThemeModeDarkText, primaryText, boldWhenActive: true);
+        StyleAccentToggleButton(ThemeModeLightBtn, current == "Light", accentBrush, defaultBg, defaultBorder, ThemeModeLightText, primaryText, boldWhenActive: true);
 
         if (ThemeModeSubtext != null)
         {
@@ -2023,10 +2018,6 @@ public partial class IslandWindow
         {
             string normalized = SettingsService.NormalizeThemeStyle(style);
             _settingsService.Update(s => s.ThemeStyle = normalized, nameof(AppSettings.ThemeStyle));
-            ThemeManager.SetThemeStyle(normalized);
-            UpdateThemeStyleUI();
-            ApplyThemeStyleVisuals();
-            ApplyTheme(_settingsService.Current.ThemeName);
 
             bool isLiquid = ThemeManager.IsLiquidGlass;
             _machine.PushToast(new ToastContent(
@@ -2049,20 +2040,10 @@ public partial class IslandWindow
         var accentBrush = (Brush)Resources["AccentBrush"];
         var defaultBorder = (Brush)FindResource("CardBorderBrush");
         var defaultBg = (Brush)FindResource("IslandButtonBgBrush");
+        var primaryText = (Brush)FindResource("PrimaryTextBrush");
 
-        void StyleBtn(Button btn, TextBlock? text, bool active)
-        {
-            btn.Background = active ? accentBrush : defaultBg;
-            btn.BorderBrush = active ? accentBrush : defaultBorder;
-            if (text != null)
-            {
-                text.Foreground = active ? ThemeBrushes.DarkInk : (Brush)FindResource("PrimaryTextBrush");
-                text.FontWeight = active ? FontWeights.Bold : FontWeights.SemiBold;
-            }
-        }
-
-        StyleBtn(ThemeStyleDefaultBtn, ThemeStyleDefaultText, current == "Default");
-        StyleBtn(ThemeStyleLiquidGlassBtn, ThemeStyleLiquidGlassText, current == "Liquid Glass");
+        StyleAccentToggleButton(ThemeStyleDefaultBtn, current == "Default", accentBrush, defaultBg, defaultBorder, ThemeStyleDefaultText, primaryText, boldWhenActive: true);
+        StyleAccentToggleButton(ThemeStyleLiquidGlassBtn, current == "Liquid Glass", accentBrush, defaultBg, defaultBorder, ThemeStyleLiquidGlassText, primaryText, boldWhenActive: true);
 
         if (ThemeStyleSubtext != null)
         {
@@ -2153,10 +2134,7 @@ public partial class IslandWindow
             IslandThemeOverlay.Visibility = _isNatureThemeActive ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        if (_isNatureThemeActive)
-        {
-            EnsureRendering();
-        }
+        UpdateNatureThemeTimerState();
     }
 
     private void UpdateIslandThemeUI()
@@ -2577,9 +2555,13 @@ public partial class IslandWindow
             AutoDownloadToggleText.Foreground = autoDl ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
         }
 
-        if (GitHubTokenBox != null && !GitHubTokenBox.IsFocused)
+        if (GitHubTokenBox != null && !GitHubTokenBox.IsFocused && !GitHubTokenBox.IsKeyboardFocused)
         {
-            GitHubTokenBox.Text = _settingsService.Current.GitHubToken ?? "";
+            string stored = _settingsService.Current.GitHubToken ?? "";
+            if (!string.Equals(GitHubTokenBox.Password, stored, StringComparison.Ordinal))
+            {
+                GitHubTokenBox.Password = stored;
+            }
         }
 
         if (LastCheckTimestampText != null)
@@ -2603,6 +2585,12 @@ public partial class IslandWindow
                 UpdateStatus.UpToDate => $"Dynamic Island {_updateService.CurrentVersionString} is up to date.",
                 _ => "Check releases, switch channels, or rollback"
             };
+        }
+
+        if (_updateService.Status is UpdateStatus.Idle or UpdateStatus.UpToDate)
+        {
+            if (UpdateProgressBar != null) UpdateProgressBar.Visibility = Visibility.Collapsed;
+            if (UpdateProgressText != null) UpdateProgressText.Visibility = Visibility.Collapsed;
         }
 
         if (UpdateAvailableBanner != null)
@@ -2698,16 +2686,11 @@ public partial class IslandWindow
         string? url = _updateService.LatestManifest?.ChangelogUrl;
         if (!string.IsNullOrWhiteSpace(url))
         {
-            try
-            {
-                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-            }
-            catch (Exception ex)
-            {
-                App.Log($"[Settings] Failed to launch changelog URL: {ex.Message}");
-            }
+            SafeProcessLauncher.TryOpenUrl(url);
         }
     }
+
+    private bool _isLoadingVersionHistory;
 
     internal async void CheckUpdatesBtn_Click(object sender, RoutedEventArgs e)
     {
@@ -2715,7 +2698,20 @@ public partial class IslandWindow
         try
         {
             var manifest = await _updateService.CheckForUpdatesAsync(silent: false, force: true);
-            if (manifest == null && _updateService.Status == UpdateStatus.UpToDate)
+            if (_isClosing) return;
+            if (manifest != null && (_updateService.Status == UpdateStatus.UpdateAvailable || _updateService.Status == UpdateStatus.ReadyToInstall))
+            {
+                _machine.PushToast(new ToastContent(
+                    "\uE896",
+                    manifest.IsCritical ? $"Critical Update v{manifest.Version}" : $"Update v{manifest.Version} Available",
+                    _updateService.Status == UpdateStatus.ReadyToInstall ? "Ready to install from Settings" : "Click Install & Restart in Settings",
+                    ThemeBrushes.BlueColor,
+                    TimeSpan.FromSeconds(3.5),
+                    TargetView: "settings",
+                    Priority: ToastPriority.Feedback
+                ));
+            }
+            else if (manifest == null && _updateService.Status == UpdateStatus.UpToDate)
             {
                 _machine.PushToast(new ToastContent(
                     "\uE73E",
@@ -2740,10 +2736,29 @@ public partial class IslandWindow
                 ));
             }
         }
+        catch (Exception ex)
+        {
+            App.Log($"[Settings] CheckUpdatesBtn_Click error: {ex}");
+            if (!_isClosing)
+            {
+                _machine.PushToast(new ToastContent(
+                    "\uE783",
+                    "Update Check Failed",
+                    ex.Message,
+                    ThemeBrushes.AmberColor,
+                    TimeSpan.FromSeconds(3.5),
+                    TargetView: "settings",
+                    Priority: ToastPriority.Feedback
+                ));
+            }
+        }
         finally
         {
-            if (CheckUpdatesBtnText != null) CheckUpdatesBtnText.Text = "Check";
-            UpdateSettingsVersionAndStatusUI();
+            if (!_isClosing)
+            {
+                if (CheckUpdatesBtnText != null) CheckUpdatesBtnText.Text = "Check";
+                UpdateSettingsVersionAndStatusUI();
+            }
         }
     }
 
@@ -2751,7 +2766,6 @@ public partial class IslandWindow
     {
         string next = string.Equals(_settingsService.Current.UpdateChannel, "Stable", StringComparison.OrdinalIgnoreCase) ? "Beta" : "Stable";
         _settingsService.Update(s => s.UpdateChannel = next, nameof(AppSettings.UpdateChannel));
-        UpdateSettingsVersionAndStatusUI();
         _machine.PushToast(new ToastContent(
             "\uE713",
             "Update Channel Changed",
@@ -2765,37 +2779,51 @@ public partial class IslandWindow
 
     internal async void InstallUpdateBtn_Click(object sender, RoutedEventArgs e)
     {
-        if (_updateService.Status == UpdateStatus.ReadyToInstall)
+        try
         {
-            _updateService.ApplyUpdateAndRestart();
-            return;
-        }
-
-        if (_updateService.Status == UpdateStatus.UpdateAvailable || _updateService.Status == UpdateStatus.Failed)
-        {
-            if (InstallUpdateBtnText != null) InstallUpdateBtnText.Text = "Downloading...";
-            if (UpdateProgressBar != null) UpdateProgressBar.Visibility = Visibility.Visible;
-            if (UpdateProgressText != null) UpdateProgressText.Visibility = Visibility.Visible;
-
-            bool ok = await _updateService.DownloadUpdateAsync();
-            if (ok)
+            if (_updateService.Status == UpdateStatus.ReadyToInstall)
             {
-                if (InstallUpdateBtnText != null) InstallUpdateBtnText.Text = "Restart Now";
-                if (UpdateProgressText != null) UpdateProgressText.Text = "Verified & ready to install";
-                _machine.PushToast(new ToastContent(
-                    "\uE896",
-                    "Ready to Install",
-                    "Click 'Restart Now' to finish upgrading Dynamic Island",
-                    ThemeBrushes.GreenColor,
-                    TimeSpan.FromSeconds(4.0),
-                    TargetView: "settings",
-                    Priority: ToastPriority.Feedback
-                ));
+                _updateService.ApplyUpdateAndRestart();
+                return;
             }
-            else
+
+            if (_updateService.Status == UpdateStatus.UpdateAvailable || _updateService.Status == UpdateStatus.Failed)
+            {
+                if (InstallUpdateBtnText != null) InstallUpdateBtnText.Text = "Downloading...";
+                if (UpdateProgressBar != null) UpdateProgressBar.Visibility = Visibility.Visible;
+                if (UpdateProgressText != null) UpdateProgressText.Visibility = Visibility.Visible;
+
+                bool ok = await _updateService.DownloadUpdateAsync();
+                if (_isClosing) return;
+
+                if (ok)
+                {
+                    if (InstallUpdateBtnText != null) InstallUpdateBtnText.Text = "Restart Now";
+                    if (UpdateProgressText != null) UpdateProgressText.Text = "Verified & ready to install";
+                    _machine.PushToast(new ToastContent(
+                        "\uE896",
+                        "Ready to Install",
+                        "Click 'Restart Now' to finish upgrading Dynamic Island",
+                        ThemeBrushes.GreenColor,
+                        TimeSpan.FromSeconds(4.0),
+                        TargetView: "settings",
+                        Priority: ToastPriority.Feedback
+                    ));
+                }
+                else
+                {
+                    if (InstallUpdateBtnText != null) InstallUpdateBtnText.Text = "Retry Download";
+                    if (UpdateProgressText != null) UpdateProgressText.Text = _updateService.LastErrorMessage ?? "Download failed";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Settings] InstallUpdateBtn_Click error: {ex}");
+            if (!_isClosing)
             {
                 if (InstallUpdateBtnText != null) InstallUpdateBtnText.Text = "Retry Download";
-                if (UpdateProgressText != null) UpdateProgressText.Text = _updateService.LastErrorMessage ?? "Download failed";
+                if (UpdateProgressText != null) UpdateProgressText.Text = ex.Message;
             }
         }
     }
@@ -2804,25 +2832,33 @@ public partial class IslandWindow
     {
         bool next = !_settingsService.Current.AutoCheckUpdates;
         _settingsService.Update(s => s.AutoCheckUpdates = next, nameof(AppSettings.AutoCheckUpdates));
-        UpdateSettingsVersionAndStatusUI();
     }
 
     internal void AutoDownloadToggleBtn_Click(object sender, RoutedEventArgs e)
     {
         bool next = !_settingsService.Current.AutoDownloadUpdates;
         _settingsService.Update(s => s.AutoDownloadUpdates = next, nameof(AppSettings.AutoDownloadUpdates));
-        UpdateSettingsVersionAndStatusUI();
     }
 
-    internal void GitHubTokenBox_LostFocus(object sender, RoutedEventArgs e)
+    internal void GitHubTokenBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            CommitGitHubToken();
+            e.Handled = true;
+        }
+    }
+
+    internal void GitHubTokenBox_LostFocus(object sender, RoutedEventArgs e) => CommitGitHubToken();
+
+    private void CommitGitHubToken()
     {
         if (GitHubTokenBox != null)
         {
-            string? token = string.IsNullOrWhiteSpace(GitHubTokenBox.Text) ? null : GitHubTokenBox.Text.Trim();
+            string? token = string.IsNullOrWhiteSpace(GitHubTokenBox.Password) ? null : GitHubTokenBox.Password.Trim();
             if (_settingsService.Current.GitHubToken != token)
             {
                 _settingsService.Update(s => s.GitHubToken = token, nameof(AppSettings.GitHubToken));
-                _updateService.SetGitHubToken(token);
                 _machine.PushToast(new ToastContent(
                     Glyph: "\uE73E",
                     Title: "GitHub Token Saved",
@@ -2846,15 +2882,27 @@ public partial class IslandWindow
             ToggleVersionHistoryText.Text = isVisible ? "View Releases" : "Hide Releases";
         }
 
-        if (!isVisible && VersionHistoryList != null && _updateService.ReleaseHistory.Count == 0)
+        if (!isVisible && VersionHistoryList != null && _updateService.ReleaseHistory.Count == 0 && !_isLoadingVersionHistory)
         {
-            await PopulateVersionHistoryUIAsync();
+            _isLoadingVersionHistory = true;
+            try
+            {
+                await PopulateVersionHistoryUIAsync();
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Settings] ToggleVersionHistoryBtn_Click error: {ex}");
+            }
+            finally
+            {
+                _isLoadingVersionHistory = false;
+            }
         }
     }
 
     private async Task PopulateVersionHistoryUIAsync()
     {
-        if (VersionHistoryList == null) return;
+        if (VersionHistoryList == null || _isClosing) return;
 
         VersionHistoryList.Children.Clear();
         var loadingText = new TextBlock
@@ -2867,6 +2915,7 @@ public partial class IslandWindow
         VersionHistoryList.Children.Add(loadingText);
 
         var history = await _updateService.FetchVersionHistoryAsync();
+        if (_isClosing || VersionHistoryList == null) return;
         VersionHistoryList.Children.Clear();
 
         if (history.Count == 0)
@@ -2926,7 +2975,7 @@ public partial class IslandWindow
                 };
                 DockPanel.SetDock(rollbackBtn, Dock.Right);
 
-                rollbackBtn.Click += async (s, e) =>
+                rollbackBtn.Click += async (s, _) =>
                 {
                     if (s is not Button btn || btn.Tag is not ReleaseHistoryItem targetRelease || string.IsNullOrEmpty(targetRelease.InstallerUrl))
                     {
@@ -2937,18 +2986,29 @@ public partial class IslandWindow
                     btn.IsEnabled = false;
                     btnLabel.Text = "Starting...";
 
-                    string tempDir = Path.Combine(Path.GetTempPath(), "DynamicIsland", "Updates");
+                    string tempDir = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "DynamicIsland", "Updates"));
                     Directory.CreateDirectory(tempDir);
-                    string ext = Path.GetExtension(targetRelease.InstallerUrl) ?? ".exe";
-                    string targetFileName = $"DynamicIsland-{targetRelease.Version}{ext}";
-                    string dest = Path.Combine(tempDir, targetFileName);
+                    string safeVer = System.Text.RegularExpressions.Regex.Replace(targetRelease.Version ?? "unknown", @"[^0-9A-Za-z._-]", "_");
+                    if (string.IsNullOrWhiteSpace(safeVer)) safeVer = "unknown";
 
+                    string dest = string.Empty;
                     try
                     {
+                        if (!GitHubReleaseClient.IsTrustedGitHubUrl(targetRelease.InstallerUrl))
+                        {
+                            throw new InvalidOperationException("Untrusted release download URL rejected.");
+                        }
+
+                        string urlPath = new Uri(targetRelease.InstallerUrl).AbsolutePath;
+                        string ext = Path.GetExtension(urlPath);
+                        if (string.IsNullOrEmpty(ext)) ext = ".exe";
+                        string targetFileName = $"DynamicIsland-Setup-{safeVer}{ext}";
+                        dest = Path.GetFullPath(Path.Combine(tempDir, targetFileName));
+
                         _machine.PushToast(new ToastContent(
                             "\uE896",
                             $"{originalAction} Started",
-                            $"Downloading {targetRelease.ReleaseTag} from GitHub...",
+                            $"Resolving checksum for {targetRelease.ReleaseTag}...",
                             ThemeBrushes.BlueColor,
                             TimeSpan.FromSeconds(3.5),
                             TargetView: "settings",
@@ -2959,6 +3019,7 @@ public partial class IslandWindow
                         {
                             Dispatcher.InvokeAsync(() =>
                             {
+                                if (_isClosing) return;
                                 btnLabel.Text = $"{info.Percent:0}%";
                                 if (UpdateProgressBar != null)
                                 {
@@ -2973,36 +3034,53 @@ public partial class IslandWindow
                             });
                         });
 
-                        // 1. Fetch expected cryptographic SHA-256 hash from release metadata/checksums
+                        // 1. Fetch expected cryptographic SHA-256 hash BEFORE downloading and fail closed if absent
                         btnLabel.Text = "Resolving...";
-                        string? expectedHash = await _updateService.FetchSha256ForReleaseAsync(targetRelease, targetFileName).ConfigureAwait(true);
+                        string? expectedHash = await _updateService.FetchSha256ForReleaseAsync(targetRelease, "DynamicIsland-Setup.exe").ConfigureAwait(true);
+                        if (_isClosing) return;
 
-                        // 2. Download package with real-time percentage progress
-                        btnLabel.Text = "Downloading...";
-                        using var client = new GitHubReleaseClient(appVersion: _updateService.CurrentVersionString);
-                        await client.DownloadFileWithProgressAsync(targetRelease.InstallerUrl, dest, progress).ConfigureAwait(true);
-
-                        // 3. Cryptographic SHA-256 integrity verification
-                        btnLabel.Text = "Verifying...";
-                        if (!string.IsNullOrWhiteSpace(expectedHash))
+                        if (string.IsNullOrWhiteSpace(expectedHash))
                         {
-                            bool verified = await UpdateIntegrityVerifier.VerifyFileAsync(dest, expectedHash).ConfigureAwait(true);
-                            if (!verified)
-                            {
-                                UpdateIntegrityVerifier.TryCleanFile(dest);
-                                _machine.PushToast(new ToastContent(
-                                    "\uE783",
-                                    "Integrity Check Failed",
-                                    $"SHA-256 mismatch for {targetRelease.ReleaseTag}. Package was discarded for security.",
-                                    ThemeBrushes.AmberColor,
-                                    TimeSpan.FromSeconds(5.0),
-                                    TargetView: "settings",
-                                    Priority: ToastPriority.Feedback
-                                ));
-                                btnLabel.Text = originalAction;
-                                btn.IsEnabled = true;
-                                return;
-                            }
+                            _machine.PushToast(new ToastContent(
+                                "\uE783",
+                                "Security Verification Blocked",
+                                $"No SHA-256 checksum published for {targetRelease.ReleaseTag}. Aborting {originalAction.ToLowerInvariant()}.",
+                                ThemeBrushes.AmberColor,
+                                TimeSpan.FromSeconds(5.0),
+                                TargetView: "settings",
+                                Priority: ToastPriority.Feedback
+                            ));
+                            btnLabel.Text = originalAction;
+                            btn.IsEnabled = true;
+                            return;
+                        }
+
+                        // 2. Download package with real-time percentage progress (using user's GitHub token)
+                        btnLabel.Text = "Downloading...";
+                        using var client = new GitHubReleaseClient(
+                            appVersion: _updateService.CurrentVersionString,
+                            gitHubToken: _settingsService.Current.GitHubToken);
+                        await client.DownloadFileWithProgressAsync(targetRelease.InstallerUrl, dest, progress).ConfigureAwait(true);
+                        if (_isClosing) return;
+
+                        // 3. Mandatory cryptographic SHA-256 integrity verification
+                        btnLabel.Text = "Verifying...";
+                        bool verified = await UpdateIntegrityVerifier.VerifyFileAsync(dest, expectedHash).ConfigureAwait(true);
+                        if (!verified)
+                        {
+                            UpdateIntegrityVerifier.TryCleanFile(dest);
+                            _machine.PushToast(new ToastContent(
+                                "\uE783",
+                                "Integrity Check Failed",
+                                $"SHA-256 mismatch for {targetRelease.ReleaseTag}. Package was discarded for security.",
+                                ThemeBrushes.AmberColor,
+                                TimeSpan.FromSeconds(5.0),
+                                TargetView: "settings",
+                                Priority: ToastPriority.Feedback
+                            ));
+                            btnLabel.Text = originalAction;
+                            btn.IsEnabled = true;
+                            return;
                         }
 
                         // 4. Verification passed: launch installer handoff and restart
@@ -3021,19 +3099,22 @@ public partial class IslandWindow
                     }
                     catch (Exception ex)
                     {
-                        UpdateIntegrityVerifier.TryCleanFile(dest);
+                        if (!string.IsNullOrEmpty(dest)) UpdateIntegrityVerifier.TryCleanFile(dest);
                         App.Log($"[UpdateManager] {originalAction} failed: {ex.Message}");
-                        _machine.PushToast(new ToastContent(
-                            "\uE783",
-                            $"{originalAction} Failed",
-                            ex.Message,
-                            ThemeBrushes.AmberColor,
-                            TimeSpan.FromSeconds(4.5),
-                            TargetView: "settings",
-                            Priority: ToastPriority.Feedback
-                        ));
-                        btnLabel.Text = originalAction;
-                        btn.IsEnabled = true;
+                        if (!_isClosing)
+                        {
+                            _machine.PushToast(new ToastContent(
+                                "\uE783",
+                                $"{originalAction} Failed",
+                                ex.Message,
+                                ThemeBrushes.AmberColor,
+                                TimeSpan.FromSeconds(4.5),
+                                TargetView: "settings",
+                                Priority: ToastPriority.Feedback
+                            ));
+                            btnLabel.Text = originalAction;
+                            btn.IsEnabled = true;
+                        }
                     }
                 };
                 dock.Children.Add(rollbackBtn);

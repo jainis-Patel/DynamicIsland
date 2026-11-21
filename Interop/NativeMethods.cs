@@ -445,6 +445,103 @@ internal static class NativeMethods
     public const byte VK_V = 0x56;
     public const byte VK_RETURN = 0x0D;
     public const uint KEYEVENTF_KEYUP = 0x0002;
+    public const uint INPUT_KEYBOARD = 1;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct INPUT
+    {
+        public uint type;
+        public INPUTUNION u;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct INPUTUNION
+    {
+        [FieldOffset(0)] public MOUSEINPUT mi;
+        [FieldOffset(0)] public KEYBDINPUT ki;
+        [FieldOffset(0)] public HARDWAREINPUT hi;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MOUSEINPUT
+    {
+        public int dx;
+        public int dy;
+        public uint mouseData;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KEYBDINPUT
+    {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct HARDWAREINPUT
+    {
+        public uint uMsg;
+        public ushort wParamL;
+        public ushort wParamH;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern uint SendInput(uint nInputs, [In] INPUT[] pInputs, int cbSize);
+
+    private static INPUT CreateKeyInput(ushort vk, bool keyUp) => new()
+    {
+        type = INPUT_KEYBOARD,
+        u = new INPUTUNION
+        {
+            ki = new KEYBDINPUT
+            {
+                wVk = vk,
+                wScan = 0,
+                dwFlags = keyUp ? KEYEVENTF_KEYUP : 0,
+                time = 0,
+                dwExtraInfo = IntPtr.Zero
+            }
+        }
+    };
+
+    private static void SendKeyInputs(params INPUT[] inputs)
+    {
+        if (inputs == null || inputs.Length == 0) return;
+        uint sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+        if (sent == 0)
+        {
+            foreach (var inp in inputs)
+            {
+                keybd_event((byte)inp.u.ki.wVk, 0, inp.u.ki.dwFlags, UIntPtr.Zero);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously injects Ctrl+V paste followed by Enter using Win32 SendInput without blocking the UI thread.
+    /// </summary>
+    public static async Task SimulatePasteAndEnterAsync()
+    {
+        SendKeyInputs(
+            CreateKeyInput((ushort)VK_MENU, keyUp: true),
+            CreateKeyInput(0x10 /* VK_SHIFT */, keyUp: true),
+            CreateKeyInput(VK_CONTROL, keyUp: false),
+            CreateKeyInput(VK_V, keyUp: false),
+            CreateKeyInput(VK_V, keyUp: true),
+            CreateKeyInput(VK_CONTROL, keyUp: true));
+
+        await Task.Delay(90).ConfigureAwait(false);
+
+        SendKeyInputs(
+            CreateKeyInput(VK_RETURN, keyUp: false),
+            CreateKeyInput(VK_RETURN, keyUp: true));
+    }
 
     /// <summary>
     /// Injects Ctrl+V paste followed by Enter to deliver a staged reply to the active foreground messenger window.
@@ -452,24 +549,19 @@ internal static class NativeMethods
     /// </summary>
     public static void SimulatePasteAndEnter()
     {
-        // Release any held modifier keys (Alt, Shift) to prevent triggering shortcuts (e.g. Alt+V, Ctrl+Shift+V)
-        keybd_event((byte)VK_MENU, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-        keybd_event(0x10 /* VK_SHIFT */, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        SendKeyInputs(
+            CreateKeyInput((ushort)VK_MENU, keyUp: true),
+            CreateKeyInput(0x10 /* VK_SHIFT */, keyUp: true),
+            CreateKeyInput(VK_CONTROL, keyUp: false),
+            CreateKeyInput(VK_V, keyUp: false),
+            CreateKeyInput(VK_V, keyUp: true),
+            CreateKeyInput(VK_CONTROL, keyUp: true));
 
-        // Ctrl down
-        keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
-        // V down & up
-        keybd_event(VK_V, 0, 0, UIntPtr.Zero);
-        keybd_event(VK_V, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-        // Ctrl up
-        keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-
-        // Allow application message queue to digest clipboard paste and validate input
         Thread.Sleep(90);
 
-        // Return (Enter) down & up
-        keybd_event(VK_RETURN, 0, 0, UIntPtr.Zero);
-        keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        SendKeyInputs(
+            CreateKeyInput(VK_RETURN, keyUp: false),
+            CreateKeyInput(VK_RETURN, keyUp: true));
     }
 
     [DllImport("xinput1_4.dll", EntryPoint = "XInputGetBatteryInformation")]
@@ -481,6 +573,7 @@ internal static class NativeMethods
     // ── Registry Notification Constants ──────────────────────────────
     public const uint REG_NOTIFY_CHANGE_NAME = 0x00000001;
     public const uint REG_NOTIFY_CHANGE_LAST_SET = 0x00000004;
+    public const uint REG_NOTIFY_THREAD_AGNOSTIC = 0x10000000;
 
     [DllImport("advapi32.dll", SetLastError = true)]
     public static extern int RegNotifyChangeKeyValue(
@@ -694,6 +787,10 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool PlaySound(byte[]? ptrToSound, IntPtr hmod, uint fdwSound);
 
+    [DllImport("winmm.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool PlaySound(IntPtr pszSound, IntPtr hmod, uint fdwSound);
+
     // ── Windows Multi-Touch & Precision Gestures (user32.dll) ─────────
     public const int WM_GESTURE = 0x0119;
     public const int WM_GESTURENOTIFY = 0x011A;
@@ -757,4 +854,272 @@ internal static class NativeMethods
         uint cIDs,
         [In] GESTURECONFIG[] pGestureConfig,
         uint cbSize);
+
+    /// <summary>
+    /// Places a popup window at exact physical screen coordinates near a monitor point,
+    /// clamping to the monitor's work area and positioning via Win32 SetWindowPos so
+    /// mixed-DPI monitors do not apply primary-DPI coordinate scaling on initial show.
+    /// </summary>
+    public static void PositionWindowNearPhysicalPoint(
+        System.Windows.Window window,
+        int physicalX,
+        int physicalY,
+        double yOffsetDip,
+        double marginDip = 8.0)
+    {
+        IntPtr mon = MonitorFromPoint(new POINT { X = physicalX, Y = physicalY }, MONITOR_DEFAULTTONEAREST);
+        double scale = 1.0;
+        if (mon != IntPtr.Zero && GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, out uint dpiX, out _) == 0)
+        {
+            scale = dpiX / 96.0;
+        }
+
+        double widthDip = !double.IsNaN(window.Width) && window.Width > 0 ? window.Width : window.ActualWidth;
+        double heightDip = !double.IsNaN(window.Height) && window.Height > 0 ? window.Height : window.ActualHeight;
+        int winWpx = (int)Math.Round(widthDip * scale);
+        int winHpx = (int)Math.Round(heightDip * scale);
+        int physX = physicalX - (winWpx / 2);
+        int physY = physicalY - (int)Math.Round(yOffsetDip * scale);
+
+        if (mon != IntPtr.Zero)
+        {
+            var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+            if (GetMonitorInfo(mon, ref mi))
+            {
+                int marginPx = (int)Math.Round(marginDip * scale);
+                int minX = mi.rcWork.Left + marginPx;
+                int maxX = Math.Max(minX, mi.rcWork.Right - winWpx - marginPx);
+                int minY = mi.rcWork.Top + marginPx;
+                int maxY = Math.Max(minY, mi.rcWork.Bottom - winHpx - marginPx);
+                physX = Math.Clamp(physX, minX, maxX);
+                physY = Math.Clamp(physY, minY, maxY);
+            }
+        }
+
+        window.Left = physX / scale;
+        window.Top = physY / scale;
+
+        IntPtr hwnd = new System.Windows.Interop.WindowInteropHelper(window).EnsureHandle();
+        if (hwnd != IntPtr.Zero)
+        {
+            SetWindowPos(hwnd, IntPtr.Zero, physX, physY, winWpx, winHpx, SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+    }
+
+    // ── Known Folders (shell32.dll) ──────────────────────────────────
+    public static readonly Guid FOLDERID_Downloads = new("374DE290-123F-4565-9164-39C4925E467B");
+
+    [DllImport("shell32.dll")]
+    public static extern int SHGetKnownFolderPath(
+        [MarshalAs(UnmanagedType.LPStruct)] Guid rfid,
+        uint dwFlags,
+        IntPtr hToken,
+        out IntPtr ppszPath);
+
+    // ── DisplayConfig EDID Monitor Names (user32.dll) ────────────────
+    public const uint QDC_ONLY_ACTIVE_PATHS = 0x00000002;
+    public const uint DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME = 1;
+    public const uint DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct LUID
+    {
+        public uint LowPart;
+        public int HighPart;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DISPLAYCONFIG_RATIONAL
+    {
+        public uint Numerator;
+        public uint Denominator;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DISPLAYCONFIG_PATH_SOURCE_INFO
+    {
+        public LUID adapterId;
+        public uint id;
+        public uint modeInfoIdx;
+        public uint statusFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DISPLAYCONFIG_PATH_TARGET_INFO
+    {
+        public LUID adapterId;
+        public uint id;
+        public uint modeInfoIdx;
+        public uint outputTechnology;
+        public uint rotation;
+        public uint scaling;
+        public DISPLAYCONFIG_RATIONAL refreshRate;
+        public uint scanLineOrdering;
+        [MarshalAs(UnmanagedType.Bool)]
+        public bool targetAvailable;
+        public uint statusFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DISPLAYCONFIG_PATH_INFO
+    {
+        public DISPLAYCONFIG_PATH_SOURCE_INFO sourceInfo;
+        public DISPLAYCONFIG_PATH_TARGET_INFO targetInfo;
+        public uint flags;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 64)]
+    public struct DISPLAYCONFIG_MODE_INFO
+    {
+        [FieldOffset(0)] public uint infoType;
+        [FieldOffset(4)] public uint id;
+        [FieldOffset(8)] public LUID adapterId;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DISPLAYCONFIG_DEVICE_INFO_HEADER
+    {
+        public uint type;
+        public uint size;
+        public LUID adapterId;
+        public uint id;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct DISPLAYCONFIG_SOURCE_DEVICE_NAME
+    {
+        public DISPLAYCONFIG_DEVICE_INFO_HEADER header;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string viewGdiDeviceName;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct DISPLAYCONFIG_TARGET_DEVICE_NAME
+    {
+        public DISPLAYCONFIG_DEVICE_INFO_HEADER header;
+        public uint flags;
+        public uint outputTechnology;
+        public ushort edidManufactureId;
+        public ushort edidProductCodeId;
+        public uint connectorInstance;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
+        public string monitorFriendlyDeviceName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string monitorDevicePath;
+    }
+
+    [DllImport("user32.dll")]
+    public static extern int GetDisplayConfigBufferSizes(
+        uint flags,
+        out uint numPathArrayElements,
+        out uint numModeInfoArrayElements);
+
+    [DllImport("user32.dll")]
+    public static extern int QueryDisplayConfig(
+        uint flags,
+        ref uint numPathArrayElements,
+        [Out] DISPLAYCONFIG_PATH_INFO[] pathArray,
+        ref uint numModeInfoArrayElements,
+        [Out] DISPLAYCONFIG_MODE_INFO[] modeInfoArray,
+        IntPtr currentTopologyId);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int DisplayConfigGetDeviceInfo(ref DISPLAYCONFIG_SOURCE_DEVICE_NAME requestPacket);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int DisplayConfigGetDeviceInfo(ref DISPLAYCONFIG_TARGET_DEVICE_NAME requestPacket);
+
+    // ── Native Wi-Fi API (wlanapi.dll) ───────────────────────────────
+    public const uint WLAN_AVAILABLE_NETWORK_CONNECTED = 0x00000001;
+    public const uint WLAN_AVAILABLE_NETWORK_HAS_PROFILE = 0x00000002;
+    public const int WLAN_CONNECTION_MODE_PROFILE = 0;
+    public const int DOT11_BSS_TYPE_INFRASTRUCTURE = 1;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct WLAN_INTERFACE_INFO
+    {
+        public Guid InterfaceGuid;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        public string strInterfaceDescription;
+        public int isState;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DOT11_SSID
+    {
+        public uint uSSIDLength;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
+        public byte[] ucSSID;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct WLAN_AVAILABLE_NETWORK
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        public string strProfileName;
+        public DOT11_SSID dot11Ssid;
+        public int dot11BssType;
+        public uint uNumberOfBssids;
+        [MarshalAs(UnmanagedType.Bool)]
+        public bool bNetworkConnectable;
+        public uint wlanNotConnectableReason;
+        public uint uNumberOfPhyTypes;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
+        public int[] dot11PhyTypes;
+        [MarshalAs(UnmanagedType.Bool)]
+        public bool bMorePhyTypes;
+        public uint wlanSignalQuality;
+        [MarshalAs(UnmanagedType.Bool)]
+        public bool bSecurityEnabled;
+        public int dot11DefaultAuthAlgorithm;
+        public int dot11DefaultCipherAlgorithm;
+        public uint dwFlags;
+        public uint dwReserved;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct WLAN_CONNECTION_PARAMETERS
+    {
+        public int wlanConnectionMode;
+        [MarshalAs(UnmanagedType.LPWStr)]
+        public string? strProfile;
+        public IntPtr pDot11Ssid;
+        public IntPtr pDesiredBssidList;
+        public int dot11BssType;
+        public uint dwFlags;
+    }
+
+    [DllImport("wlanapi.dll")]
+    public static extern uint WlanOpenHandle(
+        uint dwClientVersion,
+        IntPtr pReserved,
+        out uint pdwNegotiatedVersion,
+        out IntPtr phClientHandle);
+
+    [DllImport("wlanapi.dll")]
+    public static extern uint WlanCloseHandle(IntPtr hClientHandle, IntPtr pReserved);
+
+    [DllImport("wlanapi.dll")]
+    public static extern uint WlanEnumInterfaces(
+        IntPtr hClientHandle,
+        IntPtr pReserved,
+        out IntPtr ppInterfaceList);
+
+    [DllImport("wlanapi.dll")]
+    public static extern uint WlanGetAvailableNetworkList(
+        IntPtr hClientHandle,
+        [In] ref Guid pInterfaceGuid,
+        uint dwFlags,
+        IntPtr pReserved,
+        out IntPtr ppAvailableNetworkList);
+
+    [DllImport("wlanapi.dll", CharSet = CharSet.Unicode)]
+    public static extern uint WlanConnect(
+        IntPtr hClientHandle,
+        [In] ref Guid pInterfaceGuid,
+        [In] ref WLAN_CONNECTION_PARAMETERS pConnectionParameters,
+        IntPtr pReserved);
+
+    [DllImport("wlanapi.dll")]
+    public static extern void WlanFreeMemory(IntPtr pMemory);
 }

@@ -43,6 +43,9 @@ public partial class ClipboardView : UserControl
     private void CopyColorAsRgb_Click(object sender, RoutedEventArgs e) =>
         Island?.CopyColorAsRgb_Click(sender, e);
 
+    private void CopyPlainClipboardItem_Click(object sender, RoutedEventArgs e) =>
+        Island?.CopyPlainClipboardItem_Click(sender, e);
+
     private void EyedropperButton_Click(object sender, RoutedEventArgs e) =>
         Island?.EyedropperButton_Click(sender, e);
 

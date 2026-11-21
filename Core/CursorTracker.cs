@@ -90,7 +90,7 @@ internal sealed class CursorTracker : IDisposable
         }
 
         // Ignore transient fast swipe across top bezel (e.g. flicking across browser tabs)
-        if (inside && EnableFastSwipeGuard && _velocityX > 350.0)
+        if (inside && !_inside && EnableFastSwipeGuard && _velocityX > 350.0)
         {
             inside = false;
         }

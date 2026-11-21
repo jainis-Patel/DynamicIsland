@@ -9,8 +9,6 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        App.EnsurePowerSavingGpuPreference();
-
         if (args.Any(a => string.Equals(a, "--diagnose-memory", StringComparison.OrdinalIgnoreCase)))
         {
             var p = System.Diagnostics.Process.GetCurrentProcess();
@@ -147,13 +145,50 @@ public static class Program
         {
             if (Core.InstallerService.IsSilent(args))
             {
-                Core.InstallerService.Install(
-                    targetDir: null,
+                if (Core.InstallerService.TryParseWaitPid(args, out int waitPid))
+                {
+                    try
+                    {
+                        using var parentProc = System.Diagnostics.Process.GetProcessById(waitPid);
+                        if (!parentProc.HasExited)
+                        {
+                            parentProc.WaitForExit(15000);
+                        }
+                    }
+                    catch { }
+                }
+
+                Core.InstallerService.TryParseTargetDir(args, out string? customTargetDir);
+                bool installed = Core.InstallerService.Install(
+                    targetDir: customTargetDir,
                     createDesktopShortcut: true,
                     createStartMenuShortcut: true,
                     autoStartOnBoot: true,
                     out _);
-                return 0;
+
+                if (installed && Core.InstallerService.ShouldRelaunchAfterSilentInstall(args))
+                {
+                    string resolvedDir = !string.IsNullOrWhiteSpace(customTargetDir)
+                        ? customTargetDir
+                        : (Core.InstallerService.GetExistingInstallation().Location ?? Core.InstallerService.GetDefaultInstallDir());
+                    string installedExe = Core.InstallerService.GetInstalledExePath(resolvedDir);
+                    if (System.IO.File.Exists(installedExe))
+                    {
+                        try
+                        {
+                            using var launched = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(installedExe, "--updated")
+                            {
+                                WorkingDirectory = resolvedDir,
+                                UseShellExecute = true
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            App.Log($"[Installer] Failed to relaunch updated binary: {ex.Message}");
+                        }
+                    }
+                }
+                return installed ? 0 : 1;
             }
 
             App.StartupMode = InstallerStartupMode.Setup;
@@ -161,6 +196,7 @@ public static class Program
             return 0;
         }
 
+        App.EnsurePowerSavingGpuPreference();
         App.Log("Program.Main started.");
 
         var currentDesktopName = GetCurrentDesktopName();
@@ -275,10 +311,26 @@ public static class Program
             IntPtr hwnd = FindWindow(null, "Dynamic Island");
             if (hwnd == IntPtr.Zero) hwnd = FindWindow(null, "DynamicIsland");
             if (hwnd == IntPtr.Zero) break;
+            if (!IsDynamicIslandProcessWindow(hwnd)) break;
             if (quitMsg != 0) PostMessage(hwnd, quitMsg, IntPtr.Zero, IntPtr.Zero);
             PostMessage(hwnd, WM_HOTKEY, new IntPtr(3), IntPtr.Zero);
             PostMessage(hwnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
             Thread.Sleep(100);
+        }
+    }
+
+    private static bool IsDynamicIslandProcessWindow(IntPtr hwnd)
+    {
+        try
+        {
+            _ = GetWindowThreadProcessId(hwnd, out uint pid);
+            if (pid == 0 || pid == (uint)Environment.ProcessId) return false;
+            using var proc = System.Diagnostics.Process.GetProcessById((int)pid);
+            return string.Equals(proc.ProcessName, "DynamicIsland", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
         }
     }
 }

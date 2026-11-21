@@ -16,6 +16,7 @@ internal static class ThemeBrushes
     public static readonly Color BlueColor = Color.FromRgb(0x0A, 0x84, 0xFF);
     public static readonly Color PurpleColor = Color.FromRgb(0x5E, 0x5C, 0xE6);
     public static readonly Color PinkColor = Color.FromRgb(0xFF, 0x33, 0x66);
+    public static readonly Color CyanColor = Color.FromRgb(0x32, 0xAD, 0xE6);
     public static readonly Color PrimaryTextColor = Color.FromRgb(0xF5, 0xF5, 0xF7);
     public static readonly Color SecondaryTextColor = Color.FromRgb(0x86, 0x86, 0x8B);
     public static readonly Color MutedGreyColor = Color.FromRgb(0x98, 0x98, 0x9D);
@@ -28,6 +29,7 @@ internal static class ThemeBrushes
     public static readonly Color BlueColorLight = Color.FromRgb(0x00, 0x7A, 0xFF);
     public static readonly Color PurpleColorLight = Color.FromRgb(0x89, 0x44, 0xAB);
     public static readonly Color PinkColorLight = Color.FromRgb(0xD8, 0x1B, 0x60);
+    public static readonly Color CyanColorLight = Color.FromRgb(0x00, 0x88, 0xCC);
     public static readonly Color PrimaryTextColorLight = Color.FromRgb(0x1C, 0x1C, 0x1E);
     public static readonly Color SecondaryTextColorLight = Color.FromRgb(0x6E, 0x6E, 0x73);
     public static readonly Color MutedGreyColorLight = Color.FromRgb(0x8E, 0x8E, 0x93);
@@ -40,6 +42,7 @@ internal static class ThemeBrushes
     public static readonly SolidColorBrush BlueDark = CreateFrozen(BlueColor);
     public static readonly SolidColorBrush PinkDark = CreateFrozen(PinkColor);
     public static readonly SolidColorBrush PurpleDark = CreateFrozen(PurpleColor);
+    public static readonly SolidColorBrush CyanDark = CreateFrozen(CyanColor);
     public static readonly SolidColorBrush PrimaryTextDark = CreateFrozen(PrimaryTextColor);
     public static readonly SolidColorBrush SecondaryTextDark = CreateFrozen(SecondaryTextColor);
     public static readonly SolidColorBrush MutedGreyDark = CreateFrozen(MutedGreyColor);
@@ -52,6 +55,7 @@ internal static class ThemeBrushes
     public static readonly SolidColorBrush BlueLight = CreateFrozen(BlueColorLight);
     public static readonly SolidColorBrush PinkLight = CreateFrozen(PinkColorLight);
     public static readonly SolidColorBrush PurpleLight = CreateFrozen(PurpleColorLight);
+    public static readonly SolidColorBrush CyanLight = CreateFrozen(CyanColorLight);
     public static readonly SolidColorBrush PrimaryTextLight = CreateFrozen(PrimaryTextColorLight);
     public static readonly SolidColorBrush SecondaryTextLight = CreateFrozen(SecondaryTextColorLight);
     public static readonly SolidColorBrush MutedGreyLight = CreateFrozen(MutedGreyColorLight);
@@ -117,7 +121,7 @@ internal static class ThemeBrushes
     public static readonly SolidColorBrush DockActiveBorderLight = CreateFrozen(Color.FromArgb(0x2A, 0x00, 0x00, 0x00));
     public static readonly SolidColorBrush ButtonSubtleBgLight = CreateFrozen(Color.FromArgb(0x0C, 0x00, 0x00, 0x00));
     public static readonly SolidColorBrush ButtonSubtleBorderLight = CreateFrozen(Color.FromArgb(0x10, 0x00, 0x00, 0x00));
-    public static readonly SolidColorBrush ButtonHoverVeilLight = CreateFrozen(Color.FromArgb(0x00, 0x00, 0x00, 0x00));
+    public static readonly SolidColorBrush ButtonHoverVeilLight = CreateFrozen(Color.FromArgb(0xFF, 0x00, 0x00, 0x00));
     public static readonly SolidColorBrush BorderSubtleLight = CreateFrozen(Color.FromArgb(0x12, 0x00, 0x00, 0x00));
     public static readonly SolidColorBrush MicMutedBgLight = CreateFrozen(Color.FromArgb(0x22, 0xD7, 0x26, 0x26));
     public static readonly SolidColorBrush MenuBackgroundLight = CreateFrozen(Color.FromRgb(0xFA, 0xFA, 0xFC));
@@ -390,6 +394,7 @@ internal static class ThemeBrushes
     public static readonly SolidColorBrush ClockHandDark = CreateFrozen(Color.FromRgb(0xFF, 0xFF, 0xFF));
     public static readonly SolidColorBrush ClockHandLight = CreateFrozen(Color.FromRgb(0x11, 0x18, 0x27));
 
+    public static SolidColorBrush Cyan { get; internal set; } = CyanDark;
     public static SolidColorBrush ClockTileBg { get; internal set; } = ClockTileBgDark;
     public static SolidColorBrush ClockTileBorder { get; internal set; } = ClockTileBorderDark;
     public static SolidColorBrush ClockTileDivider { get; internal set; } = ClockTileDividerDark;
@@ -418,6 +423,7 @@ internal static class ThemeBrushes
         Blue = isDark ? BlueDark : BlueLight;
         Pink = isDark ? PinkDark : PinkLight;
         Purple = isDark ? PurpleDark : PurpleLight;
+        Cyan = isDark ? CyanDark : CyanLight;
         PrimaryText = isDark ? PrimaryTextDark : PrimaryTextLight;
         SecondaryText = isDark ? SecondaryTextDark : SecondaryTextLight;
         MutedGrey = isDark ? MutedGreyDark : MutedGreyLight;

@@ -258,24 +258,30 @@ public static class MediaPlayerBrandService
             else if (browserId.Contains("opera")) procSearch = "opera";
 
             var procs = Process.GetProcessesByName(procSearch);
-            foreach (var p in procs)
+            try
             {
-                try
+                foreach (var p in procs)
                 {
-                    string title = p.MainWindowTitle;
-                    if (string.IsNullOrWhiteSpace(title)) continue;
-                    string lower = title.ToLowerInvariant();
+                    try
+                    {
+                        string title = p.MainWindowTitle;
+                        if (string.IsNullOrWhiteSpace(title)) continue;
+                        string lower = title.ToLowerInvariant();
 
-                    if (lower.Contains("youtube music")) return YouTubeMusicInfo;
-                    if (lower.Contains("apple music")) return AppleMusicInfo;
-                    if (lower.Contains("spotify")) return SpotifyInfo;
-                    if (lower.Contains("soundcloud")) return SoundCloudInfo;
-                    if (lower.Contains("youtube")) return YouTubeMusicInfo;
+                        if (lower.Contains("youtube music")) return YouTubeMusicInfo;
+                        if (lower.Contains("apple music")) return AppleMusicInfo;
+                        if (lower.Contains("spotify")) return SpotifyInfo;
+                        if (lower.Contains("soundcloud")) return SoundCloudInfo;
+                        if (lower.Contains("youtube")) return YouTubeMusicInfo;
+                    }
+                    catch { }
                 }
-                catch { }
-                finally
+            }
+            finally
+            {
+                foreach (var p in procs)
                 {
-                    p.Dispose();
+                    try { p.Dispose(); } catch { }
                 }
             }
         }

@@ -14,12 +14,24 @@
     <SolidColorBrush x:Key="AccentBrush" Color="#FF9F0A" />
     <SolidColorBrush x:Key="PrimaryTextBrush" Color="#F5F5F7" />
     <SolidColorBrush x:Key="SecondaryBrush" Color="#86868B" />
+    <SolidColorBrush x:Key="SecondaryTextBrush" Color="#86868B" />
     <SolidColorBrush x:Key="TertiaryBrush" Color="#515156" />
+    <SolidColorBrush x:Key="MutedBrush" Color="#98989D" />
     <SolidColorBrush x:Key="CardSurfaceBrush" Color="#121216" />
+    <SolidColorBrush x:Key="CardBackground" Color="#121216" />
     <SolidColorBrush x:Key="CardBorderBrush" Color="#1AFFFFFF" />
+    <SolidColorBrush x:Key="CardBorder" Color="#1AFFFFFF" />
+    <SolidColorBrush x:Key="BorderSubtleBrush" Color="#18FFFFFF" />
     <SolidColorBrush x:Key="PillNotchEarBrush" Color="#FF040406" />
 
+    <SolidColorBrush x:Key="CyanBrush" Color="#32ADE6" />
+    <SolidColorBrush x:Key="AmberBrush" Color="#FF9F0A" />
+    <SolidColorBrush x:Key="GreenBrush" Color="#30D158" />
+    <SolidColorBrush x:Key="PinkBrush" Color="#FF3366" />
+    <SolidColorBrush x:Key="PurpleBrush" Color="#5E5CE6" />
+
     <SolidColorBrush x:Key="IslandButtonBgBrush" Color="#16FFFFFF" />
+    <SolidColorBrush x:Key="ButtonSubtleBgBrush" Color="#16FFFFFF" />
     <SolidColorBrush x:Key="IslandButtonBorderBrush" Color="#00000000" />
     <SolidColorBrush x:Key="IslandButtonHoverVeilBrush" Color="#FFFFFF" />
 
@@ -31,6 +43,7 @@
     <SolidColorBrush x:Key="DockToolButtonBgBrush" Color="#12FFFFFF" />
     <SolidColorBrush x:Key="DockToolButtonFgBrush" Color="#E5E5EA" />
     <SolidColorBrush x:Key="DockInactiveBgBrush" Color="#12FFFFFF" />
+    <SolidColorBrush x:Key="DockInactiveTextBrush" Color="#86868B" />
     <SolidColorBrush x:Key="DockActiveBgBrush" Color="#2EFFFFFF" />
     <SolidColorBrush x:Key="DockActiveBorderBrush" Color="#48FFFFFF" />
 

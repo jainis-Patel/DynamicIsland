@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using DynamicIsland.Core;
 
 namespace DynamicIsland.Services;
 
@@ -79,14 +80,9 @@ public sealed class PlayedSongRecord
 /// </summary>
 internal sealed class MediaSongListService : IDisposable
 {
-    private static readonly HttpClient Http = new()
-    {
-        Timeout = TimeSpan.FromSeconds(6.0),
-        DefaultRequestHeaders =
-        {
-            { "User-Agent", "DynamicIsland/0.4.0 (https://github.com/jainis-Patel/DynamicIsland)" }
-        }
-    };
+    private static readonly HttpClient Http = SharedHttpClient.CreateClient(
+        TimeSpan.FromSeconds(6.0),
+        $"DynamicIsland/{InstallerService.AppVersion} (https://github.com/jainis-Patel/DynamicIsland)");
 
     private static readonly Regex VideoTagsRegex = new(
         @"\s*[\(\[](?:official\s*(?:music\s*video|video|audio|lyric\s*video|visualizer|4k|hd|remastered)?|lyrics?|lyric\s*video|audio|visualizer|remastered(?:\s*\d{4})?|deluxe(?:\s*edition)?|bonus\s*track|explicit|clean\s*version|live(?:\s*at.*?)?|acoustic(?:\s*version)?|4k|1080p|hd|mv|m/v|feat\.?|ft\.?|featuring|prod\.?|with).*?[\)\]]",
@@ -208,22 +204,25 @@ internal sealed class MediaSongListService : IDisposable
                 : $"{cleanTitle} {cleanArtist}";
 
             string searchUrl = $"https://itunes.apple.com/search?term={Uri.EscapeDataString(searchTerm)}&entity=song&limit=1";
-            var resp = await Http.GetAsync(searchUrl, ct).ConfigureAwait(false);
-            if (resp.IsSuccessStatusCode)
+            using (var resp = await Http.GetAsync(searchUrl, ct).ConfigureAwait(false))
             {
-                using var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false), cancellationToken: ct).ConfigureAwait(false);
-                var root = doc.RootElement;
-                if (root.TryGetProperty("results", out var results) && results.GetArrayLength() > 0)
+                if (resp.IsSuccessStatusCode)
                 {
-                    var first = results[0];
-                    if (first.TryGetProperty("collectionId", out var colIdProp))
-                        collectionId = colIdProp.GetInt64();
-                    if (first.TryGetProperty("collectionName", out var colNameProp))
-                        collectionName = colNameProp.GetString() ?? "";
-                    if (first.TryGetProperty("artistName", out var artNameProp))
-                        artistName = artNameProp.GetString() ?? "";
-                    if (first.TryGetProperty("artworkUrl100", out var artProp))
-                        artworkUrl = artProp.GetString() ?? "";
+                    using var stream = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                    using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("results", out var results) && results.GetArrayLength() > 0)
+                    {
+                        var first = results[0];
+                        if (first.TryGetProperty("collectionId", out var colIdProp))
+                            collectionId = colIdProp.GetInt64();
+                        if (first.TryGetProperty("collectionName", out var colNameProp))
+                            collectionName = colNameProp.GetString() ?? "";
+                        if (first.TryGetProperty("artistName", out var artNameProp))
+                            artistName = artNameProp.GetString() ?? "";
+                        if (first.TryGetProperty("artworkUrl100", out var artProp))
+                            artworkUrl = artProp.GetString() ?? "";
+                    }
                 }
             }
 
@@ -231,10 +230,11 @@ internal sealed class MediaSongListService : IDisposable
             if (collectionId > 0)
             {
                 string lookupUrl = $"https://itunes.apple.com/lookup?id={collectionId}&entity=song";
-                var lookupResp = await Http.GetAsync(lookupUrl, ct).ConfigureAwait(false);
+                using var lookupResp = await Http.GetAsync(lookupUrl, ct).ConfigureAwait(false);
                 if (lookupResp.IsSuccessStatusCode)
                 {
-                    using var lookupDoc = await JsonDocument.ParseAsync(await lookupResp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false), cancellationToken: ct).ConfigureAwait(false);
+                    using var lookupStream = await lookupResp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                    using var lookupDoc = await JsonDocument.ParseAsync(lookupStream, cancellationToken: ct).ConfigureAwait(false);
                     var lRoot = lookupDoc.RootElement;
                     if (lRoot.TryGetProperty("results", out var items))
                     {
@@ -286,10 +286,11 @@ internal sealed class MediaSongListService : IDisposable
             if (result == null && !string.IsNullOrWhiteSpace(cleanArtist) && !GenericAppNames.Contains(cleanArtist))
             {
                 string artistSearchUrl = $"https://itunes.apple.com/search?term={Uri.EscapeDataString(cleanArtist)}&entity=song&limit=15";
-                var artResp = await Http.GetAsync(artistSearchUrl, ct).ConfigureAwait(false);
+                using var artResp = await Http.GetAsync(artistSearchUrl, ct).ConfigureAwait(false);
                 if (artResp.IsSuccessStatusCode)
                 {
-                    using var artDoc = await JsonDocument.ParseAsync(await artResp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false), cancellationToken: ct).ConfigureAwait(false);
+                    using var artStream = await artResp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                    using var artDoc = await JsonDocument.ParseAsync(artStream, cancellationToken: ct).ConfigureAwait(false);
                     var aRoot = artDoc.RootElement;
                     if (aRoot.TryGetProperty("results", out var artItems))
                     {

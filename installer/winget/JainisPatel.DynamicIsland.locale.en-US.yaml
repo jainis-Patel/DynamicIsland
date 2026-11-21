@@ -1,5 +1,5 @@
 PackageIdentifier: JainisPatel.DynamicIsland
-PackageVersion: 0.7.0
+PackageVersion: 0.8.0
 PackageLocale: en-US
 Publisher: Jainis Patel
 PublisherUrl: https://github.com/jainis-Patel
@@ -14,7 +14,7 @@ Description: >-
   built with WPF (.NET 8), closed-form analytical spring physics (60Hz - 240Hz+),
   WASAPI real-time audio spectrum analysis, WinRT system integrations, Live Activity IPC,
   Windows 11 Fluent 2 Mica/Acrylic backdrop composition, and zero-idle CPU overhead.
-ReleaseNotesUrl: https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.7.0
+ReleaseNotesUrl: https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.8.0
 Tags:
   - dynamic-island
   - overlay

@@ -63,11 +63,18 @@ public sealed class Choreographer : IDisposable
     private readonly Dispatcher _dispatcher;
     private readonly DispatcherTimer _masterTimer;
     private readonly Dictionary<string, ScheduledChore> _chores = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<ScheduledChore> _dueBuffer = new();
     private readonly object _lock = new();
 
     private PowerGovernorMode _currentMode = PowerGovernorMode.HighPerformance;
     private int _secondsSinceLastPowerCheck = 0;
+    private bool _suspended;
     private bool _disposed;
+
+    public bool IsSuspended
+    {
+        get { lock (_lock) return _suspended; }
+    }
 
     public PowerGovernorMode CurrentMode
     {
@@ -83,6 +90,14 @@ public sealed class Choreographer : IDisposable
                 if (_currentMode == value) return;
                 prev = _currentMode;
                 _currentMode = value;
+                foreach (var chore in _chores.Values)
+                {
+                    int eff = ComputeEffectiveInterval(chore, value);
+                    if (eff > 0 && (chore.SecondsRemaining <= 0 || chore.SecondsRemaining > eff))
+                    {
+                        chore.SecondsRemaining = eff;
+                    }
+                }
             }
             PowerModeChanged?.Invoke(prev, value);
         }
@@ -113,8 +128,43 @@ public sealed class Choreographer : IDisposable
         }
         catch { }
 
-        // Start master tick
-        _masterTimer.Start();
+        // Master timer starts on demand only when chores are registered and not suspended
+    }
+
+    public void SetSuspended(bool suspended)
+    {
+        lock (_lock)
+        {
+            if (_disposed || _suspended == suspended) return;
+            _suspended = suspended;
+            UpdateTimerStateLocked();
+        }
+    }
+
+    private void UpdateTimerStateLocked()
+    {
+        bool shouldRun = !_disposed && !_suspended && _chores.Count > 0;
+        if (_dispatcher.CheckAccess())
+        {
+            if (shouldRun && !_masterTimer.IsEnabled)
+                _masterTimer.Start();
+            else if (!shouldRun && _masterTimer.IsEnabled)
+                _masterTimer.Stop();
+        }
+        else
+        {
+            _dispatcher.InvokeAsync(() =>
+            {
+                lock (_lock)
+                {
+                    bool runNow = !_disposed && !_suspended && _chores.Count > 0;
+                    if (runNow && !_masterTimer.IsEnabled)
+                        _masterTimer.Start();
+                    else if (!runNow && _masterTimer.IsEnabled)
+                        _masterTimer.Stop();
+                }
+            }, DispatcherPriority.Background);
+        }
     }
 
     private void OnWinRTPowerChanged(object? sender, object e)
@@ -180,9 +230,11 @@ public sealed class Choreographer : IDisposable
     /// Computes the effective interval (in seconds) for a chore under the active power governor mode.
     /// Returns -1 if the chore is suspended.
     /// </summary>
-    public int GetEffectiveInterval(ScheduledChore chore)
+    public int GetEffectiveInterval(ScheduledChore chore) =>
+        ComputeEffectiveInterval(chore, CurrentMode);
+
+    private static int ComputeEffectiveInterval(ScheduledChore chore, PowerGovernorMode mode)
     {
-        var mode = CurrentMode;
         switch (mode)
         {
             case PowerGovernorMode.HighPerformance:
@@ -219,8 +271,9 @@ public sealed class Choreographer : IDisposable
         lock (_lock)
         {
             var chore = new ScheduledChore(id, callback, intervalSeconds, sensitivity);
-            chore.SecondsRemaining = GetEffectiveInterval(chore);
+            chore.SecondsRemaining = ComputeEffectiveInterval(chore, _currentMode);
             _chores[id] = chore;
+            UpdateTimerStateLocked();
         }
     }
 
@@ -232,7 +285,9 @@ public sealed class Choreographer : IDisposable
         if (string.IsNullOrWhiteSpace(id)) return false;
         lock (_lock)
         {
-            return _chores.Remove(id);
+            bool removed = _chores.Remove(id);
+            if (removed) UpdateTimerStateLocked();
+            return removed;
         }
     }
 
@@ -250,8 +305,11 @@ public sealed class Choreographer : IDisposable
         try
         {
             chore.Callback();
-            int next = GetEffectiveInterval(chore);
-            chore.SecondsRemaining = next > 0 ? next : chore.BaseIntervalSeconds;
+            lock (_lock)
+            {
+                int next = ComputeEffectiveInterval(chore, _currentMode);
+                chore.SecondsRemaining = next > 0 ? next : chore.BaseIntervalSeconds;
+            }
             return true;
         }
         catch (Exception ex)
@@ -267,6 +325,10 @@ public sealed class Choreographer : IDisposable
     public void Tick()
     {
         if (_disposed) return;
+        lock (_lock)
+        {
+            if (_disposed || _suspended) return;
+        }
 
         // Check power status periodically (every 10 seconds)
         if (++_secondsSinceLastPowerCheck >= 10)
@@ -275,13 +337,15 @@ public sealed class Choreographer : IDisposable
             AssessPowerState();
         }
 
-        List<ScheduledChore> dueChores = new();
+        ScheduledChore[]? due = null;
 
         lock (_lock)
         {
+            if (_disposed || _suspended) return;
+            _dueBuffer.Clear();
             foreach (var chore in _chores.Values)
             {
-                int effective = GetEffectiveInterval(chore);
+                int effective = ComputeEffectiveInterval(chore, _currentMode);
                 if (effective <= 0)
                 {
                     // Suspended under current power mode
@@ -292,12 +356,20 @@ public sealed class Choreographer : IDisposable
                 if (chore.SecondsRemaining <= 0)
                 {
                     chore.SecondsRemaining = effective;
-                    dueChores.Add(chore);
+                    _dueBuffer.Add(chore);
                 }
+            }
+
+            if (_dueBuffer.Count > 0)
+            {
+                due = _dueBuffer.ToArray();
+                _dueBuffer.Clear();
             }
         }
 
-        foreach (var chore in dueChores)
+        if (due == null) return;
+
+        foreach (var chore in due)
         {
             try
             {

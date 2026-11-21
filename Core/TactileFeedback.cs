@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using static DynamicIsland.Interop.NativeMethods;
 
 namespace DynamicIsland.Core;
@@ -18,6 +19,9 @@ public static class TactileFeedback
     private static readonly byte[] _tickWav;
     private static readonly byte[] _snapWav;
     private static readonly byte[] _dismissWav;
+    private static readonly IntPtr _tickWavPtr;
+    private static readonly IntPtr _snapWavPtr;
+    private static readonly IntPtr _dismissWavPtr;
 
     /// <summary>Global toggle for tactile audio micro-ticks.</summary>
     public static bool IsEnabled { get; set; } = true;
@@ -27,6 +31,9 @@ public static class TactileFeedback
         _tickWav = SynthesizeRiffWav(freqStart: 520, freqEnd: 460, decay: 110.0, durationMs: 11, amplitude: 0.35);
         _snapWav = SynthesizeRiffWav(freqStart: 320, freqEnd: 240, decay: 75.0, durationMs: 16, amplitude: 0.42);
         _dismissWav = SynthesizeRiffWav(freqStart: 380, freqEnd: 190, decay: 60.0, durationMs: 22, amplitude: 0.45);
+        _tickWavPtr = Marshal.UnsafeAddrOfPinnedArrayElement(_tickWav, 0);
+        _snapWavPtr = Marshal.UnsafeAddrOfPinnedArrayElement(_snapWav, 0);
+        _dismissWavPtr = Marshal.UnsafeAddrOfPinnedArrayElement(_dismissWav, 0);
     }
 
     /// <summary>Plays a subtle, crisp 11ms micro-tick (e.g. volume/brightness increment or chevron expand).</summary>
@@ -35,7 +42,7 @@ public static class TactileFeedback
         if (!IsEnabled) return;
         try
         {
-            PlaySound(_tickWav, IntPtr.Zero, SND_ASYNC | SND_MEMORY | SND_NODEFAULT);
+            PlaySound(_tickWavPtr, IntPtr.Zero, SND_ASYNC | SND_MEMORY | SND_NODEFAULT);
         }
         catch { }
     }
@@ -46,7 +53,7 @@ public static class TactileFeedback
         if (!IsEnabled) return;
         try
         {
-            PlaySound(_snapWav, IntPtr.Zero, SND_ASYNC | SND_MEMORY | SND_NODEFAULT);
+            PlaySound(_snapWavPtr, IntPtr.Zero, SND_ASYNC | SND_MEMORY | SND_NODEFAULT);
         }
         catch { }
     }
@@ -57,7 +64,7 @@ public static class TactileFeedback
         if (!IsEnabled) return;
         try
         {
-            PlaySound(_dismissWav, IntPtr.Zero, SND_ASYNC | SND_MEMORY | SND_NODEFAULT);
+            PlaySound(_dismissWavPtr, IntPtr.Zero, SND_ASYNC | SND_MEMORY | SND_NODEFAULT);
         }
         catch { }
     }
@@ -71,7 +78,8 @@ public static class TactileFeedback
         int dataBytes = numSamples * 2; // 16-bit mono = 2 bytes per sample
         int totalFileSize = 44 + dataBytes;
 
-        byte[] wav = new byte[totalFileSize];
+        // Allocate on the Pinned Object Heap (POH) so winmm's async SND_MEMORY thread never sees GC relocation.
+        byte[] wav = GC.AllocateArray<byte>(totalFileSize, pinned: true);
         using var ms = new MemoryStream(wav);
         using var bw = new BinaryWriter(ms);
 

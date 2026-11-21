@@ -1,6 +1,9 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                    xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
+                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                    mc:Ignorable="po">
 
     <!-- ========================================================================= -->
     <!--  Dynamic Island Installer Design Tokens                                   -->
@@ -9,51 +12,51 @@
 
     <!-- Surfaces & Neutrals -->
     <Color x:Key="ColorSurface">#121214</Color>
-    <SolidColorBrush x:Key="BrushSurface" Color="{StaticResource ColorSurface}" />
+    <SolidColorBrush x:Key="BrushSurface" Color="{StaticResource ColorSurface}" po:Freeze="True" />
 
     <Color x:Key="ColorElevated">#1A1A1D</Color>
-    <SolidColorBrush x:Key="BrushElevated" Color="{StaticResource ColorElevated}" />
+    <SolidColorBrush x:Key="BrushElevated" Color="{StaticResource ColorElevated}" po:Freeze="True" />
 
     <Color x:Key="ColorOutline">#14FFFFFF</Color> <!-- #FFFFFF14 subtle window outline -->
-    <SolidColorBrush x:Key="BrushOutline" Color="{StaticResource ColorOutline}" />
+    <SolidColorBrush x:Key="BrushOutline" Color="{StaticResource ColorOutline}" po:Freeze="True" />
 
     <Color x:Key="ColorDivider">#12FFFFFF</Color> <!-- #FFFFFF12 subtle separator -->
-    <SolidColorBrush x:Key="BrushDivider" Color="{StaticResource ColorDivider}" />
+    <SolidColorBrush x:Key="BrushDivider" Color="{StaticResource ColorDivider}" po:Freeze="True" />
 
     <Color x:Key="ColorHoverSubtle">#0DFFFFFF</Color> <!-- #FFFFFF0D hover fill -->
-    <SolidColorBrush x:Key="BrushHoverSubtle" Color="{StaticResource ColorHoverSubtle}" />
+    <SolidColorBrush x:Key="BrushHoverSubtle" Color="{StaticResource ColorHoverSubtle}" po:Freeze="True" />
 
     <!-- Typography Colors (Strictly 2 text colors on surface, min 4.5:1 contrast) -->
     <Color x:Key="ColorTextPrimary">#F5F5F7</Color>
-    <SolidColorBrush x:Key="BrushTextPrimary" Color="{StaticResource ColorTextPrimary}" />
+    <SolidColorBrush x:Key="BrushTextPrimary" Color="{StaticResource ColorTextPrimary}" po:Freeze="True" />
 
     <Color x:Key="ColorTextSecondary">#A1A1A6</Color>
-    <SolidColorBrush x:Key="BrushTextSecondary" Color="{StaticResource ColorTextSecondary}" />
+    <SolidColorBrush x:Key="BrushTextSecondary" Color="{StaticResource ColorTextSecondary}" po:Freeze="True" />
 
     <Color x:Key="ColorTextDisabled">#636366</Color>
-    <SolidColorBrush x:Key="BrushTextDisabled" Color="{StaticResource ColorTextDisabled}" />
+    <SolidColorBrush x:Key="BrushTextDisabled" Color="{StaticResource ColorTextDisabled}" po:Freeze="True" />
 
     <!-- Exactly ONE Accent Color: Amber (#FF9F0A) -->
     <!-- Used ONLY for: Primary button, Progress bar fill, Checked switch, Focus ring -->
     <Color x:Key="ColorAccent">#FF9F0A</Color>
-    <SolidColorBrush x:Key="BrushAccent" Color="{StaticResource ColorAccent}" />
+    <SolidColorBrush x:Key="BrushAccent" Color="{StaticResource ColorAccent}" po:Freeze="True" />
 
     <Color x:Key="ColorAccentHover">#FFB340</Color>
-    <SolidColorBrush x:Key="BrushAccentHover" Color="{StaticResource ColorAccentHover}" />
+    <SolidColorBrush x:Key="BrushAccentHover" Color="{StaticResource ColorAccentHover}" po:Freeze="True" />
 
     <Color x:Key="ColorAccentPressed">#E08800</Color>
-    <SolidColorBrush x:Key="BrushAccentPressed" Color="{StaticResource ColorAccentPressed}" />
+    <SolidColorBrush x:Key="BrushAccentPressed" Color="{StaticResource ColorAccentPressed}" po:Freeze="True" />
 
     <Color x:Key="ColorTextOnAccent">#1A1200</Color>
-    <SolidColorBrush x:Key="BrushTextOnAccent" Color="{StaticResource ColorTextOnAccent}" />
+    <SolidColorBrush x:Key="BrushTextOnAccent" Color="{StaticResource ColorTextOnAccent}" po:Freeze="True" />
 
     <!-- Switch Track Neutral State -->
     <Color x:Key="ColorSwitchOff">#3A3A3C</Color>
-    <SolidColorBrush x:Key="BrushSwitchOff" Color="{StaticResource ColorSwitchOff}" />
+    <SolidColorBrush x:Key="BrushSwitchOff" Color="{StaticResource ColorSwitchOff}" po:Freeze="True" />
 
     <!-- Alert / Failure Color (Used ONLY when installation actually fails) -->
     <Color x:Key="ColorError">#FF453A</Color>
-    <SolidColorBrush x:Key="BrushError" Color="{StaticResource ColorError}" />
+    <SolidColorBrush x:Key="BrushError" Color="{StaticResource ColorError}" po:Freeze="True" />
 
     <!-- Typography (Only 3 font sizes: Title 22, Body 14, Caption 12) -->
     <FontFamily x:Key="InstallerFontFamily">Segoe UI Variable Text, Segoe UI Variable Display, Segoe UI, -apple-system, sans-serif</FontFamily>

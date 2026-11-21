@@ -59,6 +59,12 @@ public partial class CaptureOverlayWindow : Window
             Top = mi.rcMonitor.Top / _dpiScale;
             Width = mi.rcMonitor.Width / _dpiScale;
             Height = mi.rcMonitor.Height / _dpiScale;
+
+            IntPtr hwnd = new System.Windows.Interop.WindowInteropHelper(this).EnsureHandle();
+            if (hwnd != IntPtr.Zero)
+            {
+                SetWindowPos(hwnd, IntPtr.Zero, mi.rcMonitor.Left, mi.rcMonitor.Top, mi.rcMonitor.Width, mi.rcMonitor.Height, SWP_NOZORDER | SWP_NOACTIVATE);
+            }
         }
         else
         {
@@ -213,7 +219,16 @@ public partial class CaptureOverlayWindow : Window
                 return cropped;
             }
 
-            // Composite annotations onto the cropped bitmap
+            // Composite annotations onto the cropped bitmap with AnnotationCanvas bounds matching OverlayCanvas
+            if (OverlayCanvas.ActualWidth > 0 && OverlayCanvas.ActualHeight > 0)
+            {
+                AnnotationCanvas.Width = OverlayCanvas.ActualWidth;
+                AnnotationCanvas.Height = OverlayCanvas.ActualHeight;
+                AnnotationCanvas.Measure(new Size(OverlayCanvas.ActualWidth, OverlayCanvas.ActualHeight));
+                AnnotationCanvas.Arrange(new Rect(0, 0, OverlayCanvas.ActualWidth, OverlayCanvas.ActualHeight));
+                AnnotationCanvas.UpdateLayout();
+            }
+
             var dv = new DrawingVisual();
             using (var dc = dv.RenderOpen())
             {
@@ -245,20 +260,27 @@ public partial class CaptureOverlayWindow : Window
 
     private async void ActionOcr_Click(object sender, RoutedEventArgs e)
     {
-        var bmp = RenderCroppedCapture();
-        Close();
-        if (bmp != null)
+        try
         {
-            string? text = await ScreenToolsService.ExtractTextFromBitmapAsync(bmp);
-            if (!string.IsNullOrWhiteSpace(text))
+            var bmp = RenderCroppedCapture();
+            Close();
+            if (bmp != null)
             {
-                try { Clipboard.SetText(text); } catch { }
-                IslandWindow.Instance?.NotifyCaptureAction("OCR Text Copied", text);
+                string? text = await ScreenToolsService.ExtractTextFromBitmapAsync(bmp);
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    try { Clipboard.SetText(text); } catch { }
+                    IslandWindow.Instance?.NotifyCaptureAction("OCR Text Copied", text);
+                }
+                else
+                {
+                    IslandWindow.Instance?.NotifyCaptureAction("No Text Detected", "Windows OCR found no readable text");
+                }
             }
-            else
-            {
-                IslandWindow.Instance?.NotifyCaptureAction("No Text Detected", "Windows OCR found no readable text");
-            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[CaptureOverlayWindow] ActionOcr failed: {ex.Message}");
         }
     }
 

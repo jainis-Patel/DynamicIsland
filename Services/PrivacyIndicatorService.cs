@@ -17,9 +17,12 @@ internal sealed class PrivacyIndicatorService : IDisposable
     private readonly DispatcherTimer _fallbackTimer;
     private readonly MMDeviceEnumerator _enumerator;
     private readonly List<RegistryWatcherState> _registryWatchers = new();
+    private readonly object _captureLock = new();
     private MMDevice? _captureDevice;
     private int _polling;
-    private bool _disposed;
+    private bool _watchersAttached;
+    private bool _isSuspended;
+    private volatile bool _disposed;
 
     private sealed class RegistryWatcherState : IDisposable
     {
@@ -31,7 +34,19 @@ internal sealed class PrivacyIndicatorService : IDisposable
 
         public void Dispose()
         {
-            try { RegisteredWait?.Unregister(null); } catch { }
+            if (RegisteredWait != null)
+            {
+                using var done = new ManualResetEvent(false);
+                try
+                {
+                    if (RegisteredWait.Unregister(done))
+                    {
+                        done.WaitOne(200);
+                    }
+                }
+                catch { }
+                RegisteredWait = null;
+            }
             try { WaitEvent.Dispose(); } catch { }
             try { Key.Dispose(); } catch { }
         }
@@ -41,6 +56,7 @@ internal sealed class PrivacyIndicatorService : IDisposable
     public bool IsMicrophoneActive { get; private set; }
     public bool IsMicrophoneMuted { get; private set; }
     public string? ActiveCallApp { get; private set; }
+    public IReadOnlyList<string> ActivePrivacyApps { get; private set; } = Array.Empty<string>();
     public DateTimeOffset? CallStartTime { get; private set; }
 
     public event Action? StateChanged;
@@ -97,17 +113,27 @@ internal sealed class PrivacyIndicatorService : IDisposable
 
     private void InitCaptureDevice()
     {
-        try
+        lock (_captureLock)
         {
-            try { _captureDevice?.Dispose(); } catch { }
-            _captureDevice = _enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
-            if (_captureDevice != null)
+            if (_disposed) return;
+            try
             {
-                IsMicrophoneMuted = _captureDevice.AudioEndpointVolume.Mute;
-                _captureDevice.AudioEndpointVolume.OnVolumeNotification += OnCaptureVolumeNotification;
+                if (_captureDevice != null)
+                {
+                    try { _captureDevice.AudioEndpointVolume.OnVolumeNotification -= OnCaptureVolumeNotification; } catch { }
+                    try { _captureDevice.Dispose(); } catch { }
+                    _captureDevice = null;
+                }
+
+                _captureDevice = _enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+                if (_captureDevice != null)
+                {
+                    IsMicrophoneMuted = _captureDevice.AudioEndpointVolume.Mute;
+                    _captureDevice.AudioEndpointVolume.OnVolumeNotification += OnCaptureVolumeNotification;
+                }
             }
+            catch { }
         }
-        catch { }
     }
 
     private void OnCaptureVolumeNotification(AudioVolumeNotificationData data)
@@ -125,9 +151,14 @@ internal sealed class PrivacyIndicatorService : IDisposable
 
     public void Start()
     {
-        TryAttachRegistryWatcher("webcam");
-        TryAttachRegistryWatcher("microphone");
-        _fallbackTimer.Start();
+        bool camAttached = TryAttachRegistryWatcher("webcam");
+        bool micAttached = TryAttachRegistryWatcher("microphone");
+        _watchersAttached = camAttached && micAttached;
+        if (!_watchersAttached && !_isSuspended)
+        {
+            _fallbackTimer.Interval = TimeSpan.FromSeconds(10);
+            _fallbackTimer.Start();
+        }
         TriggerPoll();
     }
 
@@ -139,14 +170,18 @@ internal sealed class PrivacyIndicatorService : IDisposable
 
     public void SetSuspended(bool suspended)
     {
-        if (_disposed) return;
+        if (_disposed || _isSuspended == suspended) return;
+        _isSuspended = suspended;
         if (suspended)
         {
             _fallbackTimer.Stop();
         }
-        else if (!_fallbackTimer.IsEnabled)
+        else
         {
-            _fallbackTimer.Start();
+            if (!_watchersAttached || IsCameraActive || IsMicrophoneActive)
+            {
+                _fallbackTimer.Start();
+            }
             TriggerPoll();
         }
     }
@@ -195,7 +230,7 @@ internal sealed class PrivacyIndicatorService : IDisposable
             int res = RegNotifyChangeKeyValue(
                 state.Key.Handle.DangerousGetHandle(),
                 bWatchSubtree: true,
-                REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET,
+                REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET | REG_NOTIFY_THREAD_AGNOSTIC,
                 state.WaitEvent.SafeWaitHandle.DangerousGetHandle(),
                 fAsynchronous: true);
             return res == 0;
@@ -217,24 +252,28 @@ internal sealed class PrivacyIndicatorService : IDisposable
 
     public bool ToggleMicrophoneMute()
     {
-        try
+        lock (_captureLock)
         {
-            if (_captureDevice == null) InitCaptureDevice();
-            if (_captureDevice != null)
+            if (_disposed) return IsMicrophoneMuted;
+            try
             {
-                bool nextMute = !_captureDevice.AudioEndpointVolume.Mute;
-                _captureDevice.AudioEndpointVolume.Mute = nextMute;
-                IsMicrophoneMuted = nextMute;
-                StateChanged?.Invoke();
-                return nextMute;
+                if (_captureDevice == null) InitCaptureDevice();
+                if (_captureDevice != null)
+                {
+                    bool nextMute = !_captureDevice.AudioEndpointVolume.Mute;
+                    _captureDevice.AudioEndpointVolume.Mute = nextMute;
+                    IsMicrophoneMuted = nextMute;
+                    StateChanged?.Invoke();
+                    return nextMute;
+                }
             }
+            catch (Exception ex)
+            {
+                App.Log($"[PrivacyService] ToggleMute failed: {ex.Message}");
+                InitCaptureDevice();
+            }
+            return false;
         }
-        catch (Exception ex)
-        {
-            App.Log($"[PrivacyService] ToggleMute failed: {ex.Message}");
-            InitCaptureDevice();
-        }
-        return false;
     }
 
     private void TriggerPoll()
@@ -259,6 +298,24 @@ internal sealed class PrivacyIndicatorService : IDisposable
                     ? ResolveFriendlyCallAppName(activeApps)
                     : null;
 
+                var cleanPrivacyApps = new List<string>();
+                foreach (var rawApp in activeApps)
+                {
+                    if (string.IsNullOrWhiteSpace(rawApp) ||
+                        rawApp.Contains("DynamicIsland", StringComparison.OrdinalIgnoreCase) ||
+                        rawApp.Contains("svchost", StringComparison.OrdinalIgnoreCase) ||
+                        rawApp.Contains("audiodg", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    string clean = ExtractCleanAppName(rawApp);
+                    if (!string.IsNullOrWhiteSpace(clean) && !cleanPrivacyApps.Contains(clean, StringComparer.OrdinalIgnoreCase))
+                    {
+                        cleanPrivacyApps.Add(clean);
+                    }
+                }
+                string[] privacyAppsSnapshot = cleanPrivacyApps.Count > 0 ? cleanPrivacyApps.ToArray() : Array.Empty<string>();
+
                 if (_disposed) return;
 
                 _ui.InvokeAsync(() =>
@@ -274,7 +331,10 @@ internal sealed class PrivacyIndicatorService : IDisposable
                         CallStartTime = null;
                     }
 
-                    if (cam != IsCameraActive || mic != IsMicrophoneActive || meetingApp != ActiveCallApp)
+                    bool appsChanged = !ActivePrivacyApps.SequenceEqual(privacyAppsSnapshot, StringComparer.OrdinalIgnoreCase);
+                    ActivePrivacyApps = privacyAppsSnapshot;
+
+                    if (cam != IsCameraActive || mic != IsMicrophoneActive || meetingApp != ActiveCallApp || appsChanged)
                     {
                         IsCameraActive = cam;
                         IsMicrophoneActive = mic;
@@ -282,11 +342,22 @@ internal sealed class PrivacyIndicatorService : IDisposable
                         StateChanged?.Invoke();
                     }
 
-                    // Adaptive fallback cadence: 4s while call/mic/cam is active, 10s when idle (since kernel RegNotifyChangeKeyValue wakes immediately)
-                    var desiredInterval = (cam || mic) ? TimeSpan.FromSeconds(4) : TimeSpan.FromSeconds(10);
-                    if (_fallbackTimer.Interval != desiredInterval)
+                    // Keep fallback timer running ONLY while cam/mic are active or kernel registry watchers failed
+                    if (!_isSuspended && (cam || mic || !_watchersAttached))
                     {
-                        _fallbackTimer.Interval = desiredInterval;
+                        var desiredInterval = (cam || mic) ? TimeSpan.FromSeconds(4) : TimeSpan.FromSeconds(10);
+                        if (_fallbackTimer.Interval != desiredInterval)
+                        {
+                            _fallbackTimer.Interval = desiredInterval;
+                        }
+                        if (!_fallbackTimer.IsEnabled)
+                        {
+                            _fallbackTimer.Start();
+                        }
+                    }
+                    else
+                    {
+                        _fallbackTimer.Stop();
                     }
                 });
             }
@@ -364,9 +435,10 @@ internal sealed class PrivacyIndicatorService : IDisposable
 
     private static string? TryDetectBrowserCallTitle(string browserProcName)
     {
+        Process[]? procs = null;
         try
         {
-            var procs = Process.GetProcessesByName(browserProcName);
+            procs = Process.GetProcessesByName(browserProcName);
             foreach (var p in procs)
             {
                 try
@@ -383,13 +455,19 @@ internal sealed class PrivacyIndicatorService : IDisposable
                     if (title.Contains("Telegram", StringComparison.OrdinalIgnoreCase)) return "Telegram";
                 }
                 catch { }
-                finally
-                {
-                    p.Dispose();
-                }
             }
         }
         catch { }
+        finally
+        {
+            if (procs != null)
+            {
+                foreach (var p in procs)
+                {
+                    try { p.Dispose(); } catch { }
+                }
+            }
+        }
         return null;
     }
 
@@ -416,44 +494,63 @@ internal sealed class PrivacyIndicatorService : IDisposable
 
     private bool CheckActiveWasapiCaptureSessions(List<string> activeApps)
     {
-        try
+        lock (_captureLock)
         {
-            if (_captureDevice == null) return false;
-            var sessions = _captureDevice.AudioSessionManager.Sessions;
-            bool anyActive = false;
-            for (int i = 0; i < sessions.Count; i++)
+            try
             {
-                var s = sessions[i];
-                if (s.State == NAudio.CoreAudioApi.Interfaces.AudioSessionState.AudioSessionStateActive)
+                if (_disposed || _captureDevice == null) return false;
+                var sessionMgr = _captureDevice.AudioSessionManager;
+                try
                 {
-                    uint pid = s.GetProcessID;
-                    if (pid == 0 || pid == Environment.ProcessId) continue;
-                    try
+                    var sessions = sessionMgr.Sessions;
+                    bool anyActive = false;
+                    for (int i = 0; i < sessions.Count; i++)
                     {
-                        using var proc = Process.GetProcessById((int)pid);
-                        if (!string.IsNullOrWhiteSpace(proc.ProcessName) &&
-                            !proc.ProcessName.Equals("DynamicIsland", StringComparison.OrdinalIgnoreCase) &&
-                            !proc.ProcessName.Equals("audiodg", StringComparison.OrdinalIgnoreCase) &&
-                            !proc.ProcessName.Equals("svchost", StringComparison.OrdinalIgnoreCase))
+                        var s = sessions[i];
+                        try
                         {
-                            activeApps.Add(proc.ProcessName);
-                            anyActive = true;
+                            if (s.State == NAudio.CoreAudioApi.Interfaces.AudioSessionState.AudioSessionStateActive)
+                            {
+                                uint pid = s.GetProcessID;
+                                if (pid == 0 || pid == Environment.ProcessId) continue;
+                                try
+                                {
+                                    using var proc = Process.GetProcessById((int)pid);
+                                    if (!string.IsNullOrWhiteSpace(proc.ProcessName) &&
+                                        !proc.ProcessName.Equals("DynamicIsland", StringComparison.OrdinalIgnoreCase) &&
+                                        !proc.ProcessName.Equals("audiodg", StringComparison.OrdinalIgnoreCase) &&
+                                        !proc.ProcessName.Equals("svchost", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        activeApps.Add(proc.ProcessName);
+                                        anyActive = true;
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                        finally
+                        {
+                            try { s.Dispose(); } catch { }
                         }
                     }
-                    catch { }
+                    return anyActive;
+                }
+                finally
+                {
+                    try { (sessionMgr as IDisposable)?.Dispose(); } catch { }
                 }
             }
-            return anyActive;
-        }
-        catch
-        {
-            return false;
+            catch
+            {
+                return false;
+            }
         }
     }
 
     public static bool FocusCallAppWindow(string? callAppName)
     {
         if (string.IsNullOrWhiteSpace(callAppName)) return false;
+        Process[]? procs = null;
         try
         {
             string search = callAppName.Contains("WhatsApp", StringComparison.OrdinalIgnoreCase) ? "WhatsApp"
@@ -461,7 +558,8 @@ internal sealed class PrivacyIndicatorService : IDisposable
                 : callAppName.Contains("Teams", StringComparison.OrdinalIgnoreCase) ? "ms-teams"
                 : callAppName;
 
-            foreach (var proc in Process.GetProcesses())
+            procs = Process.GetProcesses();
+            foreach (var proc in procs)
             {
                 try
                 {
@@ -476,13 +574,19 @@ internal sealed class PrivacyIndicatorService : IDisposable
                     }
                 }
                 catch { }
-                finally
-                {
-                    proc.Dispose();
-                }
             }
         }
         catch { }
+        finally
+        {
+            if (procs != null)
+            {
+                foreach (var proc in procs)
+                {
+                    try { proc.Dispose(); } catch { }
+                }
+            }
+        }
         return false;
     }
 
@@ -539,10 +643,14 @@ internal sealed class PrivacyIndicatorService : IDisposable
         _disposed = true;
         _fallbackTimer.Stop();
         DisposeWatchers();
-        if (_captureDevice != null)
+        lock (_captureLock)
         {
-            try { _captureDevice.AudioEndpointVolume.OnVolumeNotification -= OnCaptureVolumeNotification; } catch { }
-            try { _captureDevice.Dispose(); } catch { }
+            if (_captureDevice != null)
+            {
+                try { _captureDevice.AudioEndpointVolume.OnVolumeNotification -= OnCaptureVolumeNotification; } catch { }
+                try { _captureDevice.Dispose(); } catch { }
+                _captureDevice = null;
+            }
         }
     }
 }

@@ -138,6 +138,8 @@ public sealed class StaticBackdropProvider : IBackdropProvider
     {
         _srv?.Dispose();
         _texture?.Dispose();
+        _srv = null;
+        _texture = null;
 
         var desc = new Texture2DDescription
         {

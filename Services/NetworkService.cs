@@ -1,12 +1,15 @@
 using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Media;
 using System.Windows.Threading;
 using DynamicIsland.Core;
 using Windows.Devices.Radios;
 using Windows.Networking.Connectivity;
+using static DynamicIsland.Interop.NativeMethods;
 
 namespace DynamicIsland.Services;
 
@@ -59,8 +62,8 @@ internal sealed class NetworkService : IDisposable
 {
     private readonly Dispatcher _ui;
     private readonly DispatcherTimer _sampleTimer;
-    private long _prevBytesReceived = -1;
-    private long _prevBytesSent = -1;
+    private readonly Dictionary<string, (long Rx, long Tx)> _prevAdapterBytes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _sampleLock = new();
     private DateTime _prevSampleTime = DateTime.UtcNow;
 
     private string? _lastToastConnectionKey;
@@ -90,6 +93,7 @@ internal sealed class NetworkService : IDisposable
 
     private int _lastPingMs = -1;
     private DateTime _lastPingTime = DateTime.MinValue;
+    private int _pingFailures;
 
     public event Action<NetworkStatusSnapshot>? Updated;
     public event Action<ToastContent>? ConnectivityAlert;
@@ -97,7 +101,10 @@ internal sealed class NetworkService : IDisposable
 
     private List<WifiNetworkInfo> _wifiNetworks = new();
     private int _scanningWifi;
+    private int _sampling;
     private volatile bool _isExpanded;
+    private bool _isSuspended;
+    private bool _disposed;
     private readonly Func<AppSettings>? _getSettings;
 
     public IReadOnlyList<WifiNetworkInfo> WifiNetworks => _wifiNetworks;
@@ -110,33 +117,50 @@ internal sealed class NetworkService : IDisposable
         {
             Interval = TimeSpan.FromSeconds(5.0)
         };
-        _sampleTimer.Tick += (_, _) => Sample();
+        _sampleTimer.Tick += (_, _) => _ = SampleAsync();
+    }
+
+    public void UpdatePollingState()
+    {
+        if (_disposed || _isSuspended)
+        {
+            _sampleTimer.Stop();
+            return;
+        }
+
+        if (_isExpanded)
+        {
+            _sampleTimer.Interval = TimeSpan.FromSeconds(1.2);
+            if (!_sampleTimer.IsEnabled) _sampleTimer.Start();
+        }
+        else if (_getSettings?.Invoke()?.ShowNetworkSpeedInIdle ?? false)
+        {
+            _sampleTimer.Interval = TimeSpan.FromSeconds(1.5);
+            if (!_sampleTimer.IsEnabled) _sampleTimer.Start();
+        }
+        else
+        {
+            _sampleTimer.Stop();
+        }
     }
 
     public void SetExpanded(bool isExpanded)
     {
         _isExpanded = isExpanded;
-        if (isExpanded)
+        UpdatePollingState();
+        if (isExpanded && !_isSuspended)
         {
-            _sampleTimer.Interval = TimeSpan.FromSeconds(1.2);
-            Sample();
-        }
-        else
-        {
-            bool showSpeedInIdle = _getSettings?.Invoke()?.ShowNetworkSpeedInIdle ?? false;
-            _sampleTimer.Interval = showSpeedInIdle ? TimeSpan.FromSeconds(1.5) : TimeSpan.FromSeconds(5.0);
+            _ = SampleAsync();
         }
     }
 
     public void SetSuspended(bool suspended)
     {
-        if (suspended)
+        _isSuspended = suspended;
+        UpdatePollingState();
+        if (!suspended && (_isExpanded || (_getSettings?.Invoke()?.ShowNetworkSpeedInIdle ?? false)))
         {
-            _sampleTimer.Stop();
-        }
-        else if (!_sampleTimer.IsEnabled)
-        {
-            _sampleTimer.Start();
+            _ = SampleAsync();
         }
     }
 
@@ -153,15 +177,16 @@ internal sealed class NetworkService : IDisposable
 
         _ = RefreshRadioStatesAsync();
         Sample(suppressAlert: true);
-        _sampleTimer.Start();
+        UpdatePollingState();
     }
 
     private void OnNetworkStatusChanged(object? sender)
     {
-        _ui.InvokeAsync(async () =>
+        if (_disposed) return;
+        _ = Task.Run(async () =>
         {
-            await RefreshRadioStatesAsync();
-            Sample(suppressAlert: false);
+            await RefreshRadioStatesAsync().ConfigureAwait(false);
+            await SampleAsync(suppressAlert: false).ConfigureAwait(false);
         });
     }
 
@@ -253,9 +278,13 @@ internal sealed class NetworkService : IDisposable
             string? activeSsid = Current.IsWifi && Current.IsConnected ? Current.ConnectionName : null;
             var networks = await Task.Run(() =>
             {
-                var saved = GetSavedWlanProfiles();
-                string netshOut = RunNetshCommand("wlan show networks mode=bssid");
-                var parsed = ParseNetshNetworksOutput(netshOut, saved, activeSsid);
+                var parsed = TryScanWifiNative(activeSsid);
+                if (parsed == null || parsed.Count == 0)
+                {
+                    var saved = GetSavedWlanProfiles();
+                    string netshOut = RunNetshCommand("wlan show networks mode=bssid");
+                    parsed = ParseNetshNetworksOutput(netshOut, saved, activeSsid);
+                }
 
                 // Ensure the currently connected Wi-Fi network is always present at the top
                 if (!string.IsNullOrWhiteSpace(activeSsid) &&
@@ -304,8 +333,11 @@ internal sealed class NetworkService : IDisposable
         if (network.IsConnected)
             return (true, $"Already connected to {network.Ssid}");
 
-        bool connectedViaNetsh = await Task.Run(() =>
+        bool connectedViaWlan = await Task.Run(() =>
         {
+            if (network.IsSavedProfile && TryConnectWifiNative(network.Ssid))
+                return true;
+
             try
             {
                 string safeSsid = network.Ssid.Replace("\"", "");
@@ -318,7 +350,7 @@ internal sealed class NetworkService : IDisposable
             }
         }).ConfigureAwait(false);
 
-        if (connectedViaNetsh)
+        if (connectedViaWlan)
         {
             await Task.Delay(900).ConfigureAwait(false);
             _ = _ui.InvokeAsync(() =>
@@ -332,6 +364,183 @@ internal sealed class NetworkService : IDisposable
         // If no saved profile exists for this SSID (requires password entry), open Windows Wi-Fi flyout
         OpenAvailableNetworksFlyout();
         return (false, $"Enter password for {network.Ssid} in Windows Wi-Fi prompt");
+    }
+
+    private static List<WifiNetworkInfo>? TryScanWifiNative(string? activeSsid)
+    {
+        IntPtr client = IntPtr.Zero;
+        IntPtr ifaceListPtr = IntPtr.Zero;
+        try
+        {
+            if (WlanOpenHandle(2, IntPtr.Zero, out _, out client) != 0 || client == IntPtr.Zero)
+                return null;
+
+            if (WlanEnumInterfaces(client, IntPtr.Zero, out ifaceListPtr) != 0 || ifaceListPtr == IntPtr.Zero)
+                return null;
+
+            uint ifaceCount = (uint)Marshal.ReadInt32(ifaceListPtr);
+            if (ifaceCount == 0) return null;
+
+            int ifaceSize = Marshal.SizeOf<WLAN_INTERFACE_INFO>();
+            int netSize = Marshal.SizeOf<WLAN_AVAILABLE_NETWORK>();
+            var bySsid = new Dictionary<string, WifiNetworkInfo>(StringComparer.OrdinalIgnoreCase);
+
+            for (int i = 0; i < ifaceCount; i++)
+            {
+                var iface = Marshal.PtrToStructure<WLAN_INTERFACE_INFO>(IntPtr.Add(ifaceListPtr, 8 + i * ifaceSize));
+                Guid ifaceGuid = iface.InterfaceGuid;
+                IntPtr netListPtr = IntPtr.Zero;
+                try
+                {
+                    if (WlanGetAvailableNetworkList(client, ref ifaceGuid, 0, IntPtr.Zero, out netListPtr) != 0 ||
+                        netListPtr == IntPtr.Zero)
+                    {
+                        continue;
+                    }
+
+                    uint netCount = (uint)Marshal.ReadInt32(netListPtr);
+                    for (int n = 0; n < netCount; n++)
+                    {
+                        var net = Marshal.PtrToStructure<WLAN_AVAILABLE_NETWORK>(IntPtr.Add(netListPtr, 8 + n * netSize));
+                        int ssidLen = (int)Math.Min(net.dot11Ssid.uSSIDLength, 32u);
+                        if (ssidLen <= 0 || net.dot11Ssid.ucSSID == null) continue;
+
+                        string ssid = Encoding.UTF8.GetString(net.dot11Ssid.ucSSID, 0, ssidLen).Trim('\0').Trim();
+                        if (string.IsNullOrWhiteSpace(ssid)) continue;
+
+                        int pct = (int)Math.Clamp(net.wlanSignalQuality, 5u, 100u);
+                        int bars = pct >= 78 ? 4 : pct >= 55 ? 3 : pct >= 32 ? 2 : 1;
+                        bool isConn = (net.dwFlags & WLAN_AVAILABLE_NETWORK_CONNECTED) != 0 ||
+                                      (!string.IsNullOrWhiteSpace(activeSsid) &&
+                                       string.Equals(ssid, activeSsid, StringComparison.OrdinalIgnoreCase));
+                        bool isSaved = isConn || (net.dwFlags & WLAN_AVAILABLE_NETWORK_HAS_PROFILE) != 0;
+
+                        string sec = MapWlanSecurityText(net.bSecurityEnabled, net.dot11DefaultAuthAlgorithm);
+                        var info = new WifiNetworkInfo
+                        {
+                            Ssid = ssid,
+                            SignalPercent = pct,
+                            SignalBars = bars,
+                            Glyph = ResolveGlyph(true, true, false, bars),
+                            SecurityText = sec,
+                            IsConnected = isConn,
+                            IsSavedProfile = isSaved
+                        };
+
+                        if (!bySsid.TryGetValue(ssid, out var existing) ||
+                            info.IsConnected && !existing.IsConnected ||
+                            info.SignalPercent > existing.SignalPercent)
+                        {
+                            bySsid[ssid] = info;
+                        }
+                    }
+                }
+                finally
+                {
+                    if (netListPtr != IntPtr.Zero) WlanFreeMemory(netListPtr);
+                }
+            }
+
+            return bySsid.Values
+                .OrderByDescending(r => r.IsConnected)
+                .ThenByDescending(r => r.IsSavedProfile)
+                .ThenByDescending(r => r.SignalPercent)
+                .ToList();
+        }
+        catch
+        {
+            return null;
+        }
+        finally
+        {
+            if (ifaceListPtr != IntPtr.Zero) WlanFreeMemory(ifaceListPtr);
+            if (client != IntPtr.Zero) WlanCloseHandle(client, IntPtr.Zero);
+        }
+    }
+
+    private static string MapWlanSecurityText(bool securityEnabled, int authAlg)
+    {
+        if (!securityEnabled) return "Open";
+        return authAlg switch
+        {
+            9 or 10 => "WPA3",
+            6 or 7 => "WPA2",
+            4 => "WPA2",
+            1 or 2 => "Open",
+            _ => "WPA2"
+        };
+    }
+
+    private static bool TryConnectWifiNative(string ssid)
+    {
+        IntPtr client = IntPtr.Zero;
+        IntPtr ifaceListPtr = IntPtr.Zero;
+        try
+        {
+            if (WlanOpenHandle(2, IntPtr.Zero, out _, out client) != 0 || client == IntPtr.Zero)
+                return false;
+
+            if (WlanEnumInterfaces(client, IntPtr.Zero, out ifaceListPtr) != 0 || ifaceListPtr == IntPtr.Zero)
+                return false;
+
+            uint ifaceCount = (uint)Marshal.ReadInt32(ifaceListPtr);
+            int ifaceSize = Marshal.SizeOf<WLAN_INTERFACE_INFO>();
+            int netSize = Marshal.SizeOf<WLAN_AVAILABLE_NETWORK>();
+
+            for (int i = 0; i < ifaceCount; i++)
+            {
+                var iface = Marshal.PtrToStructure<WLAN_INTERFACE_INFO>(IntPtr.Add(ifaceListPtr, 8 + i * ifaceSize));
+                Guid ifaceGuid = iface.InterfaceGuid;
+                string? matchingProfile = ssid;
+
+                IntPtr netListPtr = IntPtr.Zero;
+                try
+                {
+                    if (WlanGetAvailableNetworkList(client, ref ifaceGuid, 0, IntPtr.Zero, out netListPtr) == 0 &&
+                        netListPtr != IntPtr.Zero)
+                    {
+                        uint netCount = (uint)Marshal.ReadInt32(netListPtr);
+                        for (int n = 0; n < netCount; n++)
+                        {
+                            var net = Marshal.PtrToStructure<WLAN_AVAILABLE_NETWORK>(IntPtr.Add(netListPtr, 8 + n * netSize));
+                            int ssidLen = (int)Math.Min(net.dot11Ssid.uSSIDLength, 32u);
+                            if (ssidLen <= 0 || net.dot11Ssid.ucSSID == null) continue;
+                            string candidateSsid = Encoding.UTF8.GetString(net.dot11Ssid.ucSSID, 0, ssidLen).Trim('\0').Trim();
+                            if (string.Equals(candidateSsid, ssid, StringComparison.OrdinalIgnoreCase) &&
+                                !string.IsNullOrWhiteSpace(net.strProfileName))
+                            {
+                                matchingProfile = net.strProfileName;
+                                break;
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    if (netListPtr != IntPtr.Zero) WlanFreeMemory(netListPtr);
+                }
+
+                var connParams = new WLAN_CONNECTION_PARAMETERS
+                {
+                    wlanConnectionMode = WLAN_CONNECTION_MODE_PROFILE,
+                    strProfile = matchingProfile,
+                    pDot11Ssid = IntPtr.Zero,
+                    pDesiredBssidList = IntPtr.Zero,
+                    dot11BssType = DOT11_BSS_TYPE_INFRASTRUCTURE,
+                    dwFlags = 0
+                };
+
+                if (WlanConnect(client, ref ifaceGuid, ref connParams, IntPtr.Zero) == 0)
+                    return true;
+            }
+        }
+        catch { }
+        finally
+        {
+            if (ifaceListPtr != IntPtr.Zero) WlanFreeMemory(ifaceListPtr);
+            if (client != IntPtr.Zero) WlanCloseHandle(client, IntPtr.Zero);
+        }
+        return false;
     }
 
     private static HashSet<string> GetSavedWlanProfiles()
@@ -468,17 +677,63 @@ internal sealed class NetworkService : IDisposable
 
     private static void OpenUri(string uri)
     {
+        SafeProcessLauncher.TryOpenShellUri(uri);
+    }
+
+    public async Task SampleAsync(bool suppressAlert = true)
+    {
+        if (_disposed || Interlocked.CompareExchange(ref _sampling, 1, 0) != 0)
+            return;
+
         try
         {
-            Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+            var result = await Task.Run(() => CollectNetworkSnapshot(suppressAlert)).ConfigureAwait(false);
+            if (_disposed || result == null) return;
+
+            var (snapshot, alert) = result.Value;
+            await _ui.InvokeAsync(() =>
+            {
+                if (_disposed) return;
+                Current = snapshot;
+                Updated?.Invoke(snapshot);
+                if (alert != null)
+                {
+                    ConnectivityAlert?.Invoke(alert);
+                }
+            });
         }
         catch (Exception ex)
         {
-            App.Log($"[NetworkService] Failed to launch '{uri}': {ex.Message}");
+            App.Log($"[NetworkService] SampleAsync error: {ex.Message}");
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _sampling, 0);
         }
     }
 
     public void Sample(bool suppressAlert = true)
+    {
+        try
+        {
+            var result = CollectNetworkSnapshot(suppressAlert);
+            if (result == null) return;
+
+            var (snapshot, alert) = result.Value;
+            Current = snapshot;
+            Updated?.Invoke(snapshot);
+            if (alert != null)
+            {
+                ConnectivityAlert?.Invoke(alert);
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[NetworkService] Sample error: {ex.Message}");
+        }
+    }
+
+    private (NetworkStatusSnapshot Snapshot, ToastContent? Alert)? CollectNetworkSnapshot(bool suppressAlert)
     {
         try
         {
@@ -520,8 +775,9 @@ internal sealed class NetworkService : IDisposable
                 // Fallback to System.Net.NetworkInformation below
             }
 
-            long totalRx = 0;
-            long totalTx = 0;
+            long deltaRx = 0;
+            long deltaTx = 0;
+            var currentAdapters = new Dictionary<string, (long Rx, long Tx)>(StringComparer.OrdinalIgnoreCase);
 
             var interfaces = NetworkInterface.GetAllNetworkInterfaces();
             foreach (var ni in interfaces)
@@ -532,8 +788,7 @@ internal sealed class NetworkService : IDisposable
                 try
                 {
                     var stats = ni.GetIPStatistics();
-                    totalRx += stats.BytesReceived;
-                    totalTx += stats.BytesSent;
+                    currentAdapters[ni.Id] = (stats.BytesReceived, stats.BytesSent);
                 }
                 catch { }
 
@@ -571,20 +826,38 @@ internal sealed class NetworkService : IDisposable
                 }
             }
 
-            var now = DateTime.UtcNow;
-            double dt = (now - _prevSampleTime).TotalSeconds;
+            DateTime now;
+            double dt;
             double rxRate = 0;
             double txRate = 0;
 
-            if (_prevBytesReceived >= 0 && dt > 0.1 && totalRx >= _prevBytesReceived && totalTx >= _prevBytesSent)
+            lock (_sampleLock)
             {
-                rxRate = (totalRx - _prevBytesReceived) / dt;
-                txRate = (totalTx - _prevBytesSent) / dt;
-            }
+                now = DateTime.UtcNow;
+                dt = (now - _prevSampleTime).TotalSeconds;
+                if (_prevAdapterBytes.Count > 0 && dt > 0.1)
+                {
+                    foreach (var kvp in currentAdapters)
+                    {
+                        if (_prevAdapterBytes.TryGetValue(kvp.Key, out var prev) &&
+                            kvp.Value.Rx >= prev.Rx && kvp.Value.Tx >= prev.Tx)
+                        {
+                            deltaRx += kvp.Value.Rx - prev.Rx;
+                            deltaTx += kvp.Value.Tx - prev.Tx;
+                        }
+                    }
 
-            _prevBytesReceived = totalRx;
-            _prevBytesSent = totalTx;
-            _prevSampleTime = now;
+                    rxRate = deltaRx / dt;
+                    txRate = deltaTx / dt;
+                }
+
+                _prevAdapterBytes.Clear();
+                foreach (var kvp in currentAdapters)
+                {
+                    _prevAdapterBytes[kvp.Key] = kvp.Value;
+                }
+                _prevSampleTime = now;
+            }
 
             if (!connected)
             {
@@ -623,9 +896,7 @@ internal sealed class NetworkService : IDisposable
                 PingText: pingText,
                 ShortSpeedText: FormatShortBandwidth(Math.Max(rxRate, txRate)));
 
-            Current = snapshot;
-            Updated?.Invoke(snapshot);
-
+            ToastContent? alert = null;
             string stateKey = $"{connected}|{isWifi}|{isEthernet}|{connName}";
             if (_lastToastConnectionKey == null)
             {
@@ -640,7 +911,7 @@ internal sealed class NetworkService : IDisposable
                 {
                     string title = isWifi ? $"Wi-Fi · {connName}" : "Ethernet Connected";
                     string sub = linkMbps > 0 ? $"{linkMbps} Mbps · {localIp}" : localIp;
-                    ConnectivityAlert?.Invoke(new ToastContent(
+                    alert = new ToastContent(
                         glyph,
                         title,
                         sub,
@@ -648,11 +919,11 @@ internal sealed class NetworkService : IDisposable
                         TimeSpan.FromSeconds(3.0),
                         TargetView: "network",
                         Priority: ToastPriority.System,
-                        Category: "network"));
+                        Category: "network");
                 }
                 else
                 {
-                    ConnectivityAlert?.Invoke(new ToastContent(
+                    alert = new ToastContent(
                         "\uEB5E",
                         "Network Disconnected",
                         connName,
@@ -660,13 +931,16 @@ internal sealed class NetworkService : IDisposable
                         TimeSpan.FromSeconds(3.0),
                         TargetView: "network",
                         Priority: ToastPriority.System,
-                        Category: "network"));
+                        Category: "network");
                 }
             }
+
+            return (snapshot, alert);
         }
         catch (Exception ex)
         {
-            App.Log($"[NetworkService] Sample error: {ex.Message}");
+            App.Log($"[NetworkService] CollectNetworkSnapshot error: {ex.Message}");
+            return null;
         }
     }
 
@@ -685,25 +959,29 @@ internal sealed class NetworkService : IDisposable
 
     private async Task UpdatePingAsync()
     {
-        if ((DateTime.UtcNow - _lastPingTime).TotalSeconds < 4.0) return;
+        double backoffSec = _pingFailures == 0 ? 4.0 : Math.Min(60.0, 4.0 * Math.Pow(2, _pingFailures));
+        if ((DateTime.UtcNow - _lastPingTime).TotalSeconds < backoffSec) return;
         _lastPingTime = DateTime.UtcNow;
 
         try
         {
             using var ping = new Ping();
-            var reply = await ping.SendPingAsync("1.1.1.1", 1200);
+            var reply = await ping.SendPingAsync("1.1.1.1", 1200).ConfigureAwait(false);
             if (reply.Status == IPStatus.Success)
             {
                 _lastPingMs = (int)reply.RoundtripTime;
+                _pingFailures = 0;
             }
             else
             {
                 _lastPingMs = -1;
+                _pingFailures = Math.Min(_pingFailures + 1, 5);
             }
         }
         catch
         {
             _lastPingMs = -1;
+            _pingFailures = Math.Min(_pingFailures + 1, 5);
         }
     }
 
@@ -729,6 +1007,7 @@ internal sealed class NetworkService : IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         _sampleTimer.Stop();
         try
         {

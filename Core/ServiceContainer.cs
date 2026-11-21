@@ -7,61 +7,87 @@ namespace DynamicIsland.Core;
 public sealed class ServiceContainer : IDisposable
 {
     private readonly Dictionary<Type, object> _services = new();
-    private readonly List<IDisposable> _disposables = new();
+    private readonly List<object> _disposables = new();
+    private readonly object _lock = new();
     private bool _disposed;
 
     public T Register<T>(T instance) where T : class
     {
         ArgumentNullException.ThrowIfNull(instance);
-        _services[typeof(T)] = instance;
-        if (instance is IDisposable disposable && !_disposables.Contains(disposable))
+        lock (_lock)
         {
-            _disposables.Add(disposable);
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _services[typeof(T)] = instance;
+            if ((instance is IDisposable || instance is IAsyncDisposable) && !_disposables.Contains(instance))
+            {
+                _disposables.Add(instance);
+            }
+            return instance;
         }
-        return instance;
     }
 
     public T Get<T>() where T : class
     {
-        if (_services.TryGetValue(typeof(T), out var service) && service is T typed)
+        lock (_lock)
         {
-            return typed;
+            if (_services.TryGetValue(typeof(T), out var service) && service is T typed)
+            {
+                return typed;
+            }
         }
         throw new InvalidOperationException($"Service of type {typeof(T).Name} is not registered.");
     }
 
     public bool TryGet<T>(out T? service) where T : class
     {
-        if (_services.TryGetValue(typeof(T), out var raw) && raw is T typed)
+        lock (_lock)
         {
-            service = typed;
-            return true;
+            if (_services.TryGetValue(typeof(T), out var raw) && raw is T typed)
+            {
+                service = typed;
+                return true;
+            }
         }
         service = null;
         return false;
     }
 
-    public int Count => _services.Count;
+    public int Count
+    {
+        get { lock (_lock) return _services.Count; }
+    }
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        object[] toDispose;
+        lock (_lock)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            toDispose = _disposables.ToArray();
+            _disposables.Clear();
+            _services.Clear();
+        }
 
         // Dispose in reverse order of registration so dependent services clean up before shared dependencies.
-        for (int i = _disposables.Count - 1; i >= 0; i--)
+        for (int i = toDispose.Length - 1; i >= 0; i--)
         {
+            var item = toDispose[i];
             try
             {
-                _disposables[i].Dispose();
+                if (item is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+                else if (item is IAsyncDisposable asyncDisposable)
+                {
+                    Task.Run(() => asyncDisposable.DisposeAsync().AsTask()).GetAwaiter().GetResult();
+                }
             }
             catch (Exception ex)
             {
-                App.Log($"[ServiceContainer] Error disposing {_disposables[i].GetType().Name}: {ex.Message}");
+                App.Log($"[ServiceContainer] Error disposing {item.GetType().Name}: {ex.Message}");
             }
         }
-
-        _disposables.Clear();
-        _services.Clear();
     }
 }

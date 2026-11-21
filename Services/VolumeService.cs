@@ -13,14 +13,34 @@ internal sealed class VolumeService : IDisposable
 {
     private readonly Dispatcher _ui;
     private readonly MMDeviceEnumerator _enumerator;
+    private readonly object _syncLock = new();
     private MMDevice? _device;
     private AudioEndpointVolume? _volume;
-    private bool _disposed;
+    private volatile bool _disposed;
     private float _lastVolume = -1f;
     private bool _lastMute;
 
-    public float CurrentVolume => _volume?.MasterVolumeLevelScalar ?? (_lastVolume >= 0f ? _lastVolume : 0.5f);
-    public bool IsMuted => _volume?.Mute ?? _lastMute;
+    public float CurrentVolume
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _volume?.MasterVolumeLevelScalar ?? (_lastVolume >= 0f ? _lastVolume : 0.5f);
+            }
+        }
+    }
+
+    public bool IsMuted
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _volume?.Mute ?? _lastMute;
+            }
+        }
+    }
 
     public event Action<float, bool>? VolumeChanged;
 
@@ -40,25 +60,29 @@ internal sealed class VolumeService : IDisposable
 
     private void AttachEndpoint()
     {
-        try
+        lock (_syncLock)
         {
-            DetachEndpoint();
-            _device = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-            if (_device != null)
+            if (_disposed) return;
+            try
             {
-                _volume = _device.AudioEndpointVolume;
-                _lastVolume = _volume.MasterVolumeLevelScalar;
-                _lastMute = _volume.Mute;
-                _volume.OnVolumeNotification += OnVolumeNotification;
+                DetachEndpointLocked();
+                _device = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                if (_device != null)
+                {
+                    _volume = _device.AudioEndpointVolume;
+                    _lastVolume = _volume.MasterVolumeLevelScalar;
+                    _lastMute = _volume.Mute;
+                    _volume.OnVolumeNotification += OnVolumeNotification;
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            App.Log($"[VolumeService] Attach failed: {ex.Message}");
+            catch (Exception ex)
+            {
+                App.Log($"[VolumeService] Attach failed: {ex.Message}");
+            }
         }
     }
 
-    private void DetachEndpoint()
+    private void DetachEndpointLocked()
     {
         if (_volume != null)
         {
@@ -79,67 +103,90 @@ internal sealed class VolumeService : IDisposable
         float vol = data.MasterVolume;
         bool mute = data.Muted;
 
-        if (Math.Abs(vol - _lastVolume) < 0.005f && mute == _lastMute) return;
-        _lastVolume = vol;
-        _lastMute = mute;
+        lock (_syncLock)
+        {
+            if (_disposed) return;
+            if (Math.Abs(vol - _lastVolume) < 0.005f && mute == _lastMute) return;
+            _lastVolume = vol;
+            _lastMute = mute;
+        }
 
-        _ui.InvokeAsync(() => VolumeChanged?.Invoke(vol, mute));
+        _ui.InvokeAsync(() =>
+        {
+            if (!_disposed) VolumeChanged?.Invoke(vol, mute);
+        });
     }
 
     public void SetVolume(float scalar)
     {
-        try
+        lock (_syncLock)
         {
-            if (_volume == null) AttachEndpoint();
-            if (_volume == null) return;
+            if (_disposed) return;
+            try
+            {
+                if (_volume == null) AttachEndpoint();
+                if (_volume == null) return;
 
-            float target = Math.Clamp(scalar, 0f, 1f);
-            if (_volume.Mute && target > 0) _volume.Mute = false;
-            _volume.MasterVolumeLevelScalar = target;
-        }
-        catch (Exception ex)
-        {
-            App.Log($"[VolumeService] SetVolume failed: {ex.Message}");
-            AttachEndpoint();
+                float target = Math.Clamp(scalar, 0f, 1f);
+                if (_volume.Mute && target > 0) _volume.Mute = false;
+                _volume.MasterVolumeLevelScalar = target;
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[VolumeService] SetVolume failed: {ex.Message}");
+                AttachEndpoint();
+            }
         }
     }
 
     public void StepVolume(float delta)
     {
-        try
+        lock (_syncLock)
         {
-            if (_volume == null) AttachEndpoint();
-            if (_volume == null) return;
+            if (_disposed) return;
+            try
+            {
+                if (_volume == null) AttachEndpoint();
+                if (_volume == null) return;
 
-            float current = _volume.MasterVolumeLevelScalar;
-            float target = Math.Clamp(current + delta, 0f, 1f);
-            if (_volume.Mute && delta > 0) _volume.Mute = false;
-            _volume.MasterVolumeLevelScalar = target;
-        }
-        catch (Exception ex)
-        {
-            App.Log($"[VolumeService] Step failed: {ex.Message}");
-            AttachEndpoint();
+                float current = _volume.MasterVolumeLevelScalar;
+                float target = Math.Clamp(current + delta, 0f, 1f);
+                if (_volume.Mute && delta > 0) _volume.Mute = false;
+                _volume.MasterVolumeLevelScalar = target;
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[VolumeService] Step failed: {ex.Message}");
+                AttachEndpoint();
+            }
         }
     }
 
     public void ToggleMute()
     {
-        try
+        lock (_syncLock)
         {
-            if (_volume == null) AttachEndpoint();
-            if (_volume == null) return;
-            _volume.Mute = !_volume.Mute;
-        }
-        catch (Exception ex)
-        {
-            App.Log($"[VolumeService] ToggleMute failed: {ex.Message}");
+            if (_disposed) return;
+            try
+            {
+                if (_volume == null) AttachEndpoint();
+                if (_volume == null) return;
+                _volume.Mute = !_volume.Mute;
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[VolumeService] ToggleMute failed: {ex.Message}");
+            }
         }
     }
 
     public void Dispose()
     {
-        _disposed = true;
-        DetachEndpoint();
+        lock (_syncLock)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            DetachEndpointLocked();
+        }
     }
 }

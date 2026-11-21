@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -178,8 +179,13 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
     private readonly Dispatcher _ui;
     private readonly MMDeviceEnumerator _enumerator;
     private readonly Dictionary<string, int> _bluetoothBatteryCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<uint, float> _pendingAppVolumes = new();
+    private readonly System.Threading.Timer _endpointDebounceTimer;
     private readonly object _refreshLock = new();
-    private bool _disposed;
+    private int _refreshRunning;
+    private int _refreshPending;
+    private int _appVolumeWorkerActive;
+    private volatile bool _disposed;
     private string? _lastDefaultId;
 
     public IReadOnlyList<AudioEndpointInfo> Endpoints { get; private set; } = Array.Empty<AudioEndpointInfo>();
@@ -196,6 +202,7 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
     {
         _ui = ui;
         _enumerator = new MMDeviceEnumerator();
+        _endpointDebounceTimer = new System.Threading.Timer(_ => RefreshEndpoints(), null, Timeout.Infinite, Timeout.Infinite);
         try
         {
             _enumerator.RegisterEndpointNotificationCallback(this);
@@ -208,15 +215,32 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
         RefreshEndpoints(initial: true);
     }
 
+    private void ScheduleRefreshEndpoints()
+    {
+        if (_disposed) return;
+        try
+        {
+            _endpointDebounceTimer.Change(150, Timeout.Infinite);
+        }
+        catch { }
+    }
+
     public void RefreshEndpoints(bool initial = false)
     {
         if (_disposed) return;
+        if (Interlocked.CompareExchange(ref _refreshRunning, 1, 0) != 0)
+        {
+            if (!initial) Volatile.Write(ref _refreshPending, 1);
+            return;
+        }
 
         Task.Run(() =>
         {
-            lock (_refreshLock)
+            try
             {
-                if (_disposed) return;
+                lock (_refreshLock)
+                {
+                    if (_disposed) return;
 
                 try
                 {
@@ -230,43 +254,49 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
 
                     var list = new List<AudioEndpointInfo>();
                     var collection = _enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
-
-                    foreach (var dev in collection)
+                    try
                     {
-                        try
+                        foreach (var dev in collection)
                         {
-                            string id = dev.ID;
-                            string name = dev.FriendlyName;
-                            bool isDef = string.Equals(id, defaultId, StringComparison.OrdinalIgnoreCase);
-
-                            float vol = 1.0f;
-                            bool muted = false;
                             try
                             {
-                                vol = dev.AudioEndpointVolume.MasterVolumeLevelScalar;
-                                muted = dev.AudioEndpointVolume.Mute;
+                                string id = dev.ID;
+                                string name = dev.FriendlyName;
+                                bool isDef = string.Equals(id, defaultId, StringComparison.OrdinalIgnoreCase);
+
+                                float vol = 1.0f;
+                                bool muted = false;
+                                try
+                                {
+                                    vol = dev.AudioEndpointVolume.MasterVolumeLevelScalar;
+                                    muted = dev.AudioEndpointVolume.Mute;
+                                }
+                                catch { }
+
+                                var (type, glyph) = InferDeviceTypeAndGlyph(name);
+                                int? battery = FindBatteryForDevice(name);
+
+                                list.Add(new AudioEndpointInfo
+                                {
+                                    Id = id,
+                                    Name = name,
+                                    DeviceType = type,
+                                    Glyph = glyph,
+                                    IsDefault = isDef,
+                                    Volume = vol,
+                                    IsMuted = muted,
+                                    BatteryPercent = battery
+                                });
                             }
-                            catch { }
-
-                            var (type, glyph) = InferDeviceTypeAndGlyph(name);
-                            int? battery = FindBatteryForDevice(name);
-
-                            list.Add(new AudioEndpointInfo
+                            finally
                             {
-                                Id = id,
-                                Name = name,
-                                DeviceType = type,
-                                Glyph = glyph,
-                                IsDefault = isDef,
-                                Volume = vol,
-                                IsMuted = muted,
-                                BatteryPercent = battery
-                            });
+                                try { dev.Dispose(); } catch { }
+                            }
                         }
-                        finally
-                        {
-                            try { dev.Dispose(); } catch { }
-                        }
+                    }
+                    finally
+                    {
+                        try { (collection as IDisposable)?.Dispose(); } catch { }
                     }
 
                     Endpoints = list;
@@ -289,6 +319,15 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
                     App.Log($"[AudioEndpointService] RefreshEndpoints error: {ex.Message}");
                 }
             }
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _refreshRunning, 0);
+                if (!_disposed && Interlocked.Exchange(ref _refreshPending, 0) == 1)
+                {
+                    RefreshEndpoints(initial: false);
+                }
+            }
         });
     }
 
@@ -296,9 +335,10 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
     {
         Task.Run(() =>
         {
+            IPolicyConfig? policy = null;
             try
             {
-                var policy = (IPolicyConfig)new CPolicyConfigClient();
+                policy = (IPolicyConfig)new CPolicyConfigClient();
                 policy.SetDefaultEndpoint(deviceId, AudioRole.Console);
                 policy.SetDefaultEndpoint(deviceId, AudioRole.Multimedia);
                 policy.SetDefaultEndpoint(deviceId, AudioRole.Communications);
@@ -309,6 +349,13 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
             catch (Exception ex)
             {
                 App.Log($"[AudioEndpointService] Failed to set default endpoint {deviceId}: {ex}");
+            }
+            finally
+            {
+                if (policy != null && Marshal.IsComObject(policy))
+                {
+                    try { Marshal.ReleaseComObject(policy); } catch { }
+                }
             }
         });
     }
@@ -376,80 +423,92 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
                 using var dev = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
                 if (dev == null) return;
 
-                var sessions = dev.AudioSessionManager.Sessions;
-                var byPid = new Dictionary<uint, AppAudioSessionInfo>();
-                uint selfPid = (uint)Environment.ProcessId;
-
-                for (int i = 0; i < sessions.Count; i++)
+                var sessionMgr = dev.AudioSessionManager;
+                try
                 {
-                    var s = sessions[i];
-                    try
+                    var sessions = sessionMgr.Sessions;
+                    var byPid = new Dictionary<uint, AppAudioSessionInfo>();
+                    uint selfPid = (uint)Environment.ProcessId;
+
+                    for (int i = 0; i < sessions.Count; i++)
                     {
-                        if (s.State == AudioSessionState.AudioSessionStateExpired)
-                            continue;
-
-                        uint pid = s.GetProcessID;
-                        if (pid == selfPid) continue;
-
-                        float vol = s.SimpleAudioVolume.Volume;
-                        bool muted = s.SimpleAudioVolume.Mute;
-
-                        if (s.IsSystemSoundsSession || pid == 0)
-                        {
-                            if (!byPid.ContainsKey(0))
-                            {
-                                byPid[0] = new AppAudioSessionInfo
-                                {
-                                    ProcessId = 0,
-                                    AppName = "System Sounds",
-                                    Subtitle = "Windows Audio",
-                                    Glyph = "\uE777",
-                                    Volume = vol,
-                                    IsMuted = muted
-                                };
-                            }
-                            continue;
-                        }
-
-                        if (byPid.ContainsKey(pid)) continue;
-
-                        string appName = ResolveAppName(pid, s.DisplayName);
-                        if (string.IsNullOrWhiteSpace(appName)) continue;
-
-                        string? exePath = null;
+                        var s = sessions[i];
                         try
                         {
-                            using var proc = Process.GetProcessById((int)pid);
-                            exePath = proc.MainModule?.FileName;
+                            if (s.State == AudioSessionState.AudioSessionStateExpired)
+                                continue;
+
+                            uint pid = s.GetProcessID;
+                            if (pid == selfPid) continue;
+
+                            float vol = s.SimpleAudioVolume.Volume;
+                            bool muted = s.SimpleAudioVolume.Mute;
+
+                            if (s.IsSystemSoundsSession || pid == 0)
+                            {
+                                if (!byPid.ContainsKey(0))
+                                {
+                                    byPid[0] = new AppAudioSessionInfo
+                                    {
+                                        ProcessId = 0,
+                                        AppName = "System Sounds",
+                                        Subtitle = "Windows Audio",
+                                        Glyph = "\uE777",
+                                        Volume = vol,
+                                        IsMuted = muted
+                                    };
+                                }
+                                continue;
+                            }
+
+                            if (byPid.ContainsKey(pid)) continue;
+
+                            string appName = ResolveAppName(pid, s.DisplayName);
+                            if (string.IsNullOrWhiteSpace(appName)) continue;
+
+                            string? exePath = null;
+                            try
+                            {
+                                using var proc = Process.GetProcessById((int)pid);
+                                exePath = proc.MainModule?.FileName;
+                            }
+                            catch { }
+
+                            var appIcon = !string.IsNullOrEmpty(exePath) ? Core.AppIconLoader.GetAppIcon(exePath) : null;
+
+                            byPid[pid] = new AppAudioSessionInfo
+                            {
+                                ProcessId = pid,
+                                AppName = appName,
+                                Subtitle = s.State == AudioSessionState.AudioSessionStateActive ? "Playing Audio" : "Idle Session",
+                                Glyph = GlyphForAppAudio(appName),
+                                AppIcon = appIcon,
+                                Volume = vol,
+                                IsMuted = muted
+                            };
                         }
-                        catch { }
-
-                        var appIcon = !string.IsNullOrEmpty(exePath) ? Views.Widgets.LauncherView.GetAppIcon(exePath) : null;
-
-                        byPid[pid] = new AppAudioSessionInfo
+                        catch
                         {
-                            ProcessId = pid,
-                            AppName = appName,
-                            Subtitle = s.State == AudioSessionState.AudioSessionStateActive ? "Playing Audio" : "Idle Session",
-                            Glyph = GlyphForAppAudio(appName),
-                            AppIcon = appIcon,
-                            Volume = vol,
-                            IsMuted = muted
-                        };
+                        }
+                        finally
+                        {
+                            try { s.Dispose(); } catch { }
+                        }
                     }
-                    catch
-                    {
-                    }
+
+                    var result = byPid.Values
+                        .OrderByDescending(x => x.Subtitle == "Playing Audio")
+                        .ThenBy(x => x.ProcessId == 0)
+                        .ThenBy(x => x.AppName)
+                        .ToList();
+
+                    AppSessions = result;
+                    _ui.InvokeAsync(() => AppSessionsChanged?.Invoke(AppSessions));
                 }
-
-                var result = byPid.Values
-                    .OrderByDescending(x => x.Subtitle == "Playing Audio")
-                    .ThenBy(x => x.ProcessId == 0)
-                    .ThenBy(x => x.AppName)
-                    .ToList();
-
-                AppSessions = result;
-                _ui.InvokeAsync(() => AppSessionsChanged?.Invoke(AppSessions));
+                finally
+                {
+                    try { (sessionMgr as IDisposable)?.Dispose(); } catch { }
+                }
             }
             catch (Exception ex)
             {
@@ -467,28 +526,74 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
             sessionInfo.Volume = clamped;
         }
 
-        Task.Run(() =>
+        _pendingAppVolumes[processId] = clamped;
+        if (!_disposed && Interlocked.CompareExchange(ref _appVolumeWorkerActive, 1, 0) == 0)
         {
-            try
+            _ = Task.Run(ProcessPendingAppVolumes);
+        }
+    }
+
+    private void ProcessPendingAppVolumes()
+    {
+        try
+        {
+            while (!_disposed && !_pendingAppVolumes.IsEmpty)
             {
-                using var dev = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-                if (dev == null) return;
-                var sessions = dev.AudioSessionManager.Sessions;
-                for (int i = 0; i < sessions.Count; i++)
+                var batch = new Dictionary<uint, float>();
+                foreach (var pid in _pendingAppVolumes.Keys)
                 {
-                    var s = sessions[i];
-                    if ((processId == 0 && (s.IsSystemSoundsSession || s.GetProcessID == 0)) ||
-                        (processId != 0 && s.GetProcessID == processId))
+                    if (_pendingAppVolumes.TryRemove(pid, out float val))
                     {
-                        s.SimpleAudioVolume.Volume = clamped;
+                        batch[pid] = val;
                     }
                 }
+                if (batch.Count == 0) break;
+
+                try
+                {
+                    using var dev = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                    if (dev == null) continue;
+                    var sessionMgr = dev.AudioSessionManager;
+                    try
+                    {
+                        var sessions = sessionMgr.Sessions;
+                        for (int i = 0; i < sessions.Count; i++)
+                        {
+                            var s = sessions[i];
+                            try
+                            {
+                                uint sPid = (s.IsSystemSoundsSession || s.GetProcessID == 0) ? 0u : s.GetProcessID;
+                                if (batch.TryGetValue(sPid, out float targetVol))
+                                {
+                                    s.SimpleAudioVolume.Volume = targetVol;
+                                }
+                            }
+                            finally
+                            {
+                                try { s.Dispose(); } catch { }
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        try { (sessionMgr as IDisposable)?.Dispose(); } catch { }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    App.Log($"[AudioEndpointService] SetAppSessionVolume error: {ex.Message}");
+                }
             }
-            catch (Exception ex)
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _appVolumeWorkerActive, 0);
+            if (!_disposed && !_pendingAppVolumes.IsEmpty &&
+                Interlocked.CompareExchange(ref _appVolumeWorkerActive, 1, 0) == 0)
             {
-                App.Log($"[AudioEndpointService] SetAppSessionVolume error: {ex.Message}");
+                _ = Task.Run(ProcessPendingAppVolumes);
             }
-        });
+        }
     }
 
     public void ToggleAppSessionMute(uint processId)
@@ -499,18 +604,32 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
             {
                 using var dev = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
                 if (dev == null) return;
-                var sessions = dev.AudioSessionManager.Sessions;
+                var sessionMgr = dev.AudioSessionManager;
                 bool? nextMute = null;
-
-                for (int i = 0; i < sessions.Count; i++)
+                try
                 {
-                    var s = sessions[i];
-                    if ((processId == 0 && (s.IsSystemSoundsSession || s.GetProcessID == 0)) ||
-                        (processId != 0 && s.GetProcessID == processId))
+                    var sessions = sessionMgr.Sessions;
+                    for (int i = 0; i < sessions.Count; i++)
                     {
-                        nextMute ??= !s.SimpleAudioVolume.Mute;
-                        s.SimpleAudioVolume.Mute = nextMute.Value;
+                        var s = sessions[i];
+                        try
+                        {
+                            if ((processId == 0 && (s.IsSystemSoundsSession || s.GetProcessID == 0)) ||
+                                (processId != 0 && s.GetProcessID == processId))
+                            {
+                                nextMute ??= !s.SimpleAudioVolume.Mute;
+                                s.SimpleAudioVolume.Mute = nextMute.Value;
+                            }
+                        }
+                        finally
+                        {
+                            try { s.Dispose(); } catch { }
+                        }
                     }
+                }
+                finally
+                {
+                    try { (sessionMgr as IDisposable)?.Dispose(); } catch { }
                 }
 
                 if (nextMute.HasValue)
@@ -566,29 +685,8 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
         return "\uE767";
     }
 
-    private static (string Type, string Glyph) InferDeviceTypeAndGlyph(string name)
-    {
-        string lower = name.ToLowerInvariant();
-
-        if (lower.Contains("headphone") || lower.Contains("headset") || lower.Contains("earbuds") ||
-            lower.Contains("airpods") || lower.Contains("buds") || lower.Contains("wh-1000") ||
-            lower.Contains("freebuds") || lower.Contains("xm4") || lower.Contains("xm5"))
-        {
-            return ("Headphones", "\uE7F6");
-        }
-        if (lower.Contains("bluetooth") || lower.Contains("hands-free") || lower.Contains("wireless"))
-        {
-            return ("Bluetooth", "\uE702");
-        }
-        if (lower.Contains("nvidia") || lower.Contains("amd") || lower.Contains("intel") ||
-            lower.Contains("hdmi") || lower.Contains("displayport") || lower.Contains("tv") ||
-            lower.Contains("monitor") || lower.Contains("screen"))
-        {
-            return ("Display Audio", "\uE7F4");
-        }
-
-        return ("Speakers", "\uE7F5");
-    }
+    private static (string Type, string Glyph) InferDeviceTypeAndGlyph(string name) =>
+        Core.DeviceClassifier.ClassifyAudioEndpoint(name);
 
     /// <summary>
     /// Updates the Bluetooth battery lookup table from the shared <see cref="PeripheralDeviceService"/> scan,
@@ -646,15 +744,15 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
     //  IMMNotificationClient Callbacks
     // ═════════════════════════════════════════════════════════════════
 
-    public void OnDeviceStateChanged(string deviceId, DeviceState newState) => RefreshEndpoints();
-    public void OnDeviceAdded(string pwstrDeviceId) => RefreshEndpoints();
-    public void OnDeviceRemoved(string deviceId) => RefreshEndpoints();
+    public void OnDeviceStateChanged(string deviceId, DeviceState newState) => ScheduleRefreshEndpoints();
+    public void OnDeviceAdded(string pwstrDeviceId) => ScheduleRefreshEndpoints();
+    public void OnDeviceRemoved(string deviceId) => ScheduleRefreshEndpoints();
 
     public void OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
     {
         if (flow == DataFlow.Render && (role == Role.Multimedia || role == Role.Console))
         {
-            RefreshEndpoints();
+            ScheduleRefreshEndpoints();
         }
         else if (flow == DataFlow.Capture && (role == Role.Communications || role == Role.Console))
         {
@@ -667,6 +765,7 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
     public void Dispose()
     {
         _disposed = true;
+        try { _endpointDebounceTimer.Dispose(); } catch { }
         try
         {
             _enumerator.UnregisterEndpointNotificationCallback(this);

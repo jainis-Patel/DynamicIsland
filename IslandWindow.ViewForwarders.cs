@@ -435,7 +435,7 @@ public partial class IslandWindow
     internal TextBlock AutoCheckToggleText => SettingsContainer.AutoCheckToggleText;
     internal Button AutoDownloadToggleBtn => SettingsContainer.AutoDownloadToggleBtn;
     internal TextBlock AutoDownloadToggleText => SettingsContainer.AutoDownloadToggleText;
-    internal TextBox GitHubTokenBox => SettingsContainer.GitHubTokenBox;
+    internal PasswordBox GitHubTokenBox => SettingsContainer.GitHubTokenBox;
     internal TextBlock LastCheckTimestampText => SettingsContainer.LastCheckTimestampText;
     internal Button ToggleVersionHistoryBtn => SettingsContainer.ToggleVersionHistoryBtn;
     internal TextBlock ToggleVersionHistoryText => SettingsContainer.ToggleVersionHistoryText;

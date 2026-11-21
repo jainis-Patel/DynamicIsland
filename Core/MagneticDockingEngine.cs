@@ -96,15 +96,13 @@ public static class MagneticDockingEngine
         }
 
         // 6. Free Floating clamped within work area
-        double clampedX = Math.Clamp(
-            rawCenter.X,
-            workArea.Left + (pillWidth / 2.0) + 8.0,
-            workArea.Right - (pillWidth / 2.0) - 8.0);
+        double minX = workArea.Left + (pillWidth / 2.0) + 8.0;
+        double maxX = workArea.Right - (pillWidth / 2.0) - 8.0;
+        double clampedX = Math.Clamp(rawCenter.X, minX, Math.Max(minX, maxX));
 
-        double clampedY = Math.Clamp(
-            rawCenter.Y,
-            workArea.Top + (pillHeight / 2.0) + 8.0,
-            workArea.Bottom - (pillHeight / 2.0) - 8.0);
+        double minY = workArea.Top + (pillHeight / 2.0) + 8.0;
+        double maxY = workArea.Bottom - (pillHeight / 2.0) - 8.0;
+        double clampedY = Math.Clamp(rawCenter.Y, minY, Math.Max(minY, maxY));
 
         return (MagneticDockTarget.None, new Point(clampedX, clampedY));
     }
@@ -149,7 +147,7 @@ public static class MagneticDockingEngine
         string rStr = r.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
         return isLeft
-            ? $"M 0,0 L {rStr},0 L {rStr},{rStr} A {rStr},{rStr} 0 0 1 0,0 Z"
-            : $"M 0,{rStr} L 0,0 L {rStr},0 A {rStr},{rStr} 0 0 1 0,{rStr} Z";
+            ? $"M 0,0 L {rStr},0 L {rStr},{rStr} A {rStr},{rStr} 0 0 0 0,0 Z"
+            : $"M 0,{rStr} L 0,0 L {rStr},0 A {rStr},{rStr} 0 0 0 0,{rStr} Z";
     }
 }

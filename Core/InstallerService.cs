@@ -13,7 +13,7 @@ internal static class InstallerService
 {
     public const string AppDisplayName = "Dynamic Island";
     public const string AppPublisher = "Jainis Patel";
-    public const string AppVersion = "0.7.0";
+    public const string AppVersion = "0.8.0";
 
     public static string GetDefaultInstallDir()
     {
@@ -36,6 +36,12 @@ internal static class InstallerService
     {
         string desktopFolder = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
         return Path.Combine(desktopFolder, "Dynamic Island.lnk");
+    }
+
+    public static string GetStartupShortcutPath()
+    {
+        string startupFolder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+        return Path.Combine(startupFolder, "Dynamic Island.lnk");
     }
 
     public static (bool IsInstalled, string? Version, string? Location) GetExistingInstallation()
@@ -137,9 +143,47 @@ internal static class InstallerService
     public static bool IsSilent(string[] args)
     {
         return args.Any(a => string.Equals(a, "--silent", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(a, "/silent", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(a, "/verysilent", StringComparison.OrdinalIgnoreCase) ||
                              string.Equals(a, "/S", StringComparison.OrdinalIgnoreCase) ||
                              string.Equals(a, "/quiet", StringComparison.OrdinalIgnoreCase) ||
                              string.Equals(a, "-s", StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static bool ShouldRelaunchAfterSilentInstall(string[] args)
+    {
+        return args.Any(a => string.Equals(a, "--relaunch", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(a, "/RESTARTAPPLICATIONS", StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static bool TryParseWaitPid(string[] args, out int pid)
+    {
+        pid = 0;
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (string.Equals(args[i], "--wait-pid", StringComparison.OrdinalIgnoreCase) &&
+                int.TryParse(args[i + 1], out int parsed) && parsed > 0)
+            {
+                pid = parsed;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static bool TryParseTargetDir(string[] args, out string? targetDir)
+    {
+        targetDir = null;
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (string.Equals(args[i], "--target-dir", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(args[i + 1]))
+            {
+                targetDir = args[i + 1].Trim().Trim('"');
+                return !string.IsNullOrWhiteSpace(targetDir);
+            }
+        }
+        return false;
     }
 
     public static bool CreateShortcut(string shortcutPath, string targetExePath, string description)
@@ -208,10 +252,13 @@ internal static class InstallerService
         try
         {
             progress?.Report((15, "Closing any running Dynamic Island processes..."));
-            string resolvedDir = targetDir ?? GetDefaultInstallDir();
+            string resolvedDir = !string.IsNullOrWhiteSpace(targetDir)
+                ? targetDir
+                : (GetExistingInstallation().Location ?? GetDefaultInstallDir());
             Directory.CreateDirectory(resolvedDir);
 
             string targetExe = Path.Combine(resolvedDir, "DynamicIsland.exe");
+            string backupExe = targetExe + ".bak";
             string? currentExe = Environment.ProcessPath;
 
             // Stop any existing running instance
@@ -223,19 +270,53 @@ internal static class InstallerService
             if (!string.IsNullOrEmpty(currentExe) &&
                 !string.Equals(Path.GetFullPath(currentExe), Path.GetFullPath(targetExe), StringComparison.OrdinalIgnoreCase))
             {
-                // Retry file copy up to 3 times in case of lingering locks
-                int retries = 3;
-                while (retries-- > 0)
+                bool movedExistingToBackup = false;
+                try
                 {
-                    try
+                    if (File.Exists(targetExe))
                     {
-                        File.Copy(currentExe, targetExe, overwrite: true);
-                        break;
+                        try
+                        {
+                            File.Move(targetExe, backupExe, overwrite: true);
+                            movedExistingToBackup = true;
+                        }
+                        catch
+                        {
+                            // Fall through to direct overwrite retries below
+                        }
                     }
-                    catch (IOException) when (retries > 0)
+
+                    // Retry file copy up to 20 times (6s) in case an exiting process or AV scanner holds a brief lock
+                    int retries = 20;
+                    while (retries-- > 0)
                     {
-                        Thread.Sleep(500);
+                        try
+                        {
+                            File.Copy(currentExe, targetExe, overwrite: true);
+                            break;
+                        }
+                        catch (IOException) when (retries > 0)
+                        {
+                            Thread.Sleep(300);
+                        }
+                        catch (UnauthorizedAccessException) when (retries > 0)
+                        {
+                            Thread.Sleep(300);
+                        }
                     }
+
+                    if (File.Exists(backupExe))
+                    {
+                        try { File.Delete(backupExe); } catch { }
+                    }
+                }
+                catch
+                {
+                    if (movedExistingToBackup && !File.Exists(targetExe) && File.Exists(backupExe))
+                    {
+                        try { File.Move(backupExe, targetExe, overwrite: true); } catch { }
+                    }
+                    throw;
                 }
             }
 
@@ -311,9 +392,11 @@ internal static class InstallerService
             }
             catch { }
 
+            string installDir = GetExistingInstallation().Location ?? GetDefaultInstallDir();
+
             // Remove startup registration
             SetAutoStart(false, "");
-            string targetExe = Path.Combine(GetDefaultInstallDir(), "DynamicIsland.exe");
+            string targetExe = GetInstalledExePath(installDir);
             RemovePowerSavingGpuPreference(targetExe);
 
             // Remove Add/Remove Programs registry entry
@@ -334,7 +417,6 @@ internal static class InstallerService
             }
 
             // Schedule post-exit self deletion of installation directory
-            string installDir = GetDefaultInstallDir();
             try
             {
                 Process.Start(new ProcessStartInfo("cmd.exe", $"/c timeout /t 1 /nobreak >nul & rmdir /s /q \"{installDir}\"")
@@ -369,6 +451,15 @@ internal static class InstallerService
                 else
                 {
                     key.DeleteValue("DynamicIsland", throwOnMissingValue: false);
+                }
+            }
+
+            if (!enabled || string.IsNullOrWhiteSpace(exePath))
+            {
+                string startupShortcut = GetStartupShortcutPath();
+                if (File.Exists(startupShortcut))
+                {
+                    File.Delete(startupShortcut);
                 }
             }
         }
@@ -409,11 +500,11 @@ internal static class InstallerService
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", writable: false);
-            return key?.GetValue("DynamicIsland") != null;
+            return key?.GetValue("DynamicIsland") != null || File.Exists(GetStartupShortcutPath());
         }
         catch
         {
-            return false;
+            return File.Exists(GetStartupShortcutPath());
         }
     }
 

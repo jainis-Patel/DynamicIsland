@@ -1,12 +1,9 @@
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using DynamicIsland.Core;
 using DynamicIsland.Services;
@@ -25,6 +22,7 @@ public sealed class LauncherDisplayItem
     public ImageSource? IconSource { get; init; }
     public bool HasIcon => IconSource != null;
     public bool IsUserPinned { get; init; }
+    public bool IsFolder { get; init; }
     public Brush AccentBrush { get; init; } = ThemeBrushes.AmberDark;
     public Brush IconBgBrush { get; init; } = ThemeBrushes.DockInactiveBgDark;
     public Brush IconBorderBrush { get; init; } = ThemeBrushes.CardBorderDark;
@@ -74,8 +72,6 @@ public partial class LauncherView : UserControl
     private static readonly SolidColorBrush AppDefaultBg        = CreateFrozenBrush("#18FFFFFF");
     private static readonly SolidColorBrush AppDefaultBorder    = CreateFrozenBrush("#26FFFFFF");
 
-    private static readonly Dictionary<string, ImageSource?> _iconCache = new(StringComparer.OrdinalIgnoreCase);
-
     private enum LauncherFilterMode { All, Pinned, Folders }
     private LauncherFilterMode _currentFilter = LauncherFilterMode.All;
     private string _searchQuery = "";
@@ -83,30 +79,6 @@ public partial class LauncherView : UserControl
     private List<LauncherDisplayItem> _allCombined = new();
     private List<LauncherDisplayItem> _pinnedOnly = new();
     private List<LauncherDisplayItem> _foldersOnly = new();
-
-    #region Win32 Shell Icon Extraction Interop
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-    private struct SHFILEINFO
-    {
-        public IntPtr hIcon;
-        public int iIcon;
-        public uint dwAttributes;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        public string szDisplayName;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 80)]
-        public string szTypeName;
-    }
-
-    private const uint SHGFI_ICON = 0x000000100;
-    private const uint SHGFI_LARGEICON = 0x000000000;
-
-    [DllImport("shell32.dll", CharSet = CharSet.Auto)]
-    private static extern IntPtr SHGetFileInfo(string pszPath, uint dwFileAttributes, ref SHFILEINFO psfi, uint cbFileInfo, uint uFlags);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool DestroyIcon(IntPtr hIcon);
-    #endregion
 
     public LauncherView()
     {
@@ -189,7 +161,7 @@ public partial class LauncherView : UserControl
     {
         IEnumerable<LauncherDisplayItem> source = _currentFilter switch
         {
-            LauncherFilterMode.Pinned => _pinnedOnly.Where(i => i.Subtitle != "Folder").ToList(),
+            LauncherFilterMode.Pinned => _pinnedOnly.Where(i => !i.IsFolder).ToList(),
             LauncherFilterMode.Folders => _foldersOnly,
             _ => _allCombined
         };
@@ -228,105 +200,11 @@ public partial class LauncherView : UserControl
         TabWidgetsBtn.Foreground = _currentFilter == LauncherFilterMode.Folders ? TabActiveFg : TabInactiveFg;
     }
 
-    public static ImageSource? GetAppIcon(string targetPath)
-    {
-        if (string.IsNullOrWhiteSpace(targetPath)) return null;
+    public static ImageSource? GetAppIcon(string? targetPath) =>
+        AppIconLoader.GetAppIcon(targetPath);
 
-        lock (_iconCache)
-        {
-            if (_iconCache.TryGetValue(targetPath, out var cached))
-                return cached;
-        }
-
-        ImageSource? result = null;
-        try
-        {
-            string? resolved = ResolveExePath(targetPath);
-            if (!string.IsNullOrEmpty(resolved) && (File.Exists(resolved) || Directory.Exists(resolved)))
-            {
-                var shinfo = new SHFILEINFO();
-                IntPtr hSuccess = SHGetFileInfo(resolved, 0, ref shinfo, (uint)Marshal.SizeOf(shinfo), SHGFI_ICON | SHGFI_LARGEICON);
-                if (hSuccess != IntPtr.Zero && shinfo.hIcon != IntPtr.Zero)
-                {
-                    try
-                    {
-                        var bmp = Imaging.CreateBitmapSourceFromHIcon(
-                            shinfo.hIcon,
-                            Int32Rect.Empty,
-                            BitmapSizeOptions.FromEmptyOptions());
-                        bmp.Freeze();
-                        result = bmp;
-                    }
-                    finally
-                    {
-                        DestroyIcon(shinfo.hIcon);
-                    }
-                }
-            }
-        }
-        catch
-        {
-            result = null;
-        }
-
-        lock (_iconCache)
-        {
-            _iconCache[targetPath] = result;
-        }
-
-        return result;
-    }
-
-    private static string? ResolveExePath(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path)) return null;
-
-        try
-        {
-            if (File.Exists(path) || Directory.Exists(path)) return path;
-
-            // Expand environment variables (e.g. %SystemRoot%\System32\cmd.exe)
-            string expanded = Environment.ExpandEnvironmentVariables(path);
-            if (File.Exists(expanded)) return expanded;
-
-            // System32 lookup
-            string system32 = Environment.GetFolderPath(Environment.SpecialFolder.System);
-            string cand = Path.Combine(system32, path);
-            if (File.Exists(cand)) return cand;
-            if (!cand.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && File.Exists(cand + ".exe"))
-                return cand + ".exe";
-
-            // Windows directory lookup
-            string windir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-            cand = Path.Combine(windir, path);
-            if (File.Exists(cand)) return cand;
-            if (!cand.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && File.Exists(cand + ".exe"))
-                return cand + ".exe";
-
-            // PATH environment resolution
-            var pathEnv = Environment.GetEnvironmentVariable("PATH");
-            if (!string.IsNullOrEmpty(pathEnv))
-            {
-                foreach (var dir in pathEnv.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                {
-                    try
-                    {
-                        cand = Path.Combine(dir, path);
-                        if (File.Exists(cand)) return cand;
-                        if (!path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                        {
-                            cand = Path.Combine(dir, path + ".exe");
-                            if (File.Exists(cand)) return cand;
-                        }
-                    }
-                    catch { }
-                }
-            }
-        }
-        catch { }
-
-        return null;
-    }
+    private static string? ResolveExePath(string? path) =>
+        AppIconLoader.ResolveExePath(path);
 
     public void RefreshItems()
     {
@@ -348,6 +226,7 @@ public partial class LauncherView : UserControl
                     ActionHint = "Click to launch · Right-click for options",
                     IconSource = icon,
                     IsUserPinned = true,
+                    IsFolder = i.IsFolder,
                     AccentBrush = OrangeAccent,
                     IconBgBrush = AppDefaultBg,
                     IconBorderBrush = AppDefaultBorder
@@ -361,7 +240,7 @@ public partial class LauncherView : UserControl
 
         // Pure desktop application items only (all widgets migrated to Bento Widget Gallery)
         _allCombined = _pinnedOnly;
-        _foldersOnly = _pinnedOnly.Where(i => i.Subtitle == "Folder").ToList();
+        _foldersOnly = _pinnedOnly.Where(i => i.IsFolder).ToList();
 
         TabAllBtn.Content = $"All ({_allCombined.Count})";
         TabPinnedBtn.Content = $"Apps ({_pinnedOnly.Count - _foldersOnly.Count})";
@@ -443,7 +322,7 @@ public partial class LauncherView : UserControl
                     UseShellExecute = true,
                     Verb = "runas"
                 };
-                Process.Start(psi);
+                using var _ = Process.Start(psi);
             }
         }
         catch (Exception ex)
@@ -459,11 +338,11 @@ public partial class LauncherView : UserControl
             string? file = ResolveExePath(item.TargetPath);
             if (!string.IsNullOrEmpty(file) && File.Exists(file))
             {
-                Process.Start("explorer.exe", $"/select,\"{file}\"");
+                using var _ = Process.Start("explorer.exe", $"/select,\"{file}\"");
             }
             else if (Directory.Exists(item.TargetPath))
             {
-                Process.Start("explorer.exe", $"\"{item.TargetPath}\"");
+                using var _ = Process.Start("explorer.exe", $"\"{item.TargetPath}\"");
             }
         }
         catch { }
@@ -487,6 +366,7 @@ public partial class LauncherView : UserControl
                 bool ok = Island?.QuickLauncherServiceInstance?.Launch(item.Id, files) ?? false;
                 Island?.PushNotificationToast(item.Glyph, $"Opened in {item.Name}", $"{files.Length} file(s) sent", ThemeBrushes.GreenColor);
                 RefreshItems();
+                e.Handled = true;
             }
         }
     }

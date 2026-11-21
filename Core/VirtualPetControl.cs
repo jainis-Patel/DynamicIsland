@@ -139,8 +139,9 @@ public sealed partial class VirtualPetControl : FrameworkElement
     }
 
     private const int TransformPoolSize = 64;
-    private static readonly MatrixTransform[] TransformPool = CreateTransformPool();
-    private static int _transformPoolIndex;
+    private readonly MatrixTransform[][] _transformPools = new[] { CreateTransformPool(), CreateTransformPool() };
+    private int _activePoolIndex;
+    private int _transformPoolIndex;
 
     private static MatrixTransform[] CreateTransformPool()
     {
@@ -152,9 +153,10 @@ public sealed partial class VirtualPetControl : FrameworkElement
         return pool;
     }
 
-    private static void Push(DrawingContext dc, Matrix m)
+    private void Push(DrawingContext dc, Matrix m)
     {
-        var t = TransformPool[_transformPoolIndex++ & (TransformPoolSize - 1)];
+        var pool = _transformPools[_activePoolIndex];
+        var t = pool[_transformPoolIndex++ & (TransformPoolSize - 1)];
         t.Matrix = m;
         dc.PushTransform(t);
     }
@@ -923,6 +925,8 @@ public sealed partial class VirtualPetControl : FrameworkElement
     protected override void OnRender(DrawingContext dc)
     {
         base.OnRender(dc);
+        _activePoolIndex ^= 1;
+        _transformPoolIndex = 0;
 
         double t = _time;
         double dt = _lastTime > 0 ? Math.Clamp(t - _lastTime, 0.001, 0.1) : 0.016;
@@ -1255,7 +1259,7 @@ public sealed partial class VirtualPetControl : FrameworkElement
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Shared anatomical helpers
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    private static void DrawEar(DrawingContext dc, Geometry outer, Geometry inner, Brush outerBrush, Pen outerPen,
+    private void DrawEar(DrawingContext dc, Geometry outer, Geometry inner, Brush outerBrush, Pen outerPen,
         Brush innerBrush, Point pivot, double angle)
     {
         bool rot = Math.Abs(angle) > 0.05;
@@ -1349,7 +1353,7 @@ public sealed partial class VirtualPetControl : FrameworkElement
         }
     }
 
-    private static void DrawFrontLegsAndPaws(DrawingContext dc, PetMood mood, double t,
+    private void DrawFrontLegsAndPaws(DrawingContext dc, PetMood mood, double t,
         Brush legBrush, Brush pawBrush, Pen outlinePen, Pen toePen, bool showToeBeans,
         bool isScampering = false, bool isPeeking = false)
     {

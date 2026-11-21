@@ -208,23 +208,21 @@ internal sealed class JiggleBasketService : IDisposable
                 }
 
                 var info = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-
-                // Ignore mouse gestures over windows belonging to our own process
-                // (e.g. dragging MiniPlayer, dragging island sliders, or clicking buttons)
-                IntPtr targetHwnd = WindowFromPoint(info.pt);
-                if (targetHwnd != IntPtr.Zero)
-                {
-                    GetWindowThreadProcessId(targetHwnd, out uint targetProcId);
-                    if (targetProcId == CurrentProcessId)
-                    {
-                        _detector.Reset();
-                        return CallNextHookEx(_mouseHook, nCode, wParam, lParam);
-                    }
-                }
-
                 long nowMs = Environment.TickCount64;
+
                 if (_detector.FeedSample(info.pt.X, info.pt.Y, nowMs, isLeftButtonDown: true))
                 {
+                    // Check window ownership only once when a full jiggle gesture completes
+                    IntPtr targetHwnd = WindowFromPoint(info.pt);
+                    if (targetHwnd != IntPtr.Zero)
+                    {
+                        GetWindowThreadProcessId(targetHwnd, out uint targetProcId);
+                        if (targetProcId == CurrentProcessId)
+                        {
+                            return CallNextHookEx(_mouseHook, nCode, wParam, lParam);
+                        }
+                    }
+
                     var pt = info.pt;
                     _ui.InvokeAsync(() =>
                     {

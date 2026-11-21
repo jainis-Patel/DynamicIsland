@@ -11,6 +11,7 @@ public partial class QuickReplyView : UserControl
 {
     private IslandWindow? Island => IslandWindow.Instance ?? Window.GetWindow(this) as IslandWindow;
     private NotificationHistoryItem? _currentItem;
+    private bool _isSending;
 
     public QuickReplyView()
     {
@@ -76,24 +77,35 @@ public partial class QuickReplyView : UserControl
         SendReply();
     }
 
-    private void SendReply()
+    private async void SendReply()
     {
+        if (_isSending) return;
         string text = ReplyTextBox.Text?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(text) || _currentItem == null) return;
 
+        var island = Island;
+        if (island == null) return;
+
         var item = _currentItem;
+        _isSending = true;
         SendButton.IsEnabled = false;
-        Island?.SendQuickReplyAsync(item, text).ContinueWith(t =>
+        try
         {
-            Dispatcher.InvokeAsync(() =>
+            bool sent = await island.SendQuickReplyAsync(item, text);
+            if (sent)
             {
-                SendButton.IsEnabled = true;
-                if (t.IsCompletedSuccessfully && t.Result)
-                {
-                    ReplyTextBox.Text = string.Empty;
-                }
-            });
-        });
+                ReplyTextBox.Text = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[QuickReplyView] SendReply failed: {ex.Message}");
+        }
+        finally
+        {
+            _isSending = false;
+            SendButton.IsEnabled = true;
+        }
     }
 
     private void OpenAppButton_Click(object sender, RoutedEventArgs e)

@@ -13,29 +13,48 @@ namespace DynamicIsland.Services;
 /// </summary>
 internal sealed class GitHubReleaseClient : IDisposable
 {
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    private static readonly HashSet<string> AllowedGitHubHosts = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "github.com",
+        "api.github.com",
+        "objects.githubusercontent.com",
+        "raw.githubusercontent.com",
+        "release-assets.githubusercontent.com",
+        "codeload.github.com"
+    };
+
     private readonly HttpClient _http;
     private readonly HttpClient _downloadHttp;
+    private readonly bool _ownsHttpClient;
     private string? _lastETag;
+    private volatile string? _token;
     private bool _disposed;
 
     public const string DefaultOwner = "jainis-Patel";
     public const string DefaultRepo = "DynamicIsland";
+
+    public static bool IsTrustedGitHubUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return false;
+        if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri)) return false;
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)) return false;
+        return AllowedGitHubHosts.Contains(uri.Host);
+    }
 
     public GitHubReleaseClient(HttpClient? client = null, string? appVersion = null, string? gitHubToken = null)
     {
         string ver = !string.IsNullOrWhiteSpace(appVersion) ? appVersion : InstallerService.AppVersion;
         if (!ProductInfoHeaderValue.TryParse($"DynamicIsland/{ver}", out var productHeader))
         {
-            productHeader = new ProductInfoHeaderValue("DynamicIsland", "0.6.0");
+            productHeader = new ProductInfoHeaderValue("DynamicIsland", InstallerService.AppVersion);
         }
 
-        _http = client ?? new HttpClient();
-        _http.Timeout = TimeSpan.FromSeconds(15);
-        _http.DefaultRequestHeaders.UserAgent.Add(productHeader);
-
-        _downloadHttp = new HttpClient();
-        _downloadHttp.Timeout = TimeSpan.FromMinutes(10);
-        _downloadHttp.DefaultRequestHeaders.UserAgent.Add(productHeader);
+        _ownsHttpClient = client == null;
+        string userAgent = productHeader.ToString();
+        _http = client ?? SharedHttpClient.CreateClient(TimeSpan.FromSeconds(15), userAgent);
+        _downloadHttp = SharedHttpClient.CreateClient(TimeSpan.FromMinutes(10), userAgent);
 
         if (!string.IsNullOrWhiteSpace(gitHubToken))
         {
@@ -44,18 +63,30 @@ internal sealed class GitHubReleaseClient : IDisposable
     }
 
     /// <summary>
-    /// Updates or clears the GitHub Personal Access Token authorization header.
+    /// Updates or clears the GitHub Personal Access Token (applied strictly to api.github.com requests).
     /// </summary>
     public void SetToken(string? token)
     {
-        if (!string.IsNullOrWhiteSpace(token))
+        _token = string.IsNullOrWhiteSpace(token) ? null : token.Trim();
+    }
+
+    private HttpRequestMessage CreateGetRequest(string url, string? accept = null)
+    {
+        var req = new HttpRequestMessage(HttpMethod.Get, url);
+        if (!string.IsNullOrEmpty(accept))
         {
-            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Trim());
+            req.Headers.Accept.ParseAdd(accept);
         }
-        else
+
+        string? token = _token;
+        if (!string.IsNullOrEmpty(token) &&
+            Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+            string.Equals(uri.Host, "api.github.com", StringComparison.OrdinalIgnoreCase))
         {
-            _http.DefaultRequestHeaders.Authorization = null;
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
+
+        return req;
     }
 
     /// <summary>
@@ -77,14 +108,14 @@ internal sealed class GitHubReleaseClient : IDisposable
     {
         // 1. Primary: Fetch raw release-manifest.json from GitHub CDN (Unmetered, no 60 req/hr API rate limit)
         string rawManifestUrl = $"https://raw.githubusercontent.com/{owner}/{repo}/main/release-manifest.json";
+        UpdateManifest? rawManifest = null;
 
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, rawManifestUrl);
-            request.Headers.Accept.ParseAdd("application/json, text/plain, */*");
-            if (!string.IsNullOrEmpty(_lastETag))
+            using var request = CreateGetRequest(rawManifestUrl, "application/json, text/plain, */*");
+            if (!string.IsNullOrEmpty(_lastETag) && EntityTagHeaderValue.TryParse(_lastETag, out var parsedEtag))
             {
-                request.Headers.IfNoneMatch.Add(new EntityTagHeaderValue(_lastETag));
+                request.Headers.IfNoneMatch.Add(parsedEtag);
             }
 
             using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
@@ -97,16 +128,10 @@ internal sealed class GitHubReleaseClient : IDisposable
 
             if (response.IsSuccessStatusCode)
             {
-                if (response.Headers.ETag != null)
-                {
-                    _lastETag = response.Headers.ETag.Tag;
-                }
+                string? candidateEtag = response.Headers.ETag?.Tag;
 
                 string json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                var manifest = JsonSerializer.Deserialize<UpdateManifest>(json, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                var manifest = JsonSerializer.Deserialize<UpdateManifest>(json, JsonOptions);
 
                 if (manifest != null && !string.IsNullOrWhiteSpace(manifest.Version))
                 {
@@ -114,17 +139,26 @@ internal sealed class GitHubReleaseClient : IDisposable
                     string? assetUrl = manifest.Downloads?.Installer?.Url ?? manifest.Downloads?.Portable?.Url;
                     if (!string.IsNullOrWhiteSpace(assetUrl))
                     {
-                        bool exists = await CheckAssetExistsAsync(assetUrl, ct).ConfigureAwait(false);
-                        if (exists)
+                        if (!IsTrustedGitHubUrl(assetUrl))
                         {
-                            return manifest;
+                            App.Log($"[GitHubClient] Untrusted manifest asset URL rejected: {assetUrl}");
                         }
-
-                        App.Log($"[GitHubClient] Manifest version {manifest.Version} asset is not yet published on GitHub ({assetUrl}). Falling back to GitHub Releases API.");
+                        else if (await CheckAssetExistsAsync(assetUrl, ct).ConfigureAwait(false))
+                        {
+                            if (!string.IsNullOrEmpty(candidateEtag))
+                                _lastETag = candidateEtag;
+                            rawManifest = manifest;
+                        }
+                        else
+                        {
+                            App.Log($"[GitHubClient] Manifest version {manifest.Version} asset is not yet published on GitHub ({assetUrl}). Falling back to GitHub Releases API.");
+                        }
                     }
                     else
                     {
-                        return manifest;
+                        if (!string.IsNullOrEmpty(candidateEtag))
+                            _lastETag = candidateEtag;
+                        rawManifest = manifest;
                     }
                 }
             }
@@ -134,24 +168,33 @@ internal sealed class GitHubReleaseClient : IDisposable
             App.Log($"[GitHubClient] Raw manifest check failed ({ex.Message}), falling back to GitHub API.");
         }
 
-        // 2. Secondary Fallback: Query GitHub Releases API
-        return await FetchManifestFromReleasesApiAsync(owner, repo, ct).ConfigureAwait(false);
+        // 2. Secondary Check: Query GitHub Releases API so newly tagged GitHub Releases are picked up
+        // even if the raw CDN cache is temporarily stale or rate-limited fallback is needed.
+        var apiManifest = await FetchManifestFromReleasesApiAsync(owner, repo, ct).ConfigureAwait(false);
+        if (rawManifest != null && apiManifest != null)
+        {
+            return apiManifest.ParsedVersion > rawManifest.ParsedVersion ? apiManifest : rawManifest;
+        }
+        return apiManifest ?? rawManifest;
     }
 
     /// <summary>
-    /// Verifies that a remote release asset URL is reachable and does not return HTTP 404.
+    /// Verifies that a remote release asset URL is reachable across GitHub release redirects and does not return HTTP 404.
     /// </summary>
     internal async Task<bool> CheckAssetExistsAsync(string url, CancellationToken ct = default)
     {
+        if (!IsTrustedGitHubUrl(url))
+            return false;
+
         try
         {
-            using var headReq = new HttpRequestMessage(HttpMethod.Head, url);
-            using var resp = await _http.SendAsync(headReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            using var req = CreateGetRequest(url);
+            using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
             if (resp.StatusCode == HttpStatusCode.NotFound)
             {
                 return false;
             }
-            return true;
+            return resp.IsSuccessStatusCode;
         }
         catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
@@ -159,7 +202,7 @@ internal sealed class GitHubReleaseClient : IDisposable
         }
         catch
         {
-            // For other network issues / timeouts, don't block
+            // For transient network issues / timeouts, avoid blocking valid releases
             return true;
         }
     }
@@ -174,12 +217,11 @@ internal sealed class GitHubReleaseClient : IDisposable
 
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
-            request.Headers.Accept.ParseAdd("application/vnd.github.v3+json");
+            using var request = CreateGetRequest(apiUrl, "application/vnd.github.v3+json");
 
             using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
 
-            if (response.StatusCode == HttpStatusCode.Forbidden)
+            if (response.StatusCode == HttpStatusCode.Forbidden || response.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 App.Log("[GitHubClient] GitHub API rate limit reached (60 req/hr).");
                 return null;
@@ -188,8 +230,7 @@ internal sealed class GitHubReleaseClient : IDisposable
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 // Fallback to /releases?per_page=1 in case all releases are pre-releases
-                using var fallbackReq = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{owner}/{repo}/releases?per_page=1");
-                fallbackReq.Headers.Accept.ParseAdd("application/vnd.github.v3+json");
+                using var fallbackReq = CreateGetRequest($"https://api.github.com/repos/{owner}/{repo}/releases?per_page=1", "application/vnd.github.v3+json");
                 using var fallbackResp = await _http.SendAsync(fallbackReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
                 if (fallbackResp.IsSuccessStatusCode)
                 {
@@ -242,18 +283,16 @@ internal sealed class GitHubReleaseClient : IDisposable
         }
 
         // 1. Download the exact release-manifest.json published as a release asset
-        if (!string.IsNullOrEmpty(manifestAssetUrl))
+        if (!string.IsNullOrEmpty(manifestAssetUrl) && IsTrustedGitHubUrl(manifestAssetUrl))
         {
             try
             {
-                using var mResp = await _http.GetAsync(manifestAssetUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                using var mReq = CreateGetRequest(manifestAssetUrl);
+                using var mResp = await _http.SendAsync(mReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
                 if (mResp.IsSuccessStatusCode)
                 {
                     string json = await mResp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                    var manifest = JsonSerializer.Deserialize<UpdateManifest>(json, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
+                    var manifest = JsonSerializer.Deserialize<UpdateManifest>(json, JsonOptions);
                     if (manifest != null && !string.IsNullOrWhiteSpace(manifest.Version))
                     {
                         return manifest;
@@ -269,26 +308,36 @@ internal sealed class GitHubReleaseClient : IDisposable
         // 2. Parse from GitHub Release metadata
         var fallbackManifest = ParseReleaseElement(root);
 
-        // 3. Populate SHA-256 hashes from checksums.sha256 if available
-        if (!string.IsNullOrEmpty(checksumsAssetUrl) && fallbackManifest.Downloads.Installer != null)
+        // 3. Populate SHA-256 hashes from checksums.sha256 if available (covers both Installer & Portable-only releases)
+        if (!string.IsNullOrEmpty(checksumsAssetUrl) &&
+            IsTrustedGitHubUrl(checksumsAssetUrl) &&
+            (fallbackManifest.Downloads.Installer != null || fallbackManifest.Downloads.Portable != null))
         {
             try
             {
-                string checksums = await _http.GetStringAsync(checksumsAssetUrl, ct).ConfigureAwait(false);
-                string? hash = ExtractHashFromChecksumsText(checksums, "DynamicIsland-Setup.exe") ??
-                               ExtractHashFromChecksumsText(checksums, ".exe");
-                if (!string.IsNullOrEmpty(hash))
+                using var cReq = CreateGetRequest(checksumsAssetUrl);
+                using var cResp = await _http.SendAsync(cReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                if (cResp.IsSuccessStatusCode)
                 {
-                    fallbackManifest.Downloads.Installer.Sha256 = hash;
-                }
-
-                if (fallbackManifest.Downloads.Portable != null)
-                {
-                    string? portHash = ExtractHashFromChecksumsText(checksums, "DynamicIsland-Portable.zip") ??
-                                       ExtractHashFromChecksumsText(checksums, ".zip");
-                    if (!string.IsNullOrEmpty(portHash))
+                    string checksums = await cResp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                    if (fallbackManifest.Downloads.Installer != null)
                     {
-                        fallbackManifest.Downloads.Portable.Sha256 = portHash;
+                        string? hash = ExtractHashFromChecksumsText(checksums, "DynamicIsland-Setup.exe") ??
+                                       ExtractHashFromChecksumsText(checksums, ".exe");
+                        if (!string.IsNullOrEmpty(hash))
+                        {
+                            fallbackManifest.Downloads.Installer.Sha256 = hash;
+                        }
+                    }
+
+                    if (fallbackManifest.Downloads.Portable != null)
+                    {
+                        string? portHash = ExtractHashFromChecksumsText(checksums, "DynamicIsland-Portable.zip") ??
+                                           ExtractHashFromChecksumsText(checksums, ".zip");
+                        if (!string.IsNullOrEmpty(portHash))
+                        {
+                            fallbackManifest.Downloads.Portable.Sha256 = portHash;
+                        }
                     }
                 }
             }
@@ -301,28 +350,73 @@ internal sealed class GitHubReleaseClient : IDisposable
         return fallbackManifest;
     }
 
+    private static bool IsValidHex64(string hash)
+    {
+        if (hash.Length != 64) return false;
+        foreach (char c in hash)
+        {
+            if (!Uri.IsHexDigit(c)) return false;
+        }
+        return true;
+    }
+
     /// <summary>
-    /// Parses a sha256 checksums file text to extract the 64-character hash for a specific file name or extension.
+    /// Parses a sha256 checksums file text to extract the 64-character hex hash for an exact filename or extension.
     /// </summary>
     public static string? ExtractHashFromChecksumsText(string checksumsContent, string fileNameOrExt)
     {
-        if (string.IsNullOrWhiteSpace(checksumsContent)) return null;
+        if (string.IsNullOrWhiteSpace(checksumsContent) || string.IsNullOrWhiteSpace(fileNameOrExt)) return null;
+
+        string target = fileNameOrExt.Trim();
+        bool matchByExtension = target.StartsWith('.');
+        string targetBaseName = matchByExtension ? target : Path.GetFileName(target);
 
         using var reader = new StringReader(checksumsContent);
         string? line;
         while ((line = reader.ReadLine()) != null)
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
-            var parts = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 2)
+            var parts = line.Split((char[]?)null, 2, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2) continue;
+
+            string hash = parts[0].Trim();
+            if (!IsValidHex64(hash)) continue;
+
+            string entryFile = parts[1].Trim().TrimStart('*');
+            if (entryFile.StartsWith("./", StringComparison.Ordinal) || entryFile.StartsWith(".\\", StringComparison.Ordinal))
+                entryFile = entryFile[2..];
+
+            string entryBaseName = Path.GetFileName(entryFile);
+            if (matchByExtension)
             {
-                string hash = parts[0].Trim();
-                string file = parts[1].Trim();
-                if (hash.Length == 64 && (file.Contains(fileNameOrExt, StringComparison.OrdinalIgnoreCase) ||
-                                          fileNameOrExt.Contains(file, StringComparison.OrdinalIgnoreCase)))
-                {
+                if (entryBaseName.EndsWith(targetBaseName, StringComparison.OrdinalIgnoreCase))
                     return hash;
+            }
+            else
+            {
+                if (string.Equals(entryBaseName, targetBaseName, StringComparison.OrdinalIgnoreCase))
+                    return hash;
+            }
+        }
+        return null;
+    }
+
+    internal static string? TryExtractAssetDigestSha256(JsonElement asset)
+    {
+        if (asset.TryGetProperty("digest", out var digestProp) && digestProp.GetString() is string raw)
+        {
+            string trimmed = raw.Trim();
+            if (trimmed.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+            {
+                string hex = trimmed["sha256:".Length..].Trim();
+                if (IsValidHex64(hex))
+                {
+                    return hex.ToLowerInvariant();
                 }
+            }
+            else if (IsValidHex64(trimmed))
+            {
+                return trimmed.ToLowerInvariant();
             }
         }
         return null;
@@ -354,14 +448,16 @@ internal sealed class GitHubReleaseClient : IDisposable
                 string name = asset.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
                 string downloadUrl = asset.TryGetProperty("browser_download_url", out var dl) ? dl.GetString() ?? "" : "";
                 long size = asset.TryGetProperty("size", out var s) ? s.GetInt64() : 0;
+                string? digestSha = TryExtractAssetDigestSha256(asset);
 
                 if (name.EndsWith("-Setup.exe", StringComparison.OrdinalIgnoreCase) ||
-                    name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                    (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && manifest.Downloads.Installer == null))
                 {
                     manifest.Downloads.Installer = new UpdateDownloadAsset
                     {
                         Url = downloadUrl,
-                        SizeBytes = size
+                        SizeBytes = size,
+                        Sha256 = digestSha ?? ""
                     };
                 }
                 else if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
@@ -369,7 +465,8 @@ internal sealed class GitHubReleaseClient : IDisposable
                     manifest.Downloads.Portable = new UpdateDownloadAsset
                     {
                         Url = downloadUrl,
-                        SizeBytes = size
+                        SizeBytes = size,
+                        Sha256 = digestSha ?? ""
                     };
                 }
             }
@@ -392,7 +489,8 @@ internal sealed class GitHubReleaseClient : IDisposable
 
         try
         {
-            using var response = await _http.GetAsync(apiUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            using var req = CreateGetRequest(apiUrl, "application/vnd.github.v3+json");
+            using var response = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode) return items;
 
             using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
@@ -408,6 +506,7 @@ internal sealed class GitHubReleaseClient : IDisposable
                 bool isPreRelease = release.TryGetProperty("prerelease", out var pre) && pre.GetBoolean();
 
                 string? installerUrl = null;
+                string? installerSha = null;
                 string? checksumsUrl = null;
                 string? manifestUrl = null;
                 long size = 0;
@@ -417,10 +516,12 @@ internal sealed class GitHubReleaseClient : IDisposable
                     foreach (var asset in assets.EnumerateArray())
                     {
                         string name = asset.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
-                        if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                        if (name.EndsWith("-Setup.exe", StringComparison.OrdinalIgnoreCase) ||
+                            (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && installerUrl == null))
                         {
                             installerUrl = asset.TryGetProperty("browser_download_url", out var dl) ? dl.GetString() : null;
                             size = asset.TryGetProperty("size", out var s) ? s.GetInt64() : 0;
+                            installerSha = TryExtractAssetDigestSha256(asset);
                         }
                         else if (name.Equals("checksums.sha256", StringComparison.OrdinalIgnoreCase))
                         {
@@ -441,7 +542,7 @@ internal sealed class GitHubReleaseClient : IDisposable
                     HtmlUrl: htmlUrl,
                     IsPreRelease: isPreRelease,
                     InstallerUrl: installerUrl,
-                    InstallerSha256: null,
+                    InstallerSha256: installerSha,
                     SizeBytes: size,
                     ChecksumsUrl: checksumsUrl,
                     ManifestUrl: manifestUrl));
@@ -464,23 +565,24 @@ internal sealed class GitHubReleaseClient : IDisposable
         string targetFileName,
         CancellationToken ct = default)
     {
-        if (!string.IsNullOrWhiteSpace(item.InstallerSha256))
+        if (!string.IsNullOrWhiteSpace(item.InstallerSha256) && IsValidHex64(item.InstallerSha256.Trim()))
         {
-            return item.InstallerSha256;
+            return item.InstallerSha256.Trim();
         }
 
         // 1. Try manifestUrl asset
-        if (!string.IsNullOrWhiteSpace(item.ManifestUrl))
+        if (!string.IsNullOrWhiteSpace(item.ManifestUrl) && IsTrustedGitHubUrl(item.ManifestUrl))
         {
             try
             {
-                using var resp = await _http.GetAsync(item.ManifestUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                using var req = CreateGetRequest(item.ManifestUrl);
+                using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
                 if (resp.IsSuccessStatusCode)
                 {
                     string json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                    var manifest = JsonSerializer.Deserialize<UpdateManifest>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    var manifest = JsonSerializer.Deserialize<UpdateManifest>(json, JsonOptions);
                     string? hash = manifest?.Downloads?.Installer?.Sha256;
-                    if (!string.IsNullOrWhiteSpace(hash)) return hash;
+                    if (!string.IsNullOrWhiteSpace(hash) && IsValidHex64(hash.Trim())) return hash.Trim();
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -490,27 +592,27 @@ internal sealed class GitHubReleaseClient : IDisposable
         }
 
         // 2. Try checksums.sha256 asset
-        if (!string.IsNullOrWhiteSpace(item.ChecksumsUrl))
+        if (!string.IsNullOrWhiteSpace(item.ChecksumsUrl) && IsTrustedGitHubUrl(item.ChecksumsUrl))
         {
             try
             {
-                string text = await _http.GetStringAsync(item.ChecksumsUrl, ct).ConfigureAwait(false);
-                string? hash = ExtractHashFromChecksumsText(text, targetFileName) ?? ExtractHashFromChecksumsText(text, ".exe");
-                if (!string.IsNullOrWhiteSpace(hash)) return hash;
+                using var req = CreateGetRequest(item.ChecksumsUrl);
+                using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                if (resp.IsSuccessStatusCode)
+                {
+                    string text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                    string? hash = ExtractHashFromChecksumsText(text, targetFileName);
+                    if (string.IsNullOrWhiteSpace(hash) && targetFileName.Contains("Setup", StringComparison.OrdinalIgnoreCase))
+                        hash = ExtractHashFromChecksumsText(text, "DynamicIsland-Setup.exe");
+                    if (string.IsNullOrWhiteSpace(hash) && targetFileName.Contains("Portable", StringComparison.OrdinalIgnoreCase))
+                        hash = ExtractHashFromChecksumsText(text, "DynamicIsland-Portable.zip");
+                    hash ??= ExtractHashFromChecksumsText(text, ".exe");
+                    if (!string.IsNullOrWhiteSpace(hash)) return hash;
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 App.Log($"[GitHubClient] Could not fetch checksums for rollback hash: {ex.Message}");
-            }
-        }
-
-        // 3. Fallback: search body for 64-char hex string
-        if (!string.IsNullOrWhiteSpace(item.Summary))
-        {
-            var match = System.Text.RegularExpressions.Regex.Match(item.Summary, @"\b[0-9a-fA-F]{64}\b");
-            if (match.Success)
-            {
-                return match.Value;
             }
         }
 
@@ -530,6 +632,11 @@ internal sealed class GitHubReleaseClient : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(downloadUrl);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationFilePath);
 
+        if (!IsTrustedGitHubUrl(downloadUrl))
+        {
+            throw new InvalidOperationException($"Refused untrusted download URL: '{downloadUrl}'");
+        }
+
         string? dir = Path.GetDirectoryName(destinationFilePath);
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
@@ -537,6 +644,12 @@ internal sealed class GitHubReleaseClient : IDisposable
         {
             using var response = await _downloadHttp.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
+
+            if (response.RequestMessage?.RequestUri != null &&
+                !IsTrustedGitHubUrl(response.RequestMessage.RequestUri.ToString()))
+            {
+                throw new InvalidOperationException($"Refused untrusted redirect URL: '{response.RequestMessage.RequestUri}'");
+            }
 
             long totalBytes = response.Content.Headers.ContentLength ?? -1L;
 
@@ -582,7 +695,7 @@ internal sealed class GitHubReleaseClient : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        _http.Dispose();
+        if (_ownsHttpClient) _http.Dispose();
         _downloadHttp.Dispose();
     }
 }

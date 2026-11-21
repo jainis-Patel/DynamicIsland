@@ -54,20 +54,41 @@ internal sealed class AudioSpectrum : IDisposable
         (16500, 20000, 18.0) // 15: Ultra air
     };
 
+    private static readonly Guid IeeeFloatSubType = new("00000003-0000-0010-8000-00aa00389b71");
+
     private readonly object _gate = new();
     private readonly float[] _ring = new float[FftSize];
     private readonly float[] _window = new float[FftSize];
     private readonly Complex[] _fft = new Complex[FftSize];
     private readonly float[] _bands = new float[BandCount];
     private readonly float[] _bands16 = new float[ExpandedBandCount];
+    private readonly (int First, int Last, double TiltDb)[] _bandRanges = new (int, int, double)[BandCount];
+    private readonly (int First, int Last, double TiltDb)[] _band16Ranges = new (int, int, double)[ExpandedBandCount];
 
     private WasapiLoopbackCapture? _capture;
     private WaveFormat? _format;
+    private int _cachedSampleRate;
     private int _ringPos;
     private int _sinceFft;
     private long _lastDataTick;
+    private int _restartScheduled;
+    private volatile bool _enableExpandedBands = true;
     private bool _wanted;
     private bool _disposed;
+
+    public bool EnableExpandedBands
+    {
+        get => _enableExpandedBands;
+        set
+        {
+            _enableExpandedBands = value;
+            if (!value)
+            {
+                for (int i = 0; i < ExpandedBandCount; i++)
+                    Volatile.Write(ref _bands16[i], 0f);
+            }
+        }
+    }
 
     public AudioSpectrum()
     {
@@ -143,9 +164,10 @@ internal sealed class AudioSpectrum : IDisposable
 
     private void StartCaptureLocked()
     {
+        WasapiLoopbackCapture? capture = null;
         try
         {
-            var capture = new WasapiLoopbackCapture(); // default render endpoint
+            capture = new WasapiLoopbackCapture(); // default render endpoint
             _format = capture.WaveFormat;
             capture.DataAvailable += OnDataAvailable;
             capture.RecordingStopped += OnRecordingStopped;
@@ -155,6 +177,12 @@ internal sealed class AudioSpectrum : IDisposable
         catch (Exception ex)
         {
             App.Log($"[Audio] Loopback start failed: {ex.Message}");
+            if (capture != null)
+            {
+                capture.DataAvailable -= OnDataAvailable;
+                capture.RecordingStopped -= OnRecordingStopped;
+                try { capture.Dispose(); } catch { }
+            }
             _capture = null;
         }
     }
@@ -171,14 +199,24 @@ internal sealed class AudioSpectrum : IDisposable
 
     private void ScheduleRestart()
     {
+        if (_disposed || Interlocked.CompareExchange(ref _restartScheduled, 1, 0) != 0)
+            return;
+
         Task.Run(async () =>
         {
-            await Task.Delay(400).ConfigureAwait(false);
-            lock (_gate)
+            try
             {
-                if (!_wanted || _disposed) return;
-                StopCaptureLocked();
-                StartCaptureLocked();
+                await Task.Delay(400).ConfigureAwait(false);
+                lock (_gate)
+                {
+                    if (!_wanted || _disposed) return;
+                    StopCaptureLocked();
+                    StartCaptureLocked();
+                }
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _restartScheduled, 0);
             }
         });
     }
@@ -212,20 +250,46 @@ internal sealed class AudioSpectrum : IDisposable
 
         if (bits == 32)
         {
-            ReadOnlySpan<float> samples = MemoryMarshal.Cast<byte, float>(raw);
-            int idx = 0;
-            for (int f = 0; f < frames; f++)
-            {
-                float sum = 0;
-                for (int c = 0; c < channels; c++)
-                    sum += samples[idx++];
+            bool isFloat = format.Encoding == WaveFormatEncoding.IeeeFloat ||
+                           (format is WaveFormatExtensible ext && ext.SubFormat == IeeeFloatSubType);
 
-                _ring[_ringPos] = sum * invChannels;
-                _ringPos = (_ringPos + 1) & (FftSize - 1);
-                if (++_sinceFft >= Hop)
+            if (isFloat)
+            {
+                ReadOnlySpan<float> samples = MemoryMarshal.Cast<byte, float>(raw);
+                int idx = 0;
+                for (int f = 0; f < frames; f++)
                 {
-                    _sinceFft = 0;
-                    Analyze(format.SampleRate);
+                    float sum = 0;
+                    for (int c = 0; c < channels; c++)
+                        sum += samples[idx++];
+
+                    _ring[_ringPos] = sum * invChannels;
+                    _ringPos = (_ringPos + 1) & (FftSize - 1);
+                    if (++_sinceFft >= Hop)
+                    {
+                        _sinceFft = 0;
+                        Analyze(format.SampleRate);
+                    }
+                }
+            }
+            else
+            {
+                ReadOnlySpan<int> samples = MemoryMarshal.Cast<byte, int>(raw);
+                const float inv32 = 1.0f / 2147483648f;
+                int idx = 0;
+                for (int f = 0; f < frames; f++)
+                {
+                    float sum = 0;
+                    for (int c = 0; c < channels; c++)
+                        sum += samples[idx++] * inv32;
+
+                    _ring[_ringPos] = sum * invChannels;
+                    _ringPos = (_ringPos + 1) & (FftSize - 1);
+                    if (++_sinceFft >= Hop)
+                    {
+                        _sinceFft = 0;
+                        Analyze(format.SampleRate);
+                    }
                 }
             }
         }
@@ -276,14 +340,26 @@ internal sealed class AudioSpectrum : IDisposable
         }
         FastFourierTransform.FFT(true, FftLog2, _fft);
 
-        double binHz = (double)sampleRate / FftSize;
+        if (sampleRate > 0 && sampleRate != _cachedSampleRate)
+        {
+            double binHz = (double)sampleRate / FftSize;
+            for (int b = 0; b < BandCount; b++)
+            {
+                var (low, high, tilt) = Bands[b];
+                _bandRanges[b] = (Math.Max(1, (int)(low / binHz)), Math.Min(FftSize / 2 - 1, (int)(high / binHz)), tilt);
+            }
+            for (int b = 0; b < ExpandedBandCount; b++)
+            {
+                var (low, high, tilt) = Bands16[b];
+                _band16Ranges[b] = (Math.Max(1, (int)(low / binHz)), Math.Min(FftSize / 2 - 1, (int)(high / binHz)), tilt);
+            }
+            _cachedSampleRate = sampleRate;
+        }
 
         // 4-Band compact levels
         for (int band = 0; band < BandCount; band++)
         {
-            var (low, high, tilt) = Bands[band];
-            int first = Math.Max(1, (int)(low / binHz));
-            int last = Math.Min(FftSize / 2 - 1, (int)(high / binHz));
+            var (first, last, tilt) = _bandRanges[band];
 
             double peakSq = 0;
             for (int k = first; k <= last; k++)
@@ -298,24 +374,25 @@ internal sealed class AudioSpectrum : IDisposable
             Volatile.Write(ref _bands[band], level);
         }
 
-        // 16-Band studio expanded spectrum
-        for (int band = 0; band < ExpandedBandCount; band++)
+        // 16-Band studio expanded spectrum (computed only when enabled)
+        if (_enableExpandedBands)
         {
-            var (low, high, tilt) = Bands16[band];
-            int first = Math.Max(1, (int)(low / binHz));
-            int last = Math.Min(FftSize / 2 - 1, (int)(high / binHz));
-
-            double peakSq = 0;
-            for (int k = first; k <= last; k++)
+            for (int band = 0; band < ExpandedBandCount; band++)
             {
-                double magSq = _fft[k].X * _fft[k].X + _fft[k].Y * _fft[k].Y;
-                if (magSq > peakSq) peakSq = magSq;
-            }
+                var (first, last, tilt) = _band16Ranges[band];
 
-            double peak = Math.Sqrt(peakSq);
-            double db = 20 * Math.Log10(peak + 1e-9) + tilt;
-            float level = (float)Math.Clamp((db - FloorDb) / (CeilingDb - FloorDb), 0, 1);
-            Volatile.Write(ref _bands16[band], level);
+                double peakSq = 0;
+                for (int k = first; k <= last; k++)
+                {
+                    double magSq = _fft[k].X * _fft[k].X + _fft[k].Y * _fft[k].Y;
+                    if (magSq > peakSq) peakSq = magSq;
+                }
+
+                double peak = Math.Sqrt(peakSq);
+                double db = 20 * Math.Log10(peak + 1e-9) + tilt;
+                float level = (float)Math.Clamp((db - FloorDb) / (CeilingDb - FloorDb), 0, 1);
+                Volatile.Write(ref _bands16[band], level);
+            }
         }
     }
 

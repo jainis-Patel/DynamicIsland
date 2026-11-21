@@ -167,6 +167,7 @@ public sealed class DropletRegistry
     private readonly List<DropletDescriptor> _ordered = new();
 
     private readonly Services.SettingsService? _settings;
+    private bool _isUpdatingSettings;
 
     public ObservableCollection<DropletDescriptor> Items { get; } = new();
 
@@ -183,7 +184,7 @@ public sealed class DropletRegistry
             SyncFromSettings(_settings.Current.EnabledDroplets, invokeLifecycle: false);
             _settings.PropertyChanged += prop =>
             {
-                if (prop == nameof(Services.AppSettings.EnabledDroplets))
+                if (prop == nameof(Services.AppSettings.EnabledDroplets) && !_isUpdatingSettings)
                 {
                     SyncFromSettings(_settings.Current.EnabledDroplets);
                 }
@@ -567,7 +568,15 @@ public sealed class DropletRegistry
         DropletStateChanged?.Invoke(id, enabled);
         if (_settings != null)
         {
-            _settings.Update(s => s.EnabledDroplets = ExportEnabledIds(), nameof(Services.AppSettings.EnabledDroplets));
+            _isUpdatingSettings = true;
+            try
+            {
+                _settings.Update(s => s.EnabledDroplets = ExportEnabledIds(), nameof(Services.AppSettings.EnabledDroplets));
+            }
+            finally
+            {
+                _isUpdatingSettings = false;
+            }
         }
         return d.IsEnabled;
     }
@@ -603,7 +612,15 @@ public sealed class DropletRegistry
 
         if (_settings != null)
         {
-            _settings.Update(s => s.EnabledDroplets = ExportEnabledIds(), nameof(Services.AppSettings.EnabledDroplets));
+            _isUpdatingSettings = true;
+            try
+            {
+                _settings.Update(s => s.EnabledDroplets = ExportEnabledIds(), nameof(Services.AppSettings.EnabledDroplets));
+            }
+            finally
+            {
+                _isUpdatingSettings = false;
+            }
         }
     }
 
@@ -630,7 +647,15 @@ public sealed class DropletRegistry
 
         if (_settings != null)
         {
-            _settings.Update(s => s.EnabledDroplets = null, nameof(Services.AppSettings.EnabledDroplets));
+            _isUpdatingSettings = true;
+            try
+            {
+                _settings.Update(s => s.EnabledDroplets = null, nameof(Services.AppSettings.EnabledDroplets));
+            }
+            finally
+            {
+                _isUpdatingSettings = false;
+            }
         }
     }
 }

@@ -3,7 +3,9 @@
 ; Compile via command line: iscc.exe DynamicIsland.iss
 
 #define MyAppName "Dynamic Island"
-#define MyAppVersion "0.7.0"
+#ifndef MyAppVersion
+  #define MyAppVersion "0.8.0"
+#endif
 #define MyAppPublisher "Jainis Patel"
 #define MyAppURL "https://github.com"
 #define MyAppExeName "DynamicIsland.exe"

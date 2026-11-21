@@ -57,6 +57,7 @@ internal sealed class VirtualPetService : IDisposable
     private DateTime _lastEatingTime = DateTime.MinValue;
     private int _alertCycleIndex;
     private PetMood _currentMood = PetMood.Sleeping;
+    private bool _disposed;
 
     public static readonly string[] PresetPetNames =
     {
@@ -96,8 +97,9 @@ internal sealed class VirtualPetService : IDisposable
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
 
-        _wellnessTimer = new DispatcherTimer(TimeSpan.FromSeconds(30), DispatcherPriority.Background, OnWellnessTimerTick, _dispatcher);
-        _wellnessTimer.Start();
+        _wellnessTimer = new DispatcherTimer(TimeSpan.FromMinutes(30), DispatcherPriority.Background, OnWellnessTimerTick, _dispatcher);
+        _settings.PropertyChanged += OnSettingsPropertyChanged;
+        UpdateWellnessTimerState();
 
         _happyResetTimer = new DispatcherTimer(TimeSpan.FromSeconds(3.5), DispatcherPriority.Background, (_, _) =>
         {
@@ -109,9 +111,39 @@ internal sealed class VirtualPetService : IDisposable
         }, _dispatcher);
     }
 
+    private void OnSettingsPropertyChanged(string? propName)
+    {
+        if (_disposed) return;
+        if (propName is nameof(AppSettings.EnableVirtualPet) or nameof(AppSettings.WellnessReminderMinutes))
+        {
+            _dispatcher.InvokeAsync(UpdateWellnessTimerState, DispatcherPriority.Background);
+        }
+    }
+
+    private void UpdateWellnessTimerState()
+    {
+        if (_disposed || _wellnessTimer == null) return;
+        int mins = ReminderIntervalMinutes;
+        if (!IsEnabled || mins <= 0)
+        {
+            _wellnessTimer.Stop();
+            return;
+        }
+
+        var remaining = TimeSpan.FromMinutes(mins) - (DateTime.UtcNow - _lastReminderTime);
+        var nextInterval = remaining > TimeSpan.FromSeconds(1) ? remaining : TimeSpan.FromSeconds(1);
+        _wellnessTimer.Stop();
+        _wellnessTimer.Interval = nextInterval;
+        _wellnessTimer.Start();
+    }
+
     private void OnWellnessTimerTick(object? sender, EventArgs e)
     {
-        if (!IsEnabled || ReminderIntervalMinutes <= 0) return;
+        if (_disposed || !IsEnabled || ReminderIntervalMinutes <= 0)
+        {
+            _wellnessTimer?.Stop();
+            return;
+        }
 
         var elapsed = DateTime.UtcNow - _lastReminderTime;
         if (elapsed >= TimeSpan.FromMinutes(ReminderIntervalMinutes))
@@ -119,6 +151,7 @@ internal sealed class VirtualPetService : IDisposable
             _lastReminderTime = DateTime.UtcNow;
             TriggerNextWellnessAlert();
         }
+        UpdateWellnessTimerState();
     }
 
     public void CheckWellnessNow(DateTime nowUtc)
@@ -290,6 +323,7 @@ internal sealed class VirtualPetService : IDisposable
         }, nameof(AppSettings.PetWaterCount));
 
         _lastReminderTime = DateTime.UtcNow;
+        UpdateWellnessTimerState();
         SetHappyMood();
         AffectionChanged?.Invoke(newScore);
 
@@ -307,6 +341,7 @@ internal sealed class VirtualPetService : IDisposable
         }, nameof(AppSettings.PetStretchCount));
 
         _lastReminderTime = DateTime.UtcNow;
+        UpdateWellnessTimerState();
         SetHappyMood();
         AffectionChanged?.Invoke(newScore);
 
@@ -379,6 +414,7 @@ internal sealed class VirtualPetService : IDisposable
         };
         _settings.Update(s => s.WellnessReminderMinutes = next, nameof(AppSettings.WellnessReminderMinutes));
         _lastReminderTime = DateTime.UtcNow;
+        UpdateWellnessTimerState();
     }
 
     public void ToggleEnabled()
@@ -429,6 +465,8 @@ internal sealed class VirtualPetService : IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
+        _settings.PropertyChanged -= OnSettingsPropertyChanged;
         _wellnessTimer?.Stop();
         _happyResetTimer?.Stop();
     }

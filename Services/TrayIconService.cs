@@ -8,6 +8,42 @@ using static DynamicIsland.Interop.NativeMethods;
 namespace DynamicIsland.Services;
 
 /// <summary>
+/// Options object aggregating callbacks and state predicates for <see cref="TrayIconService"/>.
+/// </summary>
+internal sealed class TrayIconOptions
+{
+    public required Action OnExpand { get; init; }
+    public required Action OnAudioSwitch { get; init; }
+    public required Action OnPower { get; init; }
+    public required Action OnVoiceMemo { get; init; }
+    public required Action OnPeripherals { get; init; }
+    public required Action OnSettings { get; init; }
+    public required Action OnTestToast { get; init; }
+    public required Action OnToggleStopwatch { get; init; }
+    public required Action OnExit { get; init; }
+    public Action? OnSystemHud { get; init; }
+    public Action? OnShelf { get; init; }
+    public Action? OnClipboard { get; init; }
+    public Action? OnNotes { get; init; }
+    public Func<bool>? IsCaffeineEnabled { get; init; }
+    public Action<bool>? SetCaffeineEnabled { get; init; }
+    public Func<bool>? IsDndEnabled { get; init; }
+    public Action<bool>? SetDndEnabled { get; init; }
+    public Func<bool>? IsReplaceBannersEnabled { get; init; }
+    public Action<bool>? SetReplaceBannersEnabled { get; init; }
+    public Func<bool>? IsNetworkSpeedEnabled { get; init; }
+    public Action<bool>? SetNetworkSpeedEnabled { get; init; }
+    public Func<string>? GetThemeMode { get; init; }
+    public Action<string>? SetThemeMode { get; init; }
+    public Func<bool>? IsEdgeBorderEnabled { get; init; }
+    public Action<bool>? SetEdgeBorderEnabled { get; init; }
+    public Func<string>? GetThemeStyle { get; init; }
+    public Action<string>? SetThemeStyle { get; init; }
+    public Func<string>? GetIslandTheme { get; init; }
+    public Action<string>? SetIslandTheme { get; init; }
+}
+
+/// <summary>
 /// Native Shell_NotifyIcon system tray integration with a dark-mode WPF context menu.
 /// Avoids Windows Forms dependencies and gives full WPF control over tray events.
 /// </summary>
@@ -47,6 +83,41 @@ internal sealed class TrayIconService : IDisposable
     private readonly Action<string>? _setIslandTheme;
     private IntPtr _hIcon;
     private bool _added;
+
+    public TrayIconService(IntPtr hwnd, TrayIconOptions options)
+        : this(
+            hwnd,
+            (options ?? throw new ArgumentNullException(nameof(options))).OnExpand,
+            options.OnAudioSwitch,
+            options.OnPower,
+            options.OnVoiceMemo,
+            options.OnPeripherals,
+            options.OnSettings,
+            options.OnTestToast,
+            options.OnToggleStopwatch,
+            options.OnExit,
+            options.OnSystemHud,
+            options.OnShelf,
+            options.OnClipboard,
+            options.OnNotes,
+            options.IsCaffeineEnabled,
+            options.SetCaffeineEnabled,
+            options.IsDndEnabled,
+            options.SetDndEnabled,
+            options.IsReplaceBannersEnabled,
+            options.SetReplaceBannersEnabled,
+            options.IsNetworkSpeedEnabled,
+            options.SetNetworkSpeedEnabled,
+            options.GetThemeMode,
+            options.SetThemeMode,
+            options.IsEdgeBorderEnabled,
+            options.SetEdgeBorderEnabled,
+            options.GetThemeStyle,
+            options.SetThemeStyle,
+            options.GetIslandTheme,
+            options.SetIslandTheme)
+    {
+    }
 
     public TrayIconService(
         IntPtr hwnd,

@@ -165,15 +165,14 @@ public partial class IslandWindow
     {
         if (sender is FrameworkElement { Tag: string rawUrl } && !string.IsNullOrWhiteSpace(rawUrl))
         {
-            try
+            string target = rawUrl.Trim();
+            if (!target.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                !target.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
-                string target = rawUrl.Trim();
-                if (!target.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-                    !target.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-                {
-                    target = "https://" + target;
-                }
-                Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+                target = "https://" + target;
+            }
+            if (SafeProcessLauncher.TryOpenUrl(target))
+            {
                 _machine.PushToast(new ToastContent(
                     "\uE8A7",
                     "Opening Link",
@@ -184,10 +183,6 @@ public partial class IslandWindow
                     Priority: ToastPriority.Feedback,
                     Category: "browser"));
             }
-            catch (Exception ex)
-            {
-                App.Log($"[Clipboard] Failed to launch URL: {ex.Message}");
-            }
             e.Handled = true;
         }
     }
@@ -196,9 +191,8 @@ public partial class IslandWindow
     {
         if (sender is FrameworkElement { Tag: string rgb } && !string.IsNullOrEmpty(rgb))
         {
-            try
+            if (SafeClipboard.TrySetText(rgb))
             {
-                Clipboard.SetText(rgb);
                 _machine.PushToast(new ToastContent(
                     "\uE8C8",
                     "RGB Copied",
@@ -209,8 +203,20 @@ public partial class IslandWindow
                     Priority: ToastPriority.Feedback,
                     Category: "clipboard"));
             }
-            catch { }
             e.Handled = true;
+        }
+    }
+
+    internal void CopyPlainClipboardItem_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is FrameworkElement { Tag: string id })
+        {
+            var item = _clipboardService.Items.FirstOrDefault(i => i.Id == id);
+            if (item != null)
+            {
+                CopyClipboardItem(item, plainTextOnly: true);
+            }
         }
     }
 
@@ -218,50 +224,59 @@ public partial class IslandWindow
     {
         if (sender is FrameworkElement { Tag: string id })
         {
-            var item = _clipboardService.Items.FirstOrDefault(i => i.Id == id);
-            if (item?.ImagePreview is BitmapSource bmp)
+            e.Handled = true;
+            try
             {
-                _machine.PushToast(new ToastContent(
-                    "\uE8B7",
-                    "Extracting Text",
-                    "Running OCR on image...",
-                    ThemeBrushes.BlueColor,
-                    TimeSpan.FromSeconds(1.5),
-                    TargetView: "clipboard",
-                    Priority: ToastPriority.Feedback,
-                    Category: "ocr"));
-
-                string? text = await ScreenToolsService.ExtractTextFromBitmapAsync(bmp);
-                if (!string.IsNullOrWhiteSpace(text))
+                var item = _clipboardService.Items.FirstOrDefault(i => i.Id == id);
+                if (item?.ImagePreview is BitmapSource bmp)
                 {
-                    try { Clipboard.SetText(text); } catch { }
-                    string preview = text.Replace("\r", " ").Replace("\n", " ").Trim();
-                    if (preview.Length > 36) preview = preview[..33] + "...";
-
                     _machine.PushToast(new ToastContent(
-                        "\uE73E",
-                        "OCR Text Copied",
-                        preview,
-                        ThemeBrushes.GreenColor,
-                        TimeSpan.FromSeconds(3.0),
+                        "\uE8B7",
+                        "Extracting Text",
+                        "Running OCR on image...",
+                        ThemeBrushes.BlueColor,
+                        TimeSpan.FromSeconds(1.5),
                         TargetView: "clipboard",
                         Priority: ToastPriority.Feedback,
                         Category: "ocr"));
-                }
-                else
-                {
-                    _machine.PushToast(new ToastContent(
-                        "\uE8BCE",
-                        "No Text Detected",
-                        "Windows OCR found no readable text in image",
-                        ThemeBrushes.AmberColor,
-                        TimeSpan.FromSeconds(2.2),
-                        TargetView: "clipboard",
-                        Priority: ToastPriority.Feedback,
-                        Category: "ocr"));
+
+                    string? text = await ScreenToolsService.ExtractTextFromBitmapAsync(bmp);
+                    if (_isClosing) return;
+
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        try { Clipboard.SetText(text); } catch { }
+                        string preview = text.Replace("\r", " ").Replace("\n", " ").Trim();
+                        if (preview.Length > 36) preview = preview[..33] + "...";
+
+                        _machine.PushToast(new ToastContent(
+                            "\uE73E",
+                            "OCR Text Copied",
+                            preview,
+                            ThemeBrushes.GreenColor,
+                            TimeSpan.FromSeconds(3.0),
+                            TargetView: "clipboard",
+                            Priority: ToastPriority.Feedback,
+                            Category: "ocr"));
+                    }
+                    else
+                    {
+                        _machine.PushToast(new ToastContent(
+                            "\uE7BA",
+                            "No Text Detected",
+                            "Windows OCR found no readable text in image",
+                            ThemeBrushes.AmberColor,
+                            TimeSpan.FromSeconds(2.2),
+                            TargetView: "clipboard",
+                            Priority: ToastPriority.Feedback,
+                            Category: "ocr"));
+                    }
                 }
             }
-            e.Handled = true;
+            catch (Exception ex)
+            {
+                App.Log($"[Clipboard] OCR card failed: {ex.Message}");
+            }
         }
     }
 
@@ -478,86 +493,104 @@ public partial class IslandWindow
 
     internal async void EyedropperButton_Click(object sender, RoutedEventArgs e)
     {
-        _machine.PushToast(new ToastContent(
-            "\uEF3C",
-            "Eyedropper Armed",
-            "Sampling pixel under cursor in 1.2s...",
-            ThemeBrushes.AmberColor,
-            TimeSpan.FromSeconds(1.2),
-            TargetView: "clipboard",
-            Priority: ToastPriority.Feedback,
-            Category: "eyedropper"));
+        try
+        {
+            _machine.PushToast(new ToastContent(
+                "\uEF3C",
+                "Eyedropper Armed",
+                "Sampling pixel under cursor in 1.2s...",
+                ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(1.2),
+                TargetView: "clipboard",
+                Priority: ToastPriority.Feedback,
+                Category: "eyedropper"));
 
-        await Task.Delay(1200);
-        var sample = ScreenToolsService.SampleCursorPixelColor();
-        try { Clipboard.SetText(sample.Hex); } catch { }
+            await Task.Delay(1200);
+            if (_isClosing) return;
 
-        _machine.PushToast(new ToastContent(
-            "\uEF3C",
-            $"Sampled {sample.Hex}",
-            $"{sample.RgbText} \u00B7 Copied to clipboard",
-            sample.Color,
-            TimeSpan.FromSeconds(3.0),
-            TargetView: "clipboard",
-            Priority: ToastPriority.Feedback,
-            Category: "eyedropper"));
+            var sample = ScreenToolsService.SampleCursorPixelColor();
+            try { Clipboard.SetText(sample.Hex); } catch { }
+
+            _machine.PushToast(new ToastContent(
+                "\uEF3C",
+                $"Sampled {sample.Hex}",
+                $"{sample.RgbText} \u00B7 Copied to clipboard",
+                sample.Color,
+                TimeSpan.FromSeconds(3.0),
+                TargetView: "clipboard",
+                Priority: ToastPriority.Feedback,
+                Category: "eyedropper"));
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Clipboard] Eyedropper failed: {ex.Message}");
+        }
     }
 
     internal async void OcrClipboardButton_Click(object sender, RoutedEventArgs e)
     {
-        System.Windows.Media.Imaging.BitmapSource? bmp = null;
         try
         {
-            if (Clipboard.ContainsImage())
+            System.Windows.Media.Imaging.BitmapSource? bmp = null;
+            try
             {
-                bmp = Clipboard.GetImage();
+                if (Clipboard.ContainsImage())
+                {
+                    bmp = Clipboard.GetImage();
+                }
             }
-        }
-        catch { }
+            catch { }
 
-        bmp ??= _clipboardService.Items.FirstOrDefault(i => i.ImagePreview != null)?.ImagePreview as System.Windows.Media.Imaging.BitmapSource;
-        if (bmp == null)
-        {
+            bmp ??= _clipboardService.Items.FirstOrDefault(i => i.ImagePreview != null)?.ImagePreview as System.Windows.Media.Imaging.BitmapSource;
+            if (bmp == null)
+            {
+                _machine.PushToast(new ToastContent(
+                    "\uE7BA",
+                    "No Image in Clipboard",
+                    "Copy a screenshot first (Win+Shift+S) to extract text",
+                    ThemeBrushes.AmberColor,
+                    TimeSpan.FromSeconds(2.5),
+                    TargetView: "clipboard",
+                    Priority: ToastPriority.Feedback,
+                    Category: "ocr"));
+                return;
+            }
+
+            string? text = await ScreenToolsService.ExtractTextFromBitmapAsync(bmp);
+            if (_isClosing) return;
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                _machine.PushToast(new ToastContent(
+                    "\uE7BA",
+                    "No Text Detected",
+                    "Windows OCR found no readable text in image",
+                    ThemeBrushes.AmberColor,
+                    TimeSpan.FromSeconds(2.2),
+                    TargetView: "clipboard",
+                    Priority: ToastPriority.Feedback,
+                    Category: "ocr"));
+                return;
+            }
+
+            try { Clipboard.SetText(text); } catch { }
+            string preview = text.Replace("\r", " ").Replace("\n", " ").Trim();
+            if (preview.Length > 36) preview = preview[..33] + "...";
+
             _machine.PushToast(new ToastContent(
-                "\uE8BCE",
-                "No Image in Clipboard",
-                "Copy a screenshot first (Win+Shift+S) to extract text",
-                ThemeBrushes.AmberColor,
-                TimeSpan.FromSeconds(2.5),
+                "\uE73E",
+                "OCR Text Copied",
+                preview,
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(3.0),
                 TargetView: "clipboard",
                 Priority: ToastPriority.Feedback,
                 Category: "ocr"));
-            return;
         }
-
-        string? text = await ScreenToolsService.ExtractTextFromBitmapAsync(bmp);
-        if (string.IsNullOrWhiteSpace(text))
+        catch (Exception ex)
         {
-            _machine.PushToast(new ToastContent(
-                "\uE8BCE",
-                "No Text Detected",
-                "Windows OCR found no readable text in image",
-                ThemeBrushes.AmberColor,
-                TimeSpan.FromSeconds(2.2),
-                TargetView: "clipboard",
-                Priority: ToastPriority.Feedback,
-                Category: "ocr"));
-            return;
+            App.Log($"[Clipboard] OCR clipboard button failed: {ex.Message}");
         }
-
-        try { Clipboard.SetText(text); } catch { }
-        string preview = text.Replace("\r", " ").Replace("\n", " ").Trim();
-        if (preview.Length > 36) preview = preview[..33] + "...";
-
-        _machine.PushToast(new ToastContent(
-            "\uE73E",
-            "OCR Text Copied",
-            preview,
-            ThemeBrushes.GreenColor,
-            TimeSpan.FromSeconds(3.0),
-            TargetView: "clipboard",
-            Priority: ToastPriority.Feedback,
-            Category: "ocr"));
     }
 
     private void OnDownloadsChanged()

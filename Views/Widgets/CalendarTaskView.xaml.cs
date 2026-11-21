@@ -38,11 +38,26 @@ public partial class CalendarTaskView : UserControl
         @"(?:\bat\s+|@\s*)(\d{1,2}(?::\d{2})?\s*(?:am|pm)?|\d{1,2}:\d{2})\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    private static readonly BrushConverter SharedBrushConverter = new();
+
     private static SolidColorBrush CreateFrozenBrush(string hex)
     {
-        var b = (SolidColorBrush)new BrushConverter().ConvertFromString(hex)!;
-        b.Freeze();
-        return b;
+        return BrushFromHex(hex, Brushes.White);
+    }
+
+    private static SolidColorBrush BrushFromHex(string? hex, SolidColorBrush fallback)
+    {
+        if (string.IsNullOrWhiteSpace(hex)) return fallback;
+        try
+        {
+            if (SharedBrushConverter.ConvertFromString(hex.Trim()) is SolidColorBrush b)
+            {
+                if (!b.IsFrozen) b.Freeze();
+                return b;
+            }
+        }
+        catch { }
+        return fallback;
     }
 
     private static void DayCell_MouseEnter(object sender, MouseEventArgs e)
@@ -321,8 +336,7 @@ public partial class CalendarTaskView : UserControl
 
     private Border CreateTaskCard(IslandTask task, TaskService taskSvc)
     {
-        var accentBrush = (SolidColorBrush)new BrushConverter().ConvertFromString(task.ColorTag ?? "#30D158")!;
-        accentBrush.Freeze();
+        var accentBrush = BrushFromHex(task.ColorTag, TaskDotBrush);
 
         var card = new Border
         {
@@ -445,8 +459,7 @@ public partial class CalendarTaskView : UserControl
 
     private Border CreateCustomEventCard(IslandCustomEvent evt, string time)
     {
-        var accentBrush = (SolidColorBrush)new BrushConverter().ConvertFromString(evt.ColorTag ?? "#FF9F0A")!;
-        accentBrush.Freeze();
+        var accentBrush = BrushFromHex(evt.ColorTag, EventDotBrush);
 
         var card = new Border
         {
@@ -565,8 +578,7 @@ public partial class CalendarTaskView : UserControl
 
     private Border CreateScheduleCard(string title, string time, string accentHex, bool hasVideo, Action onCardClick, bool isHighlighted = false)
     {
-        var accentBrush = (SolidColorBrush)new BrushConverter().ConvertFromString(accentHex)!;
-        accentBrush.Freeze();
+        var accentBrush = BrushFromHex(accentHex, EventDotBrush);
 
         var normalBg = isHighlighted ? HighlightCardBg : CardNormalBg;
         var normalBorder = isHighlighted ? HighlightCardBorder : CardNormalBorder;

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net.Http;
 using System.Text.Json;
 using System.Windows.Threading;
+using DynamicIsland.Core;
 
 namespace DynamicIsland.Services;
 
@@ -33,7 +34,7 @@ public sealed record WeatherSnapshot(
 internal sealed class WeatherService : IDisposable
 {
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(20);
-    private static readonly HttpClient SharedHttp = new() { Timeout = TimeSpan.FromSeconds(6) };
+    private static readonly HttpClient SharedHttp = SharedHttpClient.CreateClient(TimeSpan.FromSeconds(6));
 
     private readonly Dispatcher _ui;
     private readonly Func<AppSettings>? _getSettings;

@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Windows.Threading;
 using static DynamicIsland.Interop.NativeMethods;
 
@@ -12,8 +13,11 @@ internal sealed class BrightnessService : IDisposable
     private readonly Dispatcher _ui;
     private readonly Func<IntPtr> _getTargetMonitor;
     private readonly object _hwLock = new();
-    private bool _disposed;
+    private volatile bool _disposed;
     private int _brightnessPercent = 80;
+    private int _pendingBrightness = -1;
+    private int _writerActive;
+    private IntPtr _pendingMonitor;
 
     public int BrightnessPercent => _brightnessPercent;
     public bool IsHardwareSupported { get; private set; }
@@ -62,67 +66,132 @@ internal sealed class BrightnessService : IDisposable
         _brightnessPercent = clamped;
         BrightnessChanged?.Invoke(clamped);
 
-        IntPtr hMon = _getTargetMonitor();
-        Task.Run(() =>
+        _pendingMonitor = _getTargetMonitor();
+        Volatile.Write(ref _pendingBrightness, clamped);
+
+        if (!_disposed && Interlocked.CompareExchange(ref _writerActive, 1, 0) == 0)
         {
-            if (_disposed) return;
-            lock (_hwLock)
+            _ = Task.Run(ProcessBrightnessWrites);
+        }
+    }
+
+    private void ProcessBrightnessWrites()
+    {
+        try
+        {
+            while (!_disposed)
             {
-                if (!TrySetWmiBrightness(clamped))
+                int target = Interlocked.Exchange(ref _pendingBrightness, -1);
+                if (target < 0) break;
+
+                IntPtr hMon = _pendingMonitor;
+                lock (_hwLock)
                 {
-                    TrySetDdcBrightness(hMon, clamped);
+                    if (!TrySetWmiBrightness(target))
+                    {
+                        TrySetDdcBrightness(hMon, target);
+                    }
                 }
             }
-        });
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _writerActive, 0);
+            if (!_disposed && Volatile.Read(ref _pendingBrightness) >= 0 &&
+                Interlocked.CompareExchange(ref _writerActive, 1, 0) == 0)
+            {
+                _ = Task.Run(ProcessBrightnessWrites);
+            }
+        }
+    }
+
+    private static void ReleaseCom(object? obj)
+    {
+        if (obj != null && Marshal.IsComObject(obj))
+        {
+            try { Marshal.FinalReleaseComObject(obj); } catch { }
+        }
     }
 
     private static bool TryGetWmiBrightness(out int percent)
     {
         percent = 80;
+        object? locator = null;
+        object? service = null;
+        object? instances = null;
         try
         {
             var locatorType = Type.GetTypeFromProgID("WbemScripting.SWbemLocator");
             if (locatorType == null) return false;
-            dynamic? locator = Activator.CreateInstance(locatorType);
+            locator = Activator.CreateInstance(locatorType);
             if (locator == null) return false;
 
-            dynamic service = locator.ConnectServer(".", @"root\wmi");
-            dynamic instances = service.ExecQuery("SELECT CurrentBrightness FROM WmiMonitorBrightness WHERE Active=True");
-            foreach (dynamic item in instances)
+            service = ((dynamic)locator).ConnectServer(".", @"root\wmi");
+            instances = ((dynamic)service).ExecQuery("SELECT CurrentBrightness FROM WmiMonitorBrightness WHERE Active=True");
+            foreach (dynamic item in (dynamic)instances)
             {
-                percent = Convert.ToInt32(item.CurrentBrightness);
-                return true;
+                try
+                {
+                    percent = Convert.ToInt32(item.CurrentBrightness);
+                    return true;
+                }
+                finally
+                {
+                    ReleaseCom(item);
+                }
             }
         }
         catch
         {
             // WMI brightness is only supported on internal laptop panels
         }
+        finally
+        {
+            ReleaseCom(instances);
+            ReleaseCom(service);
+            ReleaseCom(locator);
+        }
         return false;
     }
 
     private static bool TrySetWmiBrightness(int percent)
     {
+        object? locator = null;
+        object? service = null;
+        object? instances = null;
         try
         {
             var locatorType = Type.GetTypeFromProgID("WbemScripting.SWbemLocator");
             if (locatorType == null) return false;
-            dynamic? locator = Activator.CreateInstance(locatorType);
+            locator = Activator.CreateInstance(locatorType);
             if (locator == null) return false;
 
-            dynamic service = locator.ConnectServer(".", @"root\wmi");
-            dynamic instances = service.ExecQuery("SELECT * FROM WmiMonitorBrightnessMethods WHERE Active=True");
+            service = ((dynamic)locator).ConnectServer(".", @"root\wmi");
+            instances = ((dynamic)service).ExecQuery("SELECT * FROM WmiMonitorBrightnessMethods WHERE Active=True");
             bool any = false;
-            foreach (dynamic item in instances)
+            foreach (dynamic item in (dynamic)instances)
             {
-                item.WmiSetBrightness(1, (byte)Math.Clamp(percent, 0, 100));
-                any = true;
+                try
+                {
+                    item.WmiSetBrightness(1, (byte)Math.Clamp(percent, 0, 100));
+                    any = true;
+                }
+                finally
+                {
+                    ReleaseCom(item);
+                }
             }
             return any;
         }
         catch
         {
             return false;
+        }
+        finally
+        {
+            ReleaseCom(instances);
+            ReleaseCom(service);
+            ReleaseCom(locator);
         }
     }
 

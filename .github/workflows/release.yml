@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release Tag (e.g. v0.4.1)'
+        description: 'Release Tag (e.g. v0.8.0)'
         required: false
-        default: 'v0.4.1'
+        default: 'v0.8.0'
 
 permissions:
   contents: write
@@ -59,7 +59,7 @@ jobs:
       - name: Build Release
         run: dotnet build -c Release -r win-x64 --no-restore -p:Version=${{ env.VERSION }}
 
-      - name: Run Deterministic Self-Test Suite (58 Checks)
+      - name: Run Deterministic Self-Test Suite (72 Checks)
         run: dotnet run -c Release -r win-x64 --no-build -- --self-test
 
       - name: Publish Single-File Native Binary (win-x64)

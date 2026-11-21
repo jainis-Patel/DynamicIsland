@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.Graphics.Capture;
 using Windows.Graphics.DirectX;
@@ -58,18 +59,28 @@ public sealed class DesktopCaptureBackdrop : IBackdropProvider
     private ID3D11ShaderResourceView? _currentSrv;
 
     private bool _isCapturing;
+    private volatile bool _isDisposed;
+    private volatile bool _isDeviceLost;
     private bool _screenshotMode;
     private int _frameWidth;
     private int _frameHeight;
-    private readonly object _lock = new();
+    private IntPtr _capturedMonitor;
+    private volatile int _monitorOriginX;
+    private volatile int _monitorOriginY;
+    private int _isRestarting;
+    private readonly object _lock;
 
     public event EventHandler? FrameReady;
 
-    public ID3D11ShaderResourceView? CurrentFrameSRV => _currentSrv;
+    public ID3D11ShaderResourceView? CurrentFrameSRV => _isDisposed ? null : _currentSrv;
     public ID3D11ShaderResourceView? BlurredFrameSRV => null; // Renderer blur chain generates blurred frame
     public bool IsCapturing => _isCapturing;
+    public bool IsDisposed => _isDisposed;
+    public bool IsDeviceLost => _isDeviceLost;
     public int FrameWidth => _frameWidth;
     public int FrameHeight => _frameHeight;
+    public int MonitorOriginX => _monitorOriginX;
+    public int MonitorOriginY => _monitorOriginY;
 
     /// <summary>
     /// Temporarily enables or disables screenshot visibility. When true, the island overlay
@@ -83,11 +94,12 @@ public sealed class DesktopCaptureBackdrop : IBackdropProvider
         SetWindowDisplayAffinity(_targetHwnd, enabled ? 0u /* WDA_NONE */ : WDA_EXCLUDEFROMCAPTURE);
     }
 
-    public DesktopCaptureBackdrop(ID3D11Device device, ID3D11DeviceContext context, IntPtr targetHwnd)
+    public DesktopCaptureBackdrop(ID3D11Device device, ID3D11DeviceContext context, IntPtr targetHwnd, object? sharedRenderLock = null)
     {
         _d3dDevice = device;
         _d3dContext = context;
         _targetHwnd = targetHwnd;
+        _lock = sharedRenderLock ?? new object();
     }
 
     public static bool IsSupported()
@@ -100,7 +112,7 @@ public sealed class DesktopCaptureBackdrop : IBackdropProvider
 
     public Task StartAsync()
     {
-        if (_isCapturing) return Task.CompletedTask;
+        if (_isCapturing || _isDisposed) return Task.CompletedTask;
 
         try
         {
@@ -114,7 +126,7 @@ public sealed class DesktopCaptureBackdrop : IBackdropProvider
             //    recursive feedback artifacts. Note: This also hides the island from
             //    Win+Shift+S and Snipping Tool screenshots. Use ToggleScreenshotMode()
             //    to temporarily restore visibility for user-initiated screenshots.
-            if (_targetHwnd != IntPtr.Zero)
+            if (_targetHwnd != IntPtr.Zero && !_screenshotMode)
             {
                 SetWindowDisplayAffinity(_targetHwnd, WDA_EXCLUDEFROMCAPTURE);
             }
@@ -126,22 +138,54 @@ public sealed class DesktopCaptureBackdrop : IBackdropProvider
                 if (hr != 0 || pInspectable == IntPtr.Zero)
                 {
                     App.Log($"[DesktopCaptureBackdrop] Failed to create WinRT D3D device from DXGI device: 0x{hr:X8}");
+                    Stop();
+                    if (_targetHwnd != IntPtr.Zero) SetWindowDisplayAffinity(_targetHwnd, 0);
                     return Task.CompletedTask;
                 }
-                _winrtDevice = WinRT.MarshalInterface<IDirect3DDevice>.FromAbi(pInspectable);
+                try
+                {
+                    _winrtDevice = WinRT.MarshalInterface<IDirect3DDevice>.FromAbi(pInspectable);
+                }
+                finally
+                {
+                    Marshal.Release(pInspectable);
+                }
             }
 
             // 3. Create Capture Item for the Monitor containing target window
             IntPtr hMonitor = MonitorFromWindow(_targetHwnd, MONITOR_DEFAULTTOPRIMARY);
+            _capturedMonitor = hMonitor;
+            var monInfo = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+            if (hMonitor != IntPtr.Zero && GetMonitorInfo(hMonitor, ref monInfo))
+            {
+                _monitorOriginX = monInfo.rcMonitor.Left;
+                _monitorOriginY = monInfo.rcMonitor.Top;
+            }
+            else
+            {
+                _monitorOriginX = 0;
+                _monitorOriginY = 0;
+            }
+
             var interop = (IGraphicsCaptureItemInterop)WindowsRuntimeMarshal.GetActivationFactory(typeof(GraphicsCaptureItem));
             Guid itemGuid = IGraphicsCaptureItemGuid;
             IntPtr pItem = interop.CreateForMonitor(hMonitor, ref itemGuid);
             if (pItem == IntPtr.Zero)
             {
                 App.Log("[DesktopCaptureBackdrop] Failed to create GraphicsCaptureItem for monitor.");
+                Stop();
+                if (_targetHwnd != IntPtr.Zero) SetWindowDisplayAffinity(_targetHwnd, 0);
                 return Task.CompletedTask;
             }
-            _captureItem = WinRT.MarshalInterface<GraphicsCaptureItem>.FromAbi(pItem);
+            try
+            {
+                _captureItem = WinRT.MarshalInterface<GraphicsCaptureItem>.FromAbi(pItem);
+                _captureItem.Closed += OnCaptureItemClosed;
+            }
+            finally
+            {
+                Marshal.Release(pItem);
+            }
 
             _frameWidth = _captureItem.Size.Width;
             _frameHeight = _captureItem.Size.Height;
@@ -180,6 +224,7 @@ public sealed class DesktopCaptureBackdrop : IBackdropProvider
         {
             App.Log($"[DesktopCaptureBackdrop] Exception starting capture: {ex.Message}");
             Stop();
+            if (_targetHwnd != IntPtr.Zero) SetWindowDisplayAffinity(_targetHwnd, 0);
         }
 
         return Task.CompletedTask;
@@ -187,10 +232,15 @@ public sealed class DesktopCaptureBackdrop : IBackdropProvider
 
     private void OnFrameArrived(Direct3D11CaptureFramePool sender, object args)
     {
+        if (_isDisposed || !_isCapturing) return;
+
         try
         {
             using var frame = sender.TryGetNextFrame();
             if (frame == null) return;
+
+            if (frame.ContentSize.Width <= 0 || frame.ContentSize.Height <= 0)
+                return;
 
             // Extract native ID3D11Texture2D from WinRT surface using IDirect3DDxgiInterfaceAccess
             var access = (IDirect3DDxgiInterfaceAccess)(object)frame.Surface;
@@ -202,11 +252,15 @@ public sealed class DesktopCaptureBackdrop : IBackdropProvider
 
             lock (_lock)
             {
+                if (_isDisposed || !_isCapturing) return;
+
                 // Ensure cached destination texture matches incoming frame resolution
                 if (_currentTexture == null || _frameWidth != frame.ContentSize.Width || _frameHeight != frame.ContentSize.Height)
                 {
                     _currentSrv?.Dispose();
                     _currentTexture?.Dispose();
+                    _currentSrv = null;
+                    _currentTexture = null;
 
                     _frameWidth = frame.ContentSize.Width;
                     _frameHeight = frame.ContentSize.Height;
@@ -230,11 +284,54 @@ public sealed class DesktopCaptureBackdrop : IBackdropProvider
                 _d3dContext.CopyResource(_currentTexture, capturedTex);
             }
 
-            FrameReady?.Invoke(this, EventArgs.Empty);
+            if (!_isDisposed && _isCapturing)
+            {
+                FrameReady?.Invoke(this, EventArgs.Empty);
+            }
+        }
+        catch (SharpGen.Runtime.SharpGenException ex) when (GlassRenderer.IsDeviceLostError(ex))
+        {
+            App.Log($"[DesktopCaptureBackdrop] D3D11 device lost in OnFrameArrived (0x{ex.ResultCode.Code:X8}).");
+            _isDeviceLost = true;
+            Stop();
         }
         catch (Exception ex)
         {
             App.Log($"[DesktopCaptureBackdrop] Frame processing error: {ex.Message}");
+        }
+    }
+
+    public void EnsureTargetMonitor(IntPtr targetHwnd)
+    {
+        if (_isDisposed || !_isCapturing || targetHwnd == IntPtr.Zero) return;
+        IntPtr currentMon = MonitorFromWindow(targetHwnd, MONITOR_DEFAULTTOPRIMARY);
+        if (currentMon == IntPtr.Zero || currentMon == _capturedMonitor) return;
+        RestartCaptureAsync();
+    }
+
+    private void OnCaptureItemClosed(GraphicsCaptureItem sender, object args)
+    {
+        if (_isDisposed || !_isCapturing) return;
+        App.Log("[DesktopCaptureBackdrop] Capture item closed by system; restarting capture.");
+        RestartCaptureAsync();
+    }
+
+    private void RestartCaptureAsync()
+    {
+        if (_isDisposed || Interlocked.CompareExchange(ref _isRestarting, 1, 0) != 0)
+            return;
+
+        try
+        {
+            Stop();
+            if (!_isDisposed)
+            {
+                _ = StartAsync();
+            }
+        }
+        finally
+        {
+            Volatile.Write(ref _isRestarting, 0);
         }
     }
 
@@ -253,7 +350,11 @@ public sealed class DesktopCaptureBackdrop : IBackdropProvider
             _session?.Dispose();
             _session = null;
 
-            _captureItem = null;
+            if (_captureItem != null)
+            {
+                _captureItem.Closed -= OnCaptureItemClosed;
+                _captureItem = null;
+            }
             _winrtDevice?.Dispose();
             _winrtDevice = null;
         }
@@ -265,6 +366,9 @@ public sealed class DesktopCaptureBackdrop : IBackdropProvider
 
     public void Dispose()
     {
+        if (_isDisposed) return;
+        _isDisposed = true;
+
         Stop();
 
         // Restore normal display affinity so the window is visible to screenshots again
@@ -302,7 +406,14 @@ internal static class WindowsRuntimeMarshal
             {
                 throw new COMException($"RoGetActivationFactory failed with HRESULT 0x{hr:X8}", hr);
             }
-            return WinRT.MarshalInterface<object>.FromAbi(pFactory);
+            try
+            {
+                return WinRT.MarshalInterface<object>.FromAbi(pFactory);
+            }
+            finally
+            {
+                Marshal.Release(pFactory);
+            }
         }
         finally
         {
@@ -318,7 +429,8 @@ internal static class WindowsRuntimeMarshal
 
     private static IntPtr CreateHString(string s)
     {
-        WindowsCreateString(s, s.Length, out IntPtr h);
+        int hr = WindowsCreateString(s, s.Length, out IntPtr h);
+        if (hr != 0) Marshal.ThrowExceptionForHR(hr);
         return h;
     }
 

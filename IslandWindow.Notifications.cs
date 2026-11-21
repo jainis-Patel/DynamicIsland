@@ -196,118 +196,109 @@ public partial class IslandWindow
 
         try
         {
-            // 1. Preserve previous clipboard contents so user data is not lost
-            try
+            using (_clipboardService.PauseCapture())
             {
-                savedClipboard = Clipboard.GetDataObject();
-            }
-            catch (Exception ex)
-            {
-                App.Log($"[QuickReply] Could not preserve previous clipboard data: {ex.Message}");
-            }
-
-            // 2. Stage reply text onto Windows clipboard with transient retry
-            bool clipboardSet = false;
-            for (int i = 0; i < 4; i++)
-            {
+                // 1. Preserve previous clipboard contents so user data is not lost
                 try
                 {
-                    Clipboard.SetText(cleanText);
-                    clipboardSet = true;
-                    break;
+                    savedClipboard = Clipboard.GetDataObject();
                 }
-                catch
+                catch (Exception ex)
                 {
-                    await Task.Delay(25);
+                    App.Log($"[QuickReply] Could not preserve previous clipboard data: {ex.Message}");
                 }
-            }
 
-            // 3. Locate the target messenger window via EnumWindows
-            IntPtr targetHwnd = NotificationListenerService.FindAppWindow(item.AppName, item.AppUserModelId, item.Title);
+                // 2. Stage reply text onto Windows clipboard with transient retry
+                bool clipboardSet = await SafeClipboard.TrySetTextAsync(cleanText);
 
-            if (targetHwnd == IntPtr.Zero)
-            {
-                // App is not currently top-level visible; attempt activation via protocol/AUMID
-                NotificationListenerService.ActivateNotification(item, preferApp: true);
+                // 3. Locate the target messenger window via EnumWindows
+                IntPtr targetHwnd = NotificationListenerService.FindAppWindow(item.AppName, item.AppUserModelId, item.Title);
 
-                // Poll up to 1.2s (12 x 100ms) for the window to appear
-                for (int i = 0; i < 12; i++)
+                if (targetHwnd == IntPtr.Zero)
                 {
-                    await Task.Delay(100);
-                    targetHwnd = NotificationListenerService.FindAppWindow(item.AppName, item.AppUserModelId, item.Title);
-                    if (targetHwnd != IntPtr.Zero) break;
-                }
-            }
+                    // App is not currently top-level visible; attempt activation via protocol/AUMID
+                    NotificationListenerService.ActivateNotification(item, preferApp: true);
 
-            // 4. Forcibly bring window to foreground and verify input focus
-            bool isForeground = false;
-            if (targetHwnd != IntPtr.Zero)
-            {
-                NotificationListenerService.ForceForegroundWindow(targetHwnd);
-
-                // Wait up to 600ms verifying that the window actually became the active foreground window
-                for (int i = 0; i < 6; i++)
-                {
-                    await Task.Delay(100);
-                    if (NativeMethods.GetForegroundWindow() == targetHwnd)
+                    // Poll up to 1.2s (12 x 100ms) for the window to appear
+                    for (int i = 0; i < 12; i++)
                     {
-                        isForeground = true;
-                        break;
+                        await Task.Delay(100);
+                        targetHwnd = NotificationListenerService.FindAppWindow(item.AppName, item.AppUserModelId, item.Title);
+                        if (targetHwnd != IntPtr.Zero) break;
                     }
                 }
-            }
 
-            // 5. Deliver or gracefully fallback
-            if (isForeground && clipboardSet)
-            {
-                // Target messaging window is verified in the foreground! Inject Ctrl+V and Enter
-                NativeMethods.SimulatePasteAndEnter();
+                // 4. Forcibly bring window to foreground and verify input focus
+                bool isForeground = false;
+                if (targetHwnd != IntPtr.Zero)
+                {
+                    NotificationListenerService.ForceForegroundWindow(targetHwnd);
 
-                // Wait briefly for the messaging app to process clipboard paste
-                await Task.Delay(150);
+                    // Wait up to 600ms verifying that the window actually became the active foreground window
+                    for (int i = 0; i < 6; i++)
+                    {
+                        await Task.Delay(100);
+                        if (NativeMethods.GetForegroundWindow() == targetHwnd)
+                        {
+                            isForeground = true;
+                            break;
+                        }
+                    }
+                }
 
-                // Restore previous clipboard data
-                RestoreClipboard(savedClipboard);
+                // 5. Deliver or gracefully fallback
+                if (isForeground && clipboardSet)
+                {
+                    // Target messaging window is verified in the foreground! Inject Ctrl+V and Enter asynchronously
+                    await NativeMethods.SimulatePasteAndEnterAsync();
 
-                // Tactile liquid impulse feedback
-                TriggerLiquidImpulse(180, -90, 25);
+                    // Wait briefly for the messaging app to process clipboard paste
+                    await Task.Delay(150);
 
-                // Dismiss notification from history ring buffer
-                _notificationListener.RemoveHistoryItem(item.Id);
+                    // Restore previous clipboard data and let WM_CLIPBOARDUPDATE drain before resuming capture
+                    RestoreClipboard(savedClipboard);
+                    await Task.Delay(50);
 
-                // Collapse Island back
-                _machine.SetPinned(false);
-                _machine.CollapseNow();
+                    // Tactile liquid impulse feedback
+                    TriggerLiquidImpulse(180, -90, 25);
 
-                // Instant feedback confirmation toast
-                _machine.PushToast(new ToastContent(
-                    "\uE73E",
-                    "Reply Sent",
-                    $"Delivered to {item.Title}",
-                    item.Accent,
-                    TimeSpan.FromSeconds(2.0),
-                    Priority: ToastPriority.Feedback));
+                    // Dismiss notification from history ring buffer
+                    _notificationListener.RemoveHistoryItem(item.Id);
 
-                return true;
-            }
-            else
-            {
-                // Fallback: App could not be confirmed in the foreground.
-                // NEVER blindly paste into the active window (which could be the user's terminal/editor).
-                // Leave the staged reply on the clipboard and notify the user with a helpful prompt.
-                _machine.SetPinned(false);
-                _machine.CollapseNow();
+                    // Collapse Island back
+                    _machine.SetPinned(false);
+                    _machine.CollapseNow();
 
-                string appName = string.IsNullOrWhiteSpace(item.AppName) ? "app" : item.AppName;
-                _machine.PushToast(new ToastContent(
-                    "\uE783",
-                    "Reply Copied to Clipboard",
-                    $"Switch to {appName} and press Ctrl+V to send",
-                    item.Accent,
-                    TimeSpan.FromSeconds(3.5),
-                    Priority: ToastPriority.Feedback));
+                    // Instant feedback confirmation toast
+                    _machine.PushToast(new ToastContent(
+                        "\uE73E",
+                        "Reply Sent",
+                        $"Delivered to {item.Title}",
+                        item.Accent,
+                        TimeSpan.FromSeconds(2.0),
+                        Priority: ToastPriority.Feedback));
 
-                return false;
+                    return true;
+                }
+                else
+                {
+                    // Fallback: App could not be confirmed in the foreground.
+                    // NEVER blindly paste into the active window (which could be the user's terminal/editor).
+                    // Leave the staged reply on the clipboard and notify the user with a helpful prompt.
+                    _machine.SetPinned(false);
+                    _machine.CollapseNow();
+
+                    string appName = string.IsNullOrWhiteSpace(item.AppName) ? "app" : item.AppName;
+                    _machine.PushToast(new ToastContent(
+                        "\uE783",
+                        "Reply Copied to Clipboard",
+                        $"Switch to {appName} and press Ctrl+V to send",
+                        item.Accent,
+                        TimeSpan.FromSeconds(3.5),
+                        Priority: ToastPriority.Feedback));
+
+                    return false;
+                }
             }
         }
         catch (Exception ex)

@@ -73,6 +73,9 @@ internal sealed class PeripheralDeviceService : IDisposable
     private bool _useSimulatedFallback;
     private int _refreshing;
     private bool _xinputUnavailable;
+    private bool _hasXInputControllers;
+    private bool _isExpanded;
+    private bool _isSuspended;
     private bool _disposed;
 
     public IReadOnlyList<PeripheralDeviceInfo> Devices => _devices;
@@ -87,14 +90,14 @@ internal sealed class PeripheralDeviceService : IDisposable
         _ui = ui;
         _pollTimer = new DispatcherTimer(DispatcherPriority.Background, _ui)
         {
-            Interval = TimeSpan.FromMinutes(3)
+            Interval = TimeSpan.FromMinutes(1)
         };
         _pollTimer.Tick += OnPollTick;
     }
 
     public void Start()
     {
-        _pollTimer.Start();
+        UpdatePollTimerState();
         _ = RefreshAsync();
     }
 
@@ -103,13 +106,46 @@ internal sealed class PeripheralDeviceService : IDisposable
         _pollTimer.Stop();
     }
 
+    public void SetExpanded(bool expanded)
+    {
+        if (_disposed || _isExpanded == expanded) return;
+        _isExpanded = expanded;
+        UpdatePollTimerState();
+        if (expanded && !_isSuspended)
+        {
+            _ = RefreshAsync();
+        }
+    }
+
     public void SetSuspended(bool suspended)
     {
         if (_disposed) return;
-        if (suspended)
+        _isSuspended = suspended;
+        UpdatePollTimerState();
+    }
+
+    private void UpdatePollTimerState()
+    {
+        if (_disposed || _isSuspended)
+        {
             _pollTimer.Stop();
-        else if (!_pollTimer.IsEnabled)
-            _pollTimer.Start();
+            return;
+        }
+
+        if (_isExpanded)
+        {
+            _pollTimer.Interval = TimeSpan.FromSeconds(30);
+            if (!_pollTimer.IsEnabled) _pollTimer.Start();
+        }
+        else if (_hasXInputControllers)
+        {
+            _pollTimer.Interval = TimeSpan.FromMinutes(1);
+            if (!_pollTimer.IsEnabled) _pollTimer.Start();
+        }
+        else
+        {
+            _pollTimer.Stop();
+        }
     }
 
     public void ToggleSimulatedFallback()
@@ -130,13 +166,17 @@ internal sealed class PeripheralDeviceService : IDisposable
 
         try
         {
-            var list = await Task.Run(async () =>
+            var (list, hasXInput) = await Task.Run(async () =>
             {
                 var found = new List<PeripheralDeviceInfo>();
+                bool anyController = false;
                 try
                 {
                     if (!_xinputUnavailable)
+                    {
                         QueryGameControllers(found);
+                        anyController = found.Count > 0;
+                    }
 
                     await QueryBluetoothAndHidDevicesAsync(found).ConfigureAwait(false);
                 }
@@ -150,7 +190,7 @@ internal sealed class PeripheralDeviceService : IDisposable
                     found.AddRange(GetSamplePeripherals());
                 }
 
-                return found;
+                return (found, anyController);
             }).ConfigureAwait(false);
 
             if (_disposed) return;
@@ -158,6 +198,8 @@ internal sealed class PeripheralDeviceService : IDisposable
             await _ui.InvokeAsync(() =>
             {
                 if (_disposed) return;
+                _hasXInputControllers = hasXInput;
+                UpdatePollTimerState();
                 _devices = list;
                 DevicesChanged?.Invoke(_devices);
 
@@ -284,7 +326,7 @@ internal sealed class PeripheralDeviceService : IDisposable
                     Name = name,
                     Category = category,
                     Glyph = glyph,
-                    BatteryPercent = battery ?? (isConnected ? 80 : null),
+                    BatteryPercent = battery,
                     IsConnected = isConnected,
                     IsCharging = false
                 };
@@ -360,31 +402,11 @@ internal sealed class PeripheralDeviceService : IDisposable
 
     public static void OpenBluetoothSettings()
     {
-        try
-        {
-            Process.Start(new ProcessStartInfo("ms-settings:bluetooth") { UseShellExecute = true });
-        }
-        catch { }
+        SafeProcessLauncher.TryOpenShellUri("ms-settings:bluetooth");
     }
 
-    private static (string category, string glyph) CategorizeDevice(string name)
-    {
-        string lower = name.ToLowerInvariant();
-        if (lower.Contains("mouse") || lower.Contains("trackball") || lower.Contains("master"))
-            return ("Mouse", "\uE962");
-        if (lower.Contains("keyboard") || lower.Contains("keychron") || lower.Contains("k380"))
-            return ("Keyboard", "\uE92E");
-        if (lower.Contains("controller") || lower.Contains("gamepad") || lower.Contains("xbox") || lower.Contains("dualsense"))
-            return ("Controller", "\uE7FC");
-        if (lower.Contains("airpod") || lower.Contains("headphone") || lower.Contains("buds") || lower.Contains("wh-1000") || lower.Contains("audio") || lower.Contains("speaker"))
-            return ("Headset", "\uE7F6");
-        if (lower.Contains("phone") || lower.Contains("iphone") || lower.Contains("pixel") || lower.Contains("galaxy") || lower.Contains("s2") || lower.Contains("s24"))
-            return ("Phone", "\uE8EA");
-        if (lower.Contains("pen") || lower.Contains("stylus") || lower.Contains("surface pen"))
-            return ("Stylus", "\uEDC6");
-
-        return ("Peripheral", "\uE702");
-    }
+    private static (string category, string glyph) CategorizeDevice(string name) =>
+        DeviceClassifier.ClassifyPeripheral(name);
 
     private static IEnumerable<PeripheralDeviceInfo> GetSamplePeripherals()
     {

@@ -28,17 +28,20 @@ internal sealed class KeyboardSoundService : IDisposable
 
     private readonly Random _rng = new();
     private readonly object _playLock = new();
+    private readonly object _sampleInitLock = new();
     private readonly byte[] _scaledBuffer = new byte[8192];
 
     private IntPtr _hook = IntPtr.Zero;
     private LowLevelKeyboardProc? _hookProc;
     private WasapiOut? _wasapiOut;
     private BufferedWaveProvider? _waveProvider;
+    private Timer? _idlePauseTimer;
+    private bool _samplesInitialized;
 
     private MechSoundProfile _profile = MechSoundProfile.CherryBlue;
-    private bool _isEnabled;
+    private volatile bool _isEnabled;
     private float _volume = 0.5f;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     public MechSoundProfile Profile
     {
@@ -56,17 +59,23 @@ internal sealed class KeyboardSoundService : IDisposable
 
     public KeyboardSoundService()
     {
-        PrecomputeAcousticSamples();
+        // Acoustic sample buffers are lazily computed on first enable/click to save startup RAM & CPU.
     }
 
-    private void PrecomputeAcousticSamples()
+    private void EnsureSamplesInitialized()
     {
-        for (int i = 0; i < 6; i++)
+        if (Volatile.Read(ref _samplesInitialized)) return;
+        lock (_sampleInitLock)
         {
-            double pitchMod = 1.0 + (i - 3) * 0.035; // +/- pitch modulation
-            _cherryBlueSamples[i] = GenerateSwitchSound(clickFreq: 2900 * pitchMod, thockFreq: 420 * pitchMod, decay: 75.0, noiseLevel: 0.18, durationMs: 38);
-            _tactileBrownSamples[i] = GenerateSwitchSound(clickFreq: 1100 * pitchMod, thockFreq: 240 * pitchMod, decay: 55.0, noiseLevel: 0.22, durationMs: 44);
-            _typewriterSamples[i] = GenerateSwitchSound(clickFreq: 3600 * pitchMod, thockFreq: 310 * pitchMod, decay: 85.0, noiseLevel: 0.35, durationMs: 48);
+            if (_samplesInitialized) return;
+            for (int i = 0; i < 6; i++)
+            {
+                double pitchMod = 1.0 + (i - 3) * 0.035; // +/- pitch modulation
+                _cherryBlueSamples[i] = GenerateSwitchSound(clickFreq: 2900 * pitchMod, thockFreq: 420 * pitchMod, decay: 75.0, noiseLevel: 0.18, durationMs: 38);
+                _tactileBrownSamples[i] = GenerateSwitchSound(clickFreq: 1100 * pitchMod, thockFreq: 240 * pitchMod, decay: 55.0, noiseLevel: 0.22, durationMs: 44);
+                _typewriterSamples[i] = GenerateSwitchSound(clickFreq: 3600 * pitchMod, thockFreq: 310 * pitchMod, decay: 85.0, noiseLevel: 0.35, durationMs: 48);
+            }
+            _samplesInitialized = true;
         }
     }
 
@@ -103,6 +112,7 @@ internal sealed class KeyboardSoundService : IDisposable
 
         if (enabled)
         {
+            EnsureSamplesInitialized();
             InitWasapi();
             InstallHook();
         }
@@ -130,7 +140,7 @@ internal sealed class KeyboardSoundService : IDisposable
 
                 _wasapiOut = new WasapiOut(NAudio.CoreAudioApi.AudioClientShareMode.Shared, 25);
                 _wasapiOut.Init(_waveProvider);
-                _wasapiOut.Play();
+                _idlePauseTimer ??= new Timer(_ => PauseWasapiIfIdle(), null, Timeout.Infinite, Timeout.Infinite);
             }
             catch (Exception ex)
             {
@@ -139,10 +149,27 @@ internal sealed class KeyboardSoundService : IDisposable
         }
     }
 
+    private void PauseWasapiIfIdle()
+    {
+        lock (_playLock)
+        {
+            try
+            {
+                if (_wasapiOut?.PlaybackState == PlaybackState.Playing)
+                {
+                    _wasapiOut.Pause();
+                }
+            }
+            catch { }
+        }
+    }
+
     private void CleanupWasapi()
     {
         lock (_playLock)
         {
+            try { _idlePauseTimer?.Dispose(); } catch { }
+            _idlePauseTimer = null;
             try { _wasapiOut?.Stop(); } catch { }
             try { _wasapiOut?.Dispose(); } catch { }
             _wasapiOut = null;
@@ -178,34 +205,43 @@ internal sealed class KeyboardSoundService : IDisposable
 
     private IntPtr LowLevelKeyboardCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        if (nCode >= 0 && (wParam.ToInt32() == WM_KEYDOWN || wParam.ToInt32() == WM_SYSKEYDOWN))
+        if (nCode >= 0 && _isEnabled && !_disposed &&
+            (wParam.ToInt32() == WM_KEYDOWN || wParam.ToInt32() == WM_SYSKEYDOWN))
         {
-            PlayKeyClick();
+            ThreadPool.UnsafeQueueUserWorkItem(static s => ((KeyboardSoundService)s!).PlayKeyClick(), this);
         }
         return CallNextHookEx(_hook, nCode, wParam, lParam);
     }
 
     public void PlayKeyClick()
     {
-        if (!_isEnabled || _waveProvider == null) return;
-
-        byte[][] samplePool = _profile switch
-        {
-            MechSoundProfile.TactileBrown => _tactileBrownSamples,
-            MechSoundProfile.RetroTypewriter => _typewriterSamples,
-            _ => _cherryBlueSamples
-        };
-
-        int idx = _rng.Next(samplePool.Length);
-        byte[] sample = samplePool[idx];
+        if (!_isEnabled || _disposed || _waveProvider == null) return;
+        EnsureSamplesInitialized();
 
         lock (_playLock)
         {
+            if (!_isEnabled || _disposed || _waveProvider == null) return;
+
+            byte[][] samplePool = _profile switch
+            {
+                MechSoundProfile.TactileBrown => _tactileBrownSamples,
+                MechSoundProfile.RetroTypewriter => _typewriterSamples,
+                _ => _cherryBlueSamples
+            };
+
+            int idx = _rng.Next(samplePool.Length);
+            byte[] sample = samplePool[idx];
+
             try
             {
+                if (_wasapiOut != null && _wasapiOut.PlaybackState != PlaybackState.Playing)
+                {
+                    _wasapiOut.Play();
+                }
+
                 if (_volume >= 0.98f)
                 {
-                    _waveProvider?.AddSamples(sample, 0, sample.Length);
+                    _waveProvider.AddSamples(sample, 0, sample.Length);
                 }
                 else
                 {
@@ -221,8 +257,10 @@ internal sealed class KeyboardSoundService : IDisposable
                         buf[i] = (byte)(scaledVal & 0xFF);
                         buf[i + 1] = (byte)((scaledVal >> 8) & 0xFF);
                     }
-                    _waveProvider?.AddSamples(buf, 0, sample.Length);
+                    _waveProvider.AddSamples(buf, 0, sample.Length);
                 }
+
+                _idlePauseTimer?.Change(3500, Timeout.Infinite);
             }
             catch { }
         }
@@ -231,7 +269,7 @@ internal sealed class KeyboardSoundService : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        _disposed = true;
         SetEnabled(false);
+        _disposed = true;
     }
 }

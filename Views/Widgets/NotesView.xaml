@@ -42,7 +42,7 @@
                 <ItemsControl x:Name="NotesListControl">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Background="{DynamicResource ElevatedSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="6,4" Margin="0,0,0,3"
+                            <Border BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="6,4" Margin="0,0,0,3"
                                     Cursor="Hand" MouseLeftButtonDown="NoteRow_Click" ToolTip="{Binding FormattedDate, StringFormat='{}Updated {0} · Click to edit'}">
                                 <Border.Style>
                                     <Style TargetType="Border">

@@ -56,6 +56,7 @@ internal sealed class CalendarService : IDisposable
     private readonly string _eventsFilePath;
     private readonly object _eventsLock = new();
     private readonly List<IslandCustomEvent> _customEvents = new();
+    private readonly DebouncedJsonStore<List<IslandCustomEvent>> _eventsStore;
     private bool _disposed;
 
     public CalendarEventInfo? NextEvent { get; private set; }
@@ -66,6 +67,10 @@ internal sealed class CalendarService : IDisposable
     {
         _ui = ui;
         _eventsFilePath = eventsFilePath ?? AppPaths.EventsFile;
+        _eventsStore = new DebouncedJsonStore<List<IslandCustomEvent>>(_eventsFilePath, () =>
+        {
+            lock (_eventsLock) return new List<IslandCustomEvent>(_customEvents);
+        });
         LoadCustomEvents();
         _timer = new DispatcherTimer(PollInterval, DispatcherPriority.Background, (_, _) => _ = RefreshAsync(), _ui);
     }
@@ -119,9 +124,9 @@ internal sealed class CalendarService : IDisposable
         lock (_eventsLock)
         {
             _customEvents.Add(evt);
-            SaveCustomEvents();
         }
 
+        _eventsStore.ScheduleSave();
         _ = RefreshAsync();
         return evt;
     }
@@ -136,12 +141,12 @@ internal sealed class CalendarService : IDisposable
             {
                 _customEvents.RemoveAt(idx);
                 removed = true;
-                SaveCustomEvents();
             }
         }
 
         if (removed)
         {
+            _eventsStore.ScheduleSave();
             _ = RefreshAsync();
         }
         return removed;
@@ -158,16 +163,6 @@ internal sealed class CalendarService : IDisposable
                 _customEvents.AddRange(loaded);
             }
         }
-    }
-
-    private void SaveCustomEvents()
-    {
-        List<IslandCustomEvent> snapshot;
-        lock (_eventsLock)
-        {
-            snapshot = new List<IslandCustomEvent>(_customEvents);
-        }
-        Core.AtomicJsonStore.Save(_eventsFilePath, snapshot, _eventsLock);
     }
 
     public async Task RefreshAsync()
@@ -197,47 +192,65 @@ internal sealed class CalendarService : IDisposable
                 }
             }
 
-            // 2. Gather WinRT system appointments
-            if (ApiInformation.IsTypePresent("Windows.ApplicationModel.Appointments.AppointmentManager"))
+            // 2. Gather WinRT system appointments (isolated so WinRT unavailability does not skip custom events)
+            try
             {
-                var store = await AppointmentManager.RequestStoreAsync(AppointmentStoreAccessType.AllCalendarsReadOnly);
-                if (store != null)
+                if (ApiInformation.IsTypePresent("Windows.ApplicationModel.Appointments.AppointmentManager"))
                 {
-                    var options = new FindAppointmentsOptions { MaxCount = 10, IncludeHidden = false };
-                    var appointments = await store.FindAppointmentsAsync(now.AddMinutes(-5), TimeSpan.FromHours(12), options);
-
-                    foreach (var appt in appointments)
+                    var store = await AppointmentManager.RequestStoreAsync(AppointmentStoreAccessType.AllCalendarsReadOnly);
+                    if (store != null)
                     {
-                        if (appt.AllDay) continue;
-                        var end = appt.StartTime + appt.Duration;
-                        if (end < now) continue;
+                        var options = new FindAppointmentsOptions { MaxCount = 10, IncludeHidden = false };
+                        var appointments = await store.FindAppointmentsAsync(now.AddMinutes(-5), TimeSpan.FromHours(12), options);
 
-                        string? joinUrl = ExtractMeetingUrl(appt.Uri?.ToString())
-                                          ?? ExtractMeetingUrl(appt.Location)
-                                          ?? ExtractMeetingUrl(appt.Details);
+                        foreach (var appt in appointments)
+                        {
+                            if (appt.AllDay) continue;
+                            var end = appt.StartTime + appt.Duration;
+                            if (end < now) continue;
 
-                        candidates.Add(new CalendarEventInfo(
-                            string.IsNullOrWhiteSpace(appt.Subject) ? "Calendar Event" : appt.Subject.Trim(),
-                            appt.StartTime,
-                            appt.Duration,
-                            appt.Location ?? "",
-                            joinUrl));
+                            string? joinUrl = ExtractMeetingUrl(appt.Uri?.ToString())
+                                              ?? ExtractMeetingUrl(appt.Location)
+                                              ?? ExtractMeetingUrl(appt.Details);
+
+                            candidates.Add(new CalendarEventInfo(
+                                string.IsNullOrWhiteSpace(appt.Subject) ? "Calendar Event" : appt.Subject.Trim(),
+                                appt.StartTime,
+                                appt.Duration,
+                                appt.Location ?? "",
+                                joinUrl));
+                        }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[CalendarService] WinRT AppointmentManager unavailable: {ex.Message}");
             }
 
             var chosen = candidates.OrderBy(c => c.StartTime).FirstOrDefault();
             NextEvent = chosen;
             _ = _ui.InvokeAsync(() => Updated?.Invoke(chosen));
-
-            NextEvent = chosen;
-            _ = _ui.InvokeAsync(() => Updated?.Invoke(chosen));
         }
         catch (Exception ex)
         {
-            // AppointmentStore may be restricted on some unpackaged setups; fail silently with debug log
-            App.Log($"[CalendarService] Poll skipped: {ex.Message}");
+            App.Log($"[CalendarService] Refresh error: {ex.Message}");
         }
+    }
+
+    private static readonly HashSet<string> AllowedMeetingSchemes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "http", "https", "msteams", "zoommtg", "slack", "webex"
+    };
+
+    private static bool TryValidateMeetingUri(string? url, out Uri? uri)
+    {
+        uri = null;
+        if (string.IsNullOrWhiteSpace(url)) return false;
+        if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var parsed)) return false;
+        if (!AllowedMeetingSchemes.Contains(parsed.Scheme)) return false;
+        uri = parsed;
+        return true;
     }
 
     /// <summary>
@@ -252,10 +265,14 @@ internal sealed class CalendarService : IDisposable
 
     public static bool LaunchMeeting(string? url)
     {
-        if (string.IsNullOrWhiteSpace(url)) return false;
+        if (!TryValidateMeetingUri(url, out var parsed) || parsed == null)
+        {
+            App.Log("[CalendarService] Rejected unsafe or invalid meeting URL.");
+            return false;
+        }
         try
         {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            using var proc = Process.Start(new ProcessStartInfo(parsed.AbsoluteUri) { UseShellExecute = true });
             return true;
         }
         catch (Exception ex)
@@ -271,11 +288,10 @@ internal sealed class CalendarService : IDisposable
         {
             if (evt != null && !string.IsNullOrWhiteSpace(evt.JoinUrl))
             {
-                Process.Start(new ProcessStartInfo(evt.JoinUrl) { UseShellExecute = true });
-                return true;
+                return LaunchMeeting(evt.JoinUrl);
             }
 
-            Process.Start(new ProcessStartInfo("outlookcal:") { UseShellExecute = true });
+            using var proc = Process.Start(new ProcessStartInfo("outlookcal:") { UseShellExecute = true });
             return true;
         }
         catch (Exception ex)
@@ -289,5 +305,6 @@ internal sealed class CalendarService : IDisposable
     {
         _disposed = true;
         _timer.Stop();
+        _eventsStore.Dispose();
     }
 }

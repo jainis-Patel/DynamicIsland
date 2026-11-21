@@ -25,8 +25,16 @@ public partial class BasketWindow : Window
     private readonly ObservableCollection<ShelfItem> _items = new();
     private readonly DispatcherTimer _autoCloseTimer;
     private Point _dragStart;
+    private bool _isClosing;
 
     public int ItemCount => _items.Count;
+
+    private void CloseSafely()
+    {
+        if (_isClosing) return;
+        _isClosing = true;
+        Close();
+    }
 
     internal BasketWindow(DropShelfService shelfService)
     {
@@ -39,7 +47,7 @@ public partial class BasketWindow : Window
         {
             if (_items.Count == 0)
             {
-                Close();
+                CloseSafely();
             }
             else
             {
@@ -78,7 +86,7 @@ public partial class BasketWindow : Window
         {
             if (e.Key == Key.Escape)
             {
-                Close();
+                CloseSafely();
                 e.Handled = true;
             }
         };
@@ -98,6 +106,7 @@ public partial class BasketWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _isClosing = true;
         DynamicIsland.LiquidGlass.GlassHost.Detach(OuterCard);
         _autoCloseTimer.Stop();
         base.OnClosed(e);
@@ -121,32 +130,7 @@ public partial class BasketWindow : Window
 
     public void MoveNearPhysicalPoint(int physicalX, int physicalY)
     {
-        var mon = MonitorFromPoint(new POINT { X = physicalX, Y = physicalY }, MONITOR_DEFAULTTONEAREST);
-        double scale = 1.0;
-        if (mon != IntPtr.Zero && GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, out uint dpiX, out _) == 0)
-        {
-            scale = dpiX / 96.0;
-        }
-
-        double dipX = (physicalX / scale) - (Width / 2);
-        double dipY = (physicalY / scale) - 42;
-
-        if (mon != IntPtr.Zero)
-        {
-            var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
-            if (GetMonitorInfo(mon, ref mi))
-            {
-                double minX = mi.rcWork.Left / scale + 8;
-                double maxX = (mi.rcWork.Right / scale) - Width - 8;
-                double minY = mi.rcWork.Top / scale + 8;
-                double maxY = (mi.rcWork.Bottom / scale) - Height - 8;
-                dipX = Math.Clamp(dipX, minX, Math.Max(minX, maxX));
-                dipY = Math.Clamp(dipY, minY, Math.Max(minY, maxY));
-            }
-        }
-
-        Left = dipX;
-        Top = dipY;
+        PositionWindowNearPhysicalPoint(this, physicalX, physicalY, yOffsetDip: 42.0);
     }
 
     public void ActivatePulse()
@@ -241,7 +225,7 @@ public partial class BasketWindow : Window
             var found = _items.FirstOrDefault(i => string.Equals(i.FullPath, path, StringComparison.OrdinalIgnoreCase));
             if (found != null) _items.Remove(found);
             RefreshUI();
-            if (_items.Count == 0) Close();
+            if (_items.Count == 0) CloseSafely();
         }
     }
 
@@ -259,11 +243,11 @@ public partial class BasketWindow : Window
                 TimeSpan.FromSeconds(2.5),
                 TargetView: "shelf",
                 Priority: ToastPriority.System));
-            Close();
+            CloseSafely();
         }
     }
 
-    private void CloseBtn_Click(object sender, RoutedEventArgs e) => Close();
+    private void CloseBtn_Click(object sender, RoutedEventArgs e) => CloseSafely();
 
     private void Item_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -273,7 +257,7 @@ public partial class BasketWindow : Window
             {
                 try
                 {
-                    Process.Start(new ProcessStartInfo(item.FullPath) { UseShellExecute = true });
+                    using var proc = Process.Start(new ProcessStartInfo(item.FullPath) { UseShellExecute = true });
                 }
                 catch (Exception ex)
                 {
@@ -341,7 +325,7 @@ public partial class BasketWindow : Window
     {
         _items.Clear();
         RefreshUI();
-        Close();
+        CloseSafely();
     }
 
     private void DragAll_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -359,7 +343,7 @@ public partial class BasketWindow : Window
                 string[] all = _items.Select(i => i.FullPath).ToArray();
                 var data = new DataObject(DataFormats.FileDrop, all);
                 DragDrop.DoDragDrop(el, data, DragDropEffects.Copy);
-                Close();
+                CloseSafely();
             }
         }
     }
@@ -412,19 +396,27 @@ public partial class BasketWindow : Window
             var captured = act.Kind;
             mi.Click += async (_, _) =>
             {
-                var res = await FileActionPipeline.ExecuteAsync(captured, paths);
-                if (res.Success)
+                try
                 {
-                    if (!string.IsNullOrEmpty(res.CopiedClipboardText))
+                    var res = await FileActionPipeline.ExecuteAsync(captured, paths);
+                    if (_isClosing) return;
+                    if (res.Success)
                     {
-                        try { Clipboard.SetText(res.CopiedClipboardText); } catch { }
+                        if (!string.IsNullOrEmpty(res.CopiedClipboardText))
+                        {
+                            try { Clipboard.SetText(res.CopiedClipboardText); } catch { }
+                        }
+                        if (res.OutputPaths.Count > 0)
+                        {
+                            AddFilesToBasket(res.OutputPaths);
+                            _shelfService.AddPaths(res.OutputPaths);
+                        }
+                        IslandWindow.Instance?.NotifyFileActionCompleted(res);
                     }
-                    if (res.OutputPaths.Count > 0)
-                    {
-                        AddFilesToBasket(res.OutputPaths);
-                        _shelfService.AddPaths(res.OutputPaths);
-                    }
-                    IslandWindow.Instance?.NotifyFileActionCompleted(res);
+                }
+                catch (Exception ex)
+                {
+                    App.Log($"[BasketWindow] Convert action failed: {ex.Message}");
                 }
             };
             menu.Items.Add(mi);

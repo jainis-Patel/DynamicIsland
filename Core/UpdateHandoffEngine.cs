@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Windows;
 
 namespace DynamicIsland.Core;
 
@@ -45,22 +46,25 @@ public static class UpdateHandoffEngine
 
     private static bool LaunchInstallerHandoff(string installerExePath)
     {
-        App.Log($"[UpdateHandoff] Spawning Inno Setup silent upgrade from: {installerExePath}");
+        App.Log($"[UpdateHandoff] Spawning silent upgrade from: {installerExePath}");
+
+        int currentPid = Environment.ProcessId;
+        string? currentExe = Environment.ProcessPath;
+        string? currentDir = !string.IsNullOrEmpty(currentExe) ? Path.GetDirectoryName(currentExe) : null;
+        string targetDirArg = !string.IsNullOrWhiteSpace(currentDir) ? $" --target-dir \"{currentDir}\"" : "";
+        string args = $"--install --silent --relaunch --wait-pid {currentPid}{targetDirArg} /SILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS";
 
         var startInfo = new ProcessStartInfo
         {
             FileName = installerExePath,
-            Arguments = "/SILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS",
+            Arguments = args,
             UseShellExecute = true
         };
 
-        var proc = Process.Start(startInfo);
+        using var proc = Process.Start(startInfo);
         if (proc != null)
         {
-            // Give installer a moment to spin up, then exit current instance gracefully
-            Program.SignalStopOnDefaultDesktop();
-            Thread.Sleep(300);
-            Environment.Exit(0);
+            RequestGracefulExit();
             return true;
         }
         return false;
@@ -75,80 +79,81 @@ public static class UpdateHandoffEngine
             return false;
         }
 
-        string tempDir = Path.Combine(Path.GetTempPath(), "DynamicIsland", "Updates");
-        Directory.CreateDirectory(tempDir);
-        string scriptPath = Path.Combine(tempDir, "apply_update.cmd");
+        string targetDir = Path.GetDirectoryName(currentExe) ?? AppDomain.CurrentDomain.BaseDirectory;
+        string stagedNewExe = Path.Combine(targetDir, $".DynamicIsland.update_{Guid.NewGuid():N}.tmp");
+        try
+        {
+            // Stage on the same volume as the target executable so replacement is an atomic move
+            File.Copy(newBinaryPath, stagedNewExe, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[UpdateHandoff] Failed to stage binary on target volume: {ex.Message}");
+            UpdateIntegrityVerifier.TryCleanFile(stagedNewExe);
+            return false;
+        }
 
-        string currentExeEscaped = currentExe.Replace("/", "\\");
-        string newBinaryEscaped = newBinaryPath.Replace("/", "\\");
-        string backupExeEscaped = (currentExe + BackupExtension).Replace("/", "\\");
+        string updatesDir = Path.Combine(AppPaths.DataDirectory, "Updates");
+        Directory.CreateDirectory(updatesDir);
+        string scriptPath = Path.Combine(updatesDir, $"apply_update_{Guid.NewGuid():N}.cmd");
+
+        string currentExeNormalized = currentExe.Replace("/", "\\");
+        string backupExeNormalized = (currentExe + BackupExtension).Replace("/", "\\");
         int currentPid = Environment.ProcessId;
 
-        // Atomic script: waits for current PID to exit, backs up current exe with retry,
-        // moves new exe with retry, auto-rolls back if replace fails, relaunches with --updated
-        string scriptContent = $@"@echo off
-setlocal enabledelayedexpansion
+        // Pass paths strictly via environment variables without delayed expansion so special
+        // CMD characters (&, |, ^, !, (, ), %) in paths cannot be injected or corrupted.
+        const string scriptContent = @"@echo off
 chcp 65001 >nul
+set ""WAITCOUNT=0""
 
-set TARGET={currentExeEscaped}
-set NEWFILE={newBinaryEscaped}
-set BAK={backupExeEscaped}
-set PID={currentPid}
-
-rem 1. Wait up to 30 seconds for the running process (PID %PID%) to terminate
-set WAITCOUNT=0
 :wait_process
-tasklist /fi ""PID eq %PID%"" 2>nul | findstr /i ""%PID%"" >nul
-if not errorlevel 1 (
-    set /a WAITCOUNT+=1
-    if !WAITCOUNT! geq 30 (
-        goto abort_and_restore
-    )
-    timeout /t 1 /nobreak >nul
-    goto wait_process
-)
+tasklist /fi ""PID eq %DI_WAIT_PID%"" 2>nul | findstr /i ""%DI_WAIT_PID%"" >nul
+if not errorlevel 1 goto wait_more
+goto do_backup_prep
 
-rem Brief delay to allow Windows to release file locks completely
+:wait_more
+set /a ""WAITCOUNT+=1""
+if %WAITCOUNT% GEQ 30 goto abort_no_relaunch
 timeout /t 1 /nobreak >nul
+goto wait_process
 
-rem 2. Backup existing binary for rollback safety (with retry up to 5 times)
-set RETRY=0
+:do_backup_prep
+timeout /t 1 /nobreak >nul
+set ""RETRY=0""
+
 :try_backup
-move /y ""!TARGET!"" ""!BAK!"" >nul 2>&1
-if errorlevel 1 (
-    set /a RETRY+=1
-    if !RETRY! lss 5 (
-        timeout /t 1 /nobreak >nul
-        goto try_backup
-    )
-    goto abort_and_restore
-)
+move /y ""%DI_TARGET%"" ""%DI_BAK%"" >nul 2>&1
+if errorlevel 1 goto backup_retry
+set ""RETRY=0""
+goto try_replace
 
-rem 3. Move newly downloaded binary into place (with retry up to 5 times)
-set RETRY=0
+:backup_retry
+set /a ""RETRY+=1""
+if %RETRY% LSS 5 timeout /t 1 /nobreak >nul
+if %RETRY% LSS 5 goto try_backup
+goto abort_restore
+
 :try_replace
-move /y ""!NEWFILE!"" ""!TARGET!"" >nul 2>&1
-if errorlevel 1 (
-    set /a RETRY+=1
-    if !RETRY! lss 5 (
-        timeout /t 1 /nobreak >nul
-        goto try_replace
-    )
-    rem Failed to install new binary! Automatically roll back from backup
-    goto abort_and_restore
-)
-
-rem 4. Relaunch updated application
-start """" ""!TARGET!"" --updated
+move /y ""%DI_NEWFILE%"" ""%DI_TARGET%"" >nul 2>&1
+if errorlevel 1 goto replace_retry
+start """" ""%DI_TARGET%"" --updated
 goto cleanup
 
-:abort_and_restore
-if not exist ""!TARGET!"" (
-    if exist ""!BAK!"" move /y ""!BAK!"" ""!TARGET!"" >nul 2>&1
-)
-if exist ""!TARGET!"" (
-    start """" ""!TARGET!""
-)
+:replace_retry
+set /a ""RETRY+=1""
+if %RETRY% LSS 5 timeout /t 1 /nobreak >nul
+if %RETRY% LSS 5 goto try_replace
+goto abort_restore
+
+:abort_restore
+if not exist ""%DI_TARGET%"" if exist ""%DI_BAK%"" move /y ""%DI_BAK%"" ""%DI_TARGET%"" >nul 2>&1
+if exist ""%DI_NEWFILE%"" del /f /q ""%DI_NEWFILE%"" >nul 2>&1
+if exist ""%DI_TARGET%"" start """" ""%DI_TARGET%""
+goto cleanup
+
+:abort_no_relaunch
+if exist ""%DI_NEWFILE%"" del /f /q ""%DI_NEWFILE%"" >nul 2>&1
 
 :cleanup
 (goto) 2>nul & del ""%~f0""
@@ -161,21 +166,62 @@ if exist ""!TARGET!"" (
         var startInfo = new ProcessStartInfo
         {
             FileName = "cmd.exe",
-            Arguments = $"/c \"{scriptPath}\"",
             CreateNoWindow = true,
             UseShellExecute = false
         };
+        startInfo.ArgumentList.Add("/d");
+        startInfo.ArgumentList.Add("/c");
+        startInfo.ArgumentList.Add(scriptPath);
+        startInfo.Environment["DI_TARGET"] = currentExeNormalized;
+        startInfo.Environment["DI_NEWFILE"] = stagedNewExe;
+        startInfo.Environment["DI_BAK"] = backupExeNormalized;
+        startInfo.Environment["DI_WAIT_PID"] = currentPid.ToString();
 
-        var proc = Process.Start(startInfo);
+        using var proc = Process.Start(startInfo);
         if (proc != null)
         {
-            Program.SignalStopOnDefaultDesktop();
-            Thread.Sleep(300);
-            Environment.Exit(0);
+            RequestGracefulExit();
             return true;
         }
 
+        UpdateIntegrityVerifier.TryCleanFile(stagedNewExe);
+        UpdateIntegrityVerifier.TryCleanFile(scriptPath);
         return false;
+    }
+
+    private static void RequestGracefulExit()
+    {
+        App.FlushLogs();
+
+        var app = Application.Current;
+        if (app != null)
+        {
+            try
+            {
+                app.Dispatcher.BeginInvoke(() =>
+                {
+                    try { app.Shutdown(0); }
+                    catch { Environment.Exit(0); }
+                });
+            }
+            catch
+            {
+                Environment.Exit(0);
+            }
+
+            // Watchdog fallback in case a modal/hanging resource blocks Shutdown
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(5000).ConfigureAwait(false);
+                App.FlushLogs();
+                Environment.Exit(0);
+            });
+            return;
+        }
+
+        Program.SignalStopOnDefaultDesktop();
+        Thread.Sleep(300);
+        Environment.Exit(0);
     }
 
     /// <summary>

@@ -42,12 +42,27 @@ public sealed class LiveActivityHub
 
     public event Action? Changed;
 
+    private void PruneExpiredLocked()
+    {
+        var now = DateTimeOffset.UtcNow;
+        _activities.RemoveAll(a => a.ExpiresAt.HasValue && a.ExpiresAt.Value <= now);
+        if (_activities.Count == 0)
+        {
+            _selectedIndex = 0;
+        }
+        else if (_selectedIndex >= _activities.Count)
+        {
+            _selectedIndex = _activities.Count - 1;
+        }
+    }
+
     public IReadOnlyList<LiveActivityItem> Activities
     {
         get
         {
             lock (_lock)
             {
+                PruneExpiredLocked();
                 return _activities.ToList();
             }
         }
@@ -57,7 +72,11 @@ public sealed class LiveActivityHub
     {
         get
         {
-            lock (_lock) return _activities.Count;
+            lock (_lock)
+            {
+                PruneExpiredLocked();
+                return _activities.Count;
+            }
         }
     }
 
@@ -65,7 +84,11 @@ public sealed class LiveActivityHub
     {
         get
         {
-            lock (_lock) return _activities.Count > 0;
+            lock (_lock)
+            {
+                PruneExpiredLocked();
+                return _activities.Count > 0;
+            }
         }
     }
 
@@ -75,6 +98,7 @@ public sealed class LiveActivityHub
         {
             lock (_lock)
             {
+                PruneExpiredLocked();
                 if (_activities.Count == 0) return null;
                 int idx = Math.Clamp(_selectedIndex, 0, _activities.Count - 1);
                 return _activities[idx];
@@ -88,6 +112,7 @@ public sealed class LiveActivityHub
         {
             lock (_lock)
             {
+                PruneExpiredLocked();
                 if (_activities.Count <= 1) return null;
                 int secondIdx = (_selectedIndex == 0) ? 1 : 0;
                 return _activities[secondIdx];
@@ -120,6 +145,7 @@ public sealed class LiveActivityHub
         ArgumentNullException.ThrowIfNull(item);
         lock (_lock)
         {
+            PruneExpiredLocked();
             int existingIdx = _activities.FindIndex(a => string.Equals(a.Id, item.Id, StringComparison.OrdinalIgnoreCase));
             if (existingIdx >= 0)
             {

@@ -95,6 +95,34 @@ public sealed class ClipboardItem : INotifyPropertyChanged
     public bool IsText => Type == ClipboardItemType.Text;
     public bool HasImage => ImagePreview != null;
     public bool HasSwatch => SwatchColor.HasValue;
+    public bool CanCopyPlain => IsText || IsCode || IsUrl;
+
+    public string PreviewSnippet
+    {
+        get
+        {
+            if (IsSecret) return MaskedText;
+            if (IsUrl) return RawText ?? Title;
+            if (string.IsNullOrWhiteSpace(RawText)) return Title;
+
+            string normalized = RawText.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\t", "  ");
+            var lines = normalized.Split('\n')
+                .SkipWhile(string.IsNullOrWhiteSpace)
+                .Take(6)
+                .ToArray();
+
+            string joined = string.Join("\n", lines).TrimEnd();
+            if (string.IsNullOrWhiteSpace(joined)) return Title;
+            if (joined.Length > 240) return joined[..237] + "...";
+            if (normalized.TrimEnd().Length > joined.Length) return joined + "\n...";
+            return joined;
+        }
+    }
+
+    public string CardFooterText =>
+        IsUrl ? Title :
+        IsSecret ? Title :
+        Subtitle;
 
     public bool IsPinned
     {
@@ -142,7 +170,29 @@ internal sealed class ClipboardHistoryService : IDisposable
     private static readonly byte[] DpapiEntropy = Encoding.UTF8.GetBytes("DynamicIsland.ClipboardHistory.v1");
 
     private readonly string _persistencePath;
-    private static readonly object SaveFileLock = new();
+    private readonly DebouncedJsonStore<List<PersistedClipDto>> _store;
+    private int _suppressCaptureCount;
+    private bool _disposed;
+
+    private sealed class CapturePauseScope : IDisposable
+    {
+        private ClipboardHistoryService? _owner;
+        public CapturePauseScope(ClipboardHistoryService owner) => _owner = owner;
+        public void Dispose()
+        {
+            var owner = Interlocked.Exchange(ref _owner, null);
+            if (owner != null)
+            {
+                Interlocked.Decrement(ref owner._suppressCaptureCount);
+            }
+        }
+    }
+
+    public IDisposable PauseCapture()
+    {
+        Interlocked.Increment(ref _suppressCaptureCount);
+        return new CapturePauseScope(this);
+    }
 
     /// <summary>
     /// Standard clipboard format names used by Windows 10/11 and password managers (1Password, Bitwarden,
@@ -181,13 +231,39 @@ internal sealed class ClipboardHistoryService : IDisposable
 
     public event Action? Changed;
 
-    private static readonly Regex HexColorRegex = new(@"^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$", RegexOptions.Compiled);
-    private static readonly Regex UrlRegex = new(@"^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(50);
+    private static readonly Regex HexColorRegex = new(@"^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$", RegexOptions.Compiled, RegexTimeout);
+    private static readonly Regex UrlRegex = new(@"^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*\/?)?$", RegexOptions.Compiled | RegexOptions.IgnoreCase, RegexTimeout);
+
+    private static bool SafeIsMatch(Regex regex, string input)
+    {
+        try
+        {
+            return regex.IsMatch(input);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return false;
+        }
+    }
+
+    private static Match? SafeMatch(Regex regex, string input)
+    {
+        try
+        {
+            return regex.Match(input);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return null;
+        }
+    }
 
     public ClipboardHistoryService(Dispatcher ui, string? persistencePath = null)
     {
         _ui = ui;
         _persistencePath = persistencePath ?? AppPaths.ClipboardFile;
+        _store = new DebouncedJsonStore<List<PersistedClipDto>>(_persistencePath, BuildPersistedSnapshot);
         LoadPersistedHistory();
     }
 
@@ -220,7 +296,7 @@ internal sealed class ClipboardHistoryService : IDisposable
             query = query.Where(i =>
                 (i.Title != null && i.Title.ToLowerInvariant().Contains(q)) ||
                 (i.Subtitle != null && i.Subtitle.ToLowerInvariant().Contains(q)) ||
-                (i.RawText != null && i.RawText.ToLowerInvariant().Contains(q)) ||
+                (!i.IsSecret && i.RawText != null && i.RawText.ToLowerInvariant().Contains(q)) ||
                 (i.CodeLanguage != null && i.CodeLanguage.ToLowerInvariant().Contains(q)));
         }
 
@@ -340,9 +416,14 @@ internal sealed class ClipboardHistoryService : IDisposable
                 }
             }
         }
+        catch (COMException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             App.Log($"[ClipboardHistory] Privacy check error: {ex.Message}");
+            return true;
         }
 
         return false;
@@ -353,6 +434,10 @@ internal sealed class ClipboardHistoryService : IDisposable
         try
         {
             return dataObject.GetData(format);
+        }
+        catch (COMException)
+        {
+            throw;
         }
         catch
         {
@@ -430,6 +515,7 @@ internal sealed class ClipboardHistoryService : IDisposable
 
     public void HandleClipboardUpdate()
     {
+        if (_disposed || Volatile.Read(ref _suppressCaptureCount) > 0) return;
         _ui.InvokeAsync(ProcessClipboardContent, DispatcherPriority.Background);
     }
 
@@ -494,6 +580,7 @@ internal sealed class ClipboardHistoryService : IDisposable
 
     private void ProcessClipboardContent()
     {
+        if (_disposed || Volatile.Read(ref _suppressCaptureCount) > 0) return;
         int retries = 3;
         while (retries > 0)
         {
@@ -531,9 +618,25 @@ internal sealed class ClipboardHistoryService : IDisposable
                     if (string.IsNullOrWhiteSpace(text) || text == _lastText) return;
                     _lastText = text;
 
-                    // 1. Check if it's a Hex Color Code
-                    var colorMatch = HexColorRegex.Match(text);
-                    if (colorMatch.Success)
+                    // 1. Secret / API Token detection FIRST (so secrets inside URLs, JSON, or code are always flagged & masked)
+                    if (DetectSecret(text, out string secretType))
+                    {
+                        newItem = new ClipboardItem
+                        {
+                            Type = ClipboardItemType.Text,
+                            IsSecret = true,
+                            SecretType = secretType,
+                            Title = $"{secretType} detected",
+                            Subtitle = MaskSecret(text),
+                            RawText = text,
+                            LineCount = 1,
+                            WordCount = 1
+                        };
+                    }
+
+                    // 2. Check if it's a Hex Color Code
+                    var colorMatch = newItem == null ? SafeMatch(HexColorRegex, text) : null;
+                    if (colorMatch is { Success: true })
                     {
                         try
                         {
@@ -553,10 +656,10 @@ internal sealed class ClipboardHistoryService : IDisposable
                         }
                     }
 
-                    // 2. Check if it's a Web URL
+                    // 3. Check if it's a Web URL
                     if (newItem == null && (text.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
                                            text.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
-                                           UrlRegex.IsMatch(text)))
+                                           SafeIsMatch(UrlRegex, text)))
                     {
                         string domain = text;
                         try
@@ -578,7 +681,7 @@ internal sealed class ClipboardHistoryService : IDisposable
                         };
                     }
 
-                    // 3. Check if it's Code Snippet
+                    // 4. Check if it's Code Snippet
                     if (newItem == null)
                     {
                         var (isCode, lang) = TryDetectCode(text);
@@ -598,22 +701,6 @@ internal sealed class ClipboardHistoryService : IDisposable
                                 CodeLanguage = lang
                             };
                         }
-                    }
-
-                    // 4. Secret / API Token detection
-                    if (newItem == null && DetectSecret(text, out string secretType))
-                    {
-                        newItem = new ClipboardItem
-                        {
-                            Type = ClipboardItemType.Text,
-                            IsSecret = true,
-                            SecretType = secretType,
-                            Title = $"{secretType} detected",
-                            Subtitle = MaskSecret(text),
-                            RawText = text,
-                            LineCount = 1,
-                            WordCount = 1
-                        };
                     }
 
                     // 5. Fallback: General Text snippet
@@ -714,6 +801,7 @@ internal sealed class ClipboardHistoryService : IDisposable
     /// <summary>
     /// Encrypts a clipboard text payload using Windows DPAPI (<see cref="DataProtectionScope.CurrentUser"/>)
     /// so persisted clipboard snippets are unreadable outside the current Windows user profile.
+    /// Returns <see langword="null"/> if encryption fails so plaintext is never persisted.
     /// </summary>
     public static string? ProtectText(string? plainText)
     {
@@ -724,9 +812,10 @@ internal sealed class ClipboardHistoryService : IDisposable
             byte[] encrypted = ProtectedData.Protect(plainBytes, DpapiEntropy, DataProtectionScope.CurrentUser);
             return DpapiPrefix + Convert.ToBase64String(encrypted);
         }
-        catch
+        catch (Exception ex)
         {
-            return plainText;
+            App.Log($"[ClipboardHistory] DPAPI ProtectText failed: {ex.Message}");
+            return null;
         }
     }
 
@@ -897,16 +986,25 @@ internal sealed class ClipboardHistoryService : IDisposable
                     catch { }
                 }
 
+                bool isSecret = DetectSecret(rawText, out string secretType);
+                if (isSecret)
+                {
+                    title = $"{secretType} detected";
+                    subtitle = MaskSecret(rawText);
+                }
+
                 _items.Add(new ClipboardItem
                 {
-                    Type = dto.Type,
+                    Type = isSecret ? ClipboardItemType.Text : dto.Type,
+                    IsSecret = isSecret,
+                    SecretType = isSecret ? secretType : null,
                     Title = title,
                     Subtitle = subtitle,
                     RawText = rawText,
                     SwatchColor = swatch,
                     CreatedAt = dto.CreatedAt,
                     IsPinned = dto.IsPinned,
-                    CodeLanguage = dto.CodeLanguage,
+                    CodeLanguage = isSecret ? null : dto.CodeLanguage,
                     LineCount = rawText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).Length
                 });
             }
@@ -918,66 +1016,83 @@ internal sealed class ClipboardHistoryService : IDisposable
         }
     }
 
-    private void SavePersistedHistoryAsync()
+    private List<PersistedClipDto> BuildPersistedSnapshot()
     {
-        List<PersistedClipDto> snapshot;
+        var snapshot = new List<PersistedClipDto>();
         lock (_items)
         {
-            snapshot = _items
-                .Where(i => i.Type != ClipboardItemType.Image && !string.IsNullOrEmpty(i.RawText))
-                .Select(i => new PersistedClipDto(
+            foreach (var i in _items)
+            {
+                if (i.Type == ClipboardItemType.Image || i.IsSecret || string.IsNullOrEmpty(i.RawText))
+                    continue;
+
+                string? protectedRaw = ProtectText(i.RawText);
+                if (string.IsNullOrEmpty(protectedRaw))
+                    continue; // Never persist plaintext when DPAPI fails
+
+                string? protectedTitle = string.IsNullOrEmpty(i.Title) ? i.Title : ProtectText(i.Title);
+                string? protectedSubtitle = string.IsNullOrEmpty(i.Subtitle) ? i.Subtitle : ProtectText(i.Subtitle);
+                if (protectedTitle == null || protectedSubtitle == null)
+                    continue;
+
+                snapshot.Add(new PersistedClipDto(
                     i.Type,
-                    ProtectText(i.Title) ?? i.Title,
-                    ProtectText(i.Subtitle) ?? i.Subtitle,
-                    ProtectText(i.RawText),
+                    protectedTitle,
+                    protectedSubtitle,
+                    protectedRaw,
                     i.SwatchColor?.ToString(),
                     i.CreatedAt,
                     i.IsPinned,
-                    i.CodeLanguage))
-                .ToList();
+                    i.CodeLanguage));
+            }
         }
-
-        _ = Task.Run(() => AtomicJsonStore.Save(_persistencePath, snapshot, SaveFileLock));
+        return snapshot;
     }
 
-    private static readonly Regex GitHubTokenRegex = new(@"\b(gh[pousr]_[A-Za-z0-9_]{36,}|github_pat_[A-Za-z0-9_]{22,})\b", RegexOptions.Compiled);
-    private static readonly Regex OpenAiKeyRegex = new(@"\b(sk-[a-zA-Z0-9]{20,}|sk-proj-[a-zA-Z0-9_-]{20,})\b", RegexOptions.Compiled);
-    private static readonly Regex AwsKeyRegex = new(@"\b(AKIA[0-9A-Z]{16})\b", RegexOptions.Compiled);
-    private static readonly Regex PrivateKeyRegex = new(@"-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----", RegexOptions.Compiled);
-    private static readonly Regex SlackTokenRegex = new(@"\b(xox[baprs]-[0-9a-zA-Z]{10,})\b", RegexOptions.Compiled);
-    private static readonly Regex JwtRegex = new(@"\beyJ[A-Za-z0-9-_]{10,}\.eyJ[A-Za-z0-9-_]{10,}\.[A-Za-z0-9-_]+\b", RegexOptions.Compiled);
+    private void SavePersistedHistoryAsync()
+    {
+        if (_disposed) return;
+        _store.ScheduleSave();
+    }
+
+    private static readonly Regex GitHubTokenRegex = new(@"\b(gh[pousr]_[A-Za-z0-9_]{36,}|github_pat_[A-Za-z0-9_]{22,})\b", RegexOptions.Compiled, RegexTimeout);
+    private static readonly Regex OpenAiKeyRegex = new(@"\b(sk-(?:proj-|ant-|svcacct-)?[A-Za-z0-9_-]{20,})\b", RegexOptions.Compiled, RegexTimeout);
+    private static readonly Regex AwsKeyRegex = new(@"\b(AKIA[0-9A-Z]{16})\b", RegexOptions.Compiled, RegexTimeout);
+    private static readonly Regex PrivateKeyRegex = new(@"-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----", RegexOptions.Compiled, RegexTimeout);
+    private static readonly Regex SlackTokenRegex = new(@"\b(xox[baprs]-[0-9A-Za-z-]{10,})\b", RegexOptions.Compiled, RegexTimeout);
+    private static readonly Regex JwtRegex = new(@"\beyJ[A-Za-z0-9-_]{10,}\.eyJ[A-Za-z0-9-_]{10,}\.[A-Za-z0-9-_]+\b", RegexOptions.Compiled, RegexTimeout);
 
     public static bool DetectSecret(string text, out string secretType)
     {
         secretType = "";
         if (string.IsNullOrWhiteSpace(text)) return false;
 
-        if (GitHubTokenRegex.IsMatch(text))
+        if (SafeIsMatch(GitHubTokenRegex, text))
         {
             secretType = "GitHub Token";
             return true;
         }
-        if (OpenAiKeyRegex.IsMatch(text))
+        if (SafeIsMatch(OpenAiKeyRegex, text))
         {
             secretType = "OpenAI API Key";
             return true;
         }
-        if (AwsKeyRegex.IsMatch(text))
+        if (SafeIsMatch(AwsKeyRegex, text))
         {
             secretType = "AWS Access Key";
             return true;
         }
-        if (PrivateKeyRegex.IsMatch(text))
+        if (SafeIsMatch(PrivateKeyRegex, text))
         {
             secretType = "Private Key";
             return true;
         }
-        if (SlackTokenRegex.IsMatch(text))
+        if (SafeIsMatch(SlackTokenRegex, text))
         {
             secretType = "Slack Token";
             return true;
         }
-        if (JwtRegex.IsMatch(text))
+        if (SafeIsMatch(JwtRegex, text))
         {
             secretType = "JWT Bearer Token";
             return true;
@@ -996,10 +1111,13 @@ internal sealed class ClipboardHistoryService : IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
         if (_listening && _hwnd != IntPtr.Zero)
         {
             RemoveClipboardFormatListener(_hwnd);
             _listening = false;
         }
+        _store.Dispose();
+        _disposed = true;
     }
 }

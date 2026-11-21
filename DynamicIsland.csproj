@@ -13,7 +13,7 @@
     <AssemblyName>DynamicIsland</AssemblyName>
     <!-- Per-Monitor V2 DPI awareness so GetCursorPos/GetWindowRect return physical pixels. -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.7.0</Version>
+    <Version>0.8.0</Version>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Authors>Jainis Patel</Authors>
     <Company>Jainis Patel</Company>
@@ -51,6 +51,9 @@
   <ItemGroup>
     <EmbeddedResource Include="src\LiquidGlass\Shaders\*.cso">
       <LogicalName>DynamicIsland.src.LiquidGlass.Shaders.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\PhoneBridge.html">
+      <LogicalName>DynamicIsland.Resources.PhoneBridge.html</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 

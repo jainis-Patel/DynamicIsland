@@ -99,6 +99,8 @@ public partial class NotificationsView : UserControl
                 if (Math.Abs(dx) > 10 && Math.Abs(dx) > Math.Abs(dy) * 1.2)
                 {
                     _isDragging = true;
+                    _draggedCard.LostMouseCapture -= NotificationCard_LostMouseCapture;
+                    _draggedCard.LostMouseCapture += NotificationCard_LostMouseCapture;
                     _draggedCard.CaptureMouse();
                 }
             }
@@ -124,6 +126,7 @@ public partial class NotificationsView : UserControl
 
             if (wasDragging && card.RenderTransform is TranslateTransform tt)
             {
+                card.LostMouseCapture -= NotificationCard_LostMouseCapture;
                 card.ReleaseMouseCapture();
                 var current = e.GetPosition(this);
                 double dx = _dragStart != null ? current.X - _dragStart.Value.X : 0;
@@ -138,9 +141,13 @@ public partial class NotificationsView : UserControl
                     double targetX = dx >= 0 ? 500 : -500;
                     var animX = new DoubleAnimation(targetX, TimeSpan.FromMilliseconds(160))
                     {
-                        EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                        EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
+                        FillBehavior = FillBehavior.Stop
                     };
-                    var animOpacity = new DoubleAnimation(0, TimeSpan.FromMilliseconds(160));
+                    var animOpacity = new DoubleAnimation(0, TimeSpan.FromMilliseconds(160))
+                    {
+                        FillBehavior = FillBehavior.Stop
+                    };
 
                     animX.Completed += (s, args) =>
                     {
@@ -169,9 +176,20 @@ public partial class NotificationsView : UserControl
                     TactileFeedback.PlaySnap();
                     var bounceX = new DoubleAnimation(0, TimeSpan.FromMilliseconds(220))
                     {
-                        EasingFunction = new ElasticEase { Oscillations = 1, Springiness = 4, EasingMode = EasingMode.EaseOut }
+                        EasingFunction = new ElasticEase { Oscillations = 1, Springiness = 4, EasingMode = EasingMode.EaseOut },
+                        FillBehavior = FillBehavior.Stop
                     };
-                    var restoreOpacity = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(160));
+                    var restoreOpacity = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(160))
+                    {
+                        FillBehavior = FillBehavior.Stop
+                    };
+                    bounceX.Completed += (_, _) =>
+                    {
+                        tt.X = 0;
+                        card.Opacity = 1.0;
+                    };
+                    tt.X = 0;
+                    card.Opacity = 1.0;
 
                     tt.BeginAnimation(TranslateTransform.XProperty, bounceX);
                     card.BeginAnimation(UIElement.OpacityProperty, restoreOpacity);
@@ -182,6 +200,27 @@ public partial class NotificationsView : UserControl
             }
         }
         _dragStart = null;
+    }
+
+    private void NotificationCard_LostMouseCapture(object sender, MouseEventArgs e)
+    {
+        if (sender is Border card)
+        {
+            card.LostMouseCapture -= NotificationCard_LostMouseCapture;
+            if (_draggedCard == card)
+            {
+                _draggedCard = null;
+                _isDragging = false;
+                _dragStart = null;
+            }
+            if (card.RenderTransform is TranslateTransform tt)
+            {
+                tt.BeginAnimation(TranslateTransform.XProperty, null);
+                tt.X = 0;
+            }
+            card.BeginAnimation(UIElement.OpacityProperty, null);
+            card.Opacity = 1.0;
+        }
     }
 
     private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject

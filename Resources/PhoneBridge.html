@@ -1,0 +1,1837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Dynamic Island · Phone Bridge</title>
+    <style>
+        :root {
+            --bg: #000000;
+            --surface: rgba(28, 28, 30, 0.86);
+            --surface-2: rgba(44, 44, 46, 0.72);
+            --border: rgba(255, 255, 255, 0.1);
+            --border-strong: rgba(255, 255, 255, 0.18);
+            --accent: #0A84FF;
+            --accent-soft: rgba(10, 132, 255, 0.16);
+            --green: #30D158;
+            --green-soft: rgba(48, 209, 88, 0.16);
+            --amber: #FF9F0A;
+            --red: #FF453A;
+            --red-soft: rgba(255, 69, 58, 0.16);
+            --purple: #BF5AF2;
+            --text: #F5F5F7;
+            --sub: #8E8E93;
+            --radius: 20px;
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100dvh;
+            overscroll-behavior-y: contain;
+        }
+
+        body {
+            background:
+                radial-gradient(circle at 50% -10%, rgba(10, 132, 255, 0.18), transparent 45%),
+                radial-gradient(circle at 85% 95%, rgba(191, 90, 242, 0.10), transparent 40%),
+                #000000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: calc(14px + var(--safe-top)) 16px calc(92px + var(--safe-bottom)) 16px;
+        }
+
+        /* Interactive Dynamic Island Top Pill */
+        .island-wrap {
+            position: sticky;
+            top: calc(10px + var(--safe-top));
+            z-index: 40;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 18px;
+            pointer-events: none;
+        }
+
+        .island-pill {
+            pointer-events: auto;
+            background: rgba(14, 14, 16, 0.92);
+            backdrop-filter: blur(22px);
+            -webkit-backdrop-filter: blur(22px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 24px;
+            padding: 8px 16px;
+            min-width: 230px;
+            max-width: 92vw;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s ease, background 0.25s ease;
+        }
+
+        .island-pill.toast-active {
+            transform: scale(1.03);
+        }
+        .island-pill.toast-success { border-color: rgba(48, 209, 88, 0.55); }
+        .island-pill.toast-error { border-color: rgba(255, 69, 58, 0.6); }
+        .island-pill.toast-info { border-color: rgba(10, 132, 255, 0.55); }
+
+        .island-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            flex-shrink: 0;
+            animation: pulse 2.2s infinite;
+        }
+
+        .status-dot.warn { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+        .status-dot.err { background: var(--red); box-shadow: 0 0 8px var(--red); animation: none; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.55; transform: scale(0.85); }
+        }
+
+        .island-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .island-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--sub);
+            font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
+        }
+
+        .island-timer {
+            color: var(--accent);
+            background: var(--accent-soft);
+            padding: 2px 7px;
+            border-radius: 10px;
+        }
+
+        .island-lock-btn {
+            appearance: none;
+            border: 1px solid rgba(48, 209, 88, 0.35);
+            background: rgba(48, 209, 88, 0.14);
+            color: var(--green);
+            border-radius: 999px;
+            height: 24px;
+            padding: 0 8px;
+            display: none;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.12s ease, background 0.15s ease;
+        }
+
+        .island-lock-btn.visible {
+            display: inline-flex;
+        }
+
+        .island-lock-btn:active {
+            transform: scale(0.94);
+        }
+
+        .island-lock-btn svg {
+            width: 11px;
+            height: 11px;
+        }
+
+        body.bridge-locked .app-shell,
+        body.bridge-locked .tab-bar {
+            display: none;
+        }
+
+        /* Main container */
+        .app-shell {
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .tab-panel {
+            display: none;
+            flex-direction: column;
+            gap: 14px;
+            animation: fadeSlide 0.2s ease-out;
+        }
+
+        .tab-panel.active {
+            display: flex;
+        }
+
+        @keyframes fadeSlide {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background: var(--surface);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border-radius: var(--radius);
+            padding: 18px;
+            border: 1px solid var(--border);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .card-title {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 650;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: -0.01em;
+        }
+
+        .card-title svg {
+            width: 18px;
+            height: 18px;
+            color: var(--accent);
+            flex-shrink: 0;
+        }
+
+        .pill-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 999px;
+            background: var(--surface-2);
+            color: var(--sub);
+        }
+
+        /* Dropzone */
+        .dropzone {
+            border: 1.5px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 22px 16px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.02);
+            transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+            cursor: pointer;
+        }
+
+        .dropzone.drag-over {
+            border-color: var(--accent);
+            background: var(--accent-soft);
+            transform: scale(0.99);
+        }
+
+        .dropzone-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+
+        .dropzone-title {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .dropzone-sub {
+            font-size: 12px;
+            color: var(--sub);
+        }
+
+        .action-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .btn {
+            appearance: none;
+            border: none;
+            border-radius: 13px;
+            padding: 12px 14px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            transition: transform 0.12s ease, opacity 0.15s ease, background 0.15s ease;
+            color: #fff;
+            background: var(--accent);
+            text-decoration: none;
+        }
+
+        .btn:active { transform: scale(0.97); }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+        .btn-secondary {
+            background: var(--surface-2);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-green {
+            background: var(--green-soft);
+            color: var(--green);
+            border: 1px solid rgba(48, 209, 88, 0.3);
+        }
+
+        .btn-sm {
+            padding: 7px 11px;
+            font-size: 12px;
+            border-radius: 10px;
+        }
+
+        .btn-full { width: 100%; }
+
+        /* Upload Queue */
+        .queue-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .queue-item {
+            background: rgba(12, 12, 14, 0.72);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 11px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .queue-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .queue-name {
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+        }
+
+        .queue-status {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--sub);
+            flex-shrink: 0;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .queue-status.done { color: var(--green); }
+        .queue-status.err { color: var(--red); }
+
+        .progress-track {
+            width: 100%;
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, var(--accent), #5AC8FA);
+            transition: width 0.12s linear;
+        }
+
+        .progress-fill.done { background: var(--green); }
+        .progress-fill.err { background: var(--red); }
+
+        .queue-foot {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--sub);
+        }
+
+        .text-btn {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 2px 6px;
+            cursor: pointer;
+        }
+
+        .text-btn.danger { color: var(--red); }
+
+        /* Clipboard */
+        textarea {
+            width: 100%;
+            min-height: 104px;
+            background: rgba(10, 10, 12, 0.85);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            color: var(--text);
+            padding: 12px;
+            font-size: 14px;
+            line-height: 1.45;
+            font-family: inherit;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        textarea:focus {
+            border-color: var(--accent);
+        }
+
+        .clip-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .url-banner {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .url-banner.visible {
+            display: flex;
+        }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .history-item {
+            background: rgba(12, 12, 14, 0.72);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 11px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .history-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .history-tags {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .tag-chip {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            padding: 2px 7px;
+            border-radius: 6px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            text-transform: uppercase;
+        }
+
+        .color-swatch {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            flex-shrink: 0;
+        }
+
+        .history-time {
+            font-size: 11px;
+            color: var(--sub);
+        }
+
+        .history-text {
+            font-size: 13px;
+            color: var(--text);
+            word-break: break-word;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.4;
+        }
+
+        .history-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        /* Shelf */
+        .search-input {
+            width: 100%;
+            background: rgba(10, 10, 12, 0.85);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            padding: 9px 12px;
+            font-size: 13px;
+            outline: none;
+            margin-bottom: 12px;
+            display: none;
+        }
+
+        .search-input.visible { display: block; }
+        .search-input:focus { border-color: var(--accent); }
+
+        .shelf-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .file-card {
+            background: rgba(12, 12, 14, 0.72);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .file-thumb {
+            width: 46px;
+            height: 46px;
+            border-radius: 10px;
+            background: var(--surface-2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            flex-shrink: 0;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent);
+            border: 1px solid var(--border);
+        }
+
+        .file-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            cursor: zoom-in;
+        }
+
+        .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-name {
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 3px;
+        }
+
+        .file-meta {
+            font-size: 11px;
+            color: var(--sub);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 26px 12px;
+            color: var(--sub);
+            font-size: 13px;
+        }
+
+        /* Bottom Tab Bar */
+        .tab-bar {
+            position: fixed;
+            bottom: calc(12px + var(--safe-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% - 32px);
+            max-width: 420px;
+            background: rgba(20, 20, 22, 0.88);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 22px;
+            padding: 6px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.7);
+            z-index: 50;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--sub);
+            border-radius: 16px;
+            padding: 8px 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.18s ease, color 0.18s ease;
+        }
+
+        .tab-btn svg { width: 20px; height: 20px; }
+
+        .tab-btn.active {
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+
+        .tab-badge {
+            position: absolute;
+            top: 4px;
+            right: calc(50% - 22px);
+            min-width: 17px;
+            height: 17px;
+            padding: 0 5px;
+            border-radius: 999px;
+            background: var(--accent);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tab-badge.visible { display: inline-flex; }
+
+        /* Modals (Lightbox & Expired) */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.86);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            z-index: 80;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-backdrop.open { display: flex; }
+
+        .lightbox-inner {
+            max-width: 96vw;
+            max-height: 86dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .lightbox-inner img {
+            max-width: 100%;
+            max-height: 74dvh;
+            border-radius: 16px;
+            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.8);
+            object-fit: contain;
+        }
+
+        .expired-card {
+            background: #161618;
+            border: 1px solid var(--border-strong);
+            border-radius: 24px;
+            padding: 26px 22px;
+            max-width: 340px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .expired-card h3 { margin: 10px 0 8px 0; font-size: 18px; }
+        .expired-card p { margin: 0 0 18px 0; font-size: 13px; color: var(--sub); line-height: 1.5; }
+
+        /* Password Auth Lock Gate */
+        .auth-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(4, 4, 8, 0.88);
+            backdrop-filter: blur(22px);
+            -webkit-backdrop-filter: blur(22px);
+            z-index: 90;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .auth-backdrop.open {
+            display: flex;
+        }
+
+        .auth-card {
+            background: rgba(24, 24, 28, 0.94);
+            border: 1px solid var(--border-strong);
+            border-radius: 26px;
+            padding: 26px 22px 22px 22px;
+            width: 100%;
+            max-width: 360px;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.78), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            text-align: center;
+        }
+
+        .auth-emblem {
+            width: 54px;
+            height: 54px;
+            border-radius: 18px;
+            background: var(--accent-soft);
+            border: 1px solid rgba(10, 132, 255, 0.32);
+            color: var(--accent);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .auth-emblem.error {
+            background: var(--red-soft);
+            border-color: rgba(255, 69, 58, 0.45);
+            color: var(--red);
+            animation: authShake 0.36s ease;
+        }
+
+        .auth-emblem.unlocked {
+            background: var(--green-soft);
+            border-color: rgba(48, 209, 88, 0.45);
+            color: var(--green);
+            transform: scale(1.06);
+        }
+
+        @keyframes authShake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-7px); }
+            45% { transform: translateX(6px); }
+            70% { transform: translateX(-4px); }
+            85% { transform: translateX(3px); }
+        }
+
+        .auth-title {
+            margin: 0 0 6px 0;
+            font-size: 19px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .auth-subtitle {
+            margin: 0 0 18px 0;
+            font-size: 13px;
+            color: var(--sub);
+            line-height: 1.45;
+        }
+
+        .auth-form {
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .auth-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--sub);
+            padding-left: 2px;
+        }
+
+        .auth-input-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .auth-input {
+            width: 100%;
+            min-height: 48px;
+            background: rgba(10, 10, 14, 0.9);
+            border: 1px solid var(--border-strong);
+            border-radius: 14px;
+            color: var(--text);
+            padding: 0 48px 0 14px;
+            font-size: 16px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .auth-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.2);
+        }
+
+        .auth-eye-btn {
+            position: absolute;
+            right: 4px;
+            min-width: 44px;
+            min-height: 44px;
+            border: none;
+            background: transparent;
+            color: var(--sub);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        .auth-eye-btn:hover {
+            color: var(--text);
+        }
+
+        .auth-eye-btn svg {
+            width: 19px;
+            height: 19px;
+        }
+
+        .auth-error {
+            min-height: 18px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--red);
+            padding-left: 2px;
+        }
+
+        .auth-submit-btn {
+            min-height: 48px;
+            margin-top: 2px;
+            font-size: 15px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Dynamic Island Live Pill -->
+    <div class="island-wrap">
+        <div id="islandPill" class="island-pill">
+            <div class="island-left">
+                <span id="statusDot" class="status-dot"></span>
+                <span id="islandLabel" class="island-title">DYNAMIC ISLAND</span>
+            </div>
+            <div id="islandMeta" class="island-meta">
+                <span id="pcName">PC</span>
+                <span id="sessionTimer" class="island-timer">--:--</span>
+                <button type="button" id="btnLockSession" class="island-lock-btn" aria-label="Lock connection" title="Lock connection">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span>Lock</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main class="app-shell">
+        <!-- TAB 1: TRANSFER -->
+        <section id="tab-transfer" class="tab-panel active">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Send to PC
+                    </h2>
+                    <span class="pill-badge">Up to 2 GB</span>
+                </div>
+
+                <input type="file" id="filePicker" multiple style="display:none">
+                <input type="file" id="mediaPicker" accept="image/*,video/*" multiple style="display:none">
+                <input type="file" id="cameraPicker" accept="image/*" capture="environment" style="display:none">
+
+                <div id="dropZone" class="dropzone" role="button" tabindex="0">
+                    <div class="dropzone-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/></svg>
+                    </div>
+                    <div class="dropzone-title">Tap to pick files or drop here</div>
+                    <div class="dropzone-sub">Lands directly in Dynamic Island Drop Shelf</div>
+                </div>
+
+                <div class="action-grid">
+                    <button type="button" class="btn btn-secondary" id="btnPickMedia">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                        Photos & Video
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btnTakePhoto">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        Take Photo
+                    </button>
+                </div>
+            </div>
+
+            <div id="queueCard" class="card" style="display:none">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        Transfers
+                    </h2>
+                    <button type="button" id="btnClearQueue" class="text-btn">Clear Done</button>
+                </div>
+                <div id="queueList" class="queue-list"></div>
+            </div>
+        </section>
+
+        <!-- TAB 2: CLIPBOARD -->
+        <section id="tab-clipboard" class="tab-panel">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+                        Clipboard Sync
+                    </h2>
+                    <button type="button" id="btnClearClip" class="text-btn">Clear</button>
+                </div>
+                <textarea id="clipText" placeholder="Paste or type text or a link to send to your PC..."></textarea>
+                <div class="clip-actions">
+                    <button type="button" class="btn" id="btnPushClip">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+                        Send to PC
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btnPullClip">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+                        Get from PC
+                    </button>
+                </div>
+                <div id="urlBanner" class="url-banner">
+                    <button type="button" class="btn btn-green btn-full" id="btnOpenUrlOnPc">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        Open Link in PC Browser
+                    </button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        PC Clipboard History
+                    </h2>
+                    <button type="button" id="btnRefreshHistory" class="text-btn">Refresh</button>
+                </div>
+                <div id="historyList" class="history-list">
+                    <div class="empty-state">Loading recent clips...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: SHELF -->
+        <section id="tab-shelf" class="tab-panel">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        PC Drop Shelf
+                    </h2>
+                    <div class="shelf-toolbar">
+                        <a id="btnDownloadAll" class="btn btn-secondary btn-sm" style="display:none" href="#">ZIP All</a>
+                        <button type="button" id="btnRefreshShelf" class="text-btn">Refresh</button>
+                    </div>
+                </div>
+                <input type="search" id="shelfSearch" class="search-input" placeholder="Filter files on shelf...">
+                <div id="shelfList" class="file-list">
+                    <div class="empty-state">Loading Drop Shelf...</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="tab-bar" aria-label="Primary">
+        <button type="button" class="tab-btn active" data-tab="transfer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>Transfer</span>
+        </button>
+        <button type="button" class="tab-btn" data-tab="clipboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+            <span>Clipboard</span>
+        </button>
+        <button type="button" class="tab-btn" data-tab="shelf">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <span>Shelf</span>
+            <span id="shelfBadge" class="tab-badge">0</span>
+        </button>
+    </nav>
+
+    <!-- Image Preview Lightbox -->
+    <div id="lightboxModal" class="modal-backdrop" role="dialog" aria-modal="true">
+        <div class="lightbox-inner">
+            <img id="lightboxImg" alt="Preview">
+            <div style="display:flex;gap:10px;">
+                <a id="lightboxDl" class="btn btn-sm" href="#">Download</a>
+                <button type="button" id="lightboxClose" class="btn btn-secondary btn-sm">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Expired Overlay -->
+    <div id="expiredModal" class="modal-backdrop" role="dialog" aria-modal="true">
+        <div class="expired-card">
+            <div class="dropzone-icon" style="background:var(--red-soft);color:var(--red);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <h3>Bridge Disconnected</h3>
+            <p id="expiredMsg">This Phone Bridge session has expired or was stopped on your PC. Scan the new QR code in Dynamic Island to reconnect.</p>
+            <button type="button" id="btnRetryConn" class="btn btn-full">Retry Connection</button>
+        </div>
+    </div>
+
+    <!-- Password Lock Screen Overlay -->
+    <div id="authGate" class="auth-backdrop" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <div class="auth-card">
+            <div id="authEmblem" class="auth-emblem">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <h2 id="authTitle" class="auth-title">Unlock Phone Bridge</h2>
+            <p id="authSubtitle" class="auth-subtitle">Enter the connection password shown on your PC to continue.</p>
+            <form id="authForm" class="auth-form" autocomplete="on" novalidate>
+                <label class="auth-label" for="authPassword">Connection Password</label>
+                <div class="auth-input-wrap">
+                    <input id="authPassword" class="auth-input" type="password" name="password" autocomplete="current-password" enterkeyhint="go" placeholder="Enter password or PIN" required>
+                    <button type="button" id="btnToggleAuthVis" class="auth-eye-btn" aria-label="Show password" aria-pressed="false">
+                        <svg id="eyeIconShow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <svg id="eyeIconHide" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    </button>
+                </div>
+                <div id="authError" class="auth-error" role="alert" aria-live="polite"></div>
+                <button type="submit" id="btnUnlock" class="btn btn-full auth-submit-btn">Unlock Connection</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const token = __DI_TOKEN_JSON__;
+        let isLocked = __DI_REQUIRE_PASSWORD__;
+        let passwordProtected = __DI_PASSWORD_PROTECTED__;
+        const initialPcName = __DI_PC_NAME_JSON__;
+        let authToken = '';
+        const BRAND_TEXT = 'DYNAMIC ISLAND';
+
+        // Strip ?t= or ?a= token from address bar for privacy
+        try {
+            if (window.location.search.includes('t=') || window.location.search.includes('a=')) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        } catch {}
+
+        let expiresAtMs = 0;
+        let lastShelfSignature = '';
+        let cachedShelfItems = [];
+        let toastTimer = null;
+        let activeTab = 'transfer';
+        let consecutiveFailures = 0;
+
+        const islandPill = document.getElementById('islandPill');
+        const islandLabel = document.getElementById('islandLabel');
+        const statusDot = document.getElementById('statusDot');
+        const pcNameEl = document.getElementById('pcName');
+        const sessionTimerEl = document.getElementById('sessionTimer');
+        const shelfBadgeEl = document.getElementById('shelfBadge');
+        const expiredModal = document.getElementById('expiredModal');
+        const expiredMsg = document.getElementById('expiredMsg');
+        const btnLockSession = document.getElementById('btnLockSession');
+        const authGate = document.getElementById('authGate');
+        const authEmblem = document.getElementById('authEmblem');
+        const authSubtitle = document.getElementById('authSubtitle');
+        const authForm = document.getElementById('authForm');
+        const authPassword = document.getElementById('authPassword');
+        const authError = document.getElementById('authError');
+        const btnUnlock = document.getElementById('btnUnlock');
+        const btnToggleAuthVis = document.getElementById('btnToggleAuthVis');
+        const eyeIconShow = document.getElementById('eyeIconShow');
+        const eyeIconHide = document.getElementById('eyeIconHide');
+
+        if (initialPcName) {
+            pcNameEl.textContent = initialPcName;
+            authSubtitle.textContent = `Enter the connection password for ${initialPcName} to unlock.`;
+        }
+
+        function authHeaders(extra = {}) {
+            const h = { ...extra };
+            if (token) h['X-DI-Token'] = token;
+            if (authToken) h['X-DI-Auth'] = authToken;
+            return h;
+        }
+
+        function authQuery(basePath, params = {}) {
+            const qs = new URLSearchParams();
+            if (authToken) qs.set('a', authToken);
+            else if (token) qs.set('t', token);
+            for (const [k, v] of Object.entries(params)) {
+                if (v !== undefined && v !== null) qs.set(k, String(v));
+            }
+            const str = qs.toString();
+            return str ? `${basePath}?${str}` : basePath;
+        }
+
+        function updateLockUi() {
+            document.body.classList.toggle('bridge-locked', isLocked);
+            authGate.classList.toggle('open', isLocked);
+            btnLockSession.classList.toggle('visible', passwordProtected && !isLocked);
+        }
+
+        function handleUnauthorized(msg = 'Session locked on PC. Re-enter password to continue.') {
+            authToken = '';
+            isLocked = true;
+            passwordProtected = true;
+            cachedShelfItems = [];
+            lastShelfSignature = '';
+            clipTextEl.value = '';
+            updateUrlBanner();
+            shelfBadgeEl.classList.remove('visible');
+            document.getElementById('historyList').replaceChildren();
+            document.getElementById('shelfList').replaceChildren();
+            authEmblem.classList.remove('unlocked', 'error');
+            authError.textContent = msg;
+            updateLockUi();
+            setConnectionState('warn');
+            showToast('Bridge Locked', 'info', 2200);
+        }
+
+        function showToast(msg, kind = 'info', durationMs = 2800) {
+            clearTimeout(toastTimer);
+            islandLabel.textContent = msg;
+            islandPill.classList.remove('toast-success', 'toast-error', 'toast-info');
+            islandPill.classList.add('toast-active', `toast-${kind}`);
+            toastTimer = setTimeout(() => {
+                islandLabel.textContent = BRAND_TEXT;
+                islandPill.classList.remove('toast-active', 'toast-success', 'toast-error', 'toast-info');
+            }, durationMs);
+        }
+
+        function setConnectionState(state, message) {
+            statusDot.classList.remove('warn', 'err');
+            if (state === 'ok') {
+                expiredModal.classList.remove('open');
+            } else if (state === 'warn') {
+                statusDot.classList.add('warn');
+            } else {
+                statusDot.classList.add('err');
+                authGate.classList.remove('open');
+                if (message) expiredMsg.textContent = message;
+                expiredModal.classList.add('open');
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (!bytes || bytes <= 0) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let i = 0;
+            let val = bytes;
+            while (val >= 1024 && i < units.length - 1) {
+                val /= 1024;
+                i++;
+            }
+            return `${val >= 100 || i === 0 ? val.toFixed(0) : val.toFixed(1)} ${units[i]}`;
+        }
+
+        function isHttpUrl(str) {
+            if (!str) return false;
+            const trimmed = str.trim();
+            if (trimmed.includes(' ') || trimmed.includes('\n')) return false;
+            try {
+                const u = new URL(trimmed);
+                return u.protocol === 'http:' || u.protocol === 'https:';
+            } catch {
+                return false;
+            }
+        }
+
+        async function copyTextReliable(text) {
+            if (!text) return false;
+            if (navigator.clipboard && window.isSecureContext) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch {}
+            }
+            // Fallback for plain HTTP LAN origins on iOS Safari & Android Chrome
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.setAttribute('readonly', '');
+                ta.style.position = 'fixed';
+                ta.style.top = '-9999px';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                ta.setSelectionRange(0, text.length);
+                const ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                return ok;
+            } catch {
+                return false;
+            }
+        }
+
+        // Tabs
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                activeTab = btn.dataset.tab;
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${activeTab}`));
+                if (activeTab === 'shelf') loadShelf(true);
+                if (activeTab === 'clipboard') loadClipboardHistory();
+            });
+        });
+
+        // Status & Countdown
+        function updateCountdownUi() {
+            if (!expiresAtMs) return;
+            const diffSec = Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
+            const m = String(Math.floor(diffSec / 60)).padStart(2, '0');
+            const s = String(diffSec % 60).padStart(2, '0');
+            sessionTimerEl.textContent = `${m}:${s}`;
+            if (diffSec === 0) {
+                setConnectionState('err', 'This Phone Bridge session has expired. Start a new session on your PC and scan the QR code.');
+            }
+        }
+
+        async function pollStatus() {
+            if (document.hidden || isLocked) return;
+            try {
+                const res = await fetch('/api/status', { headers: authHeaders() });
+                if (res.status === 401) {
+                    handleUnauthorized('Password required to access this session.');
+                    return;
+                }
+                if (res.status === 403 || res.status === 429) {
+                    setConnectionState('err', 'Session expired or stopped on PC. Scan the new QR code in Dynamic Island.');
+                    return;
+                }
+                if (!res.ok) throw new Error('status');
+                const data = await res.json();
+                consecutiveFailures = 0;
+                setConnectionState('ok');
+                if (data.pcName) pcNameEl.textContent = data.pcName;
+                if (data.expiresAtMs) expiresAtMs = data.expiresAtMs;
+                if (typeof data.passwordProtected === 'boolean') {
+                    passwordProtected = data.passwordProtected;
+                    updateLockUi();
+                }
+                updateCountdownUi();
+
+                const count = Number(data.shelfCount || 0);
+                shelfBadgeEl.textContent = count > 99 ? '99+' : String(count);
+                shelfBadgeEl.classList.toggle('visible', count > 0);
+
+                if (activeTab === 'shelf' || count !== cachedShelfItems.length) {
+                    loadShelf(false);
+                }
+            } catch {
+                consecutiveFailures++;
+                if (consecutiveFailures >= 3) {
+                    setConnectionState('err', 'Lost connection to your PC. Ensure both devices are on the same Wi-Fi network.');
+                } else {
+                    setConnectionState('warn');
+                }
+            }
+        }
+
+        // Upload Queue with XHR progress, speed & cancel
+        const queueCard = document.getElementById('queueCard');
+        const queueList = document.getElementById('queueList');
+        const uploadEntries = [];
+
+        function enqueueFiles(fileList) {
+            const files = Array.from(fileList || []);
+            if (!files.length) return;
+            queueCard.style.display = 'block';
+            files.forEach(file => {
+                const entry = createQueueItem(file);
+                uploadEntries.push(entry);
+                startUpload(entry);
+            });
+        }
+
+        function createQueueItem(file) {
+            const el = document.createElement('div');
+            el.className = 'queue-item';
+
+            const top = document.createElement('div');
+            top.className = 'queue-top';
+            const name = document.createElement('span');
+            name.className = 'queue-name';
+            name.textContent = file.name;
+            const status = document.createElement('span');
+            status.className = 'queue-status';
+            status.textContent = 'Starting...';
+            top.append(name, status);
+
+            const track = document.createElement('div');
+            track.className = 'progress-track';
+            const fill = document.createElement('div');
+            fill.className = 'progress-fill';
+            track.appendChild(fill);
+
+            const foot = document.createElement('div');
+            foot.className = 'queue-foot';
+            const meta = document.createElement('span');
+            meta.textContent = formatBytes(file.size);
+            const actionBtn = document.createElement('button');
+            actionBtn.type = 'button';
+            actionBtn.className = 'text-btn danger';
+            actionBtn.textContent = 'Cancel';
+            foot.append(meta, actionBtn);
+
+            el.append(top, track, foot);
+            queueList.prepend(el);
+
+            const entry = { file, el, status, fill, meta, actionBtn, xhr: null, done: false };
+            actionBtn.addEventListener('click', () => {
+                if (entry.xhr && !entry.done) {
+                    entry.xhr.abort();
+                } else if (entry.failed) {
+                    startUpload(entry);
+                }
+            });
+            return entry;
+        }
+
+        function startUpload(entry) {
+            entry.done = false;
+            entry.failed = false;
+            entry.fill.classList.remove('done', 'err');
+            entry.status.classList.remove('done', 'err');
+            entry.fill.style.width = '0%';
+            entry.status.textContent = '0%';
+            entry.actionBtn.className = 'text-btn danger';
+            entry.actionBtn.textContent = 'Cancel';
+            entry.actionBtn.style.display = 'inline-block';
+
+            const xhr = new XMLHttpRequest();
+            entry.xhr = xhr;
+            const startedAt = Date.now();
+
+            xhr.open('POST', '/api/upload', true);
+            if (token) xhr.setRequestHeader('X-DI-Token', token);
+            if (authToken) xhr.setRequestHeader('X-DI-Auth', authToken);
+            xhr.setRequestHeader('X-File-Name', encodeURIComponent(entry.file.name));
+
+            xhr.upload.onprogress = (ev) => {
+                if (!ev.lengthComputable) return;
+                const pct = Math.min(100, Math.round((ev.loaded / ev.total) * 100));
+                entry.fill.style.width = `${pct}%`;
+                entry.status.textContent = `${pct}%`;
+                const elapsedSec = Math.max(0.2, (Date.now() - startedAt) / 1000);
+                const bps = ev.loaded / elapsedSec;
+                entry.meta.textContent = `${formatBytes(ev.loaded)} / ${formatBytes(ev.total)} · ${formatBytes(bps)}/s`;
+            };
+
+            xhr.onload = () => {
+                entry.xhr = null;
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    entry.done = true;
+                    entry.fill.style.width = '100%';
+                    entry.fill.classList.add('done');
+                    entry.status.classList.add('done');
+                    entry.status.textContent = 'Sent';
+                    entry.meta.textContent = `${formatBytes(entry.file.size)} · Added to Drop Shelf`;
+                    entry.actionBtn.style.display = 'none';
+                    showToast(`Sent ${entry.file.name}`, 'success');
+                    loadShelf(true);
+                } else if (xhr.status === 401) {
+                    handleUnauthorized('Session locked. Re-enter password to resume uploads.');
+                    markFailed(entry, 'Locked');
+                } else if (xhr.status === 403) {
+                    setConnectionState('err', 'Session expired during upload.');
+                    markFailed(entry, 'Session expired');
+                } else {
+                    markFailed(entry, `Failed (${xhr.status})`);
+                }
+            };
+
+            xhr.onerror = () => {
+                entry.xhr = null;
+                markFailed(entry, 'Network error');
+            };
+
+            xhr.onabort = () => {
+                entry.xhr = null;
+                markFailed(entry, 'Cancelled');
+            };
+
+            xhr.send(entry.file);
+        }
+
+        function markFailed(entry, reason) {
+            entry.failed = true;
+            entry.fill.classList.add('err');
+            entry.status.classList.add('err');
+            entry.status.textContent = reason;
+            entry.actionBtn.className = 'text-btn';
+            entry.actionBtn.textContent = 'Retry';
+            showToast(`${entry.file.name}: ${reason}`, 'error');
+        }
+
+        const filePicker = document.getElementById('filePicker');
+        const mediaPicker = document.getElementById('mediaPicker');
+        const cameraPicker = document.getElementById('cameraPicker');
+        const dropZone = document.getElementById('dropZone');
+
+        [filePicker, mediaPicker, cameraPicker].forEach(inp => {
+            inp.addEventListener('change', () => {
+                enqueueFiles(inp.files);
+                inp.value = '';
+            });
+        });
+
+        dropZone.addEventListener('click', () => filePicker.click());
+        dropZone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') filePicker.click(); });
+        document.getElementById('btnPickMedia').addEventListener('click', () => mediaPicker.click());
+        document.getElementById('btnTakePhoto').addEventListener('click', () => cameraPicker.click());
+
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            if (e.dataTransfer?.files?.length) enqueueFiles(e.dataTransfer.files);
+        });
+
+        document.getElementById('btnClearQueue').addEventListener('click', () => {
+            for (let i = uploadEntries.length - 1; i >= 0; i--) {
+                if (uploadEntries[i].done || uploadEntries[i].failed) {
+                    uploadEntries[i].el.remove();
+                    uploadEntries.splice(i, 1);
+                }
+            }
+            if (!uploadEntries.length) queueCard.style.display = 'none';
+        });
+
+        // Clipboard Sync & History
+        const clipTextEl = document.getElementById('clipText');
+        const urlBanner = document.getElementById('urlBanner');
+
+        function updateUrlBanner() {
+            urlBanner.classList.toggle('visible', isHttpUrl(clipTextEl.value));
+        }
+        clipTextEl.addEventListener('input', updateUrlBanner);
+
+        document.getElementById('btnClearClip').addEventListener('click', () => {
+            clipTextEl.value = '';
+            updateUrlBanner();
+        });
+
+        document.getElementById('btnPushClip').addEventListener('click', async () => {
+            const text = clipTextEl.value;
+            if (!text.trim()) { showToast('Enter text first', 'info'); return; }
+            try {
+                const res = await fetch('/api/clipboard', {
+                    method: 'POST',
+                    headers: authHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ text })
+                });
+                if (res.status === 401) { handleUnauthorized(); return; }
+                if (res.ok) {
+                    showToast('Sent to PC Clipboard', 'success');
+                    setTimeout(loadClipboardHistory, 350);
+                } else {
+                    showToast('Clipboard push failed', 'error');
+                }
+            } catch {
+                showToast('Network error', 'error');
+            }
+        });
+
+        document.getElementById('btnPullClip').addEventListener('click', async () => {
+            try {
+                const res = await fetch('/api/clipboard', { headers: authHeaders() });
+                if (res.status === 401) { handleUnauthorized(); return; }
+                if (!res.ok) { showToast('PC Clipboard is protected', 'error'); return; }
+                const data = await res.json();
+                const text = data.text || '';
+                clipTextEl.value = text;
+                updateUrlBanner();
+                if (!text) { showToast('PC Clipboard is empty', 'info'); return; }
+                const copied = await copyTextReliable(text);
+                showToast(copied ? 'Copied PC Clipboard' : 'Loaded from PC (tap to copy)', copied ? 'success' : 'info');
+            } catch {
+                showToast('Could not read PC Clipboard', 'error');
+            }
+        });
+
+        document.getElementById('btnOpenUrlOnPc').addEventListener('click', async () => {
+            const url = clipTextEl.value.trim();
+            if (!isHttpUrl(url)) return;
+            try {
+                const res = await fetch('/api/open-url', {
+                    method: 'POST',
+                    headers: authHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ url })
+                });
+                if (res.status === 401) { handleUnauthorized(); return; }
+                showToast(res.ok ? 'Opened link on PC' : 'Could not open link', res.ok ? 'success' : 'error');
+            } catch {
+                showToast('Network error', 'error');
+            }
+        });
+
+        async function loadClipboardHistory() {
+            if (isLocked) return;
+            const host = document.getElementById('historyList');
+            try {
+                const res = await fetch('/api/clipboard/history', { headers: authHeaders() });
+                if (res.status === 401) { handleUnauthorized(); return; }
+                if (!res.ok) return;
+                const items = await res.json();
+                host.replaceChildren();
+                if (!items.length) {
+                    const empty = document.createElement('div');
+                    empty.className = 'empty-state';
+                    empty.textContent = 'No recent PC clipboard items';
+                    host.appendChild(empty);
+                    return;
+                }
+                for (const item of items) {
+                    const card = document.createElement('div');
+                    card.className = 'history-item';
+
+                    const head = document.createElement('div');
+                    head.className = 'history-head';
+
+                    const tags = document.createElement('div');
+                    tags.className = 'history-tags';
+                    const chip = document.createElement('span');
+                    chip.className = 'tag-chip';
+                    chip.textContent = item.tag || 'TEXT';
+                    tags.appendChild(chip);
+
+                    if (item.color) {
+                        const swatch = document.createElement('span');
+                        swatch.className = 'color-swatch';
+                        swatch.style.background = item.color;
+                        tags.appendChild(swatch);
+                    }
+
+                    const time = document.createElement('span');
+                    time.className = 'history-time';
+                    time.textContent = item.time || '';
+                    head.append(tags, time);
+
+                    const body = document.createElement('div');
+                    body.className = 'history-text';
+                    body.textContent = item.text || item.title || '';
+
+                    const actions = document.createElement('div');
+                    actions.className = 'history-actions';
+
+                    if (isHttpUrl(item.text)) {
+                        const openA = document.createElement('a');
+                        openA.className = 'text-btn';
+                        openA.href = item.text.trim();
+                        openA.target = '_blank';
+                        openA.rel = 'noopener noreferrer';
+                        openA.textContent = 'Open';
+                        actions.appendChild(openA);
+                    }
+
+                    const copyBtn = document.createElement('button');
+                    copyBtn.type = 'button';
+                    copyBtn.className = 'text-btn';
+                    copyBtn.textContent = 'Copy';
+                    copyBtn.addEventListener('click', async () => {
+                        const ok = await copyTextReliable(item.text || '');
+                        clipTextEl.value = item.text || '';
+                        updateUrlBanner();
+                        showToast(ok ? 'Copied to phone' : 'Loaded into box', ok ? 'success' : 'info');
+                    });
+                    actions.appendChild(copyBtn);
+
+                    card.append(head, body, actions);
+                    host.appendChild(card);
+                }
+            } catch {}
+        }
+
+        document.getElementById('btnRefreshHistory').addEventListener('click', loadClipboardHistory);
+
+        // Drop Shelf
+        const shelfSearch = document.getElementById('shelfSearch');
+        const btnDownloadAll = document.getElementById('btnDownloadAll');
+        const lightboxModal = document.getElementById('lightboxModal');
+        const lightboxImg = document.getElementById('lightboxImg');
+        const lightboxDl = document.getElementById('lightboxDl');
+
+        function renderShelf() {
+            const host = document.getElementById('shelfList');
+            const q = (shelfSearch.value || '').trim().toLowerCase();
+            const filtered = q
+                ? cachedShelfItems.filter(i => (i.name || '').toLowerCase().includes(q))
+                : cachedShelfItems;
+
+            shelfSearch.classList.toggle('visible', cachedShelfItems.length >= 5);
+            if (cachedShelfItems.length >= 2) {
+                btnDownloadAll.style.display = 'inline-flex';
+                btnDownloadAll.href = authQuery('/api/download-all');
+            } else {
+                btnDownloadAll.style.display = 'none';
+            }
+
+            host.replaceChildren();
+            if (!filtered.length) {
+                const empty = document.createElement('div');
+                empty.className = 'empty-state';
+                empty.textContent = q ? 'No matching files' : 'Drop files onto Dynamic Island on your PC to see them here.';
+                host.appendChild(empty);
+                return;
+            }
+
+            for (const item of filtered) {
+                const row = document.createElement('div');
+                row.className = 'file-card';
+
+                const thumb = document.createElement('div');
+                thumb.className = 'file-thumb';
+                const dlUrl = authQuery('/api/download', { file: item.name });
+
+                if (item.isImage) {
+                    const img = document.createElement('img');
+                    const previewUrl = authQuery('/api/preview', { file: item.name });
+                    img.src = previewUrl;
+                    img.alt = item.name;
+                    img.loading = 'lazy';
+                    img.onerror = () => { thumb.replaceChildren(); thumb.textContent = item.ext || 'IMG'; };
+                    img.addEventListener('click', () => {
+                        lightboxImg.src = previewUrl;
+                        lightboxDl.href = dlUrl;
+                        lightboxModal.classList.add('open');
+                    });
+                    thumb.appendChild(img);
+                } else {
+                    thumb.textContent = (item.ext || 'FILE').slice(0, 4);
+                }
+
+                const info = document.createElement('div');
+                info.className = 'file-info';
+                const nameEl = document.createElement('div');
+                nameEl.className = 'file-name';
+                nameEl.textContent = item.name;
+                const metaEl = document.createElement('div');
+                metaEl.className = 'file-meta';
+                metaEl.textContent = `${item.size || ''}${item.isPinned ? ' · Pinned' : ''}`;
+                info.append(nameEl, metaEl);
+
+                const dlLink = document.createElement('a');
+                dlLink.className = 'btn btn-secondary btn-sm';
+                dlLink.href = dlUrl;
+                dlLink.textContent = 'Save';
+
+                row.append(thumb, info, dlLink);
+                host.appendChild(row);
+            }
+        }
+
+        async function loadShelf(forceRender = false) {
+            if (isLocked) return;
+            try {
+                const res = await fetch('/api/shelf', { headers: authHeaders() });
+                if (res.status === 401) { handleUnauthorized(); return; }
+                if (!res.ok) return;
+                const items = await res.json();
+                const sig = JSON.stringify(items.map(i => `${i.name}|${i.size}|${i.isPinned}`));
+                cachedShelfItems = items;
+                shelfBadgeEl.textContent = items.length > 99 ? '99+' : String(items.length);
+                shelfBadgeEl.classList.toggle('visible', items.length > 0);
+                if (forceRender || sig !== lastShelfSignature) {
+                    lastShelfSignature = sig;
+                    renderShelf();
+                }
+            } catch {}
+        }
+
+        shelfSearch.addEventListener('input', renderShelf);
+        document.getElementById('btnRefreshShelf').addEventListener('click', () => {
+            loadShelf(true);
+            showToast('Shelf refreshed', 'info', 1400);
+        });
+
+        document.getElementById('lightboxClose').addEventListener('click', () => lightboxModal.classList.remove('open'));
+        lightboxModal.addEventListener('click', (e) => { if (e.target === lightboxModal) lightboxModal.classList.remove('open'); });
+        document.getElementById('btnRetryConn').addEventListener('click', () => {
+            consecutiveFailures = 0;
+            if (isLocked) {
+                expiredModal.classList.remove('open');
+                updateLockUi();
+            } else {
+                pollStatus();
+            }
+        });
+
+        btnToggleAuthVis.addEventListener('click', () => {
+            const reveal = authPassword.type === 'password';
+            authPassword.type = reveal ? 'text' : 'password';
+            btnToggleAuthVis.setAttribute('aria-pressed', String(reveal));
+            btnToggleAuthVis.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+            eyeIconShow.style.display = reveal ? 'none' : 'block';
+            eyeIconHide.style.display = reveal ? 'block' : 'none';
+            authPassword.focus();
+        });
+
+        btnLockSession.addEventListener('click', async () => {
+            try {
+                await fetch('/api/logout', { method: 'POST', headers: authHeaders() });
+            } catch {}
+            handleUnauthorized('Session locked. Enter password to reconnect.');
+        });
+
+        authForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const password = authPassword.value;
+            if (!password.trim()) {
+                authError.textContent = 'Please enter the connection password.';
+                authEmblem.classList.remove('error');
+                void authEmblem.offsetWidth;
+                authEmblem.classList.add('error');
+                authPassword.focus();
+                return;
+            }
+
+            btnUnlock.disabled = true;
+            btnUnlock.textContent = 'Verifying...';
+            authError.textContent = '';
+            authEmblem.classList.remove('error', 'unlocked');
+
+            try {
+                const res = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: authHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ password })
+                });
+                const data = await res.json().catch(() => ({}));
+
+                if (res.ok && data.ok) {
+                    authToken = data.authToken || '';
+                    isLocked = false;
+                    passwordProtected = Boolean(data.passwordProtected ?? true);
+                    consecutiveFailures = 0;
+                    if (data.pcName) pcNameEl.textContent = data.pcName;
+                    if (data.expiresAtMs) expiresAtMs = data.expiresAtMs;
+                    authPassword.value = '';
+                    authEmblem.classList.add('unlocked');
+                    setConnectionState('ok');
+                    updateLockUi();
+                    updateCountdownUi();
+                    showToast('Bridge Unlocked', 'success', 2400);
+                    pollStatus();
+                    loadShelf(true);
+                    loadClipboardHistory();
+                } else if (res.status === 403 && data.expired) {
+                    setConnectionState('err', 'This Phone Bridge session has expired on your PC. Scan the new QR code in Dynamic Island.');
+                } else if (res.status === 403) {
+                    setConnectionState('err', data.error || 'Access denied. Scan the QR code on your PC to reconnect.');
+                } else {
+                    authError.textContent = data.error || 'Incorrect password.';
+                    void authEmblem.offsetWidth;
+                    authEmblem.classList.add('error');
+                    authPassword.select();
+                }
+            } catch {
+                authError.textContent = 'Unable to reach PC. Check Wi-Fi connection.';
+                void authEmblem.offsetWidth;
+                authEmblem.classList.add('error');
+            } finally {
+                btnUnlock.disabled = false;
+                btnUnlock.textContent = 'Unlock Connection';
+            }
+        });
+
+        // Initial load & live timers
+        updateLockUi();
+        if (isLocked) {
+            setConnectionState('warn');
+            setTimeout(() => { try { authPassword.focus(); } catch {} }, 120);
+        } else {
+            pollStatus();
+            loadShelf(true);
+            loadClipboardHistory();
+        }
+        setInterval(updateCountdownUi, 1000);
+        setInterval(pollStatus, 4000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden && !isLocked) pollStatus(); });
+    </script>
+</body>
+</html>

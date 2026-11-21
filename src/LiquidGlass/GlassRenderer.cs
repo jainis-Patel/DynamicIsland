@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Windows.Media.Imaging;
+using SharpGen.Runtime;
 using Vortice.Direct3D;
 using Vortice.Direct3D11;
 using Vortice.DXGI;
@@ -72,20 +73,20 @@ public sealed class GlassRenderer : IDisposable
         public float Padding;
     }
 
-    private readonly ID3D11Device _device;
-    private readonly ID3D11DeviceContext _context;
+    private readonly ID3D11Device _device = null!;
+    private readonly ID3D11DeviceContext _context = null!;
 
-    private readonly ID3D11VertexShader _vertexShader;
-    private readonly ID3D11PixelShader _pixelShader;
-    private readonly ID3D11PixelShader _blurHorizontalShader;
-    private readonly ID3D11PixelShader _blurVerticalShader;
+    private readonly ID3D11VertexShader _vertexShader = null!;
+    private readonly ID3D11PixelShader _pixelShader = null!;
+    private readonly ID3D11PixelShader _blurHorizontalShader = null!;
+    private readonly ID3D11PixelShader _blurVerticalShader = null!;
 
-    private readonly ID3D11SamplerState _linearClampSampler;
-    private readonly ID3D11BlendState _premultipliedBlendState;
-    private readonly ID3D11RasterizerState _rasterizerState;
+    private readonly ID3D11SamplerState _linearClampSampler = null!;
+    private readonly ID3D11BlendState _premultipliedBlendState = null!;
+    private readonly ID3D11RasterizerState _rasterizerState = null!;
 
-    private readonly ID3D11Buffer _constantBuffer;
-    private readonly ID3D11Buffer _blurConstantBuffer;
+    private readonly ID3D11Buffer _constantBuffer = null!;
+    private readonly ID3D11Buffer _blurConstantBuffer = null!;
 
     // Downscaled ping-pong blur chain (1/2 or 1/4 resolution)
     private ID3D11Texture2D? _blurTexA;
@@ -107,89 +108,110 @@ public sealed class GlassRenderer : IDisposable
     private int _cachedHeight;
     private float _cachedDpiScale;
 
+    private volatile bool _isDisposed;
+    private volatile bool _isDeviceLost;
+
+    public object RenderLock { get; } = new();
+    public bool IsDisposed => _isDisposed;
+    public bool IsDeviceLost => _isDeviceLost;
+
     public ID3D11Device Device => _device;
     public ID3D11DeviceContext Context => _context;
 
     public GlassRenderer()
     {
-        // 1. Create Direct3D 11 hardware device with BGRA support for DXGI/DirectComposition
-        var creationFlags = DeviceCreationFlags.BgraSupport;
-        var featureLevels = new[]
+        try
         {
-            FeatureLevel.Level_11_1,
-            FeatureLevel.Level_11_0
-        };
+            // 1. Create Direct3D 11 hardware device with BGRA support for DXGI/DirectComposition
+            var creationFlags = DeviceCreationFlags.BgraSupport;
+            var featureLevels = new[]
+            {
+                FeatureLevel.Level_11_1,
+                FeatureLevel.Level_11_0
+            };
 
-        var hr = D3D11.D3D11CreateDevice(
-            null,
-            DriverType.Hardware,
-            creationFlags,
-            featureLevels,
-            out _device,
-            out _context);
-
-        if (hr.Failure)
-        {
-            // Fallback to WARP software rasterizer (essential for CI runners, headless VMs, or basic display adapters)
-            hr = D3D11.D3D11CreateDevice(
+            var hr = D3D11.D3D11CreateDevice(
                 null,
-                DriverType.Warp,
+                DriverType.Hardware,
                 creationFlags,
                 featureLevels,
-                out _device,
-                out _context);
-            hr.CheckError();
+                out _device!,
+                out _context!);
+
+            if (hr.Failure)
+            {
+                // Fallback to WARP software rasterizer (essential for CI runners, headless VMs, or basic display adapters)
+                hr = D3D11.D3D11CreateDevice(
+                    null,
+                    DriverType.Warp,
+                    creationFlags,
+                    featureLevels,
+                    out _device!,
+                    out _context!);
+                hr.CheckError();
+            }
+
+            // Enable thread protection on the immediate context as defense-in-depth alongside RenderLock
+            using (var multithread = _device.QueryInterfaceOrNull<ID3D11Multithread>())
+            {
+                multithread?.SetMultithreadProtected(true);
+            }
+
+            // 2. Load compiled shader bytecode
+            byte[] vsBytecode = LoadShaderBytecode("GlassVertexShader.cso");
+            byte[] psBytecode = LoadShaderBytecode("GlassPixelShader.cso");
+            byte[] blurHBytecode = LoadShaderBytecode("BlurH.cso");
+            byte[] blurVBytecode = LoadShaderBytecode("BlurV.cso");
+
+            _vertexShader = _device.CreateVertexShader(vsBytecode);
+            _pixelShader = _device.CreatePixelShader(psBytecode);
+            _blurHorizontalShader = _device.CreatePixelShader(blurHBytecode);
+            _blurVerticalShader = _device.CreatePixelShader(blurVBytecode);
+
+            // 3. Create Sampler State (Linear Clamp)
+            _linearClampSampler = _device.CreateSamplerState(SamplerDescription.LinearClamp);
+
+            // 4. Create Premultiplied Alpha Blend State
+            var blendDesc = new BlendDescription
+            {
+                AlphaToCoverageEnable = false,
+                IndependentBlendEnable = false
+            };
+            blendDesc.RenderTarget[0].BlendEnable = true;
+            blendDesc.RenderTarget[0].SourceBlend = Blend.One;
+            blendDesc.RenderTarget[0].DestinationBlend = Blend.InverseSourceAlpha;
+            blendDesc.RenderTarget[0].BlendOperation = BlendOperation.Add;
+            blendDesc.RenderTarget[0].SourceBlendAlpha = Blend.One;
+            blendDesc.RenderTarget[0].DestinationBlendAlpha = Blend.InverseSourceAlpha;
+            blendDesc.RenderTarget[0].BlendOperationAlpha = BlendOperation.Add;
+            blendDesc.RenderTarget[0].RenderTargetWriteMask = ColorWriteEnable.All;
+            _premultipliedBlendState = _device.CreateBlendState(blendDesc);
+
+            // 5. Create Rasterizer State
+            _rasterizerState = _device.CreateRasterizerState(RasterizerDescription.CullNone);
+
+            // 6. Create Constant Buffers
+            _constantBuffer = _device.CreateBuffer(new BufferDescription
+            {
+                ByteWidth = (uint)Marshal.SizeOf<GpuGlassConstants>(),
+                Usage = ResourceUsage.Dynamic,
+                BindFlags = BindFlags.ConstantBuffer,
+                CPUAccessFlags = CpuAccessFlags.Write
+            });
+
+            _blurConstantBuffer = _device.CreateBuffer(new BufferDescription
+            {
+                ByteWidth = 16,
+                Usage = ResourceUsage.Dynamic,
+                BindFlags = BindFlags.ConstantBuffer,
+                CPUAccessFlags = CpuAccessFlags.Write
+            });
         }
-
-        // 2. Load compiled shader bytecode
-        byte[] vsBytecode = LoadShaderBytecode("GlassVertexShader.cso");
-        byte[] psBytecode = LoadShaderBytecode("GlassPixelShader.cso");
-        byte[] blurHBytecode = LoadShaderBytecode("BlurH.cso");
-        byte[] blurVBytecode = LoadShaderBytecode("BlurV.cso");
-
-        _vertexShader = _device.CreateVertexShader(vsBytecode);
-        _pixelShader = _device.CreatePixelShader(psBytecode);
-        _blurHorizontalShader = _device.CreatePixelShader(blurHBytecode);
-        _blurVerticalShader = _device.CreatePixelShader(blurVBytecode);
-
-        // 3. Create Sampler State (Linear Clamp)
-        _linearClampSampler = _device.CreateSamplerState(SamplerDescription.LinearClamp);
-
-        // 4. Create Premultiplied Alpha Blend State
-        var blendDesc = new BlendDescription
+        catch
         {
-            AlphaToCoverageEnable = false,
-            IndependentBlendEnable = false
-        };
-        blendDesc.RenderTarget[0].BlendEnable = true;
-        blendDesc.RenderTarget[0].SourceBlend = Blend.One;
-        blendDesc.RenderTarget[0].DestinationBlend = Blend.InverseSourceAlpha;
-        blendDesc.RenderTarget[0].BlendOperation = BlendOperation.Add;
-        blendDesc.RenderTarget[0].SourceBlendAlpha = Blend.One;
-        blendDesc.RenderTarget[0].DestinationBlendAlpha = Blend.InverseSourceAlpha;
-        blendDesc.RenderTarget[0].BlendOperationAlpha = BlendOperation.Add;
-        blendDesc.RenderTarget[0].RenderTargetWriteMask = ColorWriteEnable.All;
-        _premultipliedBlendState = _device.CreateBlendState(blendDesc);
-
-        // 5. Create Rasterizer State
-        _rasterizerState = _device.CreateRasterizerState(RasterizerDescription.CullNone);
-
-        // 6. Create Constant Buffers
-        _constantBuffer = _device.CreateBuffer(new BufferDescription
-        {
-            ByteWidth = (uint)Marshal.SizeOf<GpuGlassConstants>(),
-            Usage = ResourceUsage.Dynamic,
-            BindFlags = BindFlags.ConstantBuffer,
-            CPUAccessFlags = CpuAccessFlags.Write
-        });
-
-        _blurConstantBuffer = _device.CreateBuffer(new BufferDescription
-        {
-            ByteWidth = 16,
-            Usage = ResourceUsage.Dynamic,
-            BindFlags = BindFlags.ConstantBuffer,
-            CPUAccessFlags = CpuAccessFlags.Write
-        });
+            Dispose();
+            throw;
+        }
     }
 
     private static byte[] LoadShaderBytecode(string filename)
@@ -225,6 +247,23 @@ public sealed class GlassRenderer : IDisposable
     /// </summary>
     public ID3D11ShaderResourceView RunBlurPipeline(ID3D11ShaderResourceView sourceSrv, int srcWidth, int srcHeight, float blurRadius)
     {
+        lock (RenderLock)
+        {
+            ObjectDisposedException.ThrowIf(_isDisposed, this);
+            try
+            {
+                return RunBlurPipelineCore(sourceSrv, srcWidth, srcHeight, blurRadius);
+            }
+            catch (SharpGenException ex) when (IsDeviceLostError(ex))
+            {
+                _isDeviceLost = true;
+                throw;
+            }
+        }
+    }
+
+    private ID3D11ShaderResourceView RunBlurPipelineCore(ID3D11ShaderResourceView sourceSrv, int srcWidth, int srcHeight, float blurRadius)
+    {
         int targetW = Math.Max(srcWidth / 2, 64);
         int targetH = Math.Max(srcHeight / 2, 64);
 
@@ -234,6 +273,7 @@ public sealed class GlassRenderer : IDisposable
         _context.VSSetShader(_vertexShader);
         _context.PSSetSampler(0, _linearClampSampler);
         _context.RSSetState(_rasterizerState);
+        _context.OMSetBlendState((ID3D11BlendState?)null);
 
         var viewport = new Viewport(0, 0, targetW, targetH, 0.0f, 1.0f);
         _context.RSSetViewport(viewport);
@@ -310,7 +350,7 @@ public sealed class GlassRenderer : IDisposable
     /// <summary>
     /// Renders one or more Liquid Glass shapes in a single draw pass over the backdrop.
     /// </summary>
-    public unsafe void Render(
+    public void Render(
         ID3D11RenderTargetView targetRtv,
         int targetWidth,
         int targetHeight,
@@ -322,8 +362,37 @@ public sealed class GlassRenderer : IDisposable
         Vector2 screenOffset = default,
         Vector2 backdropSize = default)
     {
+        lock (RenderLock)
+        {
+            ObjectDisposedException.ThrowIf(_isDisposed, this);
+            try
+            {
+                RenderCore(targetRtv, targetWidth, targetHeight, dpiScale, settings, shapes, backdropSrv, blurredBackdropSrv, screenOffset, backdropSize);
+            }
+            catch (SharpGenException ex) when (IsDeviceLostError(ex))
+            {
+                _isDeviceLost = true;
+                throw;
+            }
+        }
+    }
+
+    private unsafe void RenderCore(
+        ID3D11RenderTargetView targetRtv,
+        int targetWidth,
+        int targetHeight,
+        float dpiScale,
+        GlassSettings settings,
+        ReadOnlySpan<GlassShape> shapes,
+        ID3D11ShaderResourceView backdropSrv,
+        ID3D11ShaderResourceView? blurredBackdropSrv = null,
+        Vector2 screenOffset = default,
+        Vector2 backdropSize = default)
+    {
+        int blurSrcW = backdropSize.X > 1.0f ? (int)backdropSize.X : targetWidth;
+        int blurSrcH = backdropSize.Y > 1.0f ? (int)backdropSize.Y : targetHeight;
         ID3D11ShaderResourceView blurSrv = blurredBackdropSrv ??
-            RunBlurPipeline(backdropSrv, targetWidth, targetHeight, settings.BlurRadius);
+            RunBlurPipelineCore(backdropSrv, blurSrcW, blurSrcH, settings.BlurRadius);
 
         var viewport = new Viewport(0, 0, targetWidth, targetHeight, 0.0f, 1.0f);
         _context.RSSetViewport(viewport);
@@ -342,7 +411,7 @@ public sealed class GlassRenderer : IDisposable
             DpiScale = dpiScale,
             ShapeCount = (uint)Math.Clamp(shapes.Length, 1, MaxShapes),
             Thickness = settings.Thickness * Core.LiquidGlassTheme.GlobalThicknessScale,
-            BevelWidth = settings.BevelWidth,
+            BevelWidth = settings.BevelWidth * dpiScale,
             IndexOfRefraction = settings.IndexOfRefraction,
             BlurRadius = settings.BlurRadius * Core.LiquidGlassTheme.GlobalBlurScale,
             Saturation = settings.Saturation,
@@ -358,7 +427,7 @@ public sealed class GlassRenderer : IDisposable
             Dispersion = settings.Dispersion,
             EdgeFeather = settings.EdgeFeather,
             CornerSmoothing = settings.CornerSmoothing,
-            MergeSmoothness = settings.MergeSmoothness,
+            MergeSmoothness = settings.MergeSmoothness * dpiScale,
             ScreenOffset = screenOffset,
             BackdropSize = backdropSize
         };
@@ -372,7 +441,7 @@ public sealed class GlassRenderer : IDisposable
             constants.ShapesData[offset + 2] = s.HalfWidth;
             constants.ShapesData[offset + 3] = s.HalfHeight;
             constants.ShapesData[offset + 4] = s.CornerRadius;
-            constants.ShapesData[offset + 5] = (float)s.ShapeType;
+            constants.ShapesData[offset + 5] = BitConverter.UInt32BitsToSingle((uint)s.ShapeType);
             constants.ShapesData[offset + 6] = 0.0f;
             constants.ShapesData[offset + 7] = 0.0f;
         }
@@ -389,18 +458,27 @@ public sealed class GlassRenderer : IDisposable
     }
 
     /// <summary>
-    /// Ensures the cached render target, staging texture, and WriteableBitmap match the requested size.
+    /// Ensures the cached render target and staging texture match the requested size.
     /// Disposes and recreates them when the size or DPI changes.
     /// </summary>
-    private void EnsureCachedResources(int width, int height, float dpiScale)
+    private void EnsureCachedResources(int width, int height, float dpiScale, bool allocateBitmap)
     {
         if (_cachedRenderTex != null && _cachedWidth == width && _cachedHeight == height && _cachedDpiScale == dpiScale)
+        {
+            if (allocateBitmap && _cachedBitmap == null)
+            {
+                _cachedBitmap = new WriteableBitmap(width, height, (int)(96.0 * dpiScale), (int)(96.0 * dpiScale), System.Windows.Media.PixelFormats.Pbgra32, null);
+            }
             return;
+        }
 
         // Dispose old resources
         _cachedRtv?.Dispose();
         _cachedRenderTex?.Dispose();
         _cachedStagingTex?.Dispose();
+        _cachedRtv = null;
+        _cachedRenderTex = null;
+        _cachedStagingTex = null;
         // WriteableBitmap is managed — no Dispose needed, just drop the reference
         _cachedBitmap = null;
 
@@ -436,7 +514,10 @@ public sealed class GlassRenderer : IDisposable
         };
 
         _cachedStagingTex = _device.CreateTexture2D(stagingDesc);
-        _cachedBitmap = new WriteableBitmap(width, height, (int)(96.0 * dpiScale), (int)(96.0 * dpiScale), System.Windows.Media.PixelFormats.Bgra32, null);
+        if (allocateBitmap)
+        {
+            _cachedBitmap = new WriteableBitmap(width, height, (int)(96.0 * dpiScale), (int)(96.0 * dpiScale), System.Windows.Media.PixelFormats.Pbgra32, null);
+        }
     }
 
     /// <summary>
@@ -453,36 +534,48 @@ public sealed class GlassRenderer : IDisposable
         Vector2 screenOffset = default,
         Vector2 backdropSize = default)
     {
-        EnsureCachedResources(width, height, dpiScale);
-
-        _context.ClearRenderTargetView(_cachedRtv!, new Color4(0, 0, 0, 0));
-
-        Render(_cachedRtv!, width, height, dpiScale, settings, shapes, backdropSrv,
-               screenOffset: screenOffset, backdropSize: backdropSize);
-
-        _context.CopyResource(_cachedStagingTex!, _cachedRenderTex!);
-
-        var wb = _cachedBitmap!;
-        wb.Lock();
-
-        var mapped = _context.Map(_cachedStagingTex!, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None);
-        try
+        lock (RenderLock)
         {
-            for (int y = 0; y < height; y++)
+            ObjectDisposedException.ThrowIf(_isDisposed, this);
+            try
             {
-                IntPtr srcRow = IntPtr.Add(mapped.DataPointer, (int)(y * mapped.RowPitch));
-                IntPtr dstRow = IntPtr.Add(wb.BackBuffer, y * wb.BackBufferStride);
-                NativeMemory.Copy((void*)srcRow, (void*)dstRow, (nuint)(width * 4));
-            }
-            wb.AddDirtyRect(new System.Windows.Int32Rect(0, 0, width, height));
-        }
-        finally
-        {
-            _context.Unmap(_cachedStagingTex!, 0);
-            wb.Unlock();
-        }
+                EnsureCachedResources(width, height, dpiScale, allocateBitmap: true);
 
-        return wb;
+                _context.ClearRenderTargetView(_cachedRtv!, new Color4(0, 0, 0, 0));
+
+                RenderCore(_cachedRtv!, width, height, dpiScale, settings, shapes, backdropSrv,
+                       screenOffset: screenOffset, backdropSize: backdropSize);
+
+                _context.CopyResource(_cachedStagingTex!, _cachedRenderTex!);
+
+                var wb = _cachedBitmap!;
+                wb.Lock();
+
+                var mapped = _context.Map(_cachedStagingTex!, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None);
+                try
+                {
+                    for (int y = 0; y < height; y++)
+                    {
+                        IntPtr srcRow = IntPtr.Add(mapped.DataPointer, (int)(y * mapped.RowPitch));
+                        IntPtr dstRow = IntPtr.Add(wb.BackBuffer, y * wb.BackBufferStride);
+                        NativeMemory.Copy((void*)srcRow, (void*)dstRow, (nuint)(width * 4));
+                    }
+                    wb.AddDirtyRect(new System.Windows.Int32Rect(0, 0, width, height));
+                }
+                finally
+                {
+                    _context.Unmap(_cachedStagingTex!, 0);
+                    wb.Unlock();
+                }
+
+                return wb;
+            }
+            catch (SharpGenException ex) when (IsDeviceLostError(ex))
+            {
+                _isDeviceLost = true;
+                throw;
+            }
+        }
     }
 
     /// <summary>
@@ -500,33 +593,70 @@ public sealed class GlassRenderer : IDisposable
         Vector2 screenOffset = default,
         Vector2 backdropSize = default)
     {
-        EnsureCachedResources(width, height, dpiScale);
+        if (target == null || width <= 0 || height <= 0)
+            return;
 
-        _context.ClearRenderTargetView(_cachedRtv!, new Color4(0, 0, 0, 0));
-
-        Render(_cachedRtv!, width, height, dpiScale, settings, shapes, backdropSrv,
-               screenOffset: screenOffset, backdropSize: backdropSize);
-
-        _context.CopyResource(_cachedStagingTex!, _cachedRenderTex!);
-
-        target.Lock();
-
-        var mapped = _context.Map(_cachedStagingTex!, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None);
-        try
+        if (target.PixelWidth < width || target.PixelHeight < height ||
+            (target.Format != System.Windows.Media.PixelFormats.Bgra32 &&
+             target.Format != System.Windows.Media.PixelFormats.Pbgra32))
         {
-            for (int y = 0; y < height; y++)
+            return;
+        }
+
+        lock (RenderLock)
+        {
+            ObjectDisposedException.ThrowIf(_isDisposed, this);
+            try
             {
-                IntPtr srcRow = IntPtr.Add(mapped.DataPointer, (int)(y * mapped.RowPitch));
-                IntPtr dstRow = IntPtr.Add(target.BackBuffer, y * target.BackBufferStride);
-                NativeMemory.Copy((void*)srcRow, (void*)dstRow, (nuint)(width * 4));
+                EnsureCachedResources(width, height, dpiScale, allocateBitmap: false);
+
+                _context.ClearRenderTargetView(_cachedRtv!, new Color4(0, 0, 0, 0));
+
+                RenderCore(_cachedRtv!, width, height, dpiScale, settings, shapes, backdropSrv,
+                       screenOffset: screenOffset, backdropSize: backdropSize);
+
+                _context.CopyResource(_cachedStagingTex!, _cachedRenderTex!);
+
+                target.Lock();
+
+                var mapped = _context.Map(_cachedStagingTex!, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None);
+                try
+                {
+                    int rowBytes = width * 4;
+                    if (target.BackBufferStride >= rowBytes)
+                    {
+                        for (int y = 0; y < height; y++)
+                        {
+                            IntPtr srcRow = IntPtr.Add(mapped.DataPointer, (int)(y * mapped.RowPitch));
+                            IntPtr dstRow = IntPtr.Add(target.BackBuffer, y * target.BackBufferStride);
+                            NativeMemory.Copy((void*)srcRow, (void*)dstRow, (nuint)rowBytes);
+                        }
+                        target.AddDirtyRect(new System.Windows.Int32Rect(0, 0, width, height));
+                    }
+                }
+                finally
+                {
+                    _context.Unmap(_cachedStagingTex!, 0);
+                    target.Unlock();
+                }
             }
-            target.AddDirtyRect(new System.Windows.Int32Rect(0, 0, width, height));
+            catch (SharpGenException ex) when (IsDeviceLostError(ex))
+            {
+                _isDeviceLost = true;
+                throw;
+            }
         }
-        finally
-        {
-            _context.Unmap(_cachedStagingTex!, 0);
-            target.Unlock();
-        }
+    }
+
+    public static bool IsDeviceLostError(SharpGenException ex)
+    {
+        const int DXGI_ERROR_DEVICE_REMOVED = unchecked((int)0x887A0005);
+        const int DXGI_ERROR_DEVICE_RESET = unchecked((int)0x887A0007);
+        const int DXGI_ERROR_ACCESS_LOST = unchecked((int)0x887A0026);
+        int code = ex.ResultCode.Code;
+        return code == DXGI_ERROR_DEVICE_REMOVED ||
+               code == DXGI_ERROR_DEVICE_RESET ||
+               code == DXGI_ERROR_ACCESS_LOST;
     }
 
     private unsafe void UpdateBuffer<T>(ID3D11Buffer buffer, T data) where T : unmanaged
@@ -538,33 +668,48 @@ public sealed class GlassRenderer : IDisposable
 
     public void Dispose()
     {
-        // Cached render-to-bitmap resources
-        _cachedRtv?.Dispose();
-        _cachedRenderTex?.Dispose();
-        _cachedStagingTex?.Dispose();
-        _cachedBitmap = null;
+        lock (RenderLock)
+        {
+            if (_isDisposed) return;
+            _isDisposed = true;
 
-        _blurSrvA?.Dispose();
-        _blurRtvA?.Dispose();
-        _blurTexA?.Dispose();
+            // Cached render-to-bitmap resources
+            _cachedRtv?.Dispose();
+            _cachedRenderTex?.Dispose();
+            _cachedStagingTex?.Dispose();
+            _cachedRtv = null;
+            _cachedRenderTex = null;
+            _cachedStagingTex = null;
+            _cachedBitmap = null;
 
-        _blurSrvB?.Dispose();
-        _blurRtvB?.Dispose();
-        _blurTexB?.Dispose();
+            _blurSrvA?.Dispose();
+            _blurRtvA?.Dispose();
+            _blurTexA?.Dispose();
+            _blurSrvA = null;
+            _blurRtvA = null;
+            _blurTexA = null;
 
-        _constantBuffer.Dispose();
-        _blurConstantBuffer.Dispose();
+            _blurSrvB?.Dispose();
+            _blurRtvB?.Dispose();
+            _blurTexB?.Dispose();
+            _blurSrvB = null;
+            _blurRtvB = null;
+            _blurTexB = null;
 
-        _rasterizerState.Dispose();
-        _premultipliedBlendState.Dispose();
-        _linearClampSampler.Dispose();
+            _constantBuffer?.Dispose();
+            _blurConstantBuffer?.Dispose();
 
-        _blurVerticalShader.Dispose();
-        _blurHorizontalShader.Dispose();
-        _pixelShader.Dispose();
-        _vertexShader.Dispose();
+            _rasterizerState?.Dispose();
+            _premultipliedBlendState?.Dispose();
+            _linearClampSampler?.Dispose();
 
-        _context.Dispose();
-        _device.Dispose();
+            _blurVerticalShader?.Dispose();
+            _blurHorizontalShader?.Dispose();
+            _pixelShader?.Dispose();
+            _vertexShader?.Dispose();
+
+            _context?.Dispose();
+            _device?.Dispose();
+        }
     }
 }

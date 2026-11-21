@@ -11,6 +11,7 @@ using DynamicIsland.LiquidGlass;
 using DynamicIsland.Interop;
 using DynamicIsland.Services;
 using DynamicIsland.Views.Widgets;
+using Microsoft.Win32;
 using static DynamicIsland.Interop.NativeMethods;
 
 namespace DynamicIsland.Core;
@@ -106,7 +107,7 @@ internal static class SelfTestRunner
         Run("SpringAndHaptics: Impulse, Retarget, SnapTo & zero-allocation synthesized RIFF WAVE haptics", TestSpringDynamicsAndTactileHaptics);
         Run("Phase3Visuals: Windows 11 Fluent 2 Mica/Acrylic, WM_DPICHANGED & HDR tone mapping", TestWindows11BackdropAndHdrToneMapping);
         Run("Phase4Ecosystem: Live Activity IPC 2.0 multi-phase pipelines & clipboard secret redaction", TestLiveActivityIpcV2AndClipboardSecretDetection);
-        Run("Phase5Packaging: Inno Setup, WinGet manifest specification & v0.7.0 version invariants", TestWinGetManifestAndReleasePackageInvariants);
+        Run("Phase5Packaging: Inno Setup, WinGet manifest specification & v0.8.0 version invariants", TestWinGetManifestAndReleasePackageInvariants);
         Run("Pillar1PrecisionTouchpad: Fluid trackpad scrubbing, velocity flick skip & multi-touch pinch morphing", TestTouchpadGesturesAndVelocityInvariants);
         Run("Pillar2AiAgentApprovals: Two-way IPC prompt RPC, diff HUD parser & interactive buttons", TestAiAgentInteractiveApprovalsAndDiffViewer);
         Run("Pillar3FloatingPiPAndNotch: Tear-off drag gesture, magnetic corner snapping & hardware notch fillets", TestPillar3DetachableFloatingIslandAndHardwareNotch);
@@ -114,6 +115,7 @@ internal static class SelfTestRunner
         Run("Pillar5DeepGpuAndHardwareTelemetry: NVML/DXGI GPU sensors, per-core CPU heatmap & runaway process purge", TestPillar5DeepGpuAndHardwareTelemetry);
         Run("UpdateManagerV2: Critical update handling, 7-day skipped reminder, auto-download setting & changelog invariants", TestUpdateManagerV2Invariants);
         Run("VirtualPetOverhaul: Large Pet Playground, species signature toys, distinct behaviors & desktop roam invariants", TestVirtualPetOverhaulAndPlaygroundInvariants);
+        Run("Phase5ArchitectureAndHygiene: DebouncedJsonStore, SafeProcessLauncher, DeviceClassifier, multi-timestamp LRC, ThemeManager & frozen XAML tokens", TestPhase5ArchitectureAndHygiene);
 
         Console.WriteLine($"\nSelf-Test Summary: {passed} passed, {failed} failed.");
         return failed == 0 ? 0 : 1;
@@ -532,19 +534,22 @@ internal static class SelfTestRunner
 
         // Verify IslandStyles.xaml parses cleanly without any runtime XAML errors
         var app = Application.Current ?? new Application();
-        var dict = new ResourceDictionary
-        {
-            Source = new Uri("pack://application:,,,/DynamicIsland;component/Resources/IslandStyles.xaml", UriKind.Absolute)
-        };
-        if (!app.Resources.MergedDictionaries.Any(d => d.Source == dict.Source))
-        {
-            app.Resources.MergedDictionaries.Add(dict);
-        }
-        Assert(dict.Count > 0, "IslandStyles.xaml resource dictionary must load with entries");
-
-        // Verify SettingsView.xaml and IslandWindow load cleanly without runtime exceptions
+        var prevShutdownMode = app.ShutdownMode;
+        app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        IslandWindow? island = null;
         try
         {
+            var dict = new ResourceDictionary
+            {
+                Source = new Uri("pack://application:,,,/DynamicIsland;component/Resources/IslandStyles.xaml", UriKind.Absolute)
+            };
+            if (!app.Resources.MergedDictionaries.Any(d => d.Source == dict.Source))
+            {
+                app.Resources.MergedDictionaries.Add(dict);
+            }
+            Assert(dict.Count > 0, "IslandStyles.xaml resource dictionary must load with entries");
+
+            // Verify SettingsView.xaml and IslandWindow load cleanly without runtime exceptions
             var settingsView = new DynamicIsland.Views.Widgets.SettingsView();
             Assert(settingsView.SettingsThemesTab != null, "SettingsThemesTab must not be null");
             Assert(settingsView.NatureDensitySlider != null, "NatureDensitySlider must not be null");
@@ -554,7 +559,7 @@ internal static class SelfTestRunner
             Assert(settingsView.NatureButterfly0Btn != null, "NatureButterfly0Btn must not be null");
             Assert(settingsView.NaturePollenSlider != null, "NaturePollenSlider must not be null");
 
-            var island = new IslandWindow();
+            island = new IslandWindow();
             Assert(island.IslandThemeUnderlay != null, "IslandThemeUnderlay must not be null");
             Assert(island.IslandThemeOverlay != null, "IslandThemeOverlay must not be null");
         }
@@ -562,6 +567,11 @@ internal static class SelfTestRunner
         {
             var baseEx = ex.GetBaseException();
             Assert(false, $"Initialization crash: {ex.Message} -> Base: {baseEx.Message}\n{ex.StackTrace}");
+        }
+        finally
+        {
+            try { island?.Close(); } catch { }
+            app.ShutdownMode = prevShutdownMode;
         }
     }
 
@@ -850,7 +860,8 @@ internal static class SelfTestRunner
             File.WriteAllText(fileA, "Hello Alpha");
             File.WriteAllText(fileB, "Hello Beta");
 
-            var shelf = new DropShelfService();
+            string tempShelfPath = Path.Combine(tempDir, "shelf.json");
+            using var shelf = new DropShelfService(tempShelfPath);
             shelf.Clear();
             shelf.AddPaths(new[] { fileA, fileB });
 
@@ -1539,14 +1550,16 @@ SSID 3 : Home_Router
     private static void TestPowerPlanAndDisplayTopology()
     {
         string tempPath = Path.Combine(Path.GetTempPath(), $"di_power_disp_test_{Guid.NewGuid():N}.json");
+        PowerPlanService? power = null;
+        string? initialSchemeKey = null;
         try
         {
-            var settings = new SettingsService(tempPath);
+            using var settings = new SettingsService(tempPath);
             Assert(settings.Current.EnableChargingPulse, "Charging pulse must be enabled by default");
             Assert(settings.Current.LowBatteryAlertThreshold == 20, "Default low battery threshold must be 20%");
             Assert(settings.Current.NightLightWarmthKelvin == 3400, "Default night light warmth must be 3400K");
 
-            var power = new PowerPlanService(Dispatcher.CurrentDispatcher, settings);
+            power = new PowerPlanService(Dispatcher.CurrentDispatcher, settings);
             var cur = power.Current;
             Assert(cur != null, "PowerStatusInfo must not be null");
             Assert(!string.IsNullOrEmpty(cur!.StatusSubtitle), "StatusSubtitle must not be empty");
@@ -1554,6 +1567,8 @@ SSID 3 : Home_Router
             Assert(!string.IsNullOrEmpty(cur.WattageText), "WattageText must not be empty");
             Assert((cur.HealthPercent ?? 100) >= 10 && (cur.HealthPercent ?? 100) <= 100, "Health percent must be between 10 and 100%");
             Assert(cur.RecentBatteryHistory.Count > 0, "RecentBatteryHistory must contain samples for sparkline graph");
+
+            initialSchemeKey = cur.ActiveSchemeKey;
 
             // Power Scheme switching
             power.SetActiveScheme("Performance");
@@ -1565,8 +1580,6 @@ SSID 3 : Home_Router
             power.ChargingPulseTriggered += (pct, est) => pulseFired = true;
             power.TriggerSimulatedChargingPulse();
             Assert(pulseFired, "Charging pulse event must trigger on simulated pulse");
-
-            power.Dispose();
 
             // Display Topology queries
             var monitors = DisplayTopologyService.QueryConnectedMonitors(IntPtr.Zero);
@@ -1583,6 +1596,12 @@ SSID 3 : Home_Router
         }
         finally
         {
+            if (power != null && !string.IsNullOrWhiteSpace(initialSchemeKey))
+            {
+                try { power.SetActiveScheme(initialSchemeKey); } catch { }
+            }
+            try { DisplayTopologyService.SetNightLight(false, 3400); } catch { }
+            try { power?.Dispose(); } catch { }
             if (File.Exists(tempPath)) File.Delete(tempPath);
         }
     }
@@ -2071,33 +2090,41 @@ SSID 3 : Home_Router
         Assert(sound.Profile == MechSoundProfile.TactileBrown, "Profile property assignment failed");
 
         // 6. DropletRegistry includes all modular droplets and batch control
-        var settings = new SettingsService();
-        var registry = new DropletRegistry(settings);
-        Assert(registry.Items.Count >= 16, $"Expected >= 16 built-in droplets, got {registry.Items.Count}");
-        Assert(registry.Get("notes") != null, "Notes droplet must be registered");
-        Assert(registry.Get("quick_launcher") != null, "Quick launcher droplet must be registered");
-        Assert(registry.Get("termi_notch") != null, "Termi-Notch droplet must be registered");
-        Assert(registry.Get("window_snap") != null, "Window snap droplet must be registered");
-        Assert(registry.Get("mech_sounds") != null, "Mech sounds droplet must be registered");
+        string tempDropletSettings = Path.Combine(Path.GetTempPath(), $"di_droplet_test_{Guid.NewGuid():N}.json");
+        try
+        {
+            using var settings = new SettingsService(tempDropletSettings);
+            var registry = new DropletRegistry(settings);
+            Assert(registry.Items.Count >= 16, $"Expected >= 16 built-in droplets, got {registry.Items.Count}");
+            Assert(registry.Get("notes") != null, "Notes droplet must be registered");
+            Assert(registry.Get("quick_launcher") != null, "Quick launcher droplet must be registered");
+            Assert(registry.Get("termi_notch") != null, "Termi-Notch droplet must be registered");
+            Assert(registry.Get("window_snap") != null, "Window snap droplet must be registered");
+            Assert(registry.Get("mech_sounds") != null, "Mech sounds droplet must be registered");
 
-        // 7. Droplet batch controls & metadata integrity
-        registry.SetAll(true);
-        Assert(registry.EnabledCount == registry.Items.Count, "SetAll(true) must enable all droplets");
-        Assert(registry.TotalActiveRamKb > 0, "Total RAM should be > 0 when all droplets enabled");
+            // 7. Droplet batch controls & metadata integrity
+            registry.SetAll(true);
+            Assert(registry.EnabledCount == registry.Items.Count, "SetAll(true) must enable all droplets");
+            Assert(registry.TotalActiveRamKb > 0, "Total RAM should be > 0 when all droplets enabled");
 
-        registry.SetAll(false);
-        Assert(registry.EnabledCount == 0, "SetAll(false) must disable all droplets");
-        Assert(registry.TotalActiveRamKb == 0, "Total RAM should be 0 when all droplets disabled");
+            registry.SetAll(false);
+            Assert(registry.EnabledCount == 0, "SetAll(false) must disable all droplets");
+            Assert(registry.TotalActiveRamKb == 0, "Total RAM should be 0 when all droplets disabled");
 
-        registry.ResetToDefaults();
-        Assert(registry.Get("mech_sounds")?.IsEnabled == false, "mech_sounds must be default-disabled");
-        Assert(registry.Get("notes")?.IsEnabled == true, "notes must be default-enabled");
+            registry.ResetToDefaults();
+            Assert(registry.Get("mech_sounds")?.IsEnabled == false, "mech_sounds must be default-disabled");
+            Assert(registry.Get("notes")?.IsEnabled == true, "notes must be default-enabled");
 
-        var mech = registry.Get("mech_sounds")!;
-        Assert(!string.IsNullOrEmpty(mech.ActionLabel), "ActionLabel must not be empty");
-        Assert(!string.IsNullOrEmpty(mech.FeatureBadge), "FeatureBadge must not be empty");
-        Assert(!string.IsNullOrEmpty(mech.CategoryGlyph), "CategoryGlyph must not be empty");
-        Assert(mech.CardOpacity > 0.0 && mech.CardOpacity <= 1.0, "CardOpacity must be valid");
+            var mech = registry.Get("mech_sounds")!;
+            Assert(!string.IsNullOrEmpty(mech.ActionLabel), "ActionLabel must not be empty");
+            Assert(!string.IsNullOrEmpty(mech.FeatureBadge), "FeatureBadge must not be empty");
+            Assert(!string.IsNullOrEmpty(mech.CategoryGlyph), "CategoryGlyph must not be empty");
+            Assert(mech.CardOpacity > 0.0 && mech.CardOpacity <= 1.0, "CardOpacity must be valid");
+        }
+        finally
+        {
+            try { if (File.Exists(tempDropletSettings)) File.Delete(tempDropletSettings); } catch { }
+        }
     }
 
     private static void TestPhase5SharingAndPhoneBridge()
@@ -2132,6 +2159,39 @@ SSID 3 : Home_Router
         Assert(html.Contains("DYNAMIC ISLAND"), "PWA HTML must include Dynamic Island banner");
         Assert(html.Contains("/api/upload"), "PWA HTML must wire upload endpoint");
         Assert(html.Contains("/api/clipboard"), "PWA HTML must wire clipboard endpoint");
+        Assert(html.Contains("/api/status"), "PWA HTML must wire live status endpoint");
+        Assert(html.Contains("/api/clipboard/history"), "PWA HTML must wire clipboard history endpoint");
+        Assert(html.Contains("/api/preview"), "PWA HTML must wire image preview endpoint");
+        Assert(html.Contains("/api/download-all"), "PWA HTML must wire ZIP download-all endpoint");
+        Assert(html.Contains("/api/open-url"), "PWA HTML must wire open-url endpoint");
+        Assert(html.Contains("/api/auth"), "PWA HTML must wire auth endpoint");
+        Assert(html.Contains("XMLHttpRequest"), "PWA HTML must use XHR for live upload progress");
+
+        string lockedHtml = LanQuickShareService.GetEmbeddedPwaHtml("test_token_xyz", requirePassword: true, pcName: "TestPC", passwordProtected: true);
+        Assert(lockedHtml.Contains("authGate"), "Locked PWA HTML must include authGate lock screen");
+        Assert(lockedHtml.Contains("authPassword"), "Locked PWA HTML must include password input");
+        Assert(lockedHtml.Contains("autocomplete=\"current-password\""), "Locked PWA HTML must support password managers/autocomplete");
+        Assert(lockedHtml.Contains("let isLocked = true;"), "Locked PWA HTML must start locked when requirePassword is true");
+
+        // 2a. Random 6-digit passcode generator
+        string pin = LanQuickShareService.GeneratePasscode(6);
+        Assert(pin.Length == 6 && pin.All(char.IsDigit), $"Generated PIN must be 6 numeric digits, got '{pin}'");
+
+        // 2b. Safe HTTP URL validation for /api/open-url
+        Assert(LanQuickShareService.IsSafeHttpUrl("https://example.com/path?a=1", out var parsedHttps) && parsedHttps != null, "https URL must be accepted");
+        Assert(LanQuickShareService.IsSafeHttpUrl("http://192.168.1.5:8080/", out var parsedHttp) && parsedHttp != null, "http URL must be accepted");
+        Assert(!LanQuickShareService.IsSafeHttpUrl("file:///C:/Windows/System32/cmd.exe", out _), "file:// URL must be rejected");
+        Assert(!LanQuickShareService.IsSafeHttpUrl("javascript:alert(1)", out _), "javascript: URL must be rejected");
+        Assert(!LanQuickShareService.IsSafeHttpUrl("ms-msdt:/id", out _), "custom scheme URL must be rejected");
+        Assert(!LanQuickShareService.IsSafeHttpUrl("https://example.com\r\nEvil", out _), "CRLF URL must be rejected");
+
+        // 2c. HTTP Range parsing for /api/download
+        Assert(LanQuickShareService.TryParseByteRange("bytes=0-99", 1000, out long rStart, out long rEnd) && rStart == 0 && rEnd == 99, "Standard byte range failed");
+        Assert(LanQuickShareService.TryParseByteRange("bytes=500-", 1000, out rStart, out rEnd) && rStart == 500 && rEnd == 999, "Open-ended byte range failed");
+        Assert(LanQuickShareService.TryParseByteRange("bytes=-250", 1000, out rStart, out rEnd) && rStart == 750 && rEnd == 999, "Suffix byte range failed");
+        Assert(LanQuickShareService.TryParseByteRange("bytes=900-5000", 1000, out rStart, out rEnd) && rStart == 900 && rEnd == 999, "Clamped byte range failed");
+        Assert(!LanQuickShareService.TryParseByteRange("bytes=1000-1200", 1000, out _, out _), "Out-of-bounds range must fail");
+        Assert(!LanQuickShareService.TryParseByteRange("bytes=0-10, 20-30", 1000, out _, out _), "Multi-range must be rejected");
 
         // 3. Local IP resolution
         string? ip = LanQuickShareService.GetLocalIpAddress();
@@ -2140,10 +2200,12 @@ SSID 3 : Home_Router
         // 3b. LanQuickShare port fallback probing when base port is already occupied
         var blocker = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Any, 9292);
         blocker.Start();
+        string tempShareDir = Path.Combine(Path.GetTempPath(), $"di_share_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempShareDir);
         try
         {
-            var dummyShelf = new DropShelfService();
-            var dummyClip = new ClipboardHistoryService(System.Windows.Threading.Dispatcher.CurrentDispatcher);
+            using var dummyShelf = new DropShelfService(Path.Combine(tempShareDir, "shelf.json"));
+            using var dummyClip = new ClipboardHistoryService(System.Windows.Threading.Dispatcher.CurrentDispatcher, Path.Combine(tempShareDir, "clip.json"));
             using var shareService = new LanQuickShareService(System.Windows.Threading.Dispatcher.CurrentDispatcher, dummyShelf, dummyClip);
             var session = shareService.StartSession(durationMinutes: 5, port: 9292);
             Assert(session.Port == 9293, $"Expected fallback port 9293, got {session.Port}");
@@ -2153,6 +2215,193 @@ SSID 3 : Home_Router
         finally
         {
             blocker.Stop();
+            try { if (Directory.Exists(tempShareDir)) Directory.Delete(tempShareDir, recursive: true); } catch { }
+        }
+
+        // 3c. End-to-end password-protected Phone Bridge loopback auth, revocation, extend, and lockout
+        string tempAuthDir = Path.Combine(Path.GetTempPath(), $"di_share_auth_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempAuthDir);
+        try
+        {
+            var ui = Dispatcher.CurrentDispatcher;
+            using var dummyShelf = new DropShelfService(Path.Combine(tempAuthDir, "shelf.json"));
+            using var dummyClip = new ClipboardHistoryService(ui, Path.Combine(tempAuthDir, "clip.json"));
+            using var shareService = new LanQuickShareService(ui, dummyShelf, dummyClip);
+
+            var session = shareService.StartSession(durationMinutes: 15, port: 9393, password: "TestPass!42");
+            Assert(session.RequiresPassword, "Password-protected session must report RequiresPassword = true");
+
+            var frame = new DispatcherFrame();
+            Exception? asyncFailure = null;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var handler = new System.Net.Http.HttpClientHandler { UseCookies = false };
+                    using var http = new System.Net.Http.HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
+                    string baseUrl = $"http://127.0.0.1:{session.Port}";
+
+                    // 1) GET / without token still serves lock screen and never leaks password
+                    var rootResp = await http.GetAsync($"{baseUrl}/");
+                    Assert(rootResp.StatusCode == System.Net.HttpStatusCode.OK, $"GET / expected 200, got {rootResp.StatusCode}");
+                    string rootBody = await rootResp.Content.ReadAsStringAsync();
+                    Assert(rootBody.Contains("let isLocked = true;"), "Root HTML must start in locked state");
+                    Assert(!rootBody.Contains("TestPass!42"), "Root HTML must never leak session password");
+
+                    // 2) Protected route with pairing token ONLY must fail with 401
+                    using (var shelfReq = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"{baseUrl}/api/shelf"))
+                    {
+                        shelfReq.Headers.Add("X-DI-Token", session.Token);
+                        var shelfResp = await http.SendAsync(shelfReq);
+                        Assert(shelfResp.StatusCode == System.Net.HttpStatusCode.Unauthorized, $"Protected route without password auth expected 401, got {shelfResp.StatusCode}");
+                        string shelfErr = await shelfResp.Content.ReadAsStringAsync();
+                        Assert(shelfErr.Contains("\"locked\":true"), "401 response must include locked:true");
+                    }
+
+                    // 3) Wrong password returns 401 with remaining attempt count
+                    using (var badContent = new System.Net.Http.StringContent("{\"password\":\"WrongPass\"}", System.Text.Encoding.UTF8, "application/json"))
+                    {
+                        var badResp = await http.PostAsync($"{baseUrl}/api/auth", badContent);
+                        Assert(badResp.StatusCode == System.Net.HttpStatusCode.Unauthorized, $"Wrong password expected 401, got {badResp.StatusCode}");
+                        string badJson = await badResp.Content.ReadAsStringAsync();
+                        Assert(badJson.Contains("\"attemptsRemaining\":4"), $"Expected attemptsRemaining:4, got {badJson}");
+                    }
+
+                    // 4) Correct password returns 200 with authToken + HttpOnly di_auth cookie
+                    string authToken;
+                    using (var okContent = new System.Net.Http.StringContent("{\"password\":\"TestPass!42\"}", System.Text.Encoding.UTF8, "application/json"))
+                    {
+                        var okResp = await http.PostAsync($"{baseUrl}/api/auth", okContent);
+                        Assert(okResp.StatusCode == System.Net.HttpStatusCode.OK, $"Correct password expected 200, got {okResp.StatusCode}");
+                        string okJson = await okResp.Content.ReadAsStringAsync();
+                        using var doc = System.Text.Json.JsonDocument.Parse(okJson);
+                        authToken = doc.RootElement.GetProperty("authToken").GetString() ?? "";
+                        Assert(!string.IsNullOrWhiteSpace(authToken), "Auth response must include non-empty authToken");
+                        Assert(okResp.Headers.TryGetValues("Set-Cookie", out var cookies) && cookies.Any(c => c.Contains("di_auth=") && c.Contains("HttpOnly")),
+                            "Auth response must set HttpOnly di_auth cookie");
+                    }
+
+                    // 5) Authenticated requests work via X-DI-Auth header AND via Cookie
+                    using (var statusReq = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"{baseUrl}/api/status"))
+                    {
+                        statusReq.Headers.Add("X-DI-Auth", authToken);
+                        var statusResp = await http.SendAsync(statusReq);
+                        Assert(statusResp.StatusCode == System.Net.HttpStatusCode.OK, $"GET /api/status with X-DI-Auth expected 200, got {statusResp.StatusCode}");
+                        string statusJson = await statusResp.Content.ReadAsStringAsync();
+                        Assert(statusJson.Contains("\"passwordProtected\":true"), $"Status must report passwordProtected:true, got {statusJson}");
+                        Assert(statusJson.Contains("\"connectedClients\":1"), $"Status must report connectedClients:1, got {statusJson}");
+                    }
+
+                    using (var cookieReq = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"{baseUrl}/api/status"))
+                    {
+                        cookieReq.Headers.Add("Cookie", $"di_auth={authToken}");
+                        var cookieResp = await http.SendAsync(cookieReq);
+                        Assert(cookieResp.StatusCode == System.Net.HttpStatusCode.OK, $"GET /api/status with Cookie expected 200, got {cookieResp.StatusCode}");
+                    }
+
+                    // 6) Live password rotation immediately invalidates old authToken; new password succeeds
+                    DateTimeOffset beforeExtend = shareService.CurrentSession!.ExpiresAt;
+                    Assert(shareService.ExtendSession(15), "ExtendSession(15) must succeed");
+                    Assert((shareService.CurrentSession!.ExpiresAt - beforeExtend).TotalMinutes >= 14.5, "ExtendSession must extend expiry by ~15 minutes");
+
+                    Assert(shareService.UpdateSessionPassword("NewPass99"), "UpdateSessionPassword must succeed");
+                    using (var oldReq = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"{baseUrl}/api/status"))
+                    {
+                        oldReq.Headers.Add("X-DI-Auth", authToken);
+                        var oldResp = await http.SendAsync(oldReq);
+                        Assert(oldResp.StatusCode == System.Net.HttpStatusCode.Unauthorized, "Old authToken must be rejected immediately after password change");
+                    }
+
+                    string authToken2;
+                    using (var newContent = new System.Net.Http.StringContent("{\"password\":\"NewPass99\"}", System.Text.Encoding.UTF8, "application/json"))
+                    {
+                        var newResp = await http.PostAsync($"{baseUrl}/api/auth", newContent);
+                        Assert(newResp.StatusCode == System.Net.HttpStatusCode.OK, "New password must succeed after rotation");
+                        using var doc = System.Text.Json.JsonDocument.Parse(await newResp.Content.ReadAsStringAsync());
+                        authToken2 = doc.RootElement.GetProperty("authToken").GetString() ?? "";
+                    }
+
+                    // 7) Logout revokes authToken2
+                    using (var logoutReq = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"{baseUrl}/api/logout"))
+                    {
+                        logoutReq.Headers.Add("X-DI-Auth", authToken2);
+                        var logoutResp = await http.SendAsync(logoutReq);
+                        Assert(logoutResp.StatusCode == System.Net.HttpStatusCode.OK, "POST /api/logout must succeed");
+                    }
+                    using (var afterLogoutReq = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, $"{baseUrl}/api/status"))
+                    {
+                        afterLogoutReq.Headers.Add("X-DI-Auth", authToken2);
+                        var afterLogoutResp = await http.SendAsync(afterLogoutReq);
+                        Assert(afterLogoutResp.StatusCode == System.Net.HttpStatusCode.Unauthorized, "Logged-out authToken must be rejected");
+                    }
+
+                    // 8) Brute-force lockout after 5 consecutive wrong password attempts
+                    var lockSession = shareService.StartSession(durationMinutes: 5, port: 9394, password: "LockTest1");
+                    string lockBase = $"http://127.0.0.1:{lockSession.Port}";
+                    for (int attempt = 1; attempt <= 5; attempt++)
+                    {
+                        using var c = new System.Net.Http.StringContent("{\"password\":\"nope\"}", System.Text.Encoding.UTF8, "application/json");
+                        var resp = await http.PostAsync($"{lockBase}/api/auth", c);
+                        if (attempt < 5)
+                            Assert(resp.StatusCode == System.Net.HttpStatusCode.Unauthorized, $"Attempt {attempt} expected 401, got {resp.StatusCode}");
+                        else
+                            Assert(resp.StatusCode == (System.Net.HttpStatusCode)429, $"5th failed attempt expected 429 lockout, got {resp.StatusCode}");
+                    }
+                    shareService.StopSession();
+                }
+                catch (Exception ex)
+                {
+                    asyncFailure = ex;
+                }
+                finally
+                {
+                    _ = ui.BeginInvoke(DispatcherPriority.Send, new Action(() => frame.Continue = false));
+                }
+            });
+            Dispatcher.PushFrame(frame);
+            if (asyncFailure != null)
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(asyncFailure).Throw();
+        }
+        finally
+        {
+            try { if (Directory.Exists(tempAuthDir)) Directory.Delete(tempAuthDir, recursive: true); } catch { }
+        }
+
+        // 3d. DPAPI encrypted Phone Bridge password persistence & export sanitization
+        string tempSecSettings = Path.Combine(Path.GetTempPath(), $"di_pb_sec_{Guid.NewGuid():N}.json");
+        string tempExportSettings = Path.Combine(Path.GetTempPath(), $"di_pb_exp_{Guid.NewGuid():N}.json");
+        try
+        {
+            using (var settings = new SettingsService(tempSecSettings))
+            {
+                settings.Update(s =>
+                {
+                    s.PhoneBridgeDurationMinutes = 30;
+                    s.PhoneBridgePassword = "MyBridgeSecret!9";
+                });
+                settings.SaveNow();
+                Assert(settings.ExportToFile(tempExportSettings), "ExportToFile must succeed");
+            }
+
+            string rawJson = File.ReadAllText(tempSecSettings);
+            Assert(!rawJson.Contains("MyBridgeSecret!9", StringComparison.Ordinal), "Saved settings JSON must never store plaintext PhoneBridgePassword");
+            Assert(rawJson.Contains("PhoneBridgePasswordProtected", StringComparison.Ordinal) && rawJson.Contains("dpapi:", StringComparison.Ordinal),
+                "Saved settings JSON must persist DPAPI-encrypted PhoneBridgePasswordProtected");
+
+            string exportedJson = File.ReadAllText(tempExportSettings);
+            Assert(!exportedJson.Contains("MyBridgeSecret!9", StringComparison.Ordinal) && !exportedJson.Contains("PhoneBridgePasswordProtected", StringComparison.Ordinal),
+                "Exported settings JSON must strip PhoneBridge password secrets");
+
+            using (var reloaded = new SettingsService(tempSecSettings))
+            {
+                Assert(reloaded.Current.PhoneBridgeDurationMinutes == 30, "Reloaded PhoneBridgeDurationMinutes must match 30");
+                Assert(reloaded.Current.PhoneBridgePassword == "MyBridgeSecret!9", "Reloaded PhoneBridgePassword must decrypt cleanly via DPAPI");
+            }
+        }
+        finally
+        {
+            try { if (File.Exists(tempSecSettings)) File.Delete(tempSecSettings); } catch { }
+            try { if (File.Exists(tempExportSettings)) File.Delete(tempExportSettings); } catch { }
         }
 
         // 4. Windows Share interop GUID validation
@@ -2161,17 +2410,25 @@ SSID 3 : Home_Router
             $"IDataTransferManagerInterop GUID mismatch: {interopGuid}");
 
         // 5. DropletRegistry includes phone_bridge, mech_sounds, element_capture with dedicated TargetViews
-        var settings = new SettingsService();
-        var registry = new DropletRegistry(settings);
-        Assert(registry.Get("phone_bridge") != null, "phone_bridge droplet must be registered");
-        Assert(registry.Get("phone_bridge")?.TargetView == ExpandedView.PhoneBridge, "phone_bridge must route to ExpandedView.PhoneBridge");
-        Assert(registry.Get("mech_sounds")?.TargetView == ExpandedView.MechSounds, "mech_sounds must route to ExpandedView.MechSounds");
-        Assert(registry.Get("element_capture")?.TargetView == ExpandedView.CaptureStudio, "element_capture must route to ExpandedView.CaptureStudio");
-        Assert(registry.Get("file_converter")?.TargetView == ExpandedView.Converter, "file_converter must route to ExpandedView.Converter");
-        Assert(registry.Get("quick_launcher")?.TargetView == ExpandedView.Launcher, "quick_launcher must route to ExpandedView.Launcher");
-        Assert(registry.Get("widgets_gallery")?.TargetView == ExpandedView.WidgetsGallery, "widgets_gallery must route to ExpandedView.WidgetsGallery");
-        Assert(registry.Get("termi_notch")?.TargetView == ExpandedView.Termi, "termi_notch must route to ExpandedView.Termi");
-        Assert(registry.Items.Count >= 18, $"Expected >= 18 built-in droplets, got {registry.Items.Count}");
+        string tempPhase5Settings = Path.Combine(Path.GetTempPath(), $"di_phase5_reg_{Guid.NewGuid():N}.json");
+        try
+        {
+            using var settings = new SettingsService(tempPhase5Settings);
+            var registry = new DropletRegistry(settings);
+            Assert(registry.Get("phone_bridge") != null, "phone_bridge droplet must be registered");
+            Assert(registry.Get("phone_bridge")?.TargetView == ExpandedView.PhoneBridge, "phone_bridge must route to ExpandedView.PhoneBridge");
+            Assert(registry.Get("mech_sounds")?.TargetView == ExpandedView.MechSounds, "mech_sounds must route to ExpandedView.MechSounds");
+            Assert(registry.Get("element_capture")?.TargetView == ExpandedView.CaptureStudio, "element_capture must route to ExpandedView.CaptureStudio");
+            Assert(registry.Get("file_converter")?.TargetView == ExpandedView.Converter, "file_converter must route to ExpandedView.Converter");
+            Assert(registry.Get("quick_launcher")?.TargetView == ExpandedView.Launcher, "quick_launcher must route to ExpandedView.Launcher");
+            Assert(registry.Get("widgets_gallery")?.TargetView == ExpandedView.WidgetsGallery, "widgets_gallery must route to ExpandedView.WidgetsGallery");
+            Assert(registry.Get("termi_notch")?.TargetView == ExpandedView.Termi, "termi_notch must route to ExpandedView.Termi");
+            Assert(registry.Items.Count >= 18, $"Expected >= 18 built-in droplets, got {registry.Items.Count}");
+        }
+        finally
+        {
+            try { if (File.Exists(tempPhase5Settings)) File.Delete(tempPhase5Settings); } catch { }
+        }
     }
 
     private static void TestQrCodeGenerator()
@@ -2465,11 +2722,13 @@ SSID 3 : Home_Router
                                                    or ExpandedView.Launcher
                                                    or ExpandedView.Termi
                                                    or ExpandedView.Converter
+                                                   or ExpandedView.PhoneBridge
                                                    or ExpandedView.QuickReply;
 
         Assert(IsInputFocusable(ExpandedView.Launcher), "Launcher must accept keyboard focus");
         Assert(IsInputFocusable(ExpandedView.Termi), "Termi-Notch must accept keyboard focus");
         Assert(IsInputFocusable(ExpandedView.Converter), "Converter must accept keyboard focus");
+        Assert(IsInputFocusable(ExpandedView.PhoneBridge), "PhoneBridge must accept keyboard focus for password entry");
         Assert(IsInputFocusable(ExpandedView.Notes), "Notes must accept keyboard focus");
         Assert(IsInputFocusable(ExpandedView.Calc), "Calc must accept keyboard focus");
         Assert(IsInputFocusable(ExpandedView.Clipboard), "Clipboard must accept keyboard focus");
@@ -2726,28 +2985,36 @@ SSID 3 : Home_Router
 
     private static void TestLiquidGlassGoldenImage()
     {
-        // Execute headless golden image verification
-        int code = GoldenImageGenerator.GenerateGoldenImages();
-        Assert(code == 0, $"GoldenImageGenerator failed with exit code {code}");
-
-        string workspaceDir = Path.Combine(Environment.CurrentDirectory, "docs", "liquid-glass");
-        string backdropPath = Path.Combine(workspaceDir, "golden_backdrop.png");
-        string outputPath = Path.Combine(workspaceDir, "golden_output.png");
-
-        if (!File.Exists(outputPath))
+        // Execute headless golden image verification in an isolated temp folder
+        string tempDir = Path.Combine(Path.GetTempPath(), $"di_golden_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
         {
-            Console.WriteLine("[INFO] Golden output PNG skipped in headless CI/GPU-less environment.");
-            return;
+            int code = GoldenImageGenerator.GenerateGoldenImages(tempDir);
+            Assert(code == 0, $"GoldenImageGenerator failed with exit code {code}");
+
+            string backdropPath = Path.Combine(tempDir, "golden_backdrop.png");
+            string outputPath = Path.Combine(tempDir, "golden_output.png");
+
+            if (!File.Exists(outputPath))
+            {
+                Console.WriteLine("[INFO] Golden output PNG skipped in headless CI/GPU-less environment.");
+                return;
+            }
+
+            Assert(File.Exists(backdropPath), $"Golden backdrop file does not exist at {backdropPath}");
+            Assert(File.Exists(outputPath), $"Golden output file does not exist at {outputPath}");
+
+            var fiBackdrop = new FileInfo(backdropPath);
+            var fiOutput = new FileInfo(outputPath);
+
+            Assert(fiBackdrop.Length > 5000, $"Golden backdrop PNG too small ({fiBackdrop.Length} bytes)");
+            Assert(fiOutput.Length > 5000, $"Golden output PNG too small ({fiOutput.Length} bytes)");
         }
-
-        Assert(File.Exists(backdropPath), $"Golden backdrop file does not exist at {backdropPath}");
-        Assert(File.Exists(outputPath), $"Golden output file does not exist at {outputPath}");
-
-        var fiBackdrop = new FileInfo(backdropPath);
-        var fiOutput = new FileInfo(outputPath);
-
-        Assert(fiBackdrop.Length > 5000, $"Golden backdrop PNG too small ({fiBackdrop.Length} bytes)");
-        Assert(fiOutput.Length > 5000, $"Golden output PNG too small ({fiOutput.Length} bytes)");
+        finally
+        {
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true); } catch { }
+        }
     }
 
     private static void TestSemVersionComparison()
@@ -2886,9 +3153,58 @@ SSID 3 : Home_Router
 
     private static void TestChoreographerAndPowerGovernor()
     {
-        // 1. Integrated GPU preference
-        bool gpuPref = Choreographer.EnsureIntegratedGpuPreference();
-        // Should execute cleanly (true on standard Windows, or false if registry key inaccessible, but never throw)
+        // 1. Integrated GPU preference (snapshot & restore host HKCU value)
+        const string D3DKeyPath = @"Software\Microsoft\DirectX\UserGpuPreferences";
+        string? exePath = Environment.ProcessPath;
+        bool hadExistingValue = false;
+        object? previousValue = null;
+        RegistryValueKind previousKind = RegistryValueKind.String;
+
+        if (!string.IsNullOrEmpty(exePath))
+        {
+            try
+            {
+                using var readKey = Registry.CurrentUser.OpenSubKey(D3DKeyPath, writable: false);
+                if (readKey != null)
+                {
+                    previousValue = readKey.GetValue(exePath, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+                    if (previousValue != null)
+                    {
+                        hadExistingValue = true;
+                        previousKind = readKey.GetValueKind(exePath);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        try
+        {
+            bool gpuPref = Choreographer.EnsureIntegratedGpuPreference();
+            // Should execute cleanly (true on standard Windows, or false if registry key inaccessible, but never throw)
+        }
+        finally
+        {
+            if (!string.IsNullOrEmpty(exePath))
+            {
+                try
+                {
+                    using var writeKey = Registry.CurrentUser.OpenSubKey(D3DKeyPath, writable: true);
+                    if (writeKey != null)
+                    {
+                        if (hadExistingValue && previousValue != null)
+                        {
+                            writeKey.SetValue(exePath, previousValue, previousKind);
+                        }
+                        else
+                        {
+                            writeKey.DeleteValue(exePath, throwOnMissingValue: false);
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
 
         // 2. Choreographer lifecycle and chore calculations
         using var ch = new Choreographer();
@@ -3085,8 +3401,8 @@ SSID 3 : Home_Router
         if (File.Exists(issPath))
         {
             string issContent = File.ReadAllText(issPath);
-            Assert(issContent.Contains("#define MyAppVersion \"0.7.0\""),
-                "DynamicIsland.iss must define MyAppVersion as '0.7.0'");
+            Assert(issContent.Contains("#define MyAppVersion \"0.8.0\""),
+                "DynamicIsland.iss must define MyAppVersion as '0.8.0'");
         }
 
         // 2. release-manifest.json validation
@@ -3096,11 +3412,11 @@ SSID 3 : Home_Router
             string manifestJson = File.ReadAllText(manifestPath);
             var manifest = System.Text.Json.JsonSerializer.Deserialize<UpdateManifest>(manifestJson);
             Assert(manifest != null, "release-manifest.json must deserialize cleanly");
-            Assert(manifest!.Version == "0.7.0", $"release-manifest.json version must be '0.7.0', got '{manifest.Version}'");
-            Assert(manifest.ReleaseTag == "v0.7.0", $"release-manifest.json releaseTag must be 'v0.7.0', got '{manifest.ReleaseTag}'");
+            Assert(manifest!.Version == "0.8.0", $"release-manifest.json version must be '0.8.0', got '{manifest.Version}'");
+            Assert(manifest.ReleaseTag == "v0.8.0", $"release-manifest.json releaseTag must be 'v0.8.0', got '{manifest.ReleaseTag}'");
         }
 
-        Assert(InstallerService.AppVersion == "0.7.0", $"InstallerService.AppVersion must be '0.7.0', got '{InstallerService.AppVersion}'");
+        Assert(InstallerService.AppVersion == "0.8.0", $"InstallerService.AppVersion must be '0.8.0', got '{InstallerService.AppVersion}'");
 
         // 3. WinGet Manifest Files validation
         string wingetDir = Path.Combine(projectRoot, "installer", "winget");
@@ -3116,14 +3432,14 @@ SSID 3 : Home_Router
 
             string vContent = File.ReadAllText(versionYaml);
             Assert(vContent.Contains("PackageIdentifier: JainisPatel.DynamicIsland"), "Version YAML must specify identifier");
-            Assert(vContent.Contains("PackageVersion: 0.7.0"), "Version YAML must specify version 0.7.0");
+            Assert(vContent.Contains("PackageVersion: 0.8.0"), "Version YAML must specify version 0.8.0");
 
             string iContent = File.ReadAllText(installerYaml);
-            Assert(iContent.Contains("PackageVersion: 0.7.0"), "Installer YAML must specify version 0.7.0");
+            Assert(iContent.Contains("PackageVersion: 0.8.0"), "Installer YAML must specify version 0.8.0");
             Assert(iContent.Contains("Architecture: x64"), "Installer YAML must specify x64 architecture");
 
             string lContent = File.ReadAllText(localeYaml);
-            Assert(lContent.Contains("PackageVersion: 0.7.0"), "Locale YAML must specify version 0.7.0");
+            Assert(lContent.Contains("PackageVersion: 0.8.0"), "Locale YAML must specify version 0.8.0");
             Assert(lContent.Contains("PackageName: Dynamic Island for Windows"), "Locale YAML must specify package name");
         }
     }
@@ -3381,10 +3697,10 @@ SSID 3 : Home_Router
 
         // 4. Dynamic Concave Ear SVG Fillet Generation
         string leftEarSvg = MagneticDockingEngine.GenerateNotchEarSvgPath(12.0, isLeft: true);
-        Assert(leftEarSvg == "M 0,0 L 12,0 L 12,12 A 12,12 0 0 1 0,0 Z", $"Unexpected left ear SVG: {leftEarSvg}");
+        Assert(leftEarSvg == "M 0,0 L 12,0 L 12,12 A 12,12 0 0 0 0,0 Z", $"Unexpected left ear SVG: {leftEarSvg}");
 
         string rightEarSvg = MagneticDockingEngine.GenerateNotchEarSvgPath(12.0, isLeft: false);
-        Assert(rightEarSvg == "M 0,12 L 0,0 L 12,0 A 12,12 0 0 1 0,12 Z", $"Unexpected right ear SVG: {rightEarSvg}");
+        Assert(rightEarSvg == "M 0,12 L 0,0 L 12,0 A 12,12 0 0 0 0,12 Z", $"Unexpected right ear SVG: {rightEarSvg}");
 
         // 5. Hardware Notch Presets
         var mbp16 = SettingsService.GetNotchPresetDimensions("MacBookPro16");
@@ -3556,8 +3872,8 @@ SSID 3 : Home_Router
         Assert(snap.Cores.CoreLoads.Length == Environment.ProcessorCount, "SystemVitalsSnapshot must contain valid per-core heatmap");
         Assert(snap.Runaway.CpuPercent >= 0.0, "Runaway CPU percent must be non-negative");
 
-        // Runaway purge execution test
-        var purgeResult = perfService.PurgeRunawayProcesses(minCpuPercent: 95.0);
+        // Runaway purge execution test (high threshold so live host processes are never terminated)
+        var purgeResult = perfService.PurgeRunawayProcesses(minCpuPercent: 100000.0);
         Assert(purgeResult.KilledProcesses >= 0, "PurgeRunawayProcesses must return non-negative killed count");
         Assert(purgeResult.FreedCpuPercent >= 0.0, "PurgeRunawayProcesses must return non-negative freed CPU percent");
     }
@@ -3694,5 +4010,220 @@ SSID 3 : Home_Router
                 try { File.Delete(tempSettings); } catch { }
             }
         }
+    }
+
+    private static void TestPhase5ArchitectureAndHygiene()
+    {
+        // 1. DebouncedJsonStore coalescing & deterministic Dispose flush
+        string tempJsonPath = Path.Combine(Path.GetTempPath(), $"di_debounced_{Guid.NewGuid():N}.json");
+        try
+        {
+            int snapshotReads = 0;
+            int latestCount = 0;
+            var store = new DebouncedJsonStore<Dictionary<string, int>>(
+                tempJsonPath,
+                () =>
+                {
+                    snapshotReads++;
+                    return new Dictionary<string, int> { ["count"] = latestCount };
+                },
+                delayMs: 250);
+
+            latestCount = 1;
+            store.ScheduleSave();
+            latestCount = 2;
+            store.ScheduleSave();
+            latestCount = 3;
+            store.ScheduleSave();
+
+            Assert(snapshotReads == 0, $"Rapid ScheduleSave calls must coalesce before timer fires (got {snapshotReads} reads)");
+
+            store.Dispose();
+            Assert(snapshotReads == 1, $"Dispose must flush pending dirty state exactly once (got {snapshotReads} reads)");
+            Assert(File.Exists(tempJsonPath), "DebouncedJsonStore must write file cleanly on Dispose");
+
+            var loaded = AtomicJsonStore.Load(tempJsonPath, () => new Dictionary<string, int>());
+            Assert(loaded.TryGetValue("count", out int savedVal) && savedVal == 3,
+                $"Expected coalesced final value 3, got {savedVal}");
+
+            // Post-dispose saves must be a safe no-op
+            latestCount = 99;
+            store.ScheduleSave();
+            store.Flush();
+            Assert(snapshotReads == 1, "Disposed DebouncedJsonStore must ignore subsequent saves");
+        }
+        finally
+        {
+            if (File.Exists(tempJsonPath))
+            {
+                try { File.Delete(tempJsonPath); } catch { }
+            }
+        }
+
+        // 2. SafeProcessLauncher URI scheme & CRLF injection protection
+        Assert(!SafeProcessLauncher.TryOpenUrl(null), "Null URL must be rejected");
+        Assert(!SafeProcessLauncher.TryOpenUrl(""), "Empty URL must be rejected");
+        Assert(!SafeProcessLauncher.TryOpenUrl("   "), "Whitespace URL must be rejected");
+        Assert(!SafeProcessLauncher.TryOpenUrl("file:///C:/Windows/System32/calc.exe"), "file:// URL scheme must be rejected");
+        Assert(!SafeProcessLauncher.TryOpenUrl("javascript:alert(1)"), "javascript: URL scheme must be rejected");
+        Assert(!SafeProcessLauncher.TryOpenUrl("https://example.com/q?a=1\r\nb"), "CRLF-injected URL must be rejected");
+        Assert(!SafeProcessLauncher.TryOpenShellUri("ms-settings:bluetooth\ncmd"), "Newline-injected shell URI must be rejected");
+        Assert(!SafeProcessLauncher.TryOpenShellUri("ftp://example.com/file.zip"), "Unlisted ftp:// shell scheme must be rejected");
+        Assert(!SafeProcessLauncher.TryOpenFolder(Path.Combine(Path.GetTempPath(), $"missing_folder_{Guid.NewGuid():N}")),
+            "Non-existent directory must be rejected");
+
+        // 3. Shared DeviceClassifier & Core.AppIconLoader invariants
+        Assert(DeviceClassifier.ClassifyPeripheral("Logitech MX Master 3S").Category == "Mouse", "Mouse classification mismatch");
+        Assert(DeviceClassifier.ClassifyPeripheral("Keychron K2 Keyboard").Category == "Keyboard", "Keyboard classification mismatch");
+        Assert(DeviceClassifier.ClassifyPeripheral("Xbox Wireless Controller").Category == "Controller", "Controller classification mismatch");
+        Assert(DeviceClassifier.ClassifyPeripheral("Sony WH-1000XM5").Category == "Headset", "Headset classification mismatch");
+        Assert(DeviceClassifier.ClassifyPeripheral("AirPods Pro").IconGlyph == "\uE7F6", "Headset glyph mismatch");
+        Assert(DeviceClassifier.ClassifyPeripheral("").Category == "Peripheral", "Fallback category mismatch");
+        Assert(DeviceClassifier.IsAudioDeviceName("AirPods Pro"), "Audio device hint must match AirPods Pro");
+        Assert(!DeviceClassifier.IsAudioDeviceName("Logitech MX Master 3S"), "Mouse must not classify as audio device");
+        Assert(DeviceClassifier.ClassifyAudioEndpoint("NVIDIA High Definition Audio").Type == "Display Audio", "HDMI/Display audio classification mismatch");
+        Assert(AppIconLoader.GetAppIcon(null) == null, "Null executable path must return null icon");
+        Assert(AppIconLoader.GetAppIcon(@"C:\__nonexistent__\missing_binary_999.exe") == null, "Missing executable path must return null icon");
+        Assert(!string.IsNullOrEmpty(AppIconLoader.ResolveExePath("cmd.exe")), "System32 binary cmd.exe must resolve");
+
+        // 4. LyricsService multi-timestamp LRC expansion & binary search boundaries
+        string multiLrc = """
+            [ti:Test Track]
+            [00:05.00]Verse One
+            [00:10.00][00:25.50]Shared Chorus
+            [00:18.25]Verse Two
+            """;
+        var lrcLines = LyricsService.ParseLrc(multiLrc);
+        Assert(lrcLines.Count == 4, $"Expected 4 expanded LRC lines (excluding metadata), got {lrcLines.Count}");
+        Assert(lrcLines[0].Text == "Verse One" && lrcLines[0].Timestamp == TimeSpan.FromSeconds(5), "First LRC line mismatch");
+        Assert(lrcLines[1].Text == "Shared Chorus" && lrcLines[1].Timestamp == TimeSpan.FromSeconds(10), "Second LRC line mismatch");
+        Assert(lrcLines[2].Text == "Verse Two" && lrcLines[2].Timestamp == TimeSpan.FromSeconds(18.25), "Third LRC line mismatch");
+        Assert(lrcLines[3].Text == "Shared Chorus" && lrcLines[3].Timestamp == TimeSpan.FromSeconds(25.5), "Fourth LRC line mismatch");
+        Assert(LyricsService.FindCurrentIndex(lrcLines, TimeSpan.FromSeconds(4.5)) == -1, "Position well before first line must return -1");
+        Assert(LyricsService.FindCurrentIndex(lrcLines, TimeSpan.FromSeconds(4.9)) == 0, "Position within 120ms lead-in of first line must return index 0");
+        Assert(LyricsService.FindCurrentIndex(lrcLines, TimeSpan.FromSeconds(10.0)) == 1, "Exact match at 10s must return index 1");
+        Assert(LyricsService.FindCurrentIndex(lrcLines, TimeSpan.FromSeconds(25.5)) == 3, "Repeated chorus timestamp at 25.5s must return index 3");
+
+        // 5. Light Mode hover veil opacity fix & ThemeManager conditional event suppression
+        Assert(ThemeBrushes.ButtonHoverVeilLight.Color.A == 0xFF,
+            $"ButtonHoverVeilLight must have opaque black base for opacity animations, got alpha 0x{ThemeBrushes.ButtonHoverVeilLight.Color.A:X2}");
+        Assert(ThemeBrushes.ButtonHoverVeilLight.IsFrozen, "ButtonHoverVeilLight must be frozen");
+
+        if (!ThemeManager.Initialized)
+        {
+            ThemeManager.Initialize("Dark", "Default");
+        }
+
+        ThemeMode savedMode = ThemeManager.CurrentMode;
+        ThemeStyle savedStyle = ThemeManager.CurrentStyle;
+        int themeEvents = 0;
+        int styleEvents = 0;
+        void OnThemeChanged(AppTheme _) => themeEvents++;
+        void OnStyleChanged(ThemeStyle _) => styleEvents++;
+
+        try
+        {
+            ThemeManager.SetThemeMode(ThemeMode.Dark);
+            ThemeManager.SetThemeStyle(ThemeStyle.Default);
+
+            ThemeManager.ThemeChanged += OnThemeChanged;
+            ThemeManager.ThemeStyleChanged += OnStyleChanged;
+
+            // No-op re-apply must suppress redundant events
+            ThemeManager.SetThemeMode(ThemeMode.Dark);
+            ThemeManager.SetThemeStyle(ThemeStyle.Default);
+            Assert(themeEvents == 0 && styleEvents == 0,
+                $"No-op theme/style calls must fire 0 events (got theme={themeEvents}, style={styleEvents})");
+
+            // Switching only style fires only ThemeStyleChanged
+            ThemeManager.SetThemeStyle(ThemeStyle.LiquidGlass);
+            Assert(styleEvents == 1 && themeEvents == 0,
+                $"Style change must fire only ThemeStyleChanged (got theme={themeEvents}, style={styleEvents})");
+
+            // Switching only mode fires only ThemeChanged
+            ThemeManager.SetThemeMode(ThemeMode.Light);
+            Assert(themeEvents == 1 && styleEvents == 1,
+                $"Theme change must fire only ThemeChanged (got theme={themeEvents}, style={styleEvents})");
+        }
+        finally
+        {
+            ThemeManager.ThemeChanged -= OnThemeChanged;
+            ThemeManager.ThemeStyleChanged -= OnStyleChanged;
+            ThemeManager.SetThemeMode(savedMode);
+            ThemeManager.SetThemeStyle(savedStyle);
+        }
+
+        // 6. InstallerTokens.xaml static brushes must all be frozen at parse time
+        var installerTokens = new ResourceDictionary
+        {
+            Source = new Uri("pack://application:,,,/DynamicIsland;component/Resources/InstallerTokens.xaml", UriKind.Absolute)
+        };
+        int tokenBrushCount = 0;
+        foreach (object? val in installerTokens.Values)
+        {
+            if (val is Brush brush)
+            {
+                tokenBrushCount++;
+                Assert(brush.IsFrozen, "Every brush in InstallerTokens.xaml must be frozen via po:Freeze=\"True\"");
+            }
+        }
+        Assert(tokenBrushCount >= 14, $"Expected at least 14 frozen brushes in InstallerTokens.xaml, found {tokenBrushCount}");
+
+        // 7. Expanded Drop Shelf & Clipboard Bento Card ViewModel and Control Integrity
+        var shelfSample = new ShelfItem(
+            @"C:\Users\Demo\Pictures\shot.png",
+            "shot.png",
+            "1.4 MB",
+            "\uE8B9",
+            true,
+            "PNG",
+            ThemeBrushes.Blue);
+        Assert(shelfSample.DirectoryName == "Pictures", $"Expected parent folder 'Pictures', got '{shelfSample.DirectoryName}'");
+
+        var codeClip = new ClipboardItem
+        {
+            Type = ClipboardItemType.Code,
+            Title = "public void Run()",
+            Subtitle = "3 lines · C#",
+            RawText = "\tpublic void Run()\n\t{\n\t\tConsole.WriteLine(42);\n\t}"
+        };
+        Assert(codeClip.PreviewSnippet.Contains('\n') && codeClip.PreviewSnippet.Contains("Console.WriteLine"),
+            $"ClipboardItem.PreviewSnippet must preserve multi-line code structure, got '{codeClip.PreviewSnippet}'");
+        Assert(codeClip.CardFooterText == "3 lines · C#", $"Expected code CardFooterText, got '{codeClip.CardFooterText}'");
+        Assert(codeClip.CanCopyPlain, "Code clip must allow plain-text copy");
+
+        var urlClip = new ClipboardItem
+        {
+            Type = ClipboardItemType.Url,
+            Title = "github.com",
+            Subtitle = "https://github.com/jainis-Patel/DynamicIsland",
+            RawText = "https://github.com/jainis-Patel/DynamicIsland"
+        };
+        Assert(urlClip.CardFooterText == "github.com", $"URL CardFooterText must be host 'github.com', got '{urlClip.CardFooterText}'");
+        Assert(urlClip.PreviewSnippet == "https://github.com/jainis-Patel/DynamicIsland", "URL PreviewSnippet must show full URL");
+
+        var shelfView = new ShelfView();
+        Assert(shelfView.ShelfItemsControl != null && shelfView.DragAllShelfBtn != null && shelfView.ShelfScrollViewer != null,
+            "ShelfView named forwarder controls must be present");
+
+        var clipboardView = new ClipboardView();
+        Assert(clipboardView.ClipboardItemsControl != null && clipboardView.ClipboardSearchBox != null && clipboardView.ClipFilterAllBtn != null,
+            "ClipboardView named forwarder controls must be present");
+
+        // 8. Installer CLI argument parsing & native GitHub asset digest extraction
+        string[] silentArgs = { "--install", "--silent", "--relaunch", "--wait-pid", "4242", "--target-dir", @"C:\Apps\DynamicIsland" };
+        Assert(InstallerService.IsInstallerMode(silentArgs, @"C:\Temp\DynamicIsland-0.8.0.exe"), "--install must trigger installer mode regardless of filename");
+        Assert(InstallerService.IsSilent(silentArgs), "--silent must be recognized");
+        Assert(InstallerService.ShouldRelaunchAfterSilentInstall(silentArgs), "--relaunch must trigger post-install restart");
+        Assert(InstallerService.TryParseWaitPid(silentArgs, out int waitPid) && waitPid == 4242, "TryParseWaitPid must parse 4242");
+        Assert(InstallerService.TryParseTargetDir(silentArgs, out string? parsedDir) && parsedDir == @"C:\Apps\DynamicIsland",
+            $"TryParseTargetDir mismatch: '{parsedDir}'");
+
+        using var digestDoc = System.Text.Json.JsonDocument.Parse("""
+            {"name":"DynamicIsland-Setup.exe","digest":"sha256:ABCDEF11223344556677889900aabbccddeeff11223344556677889900aabbcc"}
+            """);
+        string? extractedDigest = GitHubReleaseClient.TryExtractAssetDigestSha256(digestDoc.RootElement);
+        Assert(extractedDigest == "abcdef11223344556677889900aabbccddeeff11223344556677889900aabbcc",
+            $"Expected lowercase 64-hex digest, got '{extractedDigest}'");
     }
 }

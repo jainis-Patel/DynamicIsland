@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Serialization;
 
 namespace DynamicIsland.Core;
@@ -63,7 +64,7 @@ public readonly struct SemVersion : IComparable<SemVersion>, IEquatable<SemVersi
         int firstDot = span.IndexOf('.');
         if (firstDot < 0) return false;
 
-        if (!int.TryParse(span[..firstDot], out int major) || major < 0) return false;
+        if (!int.TryParse(span[..firstDot], NumberStyles.None, CultureInfo.InvariantCulture, out int major) || major < 0) return false;
 
         ReadOnlySpan<char> rest = span[(firstDot + 1)..];
         int secondDot = rest.IndexOf('.');
@@ -71,13 +72,13 @@ public readonly struct SemVersion : IComparable<SemVersion>, IEquatable<SemVersi
         int minor, patch;
         if (secondDot < 0)
         {
-            if (!int.TryParse(rest, out minor) || minor < 0) return false;
+            if (!int.TryParse(rest, NumberStyles.None, CultureInfo.InvariantCulture, out minor) || minor < 0) return false;
             patch = 0;
         }
         else
         {
-            if (!int.TryParse(rest[..secondDot], out minor) || minor < 0) return false;
-            if (!int.TryParse(rest[(secondDot + 1)..], out patch) || patch < 0) return false;
+            if (!int.TryParse(rest[..secondDot], NumberStyles.None, CultureInfo.InvariantCulture, out minor) || minor < 0) return false;
+            if (!int.TryParse(rest[(secondDot + 1)..], NumberStyles.None, CultureInfo.InvariantCulture, out patch) || patch < 0) return false;
         }
 
         version = new SemVersion(major, minor, patch, preRelease);
@@ -104,7 +105,7 @@ public readonly struct SemVersion : IComparable<SemVersion>, IEquatable<SemVersi
         if (thisHasPre && !otherHasPre) return -1;
 
         // Compare pre-release identifiers lexicographically / numerically
-        return ComparePreReleaseIdentifiers(PreRelease, other.PreRelease);
+        return ComparePreReleaseIdentifiers(PreRelease ?? string.Empty, other.PreRelease ?? string.Empty);
     }
 
     private static int ComparePreReleaseIdentifiers(string pre1, string pre2)
@@ -118,8 +119,8 @@ public readonly struct SemVersion : IComparable<SemVersion>, IEquatable<SemVersi
             string p1 = parts1[i];
             string p2 = parts2[i];
 
-            bool p1IsNum = int.TryParse(p1, out int num1);
-            bool p2IsNum = int.TryParse(p2, out int num2);
+            bool p1IsNum = ulong.TryParse(p1, NumberStyles.None, CultureInfo.InvariantCulture, out ulong num1);
+            bool p2IsNum = ulong.TryParse(p2, NumberStyles.None, CultureInfo.InvariantCulture, out ulong num2);
 
             if (p1IsNum && p2IsNum)
             {
@@ -146,12 +147,12 @@ public readonly struct SemVersion : IComparable<SemVersion>, IEquatable<SemVersi
 
     public bool Equals(SemVersion other) =>
         Major == other.Major && Minor == other.Minor && Patch == other.Patch &&
-        string.Equals(PreRelease, other.PreRelease, StringComparison.OrdinalIgnoreCase);
+        string.Equals(PreRelease ?? string.Empty, other.PreRelease ?? string.Empty, StringComparison.OrdinalIgnoreCase);
 
     public override bool Equals(object? obj) => obj is SemVersion other && Equals(other);
 
     public override int GetHashCode() =>
-        HashCode.Combine(Major, Minor, Patch, StringComparer.OrdinalIgnoreCase.GetHashCode(PreRelease));
+        HashCode.Combine(Major, Minor, Patch, StringComparer.OrdinalIgnoreCase.GetHashCode(PreRelease ?? string.Empty));
 
     public override string ToString() =>
         IsPreRelease ? $"{Major}.{Minor}.{Patch}-{PreRelease}" : $"{Major}.{Minor}.{Patch}";

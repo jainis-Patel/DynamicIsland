@@ -34,19 +34,27 @@ public partial class IslandWindow
     internal async void ClockWeatherBadge_Click(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
-        await _weatherService.RefreshAsync();
-        var snap = _weatherService.Current;
-        if (snap.IsAvailable)
+        try
         {
-            _machine.PushToast(new ToastContent(
-                snap.Glyph,
-                $"{snap.LocationName} \u00B7 {snap.TempC}\u00B0C",
-                $"{snap.Condition} \u00B7 {snap.SummaryLine}",
-                ThemeBrushes.AmberColor,
-                TimeSpan.FromSeconds(2.5),
-                TargetView: null,
-                Priority: ToastPriority.Feedback,
-                Category: "weather"));
+            await _weatherService.RefreshAsync();
+            if (_isClosing) return;
+            var snap = _weatherService.Current;
+            if (snap.IsAvailable)
+            {
+                _machine.PushToast(new ToastContent(
+                    snap.Glyph,
+                    $"{snap.LocationName} \u00B7 {snap.TempC}\u00B0C",
+                    $"{snap.Condition} \u00B7 {snap.SummaryLine}",
+                    ThemeBrushes.AmberColor,
+                    TimeSpan.FromSeconds(2.5),
+                    TargetView: null,
+                    Priority: ToastPriority.Feedback,
+                    Category: "weather"));
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Weather] ClockWeatherBadge failed: {ex.Message}");
         }
     }
 

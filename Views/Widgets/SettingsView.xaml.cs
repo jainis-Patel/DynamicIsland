@@ -300,4 +300,7 @@ public partial class SettingsView : UserControl
 
     private void GitHubTokenBox_LostFocus(object sender, RoutedEventArgs e) =>
         Island?.GitHubTokenBox_LostFocus(sender, e);
+
+    private void GitHubTokenBox_KeyDown(object sender, KeyEventArgs e) =>
+        Island?.GitHubTokenBox_KeyDown(sender, e);
 }

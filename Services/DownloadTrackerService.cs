@@ -1,5 +1,7 @@
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Threading;
+using static DynamicIsland.Interop.NativeMethods;
 
 namespace DynamicIsland.Services;
 
@@ -27,7 +29,9 @@ internal sealed class DownloadTrackerService : IDisposable
     private FileSystemWatcher? _watcher;
     private readonly DispatcherTimer _pollTimer;
     private readonly Dictionary<string, DownloadInfo> _activeDownloads = new(StringComparer.OrdinalIgnoreCase);
+    private readonly string _downloadsDir;
     private bool _started;
+    private int _polling;
 
     public bool HasActiveDownloads
     {
@@ -97,17 +101,31 @@ internal sealed class DownloadTrackerService : IDisposable
         return $"{bytesFormatted} \u00B7 {clean}";
     }
 
-    public static void OpenDownloadsFolder()
+    public static string GetDownloadsFolderPath()
     {
+        IntPtr pathPtr = IntPtr.Zero;
         try
         {
-            string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-            if (Directory.Exists(downloads))
+            if (SHGetKnownFolderPath(FOLDERID_Downloads, 0, IntPtr.Zero, out pathPtr) == 0 && pathPtr != IntPtr.Zero)
             {
-                System.Diagnostics.Process.Start("explorer.exe", downloads);
+                string? known = Marshal.PtrToStringUni(pathPtr);
+                if (!string.IsNullOrWhiteSpace(known))
+                    return known;
             }
         }
         catch { }
+        finally
+        {
+            if (pathPtr != IntPtr.Zero)
+                Marshal.FreeCoTaskMem(pathPtr);
+        }
+
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+    }
+
+    public static void OpenDownloadsFolder()
+    {
+        DynamicIsland.Core.SafeProcessLauncher.TryOpenFolder(GetDownloadsFolderPath());
     }
 
     public event Action? ActiveDownloadsChanged;
@@ -116,25 +134,24 @@ internal sealed class DownloadTrackerService : IDisposable
     public DownloadTrackerService(Dispatcher ui)
     {
         _ui = ui;
+        _downloadsDir = GetDownloadsFolderPath();
         _pollTimer = new DispatcherTimer(DispatcherPriority.Background, _ui)
         {
             Interval = TimeSpan.FromMilliseconds(800)
         };
-        _pollTimer.Tick += (_, _) => PollDownloads();
+        _pollTimer.Tick += (_, _) => _ = PollDownloadsAsync();
 
         try
         {
-            string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-            if (Directory.Exists(downloads))
+            if (Directory.Exists(_downloadsDir))
             {
-                _watcher = new FileSystemWatcher(downloads)
+                _watcher = new FileSystemWatcher(_downloadsDir)
                 {
-                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.LastWrite,
-                    EnableRaisingEvents = true
+                    NotifyFilter = NotifyFilters.FileName,
+                    EnableRaisingEvents = false
                 };
 
                 _watcher.Created += OnFileEvent;
-                _watcher.Changed += OnFileEvent;
                 _watcher.Deleted += OnFileDeleted;
                 _watcher.Renamed += OnFileRenamed;
             }
@@ -145,6 +162,11 @@ internal sealed class DownloadTrackerService : IDisposable
     public void Start()
     {
         _started = true;
+        if (_watcher != null)
+        {
+            try { _watcher.EnableRaisingEvents = true; } catch { }
+            ScanExistingActiveDownloads();
+        }
         UpdateTimerState();
     }
 
@@ -152,6 +174,40 @@ internal sealed class DownloadTrackerService : IDisposable
     {
         _started = false;
         _pollTimer.Stop();
+        if (_watcher != null)
+        {
+            try { _watcher.EnableRaisingEvents = false; } catch { }
+        }
+    }
+
+    private void ScanExistingActiveDownloads()
+    {
+        try
+        {
+            if (!Directory.Exists(_downloadsDir)) return;
+            bool addedAny = false;
+            foreach (string file in Directory.EnumerateFiles(_downloadsDir))
+            {
+                string ext = Path.GetExtension(file);
+                if (!IsDownloadExt(ext)) continue;
+
+                lock (_activeDownloads)
+                {
+                    if (!_activeDownloads.ContainsKey(file))
+                    {
+                        string cleanName = CleanDownloadFileName(Path.GetFileName(file));
+                        _activeDownloads[file] = new DownloadInfo { FileName = cleanName, FullPath = file };
+                        addedAny = true;
+                    }
+                }
+            }
+
+            if (addedAny)
+            {
+                ActiveDownloadsChanged?.Invoke();
+            }
+        }
+        catch { }
     }
 
     private void UpdateTimerState()
@@ -229,7 +285,37 @@ internal sealed class DownloadTrackerService : IDisposable
         }
     }
 
-    private void PollDownloads()
+    private async Task PollDownloadsAsync()
+    {
+        if (!_started || Interlocked.CompareExchange(ref _polling, 1, 0) != 0)
+            return;
+
+        try
+        {
+            var (removedAny, bytesChanged) = await Task.Run(PollDownloadsCore).ConfigureAwait(false);
+            if (!_started) return;
+
+            if (removedAny || bytesChanged)
+            {
+                await _ui.InvokeAsync(() =>
+                {
+                    if (removedAny)
+                        UpdateTimerState();
+                    ActiveDownloadsChanged?.Invoke();
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[DownloadTracker] PollDownloadsAsync error: {ex.Message}");
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _polling, 0);
+        }
+    }
+
+    private (bool RemovedAny, bool BytesChanged) PollDownloadsCore()
     {
         List<string>? keysToRemove = null;
         bool bytesChanged = false;
@@ -283,15 +369,7 @@ internal sealed class DownloadTrackerService : IDisposable
             }
         }
 
-        if (keysToRemove is { Count: > 0 })
-        {
-            UpdateTimerState();
-            ActiveDownloadsChanged?.Invoke();
-        }
-        else if (bytesChanged)
-        {
-            ActiveDownloadsChanged?.Invoke();
-        }
+        return (keysToRemove is { Count: > 0 }, bytesChanged);
     }
 
     private static bool IsDownloadExt(string ext) =>

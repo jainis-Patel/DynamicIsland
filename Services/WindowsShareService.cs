@@ -61,12 +61,27 @@ internal sealed class WindowsShareService : IDisposable
             int hr = RoGetActivationFactory("Windows.ApplicationModel.DataTransfer.DataTransferManager", ref interopGuid, out IntPtr pFactory);
             if (hr == 0 && pFactory != IntPtr.Zero)
             {
-                _interop = (IDataTransferManagerInterop)Marshal.GetObjectForIUnknown(pFactory);
+                try
+                {
+                    _interop = (IDataTransferManagerInterop)Marshal.GetObjectForIUnknown(pFactory);
+                }
+                finally
+                {
+                    Marshal.Release(pFactory);
+                }
+
                 var dtmGuid = IDataTransferManagerGuid;
                 IntPtr pDtm = _interop.GetForWindow(hwnd, ref dtmGuid);
                 if (pDtm != IntPtr.Zero)
                 {
-                    _transferManager = Marshal.GetObjectForIUnknown(pDtm) as DataTransferManager;
+                    try
+                    {
+                        _transferManager = Marshal.GetObjectForIUnknown(pDtm) as DataTransferManager;
+                    }
+                    finally
+                    {
+                        Marshal.Release(pDtm);
+                    }
                     if (_transferManager != null)
                     {
                         _transferManager.DataRequested += OnDataRequested;
@@ -94,29 +109,47 @@ internal sealed class WindowsShareService : IDisposable
 
             if (_shareFiles != null && _shareFiles.Count > 0)
             {
-                var items = new List<IStorageItem>();
-                foreach (var path in _shareFiles)
-                {
-                    if (File.Exists(path))
-                    {
-                        try
-                        {
-                            var sf = StorageFile.GetFileFromPathAsync(Path.GetFullPath(path)).AsTask().GetAwaiter().GetResult();
-                            if (sf != null) items.Add(sf);
-                        }
-                        catch { }
-                    }
-                }
-
-                if (items.Count > 0)
-                {
-                    req.Data.SetStorageItems(items);
-                }
+                string[] filesSnapshot = _shareFiles.ToArray();
+                var deferral = req.GetDeferral();
+                _ = PopulateShareFilesAsync(req, filesSnapshot, deferral);
             }
         }
         catch (Exception ex)
         {
             App.Log($"[WindowsShareService] DataRequested error: {ex.Message}");
+        }
+    }
+
+    private static async Task PopulateShareFilesAsync(DataRequest req, string[] filesSnapshot, DataRequestDeferral deferral)
+    {
+        try
+        {
+            var items = new List<IStorageItem>();
+            foreach (var path in filesSnapshot)
+            {
+                if (File.Exists(path))
+                {
+                    try
+                    {
+                        var sf = await StorageFile.GetFileFromPathAsync(Path.GetFullPath(path));
+                        if (sf != null) items.Add(sf);
+                    }
+                    catch { }
+                }
+            }
+
+            if (items.Count > 0)
+            {
+                req.Data.SetStorageItems(items);
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[WindowsShareService] PopulateShareFilesAsync error: {ex.Message}");
+        }
+        finally
+        {
+            deferral.Complete();
         }
     }
 
@@ -175,8 +208,19 @@ internal sealed class WindowsShareService : IDisposable
         if (_transferManager != null)
         {
             _transferManager.DataRequested -= OnDataRequested;
+            if (Marshal.IsComObject(_transferManager))
+            {
+                try { Marshal.ReleaseComObject(_transferManager); } catch { }
+            }
             _transferManager = null;
         }
-        _interop = null;
+        if (_interop != null)
+        {
+            if (Marshal.IsComObject(_interop))
+            {
+                try { Marshal.ReleaseComObject(_interop); } catch { }
+            }
+            _interop = null;
+        }
     }
 }

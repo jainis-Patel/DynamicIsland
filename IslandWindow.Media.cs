@@ -172,7 +172,14 @@ public partial class IslandWindow
         else
         {
             _preferClockHeaderInMedia = false;
-            _lastAppliedMediaAccent = null;
+            if (_lastAppliedMediaAccent != null)
+            {
+                _lastAppliedMediaAccent = null;
+                if (_settingsService != null)
+                {
+                    ApplyTheme(_settingsService.Current.ThemeName);
+                }
+            }
             CompactArtImage.Source = null;
             ExpandedArtImage.Source = null;
             _lyricsService?.Reset();

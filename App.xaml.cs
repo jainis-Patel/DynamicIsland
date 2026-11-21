@@ -22,12 +22,13 @@ public partial class App : Application
 
     private static readonly string LogFile = AppPaths.LogFile;
     private const long MaxLogSizeBytes = 512 * 1024; // Cap log file at 512 KB
+    private static readonly object LogWriteLock = new();
 
     private static readonly Channel<string> LogChannel = Channel.CreateBounded<string>(
         new BoundedChannelOptions(256)
         {
             FullMode = BoundedChannelFullMode.DropOldest,
-            SingleReader = true,
+            SingleReader = false,
             SingleWriter = false
         });
 
@@ -80,7 +81,10 @@ public partial class App : Application
             }
             if (batch.Length > 0)
             {
-                File.AppendAllText(LogFile, batch.ToString());
+                lock (LogWriteLock)
+                {
+                    File.AppendAllText(LogFile, batch.ToString());
+                }
             }
         }
         catch
@@ -107,22 +111,25 @@ public partial class App : Application
             {
                 try
                 {
-                    var fi = new FileInfo(LogFile);
-                    if (fi.Exists && fi.Length > MaxLogSizeBytes)
+                    lock (LogWriteLock)
                     {
-                        try
+                        var fi = new FileInfo(LogFile);
+                        if (fi.Exists && fi.Length > MaxLogSizeBytes)
                         {
-                            File.Move(LogFile, AppPaths.LogArchiveFile, overwrite: true);
+                            try
+                            {
+                                File.Move(LogFile, AppPaths.LogArchiveFile, overwrite: true);
+                            }
+                            catch
+                            {
+                                // Fallback if archive file is locked
+                            }
+                            File.WriteAllText(LogFile, batch.ToString());
                         }
-                        catch
+                        else
                         {
-                            // Fallback if archive file is locked
+                            File.AppendAllText(LogFile, batch.ToString());
                         }
-                        File.WriteAllText(LogFile, batch.ToString());
-                    }
-                    else
-                    {
-                        File.AppendAllText(LogFile, batch.ToString());
                     }
                 }
                 catch
@@ -136,7 +143,10 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         Log("=== App OnStartup ===");
-        EnsurePowerSavingGpuPreference();
+        if (StartupMode != InstallerStartupMode.Uninstall)
+        {
+            EnsurePowerSavingGpuPreference();
+        }
 
         try
         {
@@ -167,6 +177,16 @@ public partial class App : Application
         {
             Log($"DispatcherUnhandledException: {args.Exception}");
             FlushLogs();
+            if (args.Exception is OutOfMemoryException or StackOverflowException or AccessViolationException)
+            {
+                return;
+            }
+            if (MainWindow == null || !MainWindow.IsVisible)
+            {
+                args.Handled = true;
+                Shutdown(1);
+                return;
+            }
             args.Handled = true;
         };
 

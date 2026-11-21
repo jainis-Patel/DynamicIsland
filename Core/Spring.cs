@@ -25,7 +25,14 @@ public sealed class Spring
 
     public void Step(double dt)
     {
-        if (dt <= 0) return;
+        if (!double.IsFinite(dt) || dt <= 0) return;
+        if (!double.IsFinite(Value) || !double.IsFinite(Velocity) || !double.IsFinite(Target) ||
+            !double.IsFinite(Stiffness) || !double.IsFinite(Damping) || Stiffness <= 0)
+        {
+            Value = double.IsFinite(Target) ? Target : 0;
+            Velocity = 0;
+            return;
+        }
         dt = Math.Min(dt, 0.1); // Clamp after a long UI stall
 
         double x0 = Value - Target;

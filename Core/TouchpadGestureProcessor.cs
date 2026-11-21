@@ -81,6 +81,12 @@ public sealed class TouchpadGestureProcessor
     private int _panStartX;
     private int _panStartY;
 
+    public TouchpadGestureProcessor()
+    {
+        _lastFlickTicks = -FlickCooldownMs;
+        _lastExpandCooldownTicks = -ExpandCooldownMs;
+    }
+
     /// <summary>
     /// Decodes high-resolution horizontal scroll / tilt messages (WM_MOUSEHWHEEL).
     /// Dispatches intentional flicks (Next/Prev track), smooth timeline scrubbing,

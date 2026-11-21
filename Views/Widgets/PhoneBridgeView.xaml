@@ -1,155 +1,309 @@
 <UserControl x:Class="DynamicIsland.Views.Widgets.PhoneBridgeView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:core="clr-namespace:DynamicIsland.Core"
-             mc:Ignorable="d" 
-             d:DesignHeight="220" d:DesignWidth="470">
-    <Grid Margin="0,2,0,2">
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="268" d:DesignWidth="456">
+    <Grid Margin="0,1,0,1">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Top Header & Session Controls -->
-        <DockPanel Grid.Row="0" Margin="0,0,0,6" LastChildFill="False">
+        <!-- Header Row -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Click="BackToLauncher_Click" Style="{StaticResource IslandButton}" Height="20" Width="20" Padding="0" Margin="0,0,6,0" ToolTipService.ToolTip="Back to Apps &amp; Widgets">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE72B;" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Button Click="BackToLauncher_Click" Style="{StaticResource IslandButton}" Height="22" Width="22" Padding="0" Margin="0,0,6,0" ToolTipService.ToolTip="Back to Apps &amp; Widgets">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE72B;" FontSize="9.5" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
-                <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" Margin="0,0,7,0">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8EA;" FontSize="11" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Border Width="24" Height="24" CornerRadius="12" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" Margin="0,0,7,0">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8EA;" FontSize="11.5" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
-                <TextBlock Text="Phone Bridge &amp; QuickShare" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
-                    <TextBlock x:Name="PhoneBridgeStatusBadge" Text="Local Wi-Fi PWA · No App Required" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
+                <TextBlock Text="Phone Bridge" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+
+                <!-- Consolidated Live Status & Timer Pill -->
+                <Border x:Name="HeaderStatusPill" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="7,2" Margin="8,0,0,0" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse x:Name="StatusDot" Width="6" Height="6" Fill="{DynamicResource MutedBrush}" Margin="0,0,5,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="HeaderStatusText" Style="{StaticResource Digits}" Text="Idle" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock x:Name="HeaderLockGlyph" Style="{StaticResource Glyph}" Text="&#xE72E;" FontSize="8.5" Foreground="{DynamicResource GreenBrush}" Margin="4,0,0,0" VerticalAlignment="Center" Visibility="Collapsed" ToolTipService.ToolTip="Password protection active" />
+                    </StackPanel>
                 </Border>
             </StackPanel>
 
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Click="ToggleSessionBtn_Click" x:Name="ToggleSessionBtn" Style="{StaticResource IslandButton}" Height="21" Padding="7,0" Margin="0,0,4,0" ToolTipService.ToolTip="Start or stop local HTTP bridge">
+                <Button Click="ToggleSessionBtn_Click" x:Name="ToggleSessionBtn" Style="{StaticResource IslandButton}" Height="24" Padding="10,0" Margin="0,0,4,0" ToolTipService.ToolTip="Start or stop local Wi-Fi Phone Bridge">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock x:Name="ToggleSessionGlyph" Style="{StaticResource Glyph}" Text="&#xE768;" FontSize="8.5" Foreground="{DynamicResource GreenBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
-                        <TextBlock x:Name="ToggleSessionText" Text="Start Bridge" FontSize="8" FontWeight="Medium" />
+                        <TextBlock x:Name="ToggleSessionGlyph" Style="{StaticResource Glyph}" Text="&#xE768;" FontSize="9" Foreground="{DynamicResource GreenBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="ToggleSessionText" Text="Start Bridge" FontSize="9" FontWeight="SemiBold" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
-                <Button Click="CopyUrlBtn_Click" x:Name="CopyUrlBtn" Style="{StaticResource IslandButton}" Height="21" Width="22" Padding="0" Margin="0,0,4,0" ToolTipService.ToolTip="Copy Phone Pairing URL to clipboard">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="9" Foreground="{DynamicResource PrimaryTextBrush}" />
+                <Button Click="ExtendSessionBtn_Click" x:Name="ExtendSessionBtn" Style="{StaticResource IslandButton}" Height="24" Padding="7,0" Margin="0,0,4,0" Visibility="Collapsed" ToolTipService.ToolTip="Extend bridge session by 15 minutes">
+                    <TextBlock Text="+15m" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
                 </Button>
-                <Button Click="OpenInBrowserBtn_Click" Style="{StaticResource IslandButton}" Height="21" Width="22" Padding="0" ToolTipService.ToolTip="Open Web Portal in default browser">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE774;" FontSize="9" Foreground="{DynamicResource PrimaryTextBrush}" />
+                <Button Click="OpenInBrowserBtn_Click" x:Name="OpenInBrowserBtn" Style="{StaticResource IslandButton}" Height="24" Width="24" Padding="0" Margin="0" ToolTipService.ToolTip="Open Phone Bridge portal in browser">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE774;" FontSize="9.5" Foreground="{DynamicResource PrimaryTextBrush}" />
                 </Button>
             </StackPanel>
         </DockPanel>
 
-        <!-- Main Body: Two Columns (Pairing Radar Left + Beam & Sync Right) -->
+        <!-- Main Body: Pairing & QR Left + Security & Beam Station Right -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="184" />
+                <ColumnDefinition Width="178" />
                 <ColumnDefinition Width="8" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left: Pairing Radar & URL Station -->
-            <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="8,7">
+            <!-- Left Column: Pairing & QR Station -->
+            <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="14" Padding="10,8">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <!-- Radar State Header -->
-                    <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,4">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Ellipse x:Name="StatusDot" Width="6" Height="6" Fill="{DynamicResource MutedBrush}" Margin="0,0,4,0" />
-                            <TextBlock x:Name="SessionStateText" Text="Server Idle" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" />
-                        </StackPanel>
-                        <TextBlock DockPanel.Dock="Right" x:Name="TimerText" Text="--:--" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                    </DockPanel>
+                    <!-- Hero Scannable QR Frame -->
+                    <Button x:Name="QrCodeClickBtn" Grid.Row="0" Click="QrCodeCard_Click" Focusable="False" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" HorizontalAlignment="Center" VerticalAlignment="Center" ToolTipService.ToolTip="Click to start bridge or copy pairing URL">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <ContentPresenter />
+                            </ControlTemplate>
+                        </Button.Template>
+                        <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Border x:Name="QrCardBorder" Background="#FFFFFFFF" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Image x:Name="QrCodeImage" Width="112" Height="112" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor" SnapsToDevicePixels="True" />
+                            </Border>
 
-                    <!-- Visual Pairing Matrix Card with Camera-Scannable QR Code -->
-                    <Border Grid.Row="1" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="6,5" Margin="0,2,0,3">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <!-- High-Contrast Scannable QR Container -->
-                            <Button x:Name="QrCodeClickBtn" Click="QrCodeCard_Click" Focusable="False" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" ToolTipService.ToolTip="Click to start bridge or copy pairing URL">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <ContentPresenter />
-                                    </ControlTemplate>
-                                </Button.Template>
-                                <Grid HorizontalAlignment="Center" Margin="0,0,0,3">
-                                    <!-- White high-contrast background card for instant phone camera lock -->
-                                    <Border x:Name="QrCardBorder" Background="#FFFFFFFF" CornerRadius="8" Padding="4" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <Image x:Name="QrCodeImage" Width="80" Height="80" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor" SnapsToDevicePixels="True" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
+                            <!-- Theme-Adaptive Dormant Overlay -->
+                            <Border x:Name="DormantOverlay" Background="{DynamicResource MenuBackground}" BorderBrush="{DynamicResource MenuBorder}" BorderThickness="1" CornerRadius="9" Padding="8,4" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE768;" FontSize="9.5" Foreground="{DynamicResource GreenBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Start Bridge" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
 
-                                    <!-- Dormant Overlay Badge when bridge is idle -->
-                                    <Border x:Name="DormantOverlay" Background="#E6161618" CornerRadius="8" Padding="7,4" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE768;" FontSize="9.5" Foreground="{DynamicResource GreenBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                            <TextBlock Text="Click to Start" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
+                            <!-- Live Password-Protected Shield Badge -->
+                            <Border x:Name="QrLockBadge" Width="20" Height="20" CornerRadius="10" Background="{DynamicResource GreenBrush}" BorderBrush="{DynamicResource CardSurfaceBrush}" BorderThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,3,3" Visibility="Collapsed" ToolTipService.ToolTip="Session locked by password">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE72E;" FontSize="9" Foreground="#FFFFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                        </Grid>
+                    </Button>
+
+                    <!-- Helper Caption -->
+                    <TextBlock x:Name="QrHelperText" Grid.Row="1" Text="Scan QR after starting" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,5" />
+
+                    <!-- Clickable Copy Address Pill -->
+                    <Button x:Name="AddressCopyBtn" Grid.Row="2" Click="CopyUrlBtn_Click" Style="{StaticResource IslandButton}" Height="26" Padding="8,0" Margin="0" HorizontalAlignment="Stretch" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" ToolTipService.ToolTip="Copy pairing URL to clipboard">
+                        <Grid HorizontalAlignment="Stretch">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="LanIpText" Grid.Column="0" Text="192.168.x.x:8989" FontFamily="Consolas, Segoe UI" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,5,0" />
+                            <TextBlock x:Name="CopyAddressGlyph" Grid.Column="1" Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                        </Grid>
+                    </Button>
+
+                    <!-- Bottom Slot: Duration Picker (Idle) OR Session Progress Bar (Live) -->
+                    <Grid Grid.Row="3" Margin="0,5,0,0">
+                        <Grid x:Name="DurationSelectorPanel">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="4" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="4" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="Duration15Btn" Grid.Column="0" Tag="15" Click="DurationChip_Click" Style="{StaticResource IslandButton}" Height="21" Padding="0" Margin="0" ToolTipService.ToolTip="15 minute session">
+                                <TextBlock Text="15m" FontSize="8.5" FontWeight="SemiBold" />
                             </Button>
+                            <Button x:Name="Duration30Btn" Grid.Column="2" Tag="30" Click="DurationChip_Click" Style="{StaticResource IslandButton}" Height="21" Padding="0" Margin="0" ToolTipService.ToolTip="30 minute session">
+                                <TextBlock Text="30m" FontSize="8.5" FontWeight="SemiBold" />
+                            </Button>
+                            <Button x:Name="Duration60Btn" Grid.Column="4" Tag="60" Click="DurationChip_Click" Style="{StaticResource IslandButton}" Height="21" Padding="0" Margin="0" ToolTipService.ToolTip="60 minute session">
+                                <TextBlock Text="60m" FontSize="8.5" FontWeight="SemiBold" />
+                            </Button>
+                        </Grid>
 
-                            <TextBlock Text="Scan with Phone Camera" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,1,0,0" />
-                            <TextBlock x:Name="LanIpText" Text="http://192.168.x.x:8989" FontSize="7.5" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
+                        <StackPanel x:Name="SessionProgressPanel" Visibility="Collapsed">
+                            <Border Height="3.5" CornerRadius="1.75" Background="{DynamicResource IslandSliderTrackBrush}" ClipToBounds="True">
+                                <Border x:Name="SessionProgressFill" Background="{DynamicResource GreenBrush}" CornerRadius="1.75" RenderTransformOrigin="0,0.5">
+                                    <Border.RenderTransform>
+                                        <ScaleTransform x:Name="SessionProgressScale" ScaleX="1" />
+                                    </Border.RenderTransform>
+                                </Border>
+                            </Border>
+                            <TextBlock x:Name="PortMetaText" Text="Local Wi-Fi · Port 8989" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,3,0,0" />
                         </StackPanel>
-                    </Border>
-
-                    <!-- Token & Quick Copy -->
-                    <Border Grid.Row="2" Background="{DynamicResource BorderSubtleBrush}" CornerRadius="6" Padding="6,3">
-                        <DockPanel LastChildFill="True">
-                            <TextBlock Text="Token:" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                            <TextBlock x:Name="TokenDisplay" Text="Click 'Start Bridge'" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        </DockPanel>
-                    </Border>
+                    </Grid>
                 </Grid>
             </Border>
 
-            <!-- Right: Drop to Beam + Clipboard Bridge -->
+            <!-- Right Column: Security + Beam Drop Zone + Quick Actions -->
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <!-- Beam Drop Zone -->
-                <Border Grid.Row="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="8,6" Margin="0,0,0,6"
-                        AllowDrop="True" Drop="BeamDropZone_Drop" DragOver="BeamDropZone_DragOver">
+                <!-- Card A: Connection Security (Password Entry) -->
+                <Border Grid.Row="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="10,7">
                     <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,5">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock x:Name="LockStatusGlyph" Style="{StaticResource Glyph}" Text="&#xE785;" FontSize="9.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,5,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Connection Security" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="RevokeClientsBtn" Click="RevokeClientsBtn_Click" Style="{StaticResource IslandButton}" Height="18" Padding="6,0" Margin="0,0,4,0" Visibility="Collapsed" ToolTipService.ToolTip="Disconnect &amp; lock all currently paired phones">
+                                    <TextBlock Text="Lock All" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource RedBrush}" />
+                                </Button>
+                                <Border x:Name="SecurityModeBadge" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="6,1.5">
+                                    <TextBlock x:Name="SecurityModeText" Text="Token Only" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" />
+                                </Border>
+                            </StackPanel>
+                        </DockPanel>
+
+                        <!-- Recessed Password Input Field with Inline Controls -->
+                        <Border x:Name="PasswordInputBorder" Grid.Row="1" Height="28" CornerRadius="8" Background="{DynamicResource ElevatedSurfaceBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" Padding="8,0,3,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Grid Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="PasswordPlaceholder" Text="Enter password or PIN (optional)" FontSize="9.5" Foreground="{DynamicResource SecondaryBrush}" Opacity="0.65" VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis" />
+                                    <PasswordBox x:Name="BridgePasswordBox"
+                                                 PasswordChar="●"
+                                                 MaxLength="64"
+                                                 Background="Transparent"
+                                                 BorderThickness="0"
+                                                 Foreground="{DynamicResource PrimaryTextBrush}"
+                                                 CaretBrush="{DynamicResource AccentBrush}"
+                                                 FontSize="10"
+                                                 Padding="0"
+                                                 VerticalAlignment="Center"
+                                                 VerticalContentAlignment="Center"
+                                                 PasswordChanged="BridgePasswordBox_PasswordChanged"
+                                                 KeyDown="PasswordInput_KeyDown"
+                                                 GotKeyboardFocus="PasswordInput_GotFocus"
+                                                 LostKeyboardFocus="PasswordInput_LostFocus"
+                                                 ToolTipService.ToolTip="Optional password required on phone before accessing files or clipboard" />
+                                    <TextBox x:Name="BridgePasswordPlainBox"
+                                             Visibility="Collapsed"
+                                             MaxLength="64"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             Foreground="{DynamicResource PrimaryTextBrush}"
+                                             CaretBrush="{DynamicResource AccentBrush}"
+                                             FontFamily="Consolas, Segoe UI"
+                                             FontSize="10"
+                                             Padding="0"
+                                             VerticalAlignment="Center"
+                                             VerticalContentAlignment="Center"
+                                             TextChanged="BridgePasswordPlainBox_TextChanged"
+                                             KeyDown="PasswordInput_KeyDown"
+                                             GotKeyboardFocus="PasswordInput_GotFocus"
+                                             LostKeyboardFocus="PasswordInput_LostFocus"
+                                             ToolTipService.ToolTip="Optional password required on phone before accessing files or clipboard" />
+                                </Grid>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,0,0">
+                                    <Button x:Name="TogglePasswordVisibilityBtn" Click="TogglePasswordVisibilityBtn_Click" Style="{StaticResource IslandButton}" Background="Transparent" Height="22" Width="22" Padding="0" Margin="0,0,1,0" ToolTipService.ToolTip="Show / hide password">
+                                        <TextBlock x:Name="PasswordVisGlyph" Style="{StaticResource Glyph}" Text="&#xE7B3;" FontSize="9.5" Foreground="{DynamicResource SecondaryBrush}" />
+                                    </Button>
+                                    <Button x:Name="GeneratePinBtn" Click="GeneratePinBtn_Click" Style="{StaticResource IslandButton}" Background="Transparent" Height="22" Width="22" Padding="0" Margin="0,0,1,0" ToolTipService.ToolTip="Generate random 6-digit PIN">
+                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8D7;" FontSize="9.5" Foreground="{DynamicResource AccentBrush}" />
+                                    </Button>
+                                    <Button x:Name="ClearPasswordBtn" Click="ClearPasswordBtn_Click" Style="{StaticResource IslandButton}" Background="Transparent" Height="22" Width="22" Padding="0" Margin="0,0,1,0" Visibility="Collapsed" ToolTipService.ToolTip="Clear password">
+                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
+                                    </Button>
+                                    <Button x:Name="ApplyPasswordBtn" Click="ApplyPasswordBtn_Click" Style="{StaticResource AccentButton}" Height="20" Padding="7,0" Margin="2,0,0,0" Visibility="Collapsed" ToolTipService.ToolTip="Apply password change to live bridge">
+                                        <TextBlock Text="Apply" FontSize="8" FontWeight="Bold" />
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- Card B: Interactive Beam Drop & Browse Zone -->
+                <Border x:Name="BeamDropZone" Grid.Row="1" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="10,7" Margin="0,6,0,6"
+                        AllowDrop="True" Cursor="Hand"
+                        MouseLeftButtonUp="BeamDropZone_Click"
+                        DragEnter="BeamDropZone_DragEnter"
+                        DragOver="BeamDropZone_DragOver"
+                        DragLeave="BeamDropZone_DragLeave"
+                        Drop="BeamDropZone_Drop"
+                        ToolTipService.ToolTip="Drop files here or click to browse &amp; beam to phone">
+                    <Grid>
+                        <Border x:Name="ShelfReadyPill" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="6,1.5" HorizontalAlignment="Right" VerticalAlignment="Top">
+                            <TextBlock x:Name="ShelfReadyText" Text="0 staged" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
+                        </Border>
+
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,3">
+                            <Border x:Name="BeamDropIconBg" Width="28" Height="28" CornerRadius="14" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,4">
                                 <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="12" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <TextBlock Text="Drop files to beam to Phone" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
-                            <TextBlock Text="Available instantly to any connected iPhone/Android browser" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,1,0,0" />
+                            <TextBlock Text="Drop or click to beam files" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="Instant download on phone · Up to 2 GB" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,1,0,0" />
                         </StackPanel>
                     </Grid>
                 </Border>
 
-                <!-- Bottom Bridge Actions -->
-                <Border Grid.Row="1" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="6,4">
-                    <DockPanel LastChildFill="False">
-                        <Button Click="SyncClipboardBtn_Click" Style="{StaticResource IslandButton}" Height="22" Padding="7,0" Margin="0,0,4,0" ToolTipService.ToolTip="Send current Windows clipboard text to phone">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE77F;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Push Clipboard" FontSize="8" FontWeight="Medium" />
-                            </StackPanel>
-                        </Button>
+                <!-- Card C: Quick Actions & Live Activity Footer -->
+                <Border Grid.Row="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="11" Padding="8,6">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
 
-                        <Button Click="ViewShelfBtn_Click" Style="{StaticResource IslandButton}" Height="22" Padding="7,0" ToolTipService.ToolTip="Open Drop Shelf to manage beamed files">
+                        <DockPanel Grid.Row="0" LastChildFill="False">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8F4;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Drop Shelf" FontSize="8" FontWeight="Medium" />
-                            </StackPanel>
-                        </Button>
+                                <Button Click="SyncClipboardBtn_Click" Style="{StaticResource IslandButton}" Height="22" Padding="7,0" Margin="0,0,4,0" ToolTipService.ToolTip="Refresh and share Windows clipboard text with phone">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE77F;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                        <TextBlock Text="Push Clip" FontSize="8.5" FontWeight="Medium" />
+                                    </StackPanel>
+                                </Button>
 
-                        <TextBlock DockPanel.Dock="Right" x:Name="LastActivityText" Text="Waiting for connection" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                    </DockPanel>
+                                <Button Click="ViewShelfBtn_Click" Style="{StaticResource IslandButton}" Height="22" Padding="7,0" Margin="0" ToolTipService.ToolTip="Open Drop Shelf to manage beamed files">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8F4;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                        <TextBlock Text="Shelf" FontSize="8.5" FontWeight="Medium" />
+                                        <Border x:Name="ShelfBtnBadge" Background="{DynamicResource AccentBrush}" CornerRadius="5" Padding="4,0" Margin="4,0,0,0" Visibility="Collapsed" VerticalAlignment="Center">
+                                            <TextBlock x:Name="ShelfBtnBadgeText" Text="0" FontSize="7.5" FontWeight="Bold" Foreground="#FFFFFFFF" />
+                                        </Border>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+
+                            <Border x:Name="DevicesChip" DockPanel.Dock="Right" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="6,2" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock x:Name="DevicesChipGlyph" Style="{StaticResource Glyph}" Text="&#xE8EA;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="DevicesChipText" Text="0 devices" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                        </DockPanel>
+
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,5,0,0">
+                            <Ellipse x:Name="ActivityDot" Width="5" Height="5" Fill="{DynamicResource MutedBrush}" Margin="0,0,5,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="LastActivityText" Text="Ready for pairing" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
                 </Border>
             </Grid>
         </Grid>

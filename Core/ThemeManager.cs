@@ -85,7 +85,7 @@ internal static class ThemeManager
     public static void Initialize(string? initialMode = null, string? initialStyle = null)
     {
         _currentMode = ParseThemeMode(initialMode);
-        _currentStyle = ParseThemeStyle(initialStyle);
+        ThemeStyle targetStyle = ParseThemeStyle(initialStyle);
         bool systemLight = IsSystemInLightMode();
         _lastSystemAppsUseLightTheme = systemLight ? 1 : 0;
 
@@ -97,7 +97,7 @@ internal static class ThemeManager
         };
 
         LiquidUiEngine.Initialize();
-        ApplyThemeCore(resolvedTheme, _currentStyle);
+        ApplyThemeCore(resolvedTheme, targetStyle);
         _initialized = true;
     }
 
@@ -161,8 +161,7 @@ internal static class ThemeManager
     /// </summary>
     public static void SetThemeStyle(ThemeStyle style)
     {
-        _currentStyle = style;
-        ApplyThemeCore(_currentTheme, _currentStyle);
+        ApplyThemeCore(_currentTheme, style);
     }
 
     /// <summary>
@@ -195,10 +194,17 @@ internal static class ThemeManager
 
     private static void ApplyThemeCore(AppTheme theme, ThemeStyle? style = null)
     {
+        AppTheme prevTheme = _currentTheme;
+        ThemeStyle prevStyle = _currentStyle;
+        ThemeStyle nextStyle = style ?? _currentStyle;
+
+        bool themeChanged = !_initialized || prevTheme != theme;
+        bool styleChanged = !_initialized || prevStyle != nextStyle;
+
         _currentTheme = theme;
-        if (style.HasValue) _currentStyle = style.Value;
+        _currentStyle = nextStyle;
         bool isDark = theme == AppTheme.Dark;
-        bool isLiquid = _currentStyle == ThemeStyle.LiquidGlass;
+        bool isLiquid = nextStyle == ThemeStyle.LiquidGlass;
 
         // 1. Update static frozen brushes in ThemeBrushes
         ThemeBrushes.ApplyActiveTheme(isDark, isLiquid);
@@ -211,15 +217,28 @@ internal static class ThemeManager
                 var res = Application.Current.Resources;
                 res["PrimaryTextBrush"] = isDark ? ThemeBrushes.PrimaryTextDark : ThemeBrushes.PrimaryTextLight;
                 res["SecondaryBrush"] = isDark ? ThemeBrushes.SecondaryTextDark : ThemeBrushes.SecondaryTextLight;
+                res["SecondaryTextBrush"] = res["SecondaryBrush"];
                 res["TertiaryBrush"] = isDark ? ThemeBrushes.MutedGreyDark : ThemeBrushes.MutedGreyLight;
+                res["MutedBrush"] = res["TertiaryBrush"];
+
+                res["CyanBrush"] = isDark ? ThemeBrushes.CyanDark : ThemeBrushes.CyanLight;
+                res["AmberBrush"] = isDark ? ThemeBrushes.AmberDark : ThemeBrushes.AmberLight;
+                res["GreenBrush"] = isDark ? ThemeBrushes.GreenDark : ThemeBrushes.GreenLight;
+                res["PinkBrush"] = isDark ? ThemeBrushes.PinkDark : ThemeBrushes.PinkLight;
+                res["PurpleBrush"] = isDark ? ThemeBrushes.PurpleDark : ThemeBrushes.PurpleLight;
 
                 res["CardSurfaceBrush"] = isLiquid
                     ? (isDark ? ThemeBrushes.CardSurfaceLiquidDark : ThemeBrushes.CardSurfaceLiquidLight)
                     : (isDark ? ThemeBrushes.CardSurfaceDark : ThemeBrushes.CardSurfaceLight);
+                res["CardBackground"] = res["CardSurfaceBrush"];
 
                 res["CardBorderBrush"] = isLiquid
                     ? (isDark ? ThemeBrushes.CardBorderLiquidDark : ThemeBrushes.CardBorderLiquidLight)
                     : (isDark ? ThemeBrushes.CardBorderDark : ThemeBrushes.CardBorderLight);
+                res["CardBorder"] = res["CardBorderBrush"];
+                res["BorderSubtleBrush"] = isLiquid
+                    ? (isDark ? ThemeBrushes.CardBorderLiquidDark : ThemeBrushes.CardBorderLiquidLight)
+                    : (isDark ? ThemeBrushes.BorderSubtleDark : ThemeBrushes.BorderSubtleLight);
 
                 res["PillBackgroundBrush"] = isLiquid
                     ? (isDark ? ThemeBrushes.PillBackgroundLiquidDark : ThemeBrushes.PillBackgroundLiquidLight)
@@ -240,6 +259,7 @@ internal static class ThemeManager
                 res["IslandButtonBgBrush"] = isLiquid
                     ? (isDark ? ThemeBrushes.ButtonSubtleBgLiquidDark : ThemeBrushes.ButtonSubtleBgLiquidLight)
                     : (isDark ? ThemeBrushes.ButtonSubtleBgDark : ThemeBrushes.ButtonSubtleBgLight);
+                res["ButtonSubtleBgBrush"] = res["IslandButtonBgBrush"];
 
                 res["IslandButtonBorderBrush"] = isLiquid
                     ? (isDark ? ThemeBrushes.ButtonSubtleBorderLiquidDark : ThemeBrushes.ButtonSubtleBorderLiquidLight)
@@ -341,8 +361,23 @@ internal static class ThemeManager
             }
         }
 
-        // 3. Notify subscribers
-        ThemeChanged?.Invoke(_currentTheme);
-        ThemeStyleChanged?.Invoke(_currentStyle);
+        // 3. Notify subscribers only for the theme dimension(s) that changed
+        if (themeChanged || styleChanged)
+        {
+            void Notify()
+            {
+                if (themeChanged) ThemeChanged?.Invoke(_currentTheme);
+                if (styleChanged) ThemeStyleChanged?.Invoke(_currentStyle);
+            }
+
+            if (Application.Current != null && !Application.Current.Dispatcher.CheckAccess())
+            {
+                Application.Current.Dispatcher.Invoke(Notify);
+            }
+            else
+            {
+                Notify();
+            }
+        }
     }
 }

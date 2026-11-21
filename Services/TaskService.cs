@@ -33,6 +33,7 @@ internal sealed class TaskService : IDisposable
     private readonly string _filePath;
     private readonly object _lock = new();
     private readonly List<IslandTask> _tasks = new();
+    private readonly DebouncedJsonStore<List<IslandTask>> _store;
     private bool _disposed;
 
     public event Action? TasksChanged;
@@ -40,6 +41,10 @@ internal sealed class TaskService : IDisposable
     public TaskService(string? filePath = null)
     {
         _filePath = filePath ?? AppPaths.TasksFile;
+        _store = new DebouncedJsonStore<List<IslandTask>>(_filePath, () =>
+        {
+            lock (_lock) return new List<IslandTask>(_tasks);
+        });
         Load();
     }
 
@@ -115,9 +120,9 @@ internal sealed class TaskService : IDisposable
         lock (_lock)
         {
             _tasks.Add(task);
-            Save();
         }
 
+        _store.ScheduleSave();
         TasksChanged?.Invoke();
         return task;
     }
@@ -133,9 +138,9 @@ internal sealed class TaskService : IDisposable
             task.IsCompleted = !task.IsCompleted;
             task.CompletedAt = task.IsCompleted ? DateTime.Now : null;
             newState = task.IsCompleted;
-            Save();
         }
 
+        _store.ScheduleSave();
         TasksChanged?.Invoke();
         return newState;
     }
@@ -150,12 +155,12 @@ internal sealed class TaskService : IDisposable
             {
                 _tasks.RemoveAt(idx);
                 removed = true;
-                Save();
             }
         }
 
         if (removed)
         {
+            _store.ScheduleSave();
             TasksChanged?.Invoke();
         }
         return removed;
@@ -167,14 +172,11 @@ internal sealed class TaskService : IDisposable
         lock (_lock)
         {
             count = _tasks.RemoveAll(t => t.IsCompleted);
-            if (count > 0)
-            {
-                Save();
-            }
         }
 
         if (count > 0)
         {
+            _store.ScheduleSave();
             TasksChanged?.Invoke();
         }
         return count;
@@ -193,20 +195,10 @@ internal sealed class TaskService : IDisposable
         }
     }
 
-    private void Save()
-    {
-        List<IslandTask> snapshot;
-        lock (_lock)
-        {
-            snapshot = new List<IslandTask>(_tasks);
-        }
-        AtomicJsonStore.Save(_filePath, snapshot, _lock);
-    }
-
     public void Dispose()
     {
         if (_disposed) return;
+        _store.Dispose();
         _disposed = true;
-        Save();
     }
 }

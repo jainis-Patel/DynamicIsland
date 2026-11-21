@@ -26,16 +26,36 @@ internal sealed record ShelfItem(
     public Visibility OcrVisibility => IsImage ? Visibility.Visible : Visibility.Collapsed;
     public string PinGlyph => IsPinned ? "\uE840" : "\uE718";
     public Brush PinForeground => IsPinned ? ThemeBrushes.Amber : ThemeBrushes.SecondaryText;
+
+    public string DirectoryName
+    {
+        get
+        {
+            try
+            {
+                string? trimmed = FullPath?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string? parent = Path.GetDirectoryName(trimmed);
+                string? name = Path.GetFileName(parent);
+                return !string.IsNullOrWhiteSpace(name) ? name : (Path.GetPathRoot(FullPath) ?? "Local");
+            }
+            catch
+            {
+                return "Local";
+            }
+        }
+    }
 }
 
 /// <summary>
 /// Manages the Drop Shelf ("Drop Notch") temporary holding tray for dragged files,
 /// with crash-safe atomic JSON persistence across app restarts.
 /// </summary>
-internal sealed class DropShelfService
+internal sealed class DropShelfService : IDisposable
 {
-    private static readonly string ShelfFile = AppPaths.ShelfFile;
-    private static readonly object SaveLock = new();
+    private readonly string _shelfFile;
+    private readonly object _itemsLock = new();
+    private readonly DebouncedJsonStore<string[]> _store;
+    private bool _disposed;
 
     private static readonly Brush ImgBadgeBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0xFF, 0xAF, 0x52, 0xDE));
     private static readonly Brush DocBadgeBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0xFF, 0xFF, 0x3B, 0x30));
@@ -49,16 +69,29 @@ internal sealed class DropShelfService
     private readonly List<ShelfItem> _items = new();
     private readonly HashSet<string> _pinnedPaths = new(StringComparer.OrdinalIgnoreCase);
 
-    public IReadOnlyList<ShelfItem> Items => _items;
-    public int Count => _items.Count;
-    public bool HasItems => _items.Count > 0;
+    public IReadOnlyList<ShelfItem> Items
+    {
+        get { lock (_itemsLock) return _items.ToList(); }
+    }
+
+    public int Count
+    {
+        get { lock (_itemsLock) return _items.Count; }
+    }
+
+    public bool HasItems
+    {
+        get { lock (_itemsLock) return _items.Count > 0; }
+    }
 
     public long TotalSizeBytes
     {
         get
         {
+            ShelfItem[] snapshot;
+            lock (_itemsLock) snapshot = _items.ToArray();
             long total = 0;
-            foreach (var item in _items)
+            foreach (var item in snapshot)
             {
                 try
                 {
@@ -77,9 +110,19 @@ internal sealed class DropShelfService
 
     public event Action? Changed;
 
-    public DropShelfService()
+    public DropShelfService(string? customFilePath = null)
     {
+        _shelfFile = string.IsNullOrWhiteSpace(customFilePath) ? AppPaths.ShelfFile : customFilePath;
+        _store = new DebouncedJsonStore<string[]>(_shelfFile, BuildPathSnapshot);
         LoadPersistedItems();
+    }
+
+    private string[] BuildPathSnapshot()
+    {
+        lock (_itemsLock)
+        {
+            return _items.Select(i => i.IsPinned ? $"pin|{i.FullPath}" : i.FullPath).ToArray();
+        }
     }
 
     public int AddRange(IEnumerable<string> paths)
@@ -92,16 +135,19 @@ internal sealed class DropShelfService
     public void AddPaths(IEnumerable<string> paths)
     {
         bool modified = false;
-        foreach (var path in paths)
+        lock (_itemsLock)
         {
-            if (_items.Any(i => string.Equals(i.FullPath, path, StringComparison.OrdinalIgnoreCase)))
-                continue;
-
-            if (TryCreateItem(path, _pinnedPaths.Contains(path), out var item) && item != null)
+            foreach (var path in paths)
             {
-                int insertIdx = item.IsPinned ? 0 : _items.TakeWhile(i => i.IsPinned).Count();
-                _items.Insert(insertIdx, item);
-                modified = true;
+                if (_items.Any(i => string.Equals(i.FullPath, path, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                if (TryCreateItem(path, _pinnedPaths.Contains(path), out var item) && item != null)
+                {
+                    int insertIdx = item.IsPinned ? 0 : _items.TakeWhile(i => i.IsPinned).Count();
+                    _items.Insert(insertIdx, item);
+                    modified = true;
+                }
             }
         }
 
@@ -114,7 +160,13 @@ internal sealed class DropShelfService
 
     public void Remove(string path)
     {
-        if (_items.RemoveAll(i => string.Equals(i.FullPath, path, StringComparison.OrdinalIgnoreCase)) > 0)
+        bool removed;
+        lock (_itemsLock)
+        {
+            removed = _items.RemoveAll(i => string.Equals(i.FullPath, path, StringComparison.OrdinalIgnoreCase)) > 0;
+        }
+
+        if (removed)
         {
             SaveAsync();
             Changed?.Invoke();
@@ -123,13 +175,16 @@ internal sealed class DropShelfService
 
     public void Clear()
     {
-        if (_items.Count == 0) return;
-        int removed = _items.RemoveAll(i => !i.IsPinned);
-        if (removed == 0 && _items.Count > 0)
+        lock (_itemsLock)
         {
-            // If only pinned items remain and user clicks Clear again, clear all
-            _items.Clear();
-            _pinnedPaths.Clear();
+            if (_items.Count == 0) return;
+            int removed = _items.RemoveAll(i => !i.IsPinned);
+            if (removed == 0 && _items.Count > 0)
+            {
+                // If only pinned items remain and user clicks Clear again, clear all
+                _items.Clear();
+                _pinnedPaths.Clear();
+            }
         }
         SaveAsync();
         Changed?.Invoke();
@@ -137,18 +192,22 @@ internal sealed class DropShelfService
 
     public bool TogglePin(string path)
     {
-        int idx = _items.FindIndex(i => string.Equals(i.FullPath, path, StringComparison.OrdinalIgnoreCase));
-        if (idx < 0) return false;
+        bool nextPinned;
+        lock (_itemsLock)
+        {
+            int idx = _items.FindIndex(i => string.Equals(i.FullPath, path, StringComparison.OrdinalIgnoreCase));
+            if (idx < 0) return false;
 
-        var cur = _items[idx];
-        bool nextPinned = !cur.IsPinned;
-        if (nextPinned) _pinnedPaths.Add(path);
-        else _pinnedPaths.Remove(path);
+            var cur = _items[idx];
+            nextPinned = !cur.IsPinned;
+            if (nextPinned) _pinnedPaths.Add(path);
+            else _pinnedPaths.Remove(path);
 
-        _items[idx] = cur with { IsPinned = nextPinned };
-        var sorted = _items.OrderByDescending(i => i.IsPinned).ToList();
-        _items.Clear();
-        _items.AddRange(sorted);
+            _items[idx] = cur with { IsPinned = nextPinned };
+            var sorted = _items.OrderByDescending(i => i.IsPinned).ToList();
+            _items.Clear();
+            _items.AddRange(sorted);
+        }
 
         SaveAsync();
         Changed?.Invoke();
@@ -157,26 +216,29 @@ internal sealed class DropShelfService
 
     private void LoadPersistedItems()
     {
-        var paths = AtomicJsonStore.Load<string[]?>(ShelfFile, () => null);
+        var paths = AtomicJsonStore.Load<string[]?>(_shelfFile, () => null);
         if (paths == null) return;
 
-        foreach (var raw in paths)
+        lock (_itemsLock)
         {
-            bool pinned = raw.StartsWith("pin|", StringComparison.OrdinalIgnoreCase);
-            string path = pinned ? raw[4..] : raw;
-            if (pinned) _pinnedPaths.Add(path);
-
-            if (TryCreateItem(path, pinned, out var item) && item != null)
+            foreach (var raw in paths)
             {
-                _items.Add(item);
+                bool pinned = raw.StartsWith("pin|", StringComparison.OrdinalIgnoreCase);
+                string path = pinned ? raw[4..] : raw;
+                if (pinned) _pinnedPaths.Add(path);
+
+                if (TryCreateItem(path, pinned, out var item) && item != null)
+                {
+                    _items.Add(item);
+                }
             }
         }
     }
 
     private void SaveAsync()
     {
-        string[] paths = _items.Select(i => i.IsPinned ? $"pin|{i.FullPath}" : i.FullPath).ToArray();
-        _ = Task.Run(() => AtomicJsonStore.Save(ShelfFile, paths, SaveLock));
+        if (_disposed) return;
+        _store.ScheduleSave();
     }
 
     internal static bool TryCreateItem(string path, out ShelfItem? item) => TryCreateItem(path, false, out item);
@@ -195,7 +257,7 @@ internal sealed class DropShelfService
                 bool isImage = IsImageExtension(ext);
                 string tag = TagForExtension(ext);
                 Brush badgeBrush = BrushForExtension(ext);
-                ImageSource? thumbnail = isImage ? TryLoadThumbnail(path, 180) : null;
+                ImageSource? thumbnail = isImage ? TryLoadThumbnail(path, 320) : null;
 
                 item = new ShelfItem(path, fi.Name, size, glyph, isImage, tag, badgeBrush, thumbnail, isPinned);
                 return true;
@@ -269,10 +331,14 @@ internal sealed class DropShelfService
     {
         try
         {
-            var valid = _items
-                .Select(i => i.FullPath)
-                .Where(p => File.Exists(p) || Directory.Exists(p))
-                .ToList();
+            List<string> valid;
+            lock (_itemsLock)
+            {
+                valid = _items
+                    .Select(i => i.FullPath)
+                    .Where(p => File.Exists(p) || Directory.Exists(p))
+                    .ToList();
+            }
 
             if (valid.Count == 0) return false;
 
@@ -452,10 +518,14 @@ internal sealed class DropShelfService
     /// </summary>
     public string? CreateZipBundle(string? targetDirectory = null)
     {
-        var snapshot = _items
-            .Select(i => i.FullPath)
-            .Where(p => File.Exists(p) || Directory.Exists(p))
-            .ToList();
+        List<string> snapshot;
+        lock (_itemsLock)
+        {
+            snapshot = _items
+                .Select(i => i.FullPath)
+                .Where(p => File.Exists(p) || Directory.Exists(p))
+                .ToList();
+        }
 
         if (snapshot.Count == 0) return null;
 
@@ -562,4 +632,11 @@ internal sealed class DropShelfService
         ".txt" or ".md" or ".log" => "\uE8C4",
         _ => "\uE7C3"
     };
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _store.Dispose();
+        _disposed = true;
+    }
 }

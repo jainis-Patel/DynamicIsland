@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using SharpGen.Runtime;
 
 namespace DynamicIsland.LiquidGlass;
 
@@ -167,6 +168,8 @@ public static class GlassHost
         private GlassSettings _settings;
         private readonly Brush? _originalBackground;
         private readonly ImageBrush _glassBrush = new();
+        private readonly GlassShape[] _shapeBuffer = new GlassShape[1];
+        private System.Windows.Media.Imaging.WriteableBitmap? _targetBitmap;
         private bool _isDisposed;
         private int _lastWidth = -1;
         private int _lastHeight = -1;
@@ -200,10 +203,10 @@ public static class GlassHost
             _element.SizeChanged += OnElementSizeChanged;
             _element.Loaded += OnElementLoaded;
             _element.Unloaded += OnElementUnloaded;
-            GlassManager.Instance.FrameReady += OnBackdropFrameReady;
 
             if (_element.IsLoaded)
             {
+                GlassManager.Instance.FrameReady += OnBackdropFrameReady;
                 RequestRender();
             }
         }
@@ -220,11 +223,18 @@ public static class GlassHost
             RequestRender();
         }
 
-        private void OnElementLoaded(object sender, RoutedEventArgs e) => RequestRender();
+        private void OnElementLoaded(object sender, RoutedEventArgs e)
+        {
+            if (_isDisposed || GlassManager.Instance.IsDisposed) return;
+            GlassManager.Instance.FrameReady -= OnBackdropFrameReady;
+            GlassManager.Instance.FrameReady += OnBackdropFrameReady;
+            RequestRender();
+        }
 
         private void OnElementUnloaded(object sender, RoutedEventArgs e)
         {
-            // Pause rendering when element is unloaded to save CPU/GPU cycles
+            // Pause rendering and detach singleton handler when element is unloaded
+            GlassManager.Instance.FrameReady -= OnBackdropFrameReady;
         }
 
         private void OnElementSizeChanged(object sender, SizeChangedEventArgs e) => RequestRender();
@@ -239,14 +249,14 @@ public static class GlassHost
 
         private void OnBackdropFrameReady(object? sender, EventArgs e)
         {
-            if (_isDisposed) return;
+            if (_isDisposed || !_element.IsLoaded) return;
             var now = DateTime.UtcNow;
             if (now - _lastFrameRender < FrameThrottle) return;
             _lastFrameRender = now;
 
             _element.Dispatcher.InvokeAsync(() =>
             {
-                if (_isDisposed) return;
+                if (_isDisposed || !_element.IsLoaded) return;
                 _lastWidth = -1; // Force re-render
                 _lastHeight = -1;
                 RequestRender();
@@ -255,7 +265,8 @@ public static class GlassHost
 
         public void RequestRender()
         {
-            if (_isDisposed || !_element.IsLoaded) return;
+            if (_isDisposed || !_element.IsLoaded || GlassManager.Instance.IsDisposed || !GlassManager.Instance.IsEnabled)
+                return;
 
             int w = (int)Math.Max(_element.ActualWidth, 1);
             int h = (int)Math.Max(_element.ActualHeight, 1);
@@ -276,33 +287,71 @@ public static class GlassHost
 
             _element.Dispatcher.InvokeAsync(() =>
             {
-                if (_isDisposed) return;
+                if (_isDisposed || !_element.IsLoaded || GlassManager.Instance.IsDisposed || !GlassManager.Instance.IsEnabled)
+                    return;
+
                 try
                 {
                     var renderer = GlassManager.Instance.Renderer;
                     var backdrop = GlassManager.Instance.SharedBackdrop;
 
-                    if (backdrop.CurrentFrameSRV == null) return;
-
-                    // Compute proper DPI scale
-                    float dpiScale = 1.0f;
-                    var source = PresentationSource.FromVisual(_element);
-                    if (source?.CompositionTarget != null)
-                        dpiScale = (float)source.CompositionTarget.TransformToDevice.M11;
-
-                    float radius = _settings.CornerRadius;
-                    if (_element is Border border)
+                    lock (renderer.RenderLock)
                     {
-                        radius = (float)Math.Max(border.CornerRadius.TopLeft, border.CornerRadius.BottomRight);
+                        if (_isDisposed || renderer.IsDisposed || renderer.IsDeviceLost)
+                            return;
+
+                        var srv = backdrop.CurrentFrameSRV;
+                        if (srv == null || backdrop is DesktopCaptureBackdrop { IsDisposed: true })
+                            return;
+
+                        // Compute proper DPI scale
+                        float dpiScale = 1.0f;
+                        var source = PresentationSource.FromVisual(_element);
+                        if (source?.CompositionTarget != null)
+                            dpiScale = (float)source.CompositionTarget.TransformToDevice.M11;
+
+                        float radius = _settings.CornerRadius;
+                        if (_element is Border border)
+                        {
+                            radius = (float)Math.Max(border.CornerRadius.TopLeft, border.CornerRadius.BottomRight);
+                        }
+
+                        float safeScale = Math.Max(dpiScale, 0.5f);
+                        int pxW = Math.Max((int)Math.Round(w * safeScale), 1);
+                        int pxH = Math.Max((int)Math.Round(h * safeScale), 1);
+
+                        _shapeBuffer[0] = GlassShape.FromBounds(0, 0, pxW, pxH, radius * safeScale, _shapeType);
+
+                        float originX = backdrop is DesktopCaptureBackdrop dcb ? dcb.MonitorOriginX : 0f;
+                        float originY = backdrop is DesktopCaptureBackdrop dcb2 ? dcb2.MonitorOriginY : 0f;
+                        var relativeOffset = new Vector2(screenOffset.X - originX, screenOffset.Y - originY);
+                        var backdropSize = new Vector2(backdrop.FrameWidth, backdrop.FrameHeight);
+
+                        if (_targetBitmap == null || _targetBitmap.PixelWidth != pxW || _targetBitmap.PixelHeight != pxH ||
+                            Math.Abs(_targetBitmap.DpiX - 96.0 * safeScale) > 0.5)
+                        {
+                            _targetBitmap = new System.Windows.Media.Imaging.WriteableBitmap(
+                                pxW,
+                                pxH,
+                                96.0 * safeScale,
+                                96.0 * safeScale,
+                                PixelFormats.Pbgra32,
+                                null);
+                        }
+
+                        renderer.RenderToExistingBitmap(_targetBitmap, pxW, pxH, safeScale, _settings, _shapeBuffer, srv, relativeOffset, backdropSize);
+                        if (_glassBrush.ImageSource != _targetBitmap)
+                        {
+                            _glassBrush.ImageSource = _targetBitmap;
+                        }
                     }
-
-                    var shape = GlassShape.FromBounds(0, 0, w, h, radius, _shapeType);
-                    var shapes = new[] { shape };
-
-                    var backdropSize = new Vector2(backdrop.FrameWidth, backdrop.FrameHeight);
-
-                    var bmp = renderer.RenderToBitmap(w, h, dpiScale, _settings, shapes, backdrop.CurrentFrameSRV, screenOffset, backdropSize);
-                    _glassBrush.ImageSource = bmp;
+                }
+                catch (SharpGenException ex)
+                {
+                    GlassManager.Instance.NotifyDeviceFailure(ex);
+                }
+                catch (ObjectDisposedException)
+                {
                 }
                 catch (Exception ex)
                 {
@@ -315,6 +364,7 @@ public static class GlassHost
         {
             if (_isDisposed) return;
             _isDisposed = true;
+            _targetBitmap = null;
 
             _element.SizeChanged -= OnElementSizeChanged;
             _element.Loaded -= OnElementLoaded;

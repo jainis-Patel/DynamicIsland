@@ -17,6 +17,7 @@ public partial class NotesPopupWindow : Window
     private string? _currentNoteId;
     private string _currentColorTag = "#FF9F0A";
     private bool _isUpdatingUi;
+    private bool _isClosing;
 
     internal NotesPopupWindow(NotesService notesService, DropShelfService shelfService)
     {
@@ -56,32 +57,7 @@ public partial class NotesPopupWindow : Window
     {
         if (GetCursorPos(out var pt))
         {
-            var mon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
-            double scale = 1.0;
-            if (mon != IntPtr.Zero && GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, out uint dpiX, out _) == 0)
-            {
-                scale = dpiX / 96.0;
-            }
-
-            double dipX = (pt.X / scale) - (Width / 2);
-            double dipY = (pt.Y / scale) - 24;
-
-            if (mon != IntPtr.Zero)
-            {
-                var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
-                if (GetMonitorInfo(mon, ref mi))
-                {
-                    double minX = mi.rcWork.Left / scale + 8;
-                    double maxX = (mi.rcWork.Right / scale) - Width - 8;
-                    double minY = mi.rcWork.Top / scale + 8;
-                    double maxY = (mi.rcWork.Bottom / scale) - Height - 8;
-                    dipX = Math.Clamp(dipX, minX, Math.Max(minX, maxX));
-                    dipY = Math.Clamp(dipY, minY, Math.Max(minY, maxY));
-                }
-            }
-
-            Left = dipX;
-            Top = dipY;
+            PositionWindowNearPhysicalPoint(this, pt.X, pt.Y, yOffsetDip: 24.0);
         }
 
         RefreshList();
@@ -243,7 +219,14 @@ public partial class NotesPopupWindow : Window
         }
     }
 
-    private void CloseBtn_Click(object sender, RoutedEventArgs e) => Close();
+    private void CloseSafely()
+    {
+        if (_isClosing) return;
+        _isClosing = true;
+        Close();
+    }
+
+    private void CloseBtn_Click(object sender, RoutedEventArgs e) => CloseSafely();
 
     private void ColorSwatch_Click(object sender, RoutedEventArgs e)
     {
@@ -307,14 +290,14 @@ public partial class NotesPopupWindow : Window
     private void Window_Deactivated(object sender, EventArgs e)
     {
         // Auto-close on focus lost
-        Close();
+        CloseSafely();
     }
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape)
         {
-            Close();
+            CloseSafely();
             e.Handled = true;
         }
         else if (e.Key == Key.N && (Keyboard.Modifiers & ModifierKeys.Control) != 0)
@@ -331,6 +314,7 @@ public partial class NotesPopupWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _isClosing = true;
         DynamicIsland.LiquidGlass.GlassHost.Detach(NotesCard);
         base.OnClosed(e);
     }

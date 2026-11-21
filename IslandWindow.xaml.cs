@@ -39,7 +39,7 @@ public partial class IslandWindow : Window
 
     // Unified width (484 DIP) with harmonized vertical rhythm steps (multiples of 8px)
     private static readonly PillShape SettingsExpandedShape   = new(484, 348, 38);
-    private static readonly PillShape ClipboardExpandedShape  = new(484, 216, 34);
+    private static readonly PillShape ClipboardExpandedShape  = new(588, 296, 36);
     private static readonly PillShape NetworkExpandedShape    = new(484, 196, 34);
     private static readonly PillShape BatteryExpandedShape    = new(484, 216, 34);
     private static readonly PillShape SystemHudExpandedShape  = new(484, 232, 34);
@@ -48,13 +48,13 @@ public partial class IslandWindow : Window
     private static readonly PillShape WidgetsGalleryExpandedShape = new(484, 340, 36);
     private static readonly PillShape LauncherExpandedShape   = new(484, 320, 36);
     private static readonly PillShape TermiExpandedShape      = new(484, 232, 36);
-    private static readonly PillShape PhoneBridgeExpandedShape = new(490, 252, 36);
+    private static readonly PillShape PhoneBridgeExpandedShape = new(484, 288, 36);
     private static readonly PillShape MechSoundsExpandedShape  = new(484, 220, 34);
     private static readonly PillShape CaptureStudioExpandedShape = new(484, 232, 36);
     private static readonly PillShape CalendarExpandedShape   = new(484, 256, 36);
     private static readonly PillShape NotesExpandedShape      = new(484, 240, 36);
     private static readonly PillShape AudioExpandedShape      = new(484, 340, 36);
-    private static readonly PillShape ShelfExpandedShape      = new(484, 188, 34);
+    private static readonly PillShape ShelfExpandedShape      = new(588, 268, 36);
     private static readonly PillShape QuickReplyExpandedShape = new(484, 156, 36);
     private static readonly PillShape PetExpandedShape        = new(484, 216, 34);
 
@@ -276,6 +276,7 @@ public partial class IslandWindow : Window
     private readonly Choreographer _choreographer;
     private Views.MiniPlayerWindow? _miniPlayerWindow;
     private TrayIconService? _trayIcon;
+    private bool _isClosing;
 
     internal SystemPerformanceService? SystemPerfServiceInstance => _systemPerfService;
     internal NetworkService? NetworkServiceInstance => _networkService;
@@ -294,6 +295,7 @@ public partial class IslandWindow : Window
     internal DropletRegistry? Droplets => _dropletRegistry;
     internal ClipboardHistoryService ClipboardService => _clipboardService;
     internal DropShelfService Shelf => _shelfService;
+    internal SettingsService Settings => _settingsService;
     internal UpdateManagerService UpdateService => _updateService;
     internal void NavigateToView(ExpandedView view) => SwitchExpandedView(view);
     internal void PushToast(ToastContent content) => _machine.PushToast(content);
@@ -459,8 +461,11 @@ public partial class IslandWindow : Window
             _machine.SetSuppressed(fullscreen);
             _systemPerfService?.SetFullscreenSuspended(fullscreen);
             _networkService?.SetSuspended(fullscreen);
+            _privacyService?.SetSuspended(fullscreen);
             _peripheralService?.SetSuspended(fullscreen);
+            _choreographer?.SetSuspended(fullscreen);
             _cursor?.SetSuspended(fullscreen);
+            UpdateNatureThemeTimerState();
         };
 
         // Register Services
@@ -565,11 +570,8 @@ public partial class IslandWindow : Window
         _powerPlanService.ChargingPulseTriggered += OnChargingPulseTriggered;
         _powerPlanService.DisconnectedTriggered += OnPowerDisconnectedTriggered;
         _powerPlanService.LowBatteryTriggered += OnLowBatteryTriggered;
-        _bluetoothMonitor.Alert += toast =>
-        {
-            _machine.PushToast(toast);
-            _ = _peripheralService.RefreshAsync();
-        };
+        _bluetoothMonitor.Alert += toast => _machine.PushToast(toast);
+        _bluetoothMonitor.DevicesChanged += () => _ = _peripheralService.RefreshAsync();
         _volumeService.VolumeChanged += OnVolumeChanged;
         _shelfService.Changed += OnShelfChanged;
         _privacyService.StateChanged += OnPrivacyStateChanged;
@@ -933,8 +935,10 @@ public partial class IslandWindow : Window
     public bool ShareFilesViaWindows(IEnumerable<string> filePaths, string? title = null) =>
         _windowsShareService.ShareFiles(filePaths, title);
 
-    public LanShareSessionInfo StartPhoneBridgeSession(int durationMinutes = 10) =>
-        _lanQuickShareService.StartSession(durationMinutes);
+    public LanShareSessionInfo StartPhoneBridgeSession(int durationMinutes = 15, string? password = null) =>
+        _lanQuickShareService.StartSession(
+            durationMinutes,
+            password: password ?? _settingsService.Current.PhoneBridgePassword);
 
     internal NotesService NotesService => _notesService;
     internal DropShelfService ShelfService => _shelfService;
@@ -1231,8 +1235,20 @@ public partial class IslandWindow : Window
 
         if (source.Count == target.Count + 1 && target.Count > 0 && EqualityComparer<T>.Default.Equals(source[1], target[0]))
         {
-            target.Insert(0, source[0]);
-            return;
+            bool allMatch = true;
+            for (int i = 1; i < target.Count; i++)
+            {
+                if (!EqualityComparer<T>.Default.Equals(source[i + 1], target[i]))
+                {
+                    allMatch = false;
+                    break;
+                }
+            }
+            if (allMatch)
+            {
+                target.Insert(0, source[0]);
+                return;
+            }
         }
 
         for (int i = target.Count - 1; i >= 0; i--)
@@ -1266,18 +1282,38 @@ public partial class IslandWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _isClosing = true;
         App.Log("IslandWindow OnClosed called.");
         _clockTimer.Stop();
         _topmostTimer.Stop();
+        _natureThemeTimer?.Stop();
+        _caffeineTimer?.Stop();
+        _tuckRestoreTimer?.Stop();
         StopRendering();
+
+        try { if (_miniPlayerWindow != null) { _miniPlayerWindow.Close(); _miniPlayerWindow = null; } } catch { }
+        try { if (_petFloatWindow != null) { _petFloatWindow.Close(); _petFloatWindow = null; } } catch { }
+
         UnregisterAllHotKeys();
+        UninstallVolumeKeyHook();
         UnregisterSystemEvents();
+
+        if (_hwnd != IntPtr.Zero)
+        {
+            try { System.Windows.Interop.HwndSource.FromHwnd(_hwnd)?.RemoveHook(WndProc); } catch { }
+        }
 
         _settingsService.SaveNow();
         _trayIcon?.Dispose();
+        _machine.Dispose();
+        DynamicIsland.LiquidGlass.GlassManager.Instance.Dispose();
         _services.Dispose();
 
         _hwnd = IntPtr.Zero;
+        if (ReferenceEquals(Instance, this))
+        {
+            Instance = null;
+        }
 
         base.OnClosed(e);
     }

@@ -85,7 +85,9 @@ public partial class IslandWindow
                                  or ExpandedView.Launcher
                                  or ExpandedView.Termi
                                  or ExpandedView.Converter
-                                 or ExpandedView.QuickReply);
+                                 or ExpandedView.PhoneBridge
+                                 or ExpandedView.QuickReply
+                                 or ExpandedView.Settings);
 
         // Morph the pill smoothly to target shape (496x338 for Settings, 496x192 for Media/Clock, etc.)
         // using smooth spring target easing without jarring velocity spikes.
@@ -97,7 +99,17 @@ public partial class IslandWindow
         _height.Target = targetShape.Height;
         _radius.Target = targetShape.Radius;
 
-                if (view == ExpandedView.SystemHud)
+        if (view == ExpandedView.WidgetsGallery)
+        {
+            WidgetsGalleryContainer?.SetExpanded(true);
+            WidgetsGalleryContainer?.RefreshAllWidgets();
+        }
+        else if (previousView == ExpandedView.WidgetsGallery)
+        {
+            WidgetsGalleryContainer?.SetExpanded(false);
+        }
+
+        if (view == ExpandedView.SystemHud)
         {
             _systemPerfService?.SetHudExpanded(true);
             if (HudHardwareSubtitle != null && _systemPerfService != null)
@@ -117,14 +129,32 @@ public partial class IslandWindow
             _networkService?.SetExpanded(false);
         }
 
-        if (view == ExpandedView.WidgetsGallery)
+        if (view == ExpandedView.Battery)
         {
-            WidgetsGalleryContainer?.SetExpanded(true);
-            WidgetsGalleryContainer?.RefreshAllWidgets();
+            _powerPlanService?.SetExpanded(true);
         }
-        else if (previousView == ExpandedView.WidgetsGallery)
+        else if (previousView == ExpandedView.Battery)
         {
-            WidgetsGalleryContainer?.SetExpanded(false);
+            _powerPlanService?.SetExpanded(false);
+        }
+
+        if (view == ExpandedView.Peripherals)
+        {
+            _peripheralService?.SetExpanded(true);
+        }
+        else if (previousView == ExpandedView.Peripherals)
+        {
+            _peripheralService?.SetExpanded(false);
+        }
+
+        if (view == ExpandedView.PhoneBridge)
+        {
+            PhoneBridgeContainer?.SetExpanded(true);
+            PhoneBridgeContainer?.RefreshSession();
+        }
+        else if (previousView == ExpandedView.PhoneBridge)
+        {
+            PhoneBridgeContainer?.SetExpanded(false);
         }
 
         if (view == ExpandedView.Launcher)
@@ -138,10 +168,6 @@ public partial class IslandWindow
         else if (view == ExpandedView.Termi)
         {
             TermiContainer?.PopulateSnippetPills();
-        }
-        else if (view == ExpandedView.PhoneBridge)
-        {
-            PhoneBridgeContainer?.RefreshSession();
         }
         else if (view == ExpandedView.MechSounds)
         {
@@ -206,7 +232,7 @@ public partial class IslandWindow
         }
         else if (view == ExpandedView.Peripherals)
         {
-            _ = _peripheralService.RefreshAsync();
+            _ = _peripheralService?.RefreshAsync();
         }
         else if (view == ExpandedView.Network)
         {
@@ -452,12 +478,10 @@ public partial class IslandWindow
             return;
         }
 
-        Point pos = default;
-        try { pos = Mouse.GetPosition(Pill); } catch { }
-        double dockThreshold = Pill.ActualHeight > 0 ? Pill.ActualHeight - 34 : 156;
-        if (pos.Y >= dockThreshold && DockScrollViewer != null)
+        if (ExpandedClockHeader is { Visibility: Visibility.Visible, IsMouseOver: true } ||
+            ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 && _currentExpandedView == ExpandedView.Media))
         {
-            SmoothScrollHorizontal(DockScrollViewer, -delta * 0.85);
+            CycleClockStyle(delta < 0 ? 1 : -1);
             return;
         }
 
@@ -601,7 +625,7 @@ public partial class IslandWindow
     {
         if (ShelfScrollViewer != null)
         {
-            SmoothScrollTo(ShelfScrollViewer, ShelfScrollViewer.HorizontalOffset - 260);
+            SmoothScrollTo(ShelfScrollViewer, ShelfScrollViewer.HorizontalOffset - 372);
         }
     }
 
@@ -609,7 +633,7 @@ public partial class IslandWindow
     {
         if (ShelfScrollViewer != null)
         {
-            SmoothScrollTo(ShelfScrollViewer, ShelfScrollViewer.HorizontalOffset + 260);
+            SmoothScrollTo(ShelfScrollViewer, ShelfScrollViewer.HorizontalOffset + 372);
         }
     }
 
@@ -636,7 +660,7 @@ public partial class IslandWindow
     {
         if (ClipboardScrollViewer != null)
         {
-            SmoothScrollTo(ClipboardScrollViewer, ClipboardScrollViewer.HorizontalOffset - 260);
+            SmoothScrollTo(ClipboardScrollViewer, ClipboardScrollViewer.HorizontalOffset - 372);
         }
     }
 
@@ -644,7 +668,7 @@ public partial class IslandWindow
     {
         if (ClipboardScrollViewer != null)
         {
-            SmoothScrollTo(ClipboardScrollViewer, ClipboardScrollViewer.HorizontalOffset + 260);
+            SmoothScrollTo(ClipboardScrollViewer, ClipboardScrollViewer.HorizontalOffset + 372);
         }
     }
 
@@ -736,6 +760,14 @@ public partial class IslandWindow
                 return;
             }
 
+            if (_currentExpandedView == ExpandedView.PhoneBridge &&
+                Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase or PasswordBox)
+            {
+                Keyboard.ClearFocus();
+                e.Handled = true;
+                return;
+            }
+
             if (_currentExpandedView != ExpandedView.Media)
             {
                 SwitchExpandedView(ExpandedView.Media);
@@ -782,13 +814,13 @@ public partial class IslandWindow
             {
                 if (e.Key == Key.Left)
                 {
-                    SmoothScrollTo(sv, sv.HorizontalOffset - 260);
+                    SmoothScrollTo(sv, sv.HorizontalOffset - 372);
                     e.Handled = true;
                     return;
                 }
                 if (e.Key == Key.Right)
                 {
-                    SmoothScrollTo(sv, sv.HorizontalOffset + 260);
+                    SmoothScrollTo(sv, sv.HorizontalOffset + 372);
                     e.Handled = true;
                     return;
                 }

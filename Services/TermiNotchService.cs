@@ -27,15 +27,17 @@ internal sealed class TermiNotchService : IDisposable
     private readonly string _filePath;
     private readonly object _lock = new();
     private readonly List<TermiCommandSnippet> _snippets = new();
+    private readonly DebouncedJsonStore<List<TermiCommandSnippet>> _store;
     private CancellationTokenSource? _currentRunCts;
     private Process? _activeProcess;
+    private int _isRunningFlag;
     private bool _disposed;
 
     public event Action? SnippetsChanged;
     public event Action<string, bool>? OutputReceived;
     public event Action<bool, int>? ExecutionCompleted; // (success, exitCode)
 
-    public bool IsRunning { get; private set; }
+    public bool IsRunning => Volatile.Read(ref _isRunningFlag) == 1;
 
     public IReadOnlyList<TermiCommandSnippet> Snippets
     {
@@ -48,6 +50,10 @@ internal sealed class TermiNotchService : IDisposable
     public TermiNotchService(string? customFilePath = null)
     {
         _filePath = customFilePath ?? AppPaths.TermiNotchFile;
+        _store = new DebouncedJsonStore<List<TermiCommandSnippet>>(_filePath, () =>
+        {
+            lock (_lock) return _snippets.ToList();
+        });
         Load();
     }
 
@@ -114,15 +120,9 @@ internal sealed class TermiNotchService : IDisposable
     public void SaveNow()
     {
         if (_disposed) return;
-        List<TermiCommandSnippet> snapshot;
-        lock (_lock)
-        {
-            snapshot = _snippets.ToList();
-        }
-
         try
         {
-            AtomicJsonStore.Save(_filePath, snapshot, _lock);
+            _store.FlushNow();
         }
         catch (Exception ex)
         {
@@ -149,7 +149,7 @@ internal sealed class TermiNotchService : IDisposable
             _snippets.Add(snippet);
         }
 
-        SaveNow();
+        _store.ScheduleSave();
         SnippetsChanged?.Invoke();
         return snippet;
     }
@@ -164,7 +164,7 @@ internal sealed class TermiNotchService : IDisposable
 
         if (removed)
         {
-            SaveNow();
+            _store.ScheduleSave();
             SnippetsChanged?.Invoke();
         }
         return removed;
@@ -189,25 +189,37 @@ internal sealed class TermiNotchService : IDisposable
 
     public async Task<int> RunRawCommandAsync(string command, string shell = "powershell", TermiCommandSnippet? snippetToUpdate = null)
     {
-        if (IsRunning)
+        if (_disposed)
+        {
+            return -1;
+        }
+
+        if (Interlocked.CompareExchange(ref _isRunningFlag, 1, 0) != 0)
         {
             OutputReceived?.Invoke("[Warning] Another command is already running.", true);
             return -1;
         }
 
-        IsRunning = true;
-        _currentRunCts = new CancellationTokenSource();
-        var ct = _currentRunCts.Token;
+        var runCts = new CancellationTokenSource();
+        lock (_lock)
+        {
+            if (_disposed)
+            {
+                runCts.Dispose();
+                Interlocked.Exchange(ref _isRunningFlag, 0);
+                return -1;
+            }
+            _currentRunCts = runCts;
+        }
+
+        var ct = runCts.Token;
+        bool useCmd = string.Equals(shell, "cmd", StringComparison.OrdinalIgnoreCase);
 
         OutputReceived?.Invoke($"> [{shell.ToUpperInvariant()}] {command}", false);
 
-        string exe = shell == "cmd" ? "cmd.exe" : "powershell.exe";
-        string args = shell == "cmd" ? $"/c {command}" : $"-NoProfile -ExecutionPolicy Bypass -Command \"{command.Replace("\"", "\\\"")}\"";
-
         var psi = new ProcessStartInfo
         {
-            FileName = exe,
-            Arguments = args,
+            FileName = useCmd ? "cmd.exe" : "powershell.exe",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -216,53 +228,95 @@ internal sealed class TermiNotchService : IDisposable
             StandardErrorEncoding = Encoding.UTF8
         };
 
+        if (useCmd)
+        {
+            psi.ArgumentList.Add("/d");
+            psi.ArgumentList.Add("/s");
+            psi.ArgumentList.Add("/c");
+            psi.ArgumentList.Add(command);
+        }
+        else
+        {
+            string script = $"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; {command}";
+            string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+            psi.ArgumentList.Add("-NoLogo");
+            psi.ArgumentList.Add("-NoProfile");
+            psi.ArgumentList.Add("-NonInteractive");
+            psi.ArgumentList.Add("-EncodedCommand");
+            psi.ArgumentList.Add(encoded);
+        }
+
         int exitCode = -1;
         var sw = Stopwatch.StartNew();
+        Process? proc = null;
 
         try
         {
-            using var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
-            _activeProcess = proc;
+            proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
+            var outputEof = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var errorEof = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
             proc.OutputDataReceived += (_, e) =>
             {
-                if (e.Data != null) OutputReceived?.Invoke(e.Data, false);
+                if (e.Data == null) outputEof.TrySetResult();
+                else OutputReceived?.Invoke(e.Data, false);
             };
             proc.ErrorDataReceived += (_, e) =>
             {
-                if (e.Data != null) OutputReceived?.Invoke(e.Data, true);
+                if (e.Data == null) errorEof.TrySetResult();
+                else OutputReceived?.Invoke(e.Data, true);
             };
+
+            lock (_lock)
+            {
+                _activeProcess = proc;
+            }
 
             proc.Start();
             proc.BeginOutputReadLine();
             proc.BeginErrorReadLine();
 
             await proc.WaitForExitAsync(ct);
+            await Task.WhenAll(outputEof.Task, errorEof.Task).WaitAsync(TimeSpan.FromSeconds(2), CancellationToken.None);
             exitCode = proc.ExitCode;
         }
         catch (OperationCanceledException)
         {
+            KillProcessTree(proc);
             OutputReceived?.Invoke("[TermiNotch] Command cancelled by user.", true);
             exitCode = -999;
         }
         catch (Exception ex)
         {
+            KillProcessTree(proc);
             OutputReceived?.Invoke($"[TermiNotch] Execution failed: {ex.Message}", true);
             exitCode = -1;
         }
         finally
         {
             sw.Stop();
-            _activeProcess = null;
-            IsRunning = false;
-            _currentRunCts?.Dispose();
-            _currentRunCts = null;
+            lock (_lock)
+            {
+                _activeProcess = null;
+                _currentRunCts = null;
+            }
+
+            if (proc != null)
+            {
+                try { proc.Dispose(); } catch { }
+            }
+
+            Interlocked.Exchange(ref _isRunningFlag, 0);
+            try { runCts.Dispose(); } catch { }
 
             if (snippetToUpdate != null)
             {
-                snippetToUpdate.LastRunAt = DateTimeOffset.Now;
-                snippetToUpdate.LastExitCode = exitCode;
-                SaveNow();
+                lock (_lock)
+                {
+                    snippetToUpdate.LastRunAt = DateTimeOffset.Now;
+                    snippetToUpdate.LastExitCode = exitCode;
+                }
+                _store.ScheduleSave();
                 SnippetsChanged?.Invoke();
             }
 
@@ -273,15 +327,34 @@ internal sealed class TermiNotchService : IDisposable
         return exitCode;
     }
 
-    public void CancelCurrentCommand()
+    private static void KillProcessTree(Process? proc)
     {
+        if (proc == null) return;
         try
         {
-            _currentRunCts?.Cancel();
-            if (_activeProcess != null && !_activeProcess.HasExited)
+            if (!proc.HasExited)
             {
-                _activeProcess.Kill(entireProcessTree: true);
+                proc.Kill(entireProcessTree: true);
+                proc.WaitForExit(1500);
             }
+        }
+        catch { }
+    }
+
+    public void CancelCurrentCommand()
+    {
+        CancellationTokenSource? cts;
+        Process? proc;
+        lock (_lock)
+        {
+            cts = _currentRunCts;
+            proc = _activeProcess;
+        }
+
+        try
+        {
+            cts?.Cancel();
+            KillProcessTree(proc);
         }
         catch (Exception ex)
         {
@@ -292,8 +365,8 @@ internal sealed class TermiNotchService : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
+        _store.Dispose();
         _disposed = true;
         CancelCurrentCommand();
-        SaveNow();
     }
 }

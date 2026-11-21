@@ -278,15 +278,18 @@ public partial class IslandWindow
     {
         try
         {
-            var session = _lanQuickShareService.StartSession(10);
+            int duration = _settingsService.Current.PhoneBridgeDurationMinutes;
+            string? password = _settingsService.Current.PhoneBridgePassword;
+            var session = _lanQuickShareService.StartSession(duration, password: password);
             try { Clipboard.SetText(session.Url); } catch { }
+            string lockTag = session.RequiresPassword ? " · Password protected" : string.Empty;
             _machine.PushToast(new ToastContent(
                 "\uE8EA",
                 "Phone Bridge Ready",
-                $"{session.Url} (Link copied · 10m expiry)",
+                $"{session.DisplayAddress} (Link copied · {duration}m{lockTag})",
                 ThemeBrushes.GreenColor,
                 TimeSpan.FromSeconds(5.5),
-                TargetView: "shelf",
+                TargetView: "phonebridge",
                 Priority: ToastPriority.Feedback,
                 Category: "phonebridge"));
         }
@@ -317,7 +320,7 @@ public partial class IslandWindow
             {
                 if (File.Exists(item.FullPath) || Directory.Exists(item.FullPath))
                 {
-                    Process.Start(new ProcessStartInfo(item.FullPath) { UseShellExecute = true });
+                    using var proc = Process.Start(new ProcessStartInfo(item.FullPath) { UseShellExecute = true });
                     _machine.PushToast(new ToastContent(
                         "\uE8E5",
                         "Opening Item",
@@ -384,17 +387,25 @@ public partial class IslandWindow
         if (sender is FrameworkElement { Tag: string path } && File.Exists(path))
         {
             e.Handled = true;
-            string? text = await ScreenToolsService.ExtractTextFromFileAsync(path);
-            if (!string.IsNullOrWhiteSpace(text))
+            try
             {
-                try { Clipboard.SetText(text); } catch { }
-                string preview = text.Replace("\r", " ").Replace("\n", " ").Trim();
-                if (preview.Length > 36) preview = preview[..33] + "...";
-                NotifyCaptureAction("OCR Copied to Clipboard", preview);
+                string? text = await ScreenToolsService.ExtractTextFromFileAsync(path);
+                if (_isClosing) return;
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    try { Clipboard.SetText(text); } catch { }
+                    string preview = text.Replace("\r", " ").Replace("\n", " ").Trim();
+                    if (preview.Length > 36) preview = preview[..33] + "...";
+                    NotifyCaptureAction("OCR Copied to Clipboard", preview);
+                }
+                else
+                {
+                    NotifyCaptureAction("OCR Notice", "No readable text found in image");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                NotifyCaptureAction("OCR Notice", "No readable text found in image");
+                App.Log($"[DropShelf] OCR failed: {ex.Message}");
             }
         }
     }
@@ -459,7 +470,17 @@ public partial class IslandWindow
         {
             var mi = new MenuItem { Header = $"{act.Label} — {act.Subtitle}" };
             var capturedKind = act.Kind;
-            mi.Click += async (_, _) => await RunShelfFileActionAsync(capturedKind, paths, act.Label);
+            mi.Click += async (_, _) =>
+            {
+                try
+                {
+                    await RunShelfFileActionAsync(capturedKind, paths, act.Label);
+                }
+                catch (Exception ex)
+                {
+                    App.Log($"[DropShelf] File action failed: {ex.Message}");
+                }
+            };
             menu.Items.Add(mi);
         }
 
@@ -484,17 +505,25 @@ public partial class IslandWindow
                 var ocrItem = new MenuItem { Header = "🔍 Extract Text (Offline OCR)" };
                 ocrItem.Click += async (_, _) =>
                 {
-                    string? text = await ScreenToolsService.ExtractTextFromFileAsync(singleItem.FullPath);
-                    if (!string.IsNullOrWhiteSpace(text))
+                    try
                     {
-                        try { Clipboard.SetText(text); } catch { }
-                        string preview = text.Replace("\r", " ").Replace("\n", " ").Trim();
-                        if (preview.Length > 36) preview = preview[..33] + "...";
-                        NotifyCaptureAction("OCR Copied to Clipboard", preview);
+                        string? text = await ScreenToolsService.ExtractTextFromFileAsync(singleItem.FullPath);
+                        if (_isClosing) return;
+                        if (!string.IsNullOrWhiteSpace(text))
+                        {
+                            try { Clipboard.SetText(text); } catch { }
+                            string preview = text.Replace("\r", " ").Replace("\n", " ").Trim();
+                            if (preview.Length > 36) preview = preview[..33] + "...";
+                            NotifyCaptureAction("OCR Copied to Clipboard", preview);
+                        }
+                        else
+                        {
+                            NotifyCaptureAction("OCR Notice", "No readable text found in image");
+                        }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        NotifyCaptureAction("OCR Notice", "No readable text found in image");
+                        App.Log($"[DropShelf] Menu OCR failed: {ex.Message}");
                     }
                 };
                 menu.Items.Add(ocrItem);

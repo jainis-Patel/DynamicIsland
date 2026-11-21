@@ -19,8 +19,8 @@ public partial class IslandWindow
     private Point _dragStartMouseScreen;
     private double _dragStartPillCenterX;
     private double _dragStartPillCenterY;
-    private double _floatingCenterX = -1;
-    private double _floatingCenterY = -1;
+    private double _floatingCenterX = double.NaN;
+    private double _floatingCenterY = double.NaN;
     private MagneticDockTarget _activeMagneticDock = MagneticDockTarget.None;
 
     public bool IsDetachedPiP => _isDetachedPiP;
@@ -29,8 +29,16 @@ public partial class IslandWindow
     internal void InitializeFloatingState()
     {
         _isDetachedPiP = _settingsService?.Current.IsDetachedFloating ?? false;
-        _floatingCenterX = _settingsService?.Current.FloatingX ?? -1;
-        _floatingCenterY = _settingsService?.Current.FloatingY ?? -1;
+        double fx = _settingsService?.Current.FloatingX ?? double.NaN;
+        double fy = _settingsService?.Current.FloatingY ?? double.NaN;
+        // Preserve negative multi-monitor coordinates; only treat legacy (-1, -1) sentinel as unset.
+        if (fx == -1 && fy == -1)
+        {
+            fx = double.NaN;
+            fy = double.NaN;
+        }
+        _floatingCenterX = fx;
+        _floatingCenterY = fy;
     }
 
     internal void StartPillDrag(Point mouseScreenPoint)

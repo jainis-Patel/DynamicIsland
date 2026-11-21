@@ -31,6 +31,8 @@ public partial class MiniPlayerWindow : Window
 
     private bool _isUserSeeking;
     private bool _isUserVolumeSeeking;
+    private bool _isUpdatingVolumeUi;
+    private int _activePlayersRenderVersion;
     private bool _isCompactMode;
     private bool _isPinned = true;
     private DrawerState _activeDrawer = DrawerState.None;
@@ -118,6 +120,14 @@ public partial class MiniPlayerWindow : Window
             _isUserSeeking = false;
             CommitSeek();
         }));
+        MiniTimelineSlider.LostMouseCapture += (_, _) =>
+        {
+            if (_isUserSeeking)
+            {
+                _isUserSeeking = false;
+                CommitSeek();
+            }
+        };
 
         MiniVolumeSlider.AddHandler(Thumb.DragStartedEvent, new DragStartedEventHandler((_, _) => _isUserVolumeSeeking = true));
         MiniVolumeSlider.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler((_, _) => _isUserVolumeSeeking = false));
@@ -178,6 +188,7 @@ public partial class MiniPlayerWindow : Window
     private void MiniTimelineSlider_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
         _isUserSeeking = true;
+        MiniTimelineSlider.CaptureMouse();
         double mouseX = e.GetPosition(MiniTimelineSlider).X;
         double width = MiniTimelineSlider.ActualWidth;
         if (width > 0)
@@ -218,6 +229,7 @@ public partial class MiniPlayerWindow : Window
         if (_isUserSeeking)
         {
             _isUserSeeking = false;
+            MiniTimelineSlider.ReleaseMouseCapture();
             CommitSeek();
         }
     }
@@ -229,10 +241,13 @@ public partial class MiniPlayerWindow : Window
         if (e.ChangedButton == MouseButton.Left)
         {
             try { DragMove(); } catch { }
+            CheckSnapToIsland();
         }
     }
 
-    private void RootCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void RootCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e) => CheckSnapToIsland();
+
+    private void CheckSnapToIsland()
     {
         // Snap-to-Island detection: if released near top center directly over island
         if (IslandWindow.Instance is { } island)
@@ -456,7 +471,15 @@ public partial class MiniPlayerWindow : Window
     {
         if (!_isUserVolumeSeeking)
         {
-            MiniVolumeSlider.Value = Math.Clamp(vol * 100f, 0, 100);
+            _isUpdatingVolumeUi = true;
+            try
+            {
+                MiniVolumeSlider.Value = Math.Clamp(vol * 100f, 0, 100);
+            }
+            finally
+            {
+                _isUpdatingVolumeUi = false;
+            }
         }
 
         if (isMuted || vol <= 0.01f)
@@ -483,6 +506,7 @@ public partial class MiniPlayerWindow : Window
 
     private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
+        if (_isUpdatingVolumeUi) return;
         if (IsLoaded && (MiniVolumeSlider.IsMouseOver || _isUserVolumeSeeking))
         {
             float targetScalar = (float)Math.Clamp(MiniVolumeSlider.Value / 100.0, 0.0, 1.0);
@@ -1104,8 +1128,11 @@ public partial class MiniPlayerWindow : Window
 
     private async Task RenderActivePlayersTabAsync()
     {
-        ActivePlayersListHost.Children.Clear();
+        int version = ++_activePlayersRenderVersion;
         var sessions = await _mediaService.GetActiveSessionsAsync();
+        if (version != _activePlayersRenderVersion) return;
+
+        ActivePlayersListHost.Children.Clear();
 
         if (sessions.Count == 0)
         {

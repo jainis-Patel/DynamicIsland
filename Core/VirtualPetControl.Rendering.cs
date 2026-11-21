@@ -664,7 +664,7 @@ public sealed partial class VirtualPetControl
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Particles (table-driven, zero per-frame brushes / geometries)
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    private static void RenderParticles(DrawingContext dc, PetMood mood, double t, double cx, double cy,
+    private void RenderParticles(DrawingContext dc, PetMood mood, double t, double cx, double cy,
         bool isScampering = false, bool isPeeking = false)
     {
         if (isScampering)
@@ -755,7 +755,7 @@ public sealed partial class VirtualPetControl
         dc.DrawLine(pen, new Point(x - half, y + half), new Point(x + half, y + half));
     }
 
-    private static void DrawHeart(DrawingContext dc, double x, double y, double size, double opacity)
+    private void DrawHeart(DrawingContext dc, double x, double y, double size, double opacity)
     {
         int l = Lvl(opacity);
         if (l == 0 || size <= 0.1) return;
@@ -764,7 +764,7 @@ public sealed partial class VirtualPetControl
         dc.Pop();
     }
 
-    private static void DrawStar(DrawingContext dc, double x, double y, double size, double opacity, double rotDeg)
+    private void DrawStar(DrawingContext dc, double x, double y, double size, double opacity, double rotDeg)
     {
         int l = Lvl(opacity);
         if (l == 0 || size <= 0.1) return;
@@ -799,7 +799,7 @@ public sealed partial class VirtualPetControl
         }
     }
 
-    private static void DrawWaterDrop(DrawingContext dc, double x, double y)
+    private void DrawWaterDrop(DrawingContext dc, double x, double y)
     {
         Push(dc, new Matrix(1, 0, 0, 1, x, y));
         dc.DrawGeometry(WaterDropBrush, null, DropGeo);
@@ -808,7 +808,7 @@ public sealed partial class VirtualPetControl
         dc.DrawEllipse(null, RipplePen, new Point(x, y + 4.8), 3.2, 1.2);
     }
 
-    private static void DrawSakuraPetal(DrawingContext dc, double x, double y, double rotDeg)
+    private void DrawSakuraPetal(DrawingContext dc, double x, double y, double rotDeg)
     {
         var m = Matrix.Identity;
         m.Rotate(rotDeg);
@@ -818,7 +818,7 @@ public sealed partial class VirtualPetControl
         dc.Pop();
     }
 
-    private static void DrawBambooLeaf(DrawingContext dc, double x, double y, double rotDeg)
+    private void DrawBambooLeaf(DrawingContext dc, double x, double y, double rotDeg)
     {
         var m = Matrix.Identity;
         m.Rotate(rotDeg);

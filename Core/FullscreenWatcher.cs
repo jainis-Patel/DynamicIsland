@@ -13,6 +13,7 @@ internal sealed class FullscreenWatcher : IDisposable
     private readonly DispatcherTimer _timer;
     private readonly Func<(IntPtr IslandHwnd, IntPtr Monitor)> _getContext;
     private bool _fullscreen;
+    private bool _suspended;
 
     public event Action<bool>? Changed;
 
@@ -25,8 +26,24 @@ internal sealed class FullscreenWatcher : IDisposable
 
     public void Start()
     {
+        if (_suspended) return;
         _timer.Start();
         OnTick(null, EventArgs.Empty);
+    }
+
+    public void SetSuspended(bool suspended)
+    {
+        if (_suspended == suspended) return;
+        _suspended = suspended;
+        if (suspended)
+        {
+            _timer.Stop();
+        }
+        else
+        {
+            _timer.Start();
+            OnTick(null, EventArgs.Empty);
+        }
     }
 
     private void OnTick(object? sender, EventArgs e)

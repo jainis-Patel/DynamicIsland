@@ -36,7 +36,7 @@ internal sealed class VoiceMemoService : IDisposable
     private string? _currentFilePath;
     private DateTime _recordStartTime;
     private volatile float _currentPeak;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     public bool IsRecording { get; private set; }
     public bool IsPlaying { get; private set; }
@@ -253,7 +253,7 @@ internal sealed class VoiceMemoService : IDisposable
             int bitsPerSample;
             lock (_writerLock)
             {
-                if (_writer == null || _capture == null) return;
+                if (_disposed || _writer == null || _capture == null) return;
                 _writer.Write(e.Buffer, 0, e.BytesRecorded);
                 bitsPerSample = _capture.WaveFormat.BitsPerSample;
             }
@@ -291,6 +291,7 @@ internal sealed class VoiceMemoService : IDisposable
             var dur = Elapsed;
             string? savedPath = _currentFilePath;
             CleanupCapture();
+            if (_disposed) return;
 
             if (!string.IsNullOrEmpty(savedPath) && File.Exists(savedPath) && dur > TimeSpan.FromMilliseconds(500))
             {

@@ -203,6 +203,7 @@ public sealed class SystemPerformanceService : IDisposable
     private struct CachedProcessEntry
     {
         public string ExeName;
+        public long CreationTime;
         public long LastTotalTime;
         public long LastSampleTick;
         public int LastSeenGeneration;
@@ -216,6 +217,7 @@ public sealed class SystemPerformanceService : IDisposable
         public ulong MaxPidWorkingSet;
         public ulong TotalWorkingSet;
         public double TotalCpuPercent;
+        public bool ContainsForegroundPid;
     }
 
     private readonly Dictionary<uint, CachedProcessEntry> _pidCache = new(512);
@@ -235,7 +237,7 @@ public sealed class SystemPerformanceService : IDisposable
     private volatile bool _isHudExpanded;
     private volatile bool _isFullscreenSuspended;
     private volatile bool _isSessionLocked;
-    private bool _isDisposed;
+    private volatile bool _isDisposed;
 
     private readonly uint _currentPid;
     private readonly GpuTelemetryProvider _gpuProvider;
@@ -346,8 +348,14 @@ public sealed class SystemPerformanceService : IDisposable
 
     public SystemVitalsSnapshot SampleTelemetry(bool forceProcessScan = false, bool forceDispatch = false)
     {
+        SystemVitalsSnapshot snapshot;
+        bool shouldInvoke = false;
+
         lock (_syncLock)
         {
+            if (_isDisposed)
+                return LatestSnapshot;
+
             // 1. Tier 1: Sub-millisecond CPU & RAM Kernel Calls (0 Heap Allocations)
             int cpuPercent = SampleSystemCpuPercent(out long systemDeltaTicks);
             ReadMemoryStatus(out int ramPercent, out double usedGb, out double totalGb, out double availGb);
@@ -384,7 +392,7 @@ public sealed class SystemPerformanceService : IDisposable
                 cores = _cpuCoreSampler.Sample();
             }
 
-            var snapshot = new SystemVitalsSnapshot(
+            snapshot = new SystemVitalsSnapshot(
                 cpuPercent,
                 ramPercent,
                 usedGb,
@@ -411,7 +419,7 @@ public sealed class SystemPerformanceService : IDisposable
             {
                 _lastDispatchedCpu = cpuPercent;
                 _lastDispatchedRamGb = usedGb;
-                VitalsUpdated?.Invoke(snapshot);
+                shouldInvoke = true;
             }
 
             // Adjust idle polling cadence dynamically if power state changed
@@ -420,9 +428,14 @@ public sealed class SystemPerformanceService : IDisposable
                 int targetInterval = onBattery ? 8000 : 5000;
                 _pollTimer?.Change(targetInterval, targetInterval);
             }
-
-            return snapshot;
         }
+
+        if (shouldInvoke)
+        {
+            VitalsUpdated?.Invoke(snapshot);
+        }
+
+        return snapshot;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -496,6 +509,8 @@ public sealed class SystemPerformanceService : IDisposable
 
         uint countersSize = (uint)Marshal.SizeOf<PROCESS_MEMORY_COUNTERS>();
         long nowTicks = Environment.TickCount64;
+        IntPtr fgHwnd = GetForegroundWindow();
+        GetWindowThreadProcessId(fgHwnd, out uint foregroundPid);
 
         for (int i = 0; i < count; i++)
         {
@@ -517,13 +532,16 @@ public sealed class SystemPerformanceService : IDisposable
                     continue;
 
                 double procCpuPercent = 0.0;
+                long creationTime = 0;
                 long totalProcTime = 0;
-                if (GetProcessTimes(hProcess, out _, out _, out long kTime, out long uTime))
+                if (GetProcessTimes(hProcess, out long cTime, out _, out long kTime, out long uTime))
                 {
+                    creationTime = cTime;
                     totalProcTime = kTime + uTime;
                 }
 
-                if (!_pidCache.TryGetValue(pid, out CachedProcessEntry cached))
+                if (!_pidCache.TryGetValue(pid, out CachedProcessEntry cached) ||
+                    (cached.CreationTime != 0 && creationTime != 0 && cached.CreationTime != creationTime))
                 {
                     string? exeName = TryReadProcessExeName(hProcess);
                     if (string.IsNullOrEmpty(exeName))
@@ -532,6 +550,7 @@ public sealed class SystemPerformanceService : IDisposable
                     cached = new CachedProcessEntry
                     {
                         ExeName = exeName,
+                        CreationTime = creationTime,
                         LastTotalTime = totalProcTime,
                         LastSampleTick = nowTicks,
                         LastSeenGeneration = _scanGeneration
@@ -544,6 +563,7 @@ public sealed class SystemPerformanceService : IDisposable
                     {
                         procCpuPercent = Math.Clamp((procDelta * 100.0) / systemDeltaTicks, 0.0, 100.0);
                     }
+                    if (cached.CreationTime == 0) cached.CreationTime = creationTime;
                     cached.LastTotalTime = totalProcTime;
                     cached.LastSampleTick = nowTicks;
                     cached.LastSeenGeneration = _scanGeneration;
@@ -556,6 +576,8 @@ public sealed class SystemPerformanceService : IDisposable
                     group.Count++;
                     group.TotalWorkingSet += workingSet;
                     group.TotalCpuPercent += procCpuPercent;
+                    if (pid == foregroundPid)
+                        group.ContainsForegroundPid = true;
                     if (workingSet > group.MaxPidWorkingSet)
                     {
                         group.MaxPidWorkingSet = workingSet;
@@ -572,7 +594,8 @@ public sealed class SystemPerformanceService : IDisposable
                         MaxPid = pid,
                         MaxPidWorkingSet = workingSet,
                         TotalWorkingSet = workingSet,
-                        TotalCpuPercent = procCpuPercent
+                        TotalCpuPercent = procCpuPercent,
+                        ContainsForegroundPid = (pid == foregroundPid)
                     };
                 }
             }
@@ -627,8 +650,6 @@ public sealed class SystemPerformanceService : IDisposable
         }
 
         // Identify non-whitelisted background runaway process consuming >= 20% CPU
-        IntPtr fgHwnd = GetForegroundWindow();
-        GetWindowThreadProcessId(fgHwnd, out uint foregroundPid);
         double maxRunawayCpu = 0.0;
         AggregatedGroup runawayCandidate = default;
 
@@ -637,7 +658,7 @@ public sealed class SystemPerformanceService : IDisposable
             AggregatedGroup g = kvp.Value;
             if (g.TotalCpuPercent >= 20.0)
             {
-                if (!IsProtectedProcess(g.ExeName) && g.MaxPid != foregroundPid && g.MaxPid != _currentPid)
+                if (!IsProtectedProcess(g.ExeName) && !g.ContainsForegroundPid && g.MaxPid != foregroundPid && g.MaxPid != _currentPid)
                 {
                     if (g.TotalCpuPercent > maxRunawayCpu)
                     {
@@ -761,6 +782,16 @@ public sealed class SystemPerformanceService : IDisposable
     /// </summary>
     public bool TryTerminateProcessGroup(string exeName, uint fallbackPid)
     {
+        bool killedAny = TryTerminateProcessGroupCore(exeName, fallbackPid);
+        if (killedAny)
+        {
+            SampleTelemetry(forceProcessScan: true, forceDispatch: true);
+        }
+        return killedAny;
+    }
+
+    private bool TryTerminateProcessGroupCore(string exeName, uint fallbackPid)
+    {
         if (string.IsNullOrWhiteSpace(exeName))
             return false;
 
@@ -777,20 +808,20 @@ public sealed class SystemPerformanceService : IDisposable
             {
                 if (string.Equals(kvp.Value.ExeName, exeName, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (TryTerminateSinglePid(kvp.Key))
+                    if (TryTerminateSinglePid(kvp.Key, kvp.Value.CreationTime))
                         killedAny = true;
                 }
             }
 
             if (!killedAny && fallbackPid > 4)
             {
-                killedAny = TryTerminateSinglePid(fallbackPid);
+                long expectedCreate = _pidCache.TryGetValue(fallbackPid, out var entry) ? entry.CreationTime : 0;
+                killedAny = TryTerminateSinglePid(fallbackPid, expectedCreate);
             }
 
             if (killedAny)
             {
                 _pidCache.Clear();
-                SampleTelemetry(forceProcessScan: true, forceDispatch: true);
             }
         }
 
@@ -802,12 +833,9 @@ public sealed class SystemPerformanceService : IDisposable
     /// </summary>
     public RunawayPurgeResult PurgeRunawayProcesses(double minCpuPercent = 20.0)
     {
+        var candidates = new List<(string ExeName, uint MaxPid, double TotalCpuPercent)>();
         lock (_syncLock)
         {
-            int killedCount = 0;
-            double freedCpu = 0.0;
-            var terminated = new List<string>();
-
             IntPtr fgHwnd = GetForegroundWindow();
             GetWindowThreadProcessId(fgHwnd, out uint foregroundPid);
 
@@ -817,26 +845,34 @@ public sealed class SystemPerformanceService : IDisposable
                 if (g.TotalCpuPercent >= minCpuPercent)
                 {
                     string name = g.ExeName;
-                    if (IsProtectedProcess(name) || g.MaxPid == foregroundPid || g.MaxPid == _currentPid)
+                    if (IsProtectedProcess(name) || g.ContainsForegroundPid || g.MaxPid == foregroundPid || g.MaxPid == _currentPid)
                         continue;
 
-                    if (TryTerminateProcessGroup(name, g.MaxPid))
-                    {
-                        killedCount++;
-                        freedCpu += g.TotalCpuPercent;
-                        terminated.Add(name);
-                    }
+                    candidates.Add((name, g.MaxPid, g.TotalCpuPercent));
                 }
             }
-
-            if (killedCount > 0)
-            {
-                _pidCache.Clear();
-                SampleTelemetry(forceProcessScan: true, forceDispatch: true);
-            }
-
-            return new RunawayPurgeResult(killedCount, freedCpu, string.Join(", ", terminated));
         }
+
+        int killedCount = 0;
+        double freedCpu = 0.0;
+        var terminated = new List<string>();
+
+        foreach (var candidate in candidates)
+        {
+            if (TryTerminateProcessGroupCore(candidate.ExeName, candidate.MaxPid))
+            {
+                killedCount++;
+                freedCpu += candidate.TotalCpuPercent;
+                terminated.Add(candidate.ExeName);
+            }
+        }
+
+        if (killedCount > 0)
+        {
+            SampleTelemetry(forceProcessScan: true, forceDispatch: true);
+        }
+
+        return new RunawayPurgeResult(killedCount, freedCpu, string.Join(", ", terminated));
     }
 
     public static bool IsProtectedProcess(string? exeName)
@@ -859,14 +895,21 @@ public sealed class SystemPerformanceService : IDisposable
                clean.Equals("Idle", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool TryTerminateSinglePid(uint pid)
+    private static bool TryTerminateSinglePid(uint pid, long expectedCreationTime = 0)
     {
-        IntPtr hProc = OpenProcess(PROCESS_TERMINATE, false, pid);
+        IntPtr hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE, false, pid);
         if (hProc == IntPtr.Zero)
             return false;
 
         try
         {
+            if (expectedCreationTime != 0 &&
+                GetProcessTimes(hProc, out long actualCreationTime, out _, out _, out _) &&
+                actualCreationTime != expectedCreationTime)
+            {
+                return false;
+            }
+
             using var proc = Process.GetProcessById((int)pid);
             proc.Kill(entireProcessTree: true);
             return true;
@@ -885,7 +928,8 @@ public sealed class SystemPerformanceService : IDisposable
     {
         try
         {
-            EmptyWorkingSet(Process.GetCurrentProcess().Handle);
+            using var proc = Process.GetCurrentProcess();
+            EmptyWorkingSet(proc.Handle);
         }
         catch
         {
@@ -932,20 +976,23 @@ public sealed class SystemPerformanceService : IDisposable
 
     public void Dispose()
     {
-        if (_isDisposed)
-            return;
+        lock (_syncLock)
+        {
+            if (_isDisposed)
+                return;
 
-        _isDisposed = true;
-        try
-        {
-            SystemEvents.SessionSwitch -= OnSessionSwitch;
+            _isDisposed = true;
+            try
+            {
+                SystemEvents.SessionSwitch -= OnSessionSwitch;
+            }
+            catch
+            {
+            }
+            _pollTimer?.Dispose();
+            _pollTimer = null;
+            _gpuProvider.Dispose();
+            _cpuCoreSampler.Dispose();
         }
-        catch
-        {
-        }
-        _pollTimer?.Dispose();
-        _pollTimer = null;
-        _gpuProvider.Dispose();
-        _cpuCoreSampler.Dispose();
     }
 }

@@ -64,7 +64,7 @@ internal static class WindowBlurHelper
     {
         public int Attribute;
         public IntPtr Data;
-        public int SizeOfData;
+        public nuint SizeOfData;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -103,14 +103,7 @@ internal static class WindowBlurHelper
     {
         if (hwnd == IntPtr.Zero) return;
 
-        // 1. Ensure window is NEVER hidden from screenshots
-        try
-        {
-            SetWindowDisplayAffinity(hwnd, 0 /* WDA_NONE */);
-        }
-        catch { }
-
-        // 2. Windows 11 Fluent 2 Native Backdrop Composition (Mica / Acrylic)
+        // 1. Windows 11 Fluent 2 Native Backdrop Composition (Mica / Acrylic)
         if (Environment.OSVersion.Version.Build >= 22000)
         {
             try
@@ -157,7 +150,7 @@ internal static class WindowBlurHelper
                 {
                     Attribute = WCA_ACCENT_POLICY,
                     Data = pPolicy,
-                    SizeOfData = size
+                    SizeOfData = (nuint)size
                 };
 
                 int res = SetWindowCompositionAttribute(hwnd, ref data);
@@ -166,7 +159,19 @@ internal static class WindowBlurHelper
                     // Fall back to standard BlurBehind if AcrylicBlurBehind isn't supported on this specific OS build
                     policy.AccentState = AccentState.ACCENT_ENABLE_BLURBEHIND;
                     Marshal.StructureToPtr(policy, pPolicy, false);
-                    SetWindowCompositionAttribute(hwnd, ref data);
+                    res = SetWindowCompositionAttribute(hwnd, ref data);
+                }
+
+                if (res == 0)
+                {
+                    var bb = new DWM_BLURBEHIND
+                    {
+                        dwFlags = 1, // DWM_BB_ENABLE
+                        fEnable = true,
+                        hRgnBlur = IntPtr.Zero,
+                        fTransitionOnMaximized = false
+                    };
+                    DwmEnableBlurBehindWindow(hwnd, ref bb);
                 }
             }
             finally
@@ -199,12 +204,6 @@ internal static class WindowBlurHelper
     {
         if (hwnd == IntPtr.Zero) return;
 
-        try
-        {
-            SetWindowDisplayAffinity(hwnd, 0 /* WDA_NONE */);
-        }
-        catch { }
-
         if (Environment.OSVersion.Version.Build >= 22621)
         {
             try
@@ -234,7 +233,7 @@ internal static class WindowBlurHelper
                 {
                     Attribute = WCA_ACCENT_POLICY,
                     Data = pPolicy,
-                    SizeOfData = size
+                    SizeOfData = (nuint)size
                 };
                 SetWindowCompositionAttribute(hwnd, ref data);
             }

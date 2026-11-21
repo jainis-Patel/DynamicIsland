@@ -108,7 +108,7 @@ public partial class NotesView : UserControl
         string text = NoteEditorBox.Text;
         EditorPlaceholder.Visibility = string.IsNullOrEmpty(text) ? Visibility.Visible : Visibility.Collapsed;
 
-        if (string.IsNullOrWhiteSpace(text)) return;
+        if (string.IsNullOrWhiteSpace(text) && _currentNoteId == null) return;
 
         if (_currentNoteId == null)
         {

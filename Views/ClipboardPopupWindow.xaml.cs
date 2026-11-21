@@ -48,32 +48,7 @@ public partial class ClipboardPopupWindow : Window
     {
         if (GetCursorPos(out var pt))
         {
-            var mon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
-            double scale = 1.0;
-            if (mon != IntPtr.Zero && GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, out uint dpiX, out _) == 0)
-            {
-                scale = dpiX / 96.0;
-            }
-
-            double dipX = (pt.X / scale) - (Width / 2);
-            double dipY = (pt.Y / scale) - 24;
-
-            if (mon != IntPtr.Zero)
-            {
-                var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
-                if (GetMonitorInfo(mon, ref mi))
-                {
-                    double minX = mi.rcWork.Left / scale + 8;
-                    double maxX = (mi.rcWork.Right / scale) - Width - 8;
-                    double minY = mi.rcWork.Top / scale + 8;
-                    double maxY = (mi.rcWork.Bottom / scale) - Height - 8;
-                    dipX = Math.Clamp(dipX, minX, Math.Max(minX, maxX));
-                    dipY = Math.Clamp(dipY, minY, Math.Max(minY, maxY));
-                }
-            }
-
-            Left = dipX;
-            Top = dipY;
+            PositionWindowNearPhysicalPoint(this, pt.X, pt.Y, yOffsetDip: 24.0);
         }
 
         RefreshList();

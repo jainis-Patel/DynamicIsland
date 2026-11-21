@@ -51,10 +51,32 @@ public static class UpdateIntegrityVerifier
             return false;
         }
 
+        string cleanExpected = expectedSha256.Trim();
+        if (cleanExpected.Length != 64)
+        {
+            return false;
+        }
+
+        byte[] expectedBytes;
         try
         {
-            string actualHash = await ComputeFileSha256Async(filePath, ct).ConfigureAwait(false);
-            return string.Equals(actualHash, expectedSha256.Trim(), StringComparison.OrdinalIgnoreCase);
+            expectedBytes = Convert.FromHexString(cleanExpected);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+
+        try
+        {
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, BufferSize, useAsync: true);
+            using var sha256 = SHA256.Create();
+            byte[] actualBytes = await sha256.ComputeHashAsync(stream, ct).ConfigureAwait(false);
+            return CryptographicOperations.FixedTimeEquals(actualBytes, expectedBytes);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {

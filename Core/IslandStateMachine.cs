@@ -41,7 +41,7 @@ public sealed record ToastContent(
 /// Includes a priority-aware toast queue with category coalescing so low-priority feedback toasts
 /// (e.g. volume steps) never clobber critical alerts or incoming notifications.
 /// </summary>
-public sealed class IslandStateMachine
+public sealed class IslandStateMachine : IDisposable
 {
     public static readonly TimeSpan HoverEnterDelay = TimeSpan.FromMilliseconds(110);
     public static readonly TimeSpan HoverLeaveDelay = TimeSpan.FromMilliseconds(260);
@@ -172,6 +172,7 @@ public sealed class IslandStateMachine
             _leaveTimer.Stop();
             _pointerInside = false;
             _hovered = false;
+            _pinned = false;
         }
         Evaluate();
     }
@@ -262,10 +263,17 @@ public sealed class IslandStateMachine
     {
         _toast = toast;
         _toastTimer.Stop();
-        _toastTimer.Interval = toast.Duration;
+        _toastTimer.Interval = TimeSpan.FromMilliseconds(Math.Clamp(toast.Duration.TotalMilliseconds, 100.0, 30000.0));
         _toastTimer.Start();
         ToastChanged?.Invoke(toast, replacing);
         Evaluate();
+    }
+
+    public void Dispose()
+    {
+        _enterTimer.Stop();
+        _leaveTimer.Stop();
+        _toastTimer.Stop();
     }
 
     private void Evaluate()

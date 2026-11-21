@@ -115,6 +115,10 @@ public sealed class QrCode
         Mask = mask;
         ApplyMask(mask);
         DrawFormatBits(mask);
+        if (Version >= 7)
+        {
+            DrawVersionInfo(Version, isDummy: false);
+        }
     }
 
     /// <summary>

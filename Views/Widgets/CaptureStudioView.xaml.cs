@@ -90,9 +90,9 @@ public partial class CaptureStudioView : UserControl
 
     private async void PasteImageOcr_Click(object sender, RoutedEventArgs e)
     {
-        if (Clipboard.ContainsImage())
+        try
         {
-            try
+            if (Clipboard.ContainsImage())
             {
                 var bmp = Clipboard.GetImage();
                 if (bmp != null)
@@ -115,22 +115,22 @@ public partial class CaptureStudioView : UserControl
                     }
                 }
             }
-            catch (Exception ex)
+            else if (Clipboard.ContainsText())
             {
-                OcrStatusText.Text = "OCR error: " + ex.Message;
-                OcrStatusText.Foreground = ThemeBrushes.Red;
+                OcrResultBox.Text = Clipboard.GetText();
+                OcrStatusText.Text = "Pasted clipboard text";
+                OcrStatusText.Foreground = ThemeBrushes.Accent;
+            }
+            else
+            {
+                OcrStatusText.Text = "No image in clipboard";
+                OcrStatusText.Foreground = ThemeBrushes.Amber;
             }
         }
-        else if (Clipboard.ContainsText())
+        catch (Exception ex)
         {
-            OcrResultBox.Text = Clipboard.GetText();
-            OcrStatusText.Text = "Pasted clipboard text";
-            OcrStatusText.Foreground = ThemeBrushes.Accent;
-        }
-        else
-        {
-            OcrStatusText.Text = "No image in clipboard";
-            OcrStatusText.Foreground = ThemeBrushes.Amber;
+            OcrStatusText.Text = "OCR error: " + ex.Message;
+            OcrStatusText.Foreground = ThemeBrushes.Red;
         }
     }
 
@@ -147,6 +147,7 @@ public partial class CaptureStudioView : UserControl
     {
         if (e.Data.GetData(DataFormats.FileDrop) is string[] files && files.Length > 0)
         {
+            e.Handled = true;
             string file = files[0];
             string ext = Path.GetExtension(file).ToLowerInvariant();
             if (ext is ".png" or ".jpg" or ".jpeg" or ".bmp" or ".webp")
@@ -181,7 +182,6 @@ public partial class CaptureStudioView : UserControl
                 OcrStatusText.Text = "Please drop an image file (PNG/JPG/BMP/WebP)";
                 OcrStatusText.Foreground = ThemeBrushes.Amber;
             }
-            e.Handled = true;
         }
     }
 
@@ -189,14 +189,21 @@ public partial class CaptureStudioView : UserControl
     {
         if (!string.IsNullOrWhiteSpace(OcrResultBox.Text))
         {
-            Clipboard.SetText(OcrResultBox.Text);
-            _window?.ShowToast(
-                "\uE8C8",
-                "OCR Text Copied",
-                $"{OcrResultBox.Text.Length} characters copied to clipboard",
-                ThemeBrushes.GreenColor,
-                "capturestudio");
-            _window?.TriggerLiquidImpulse(18, -6, 2);
+            try
+            {
+                Clipboard.SetText(OcrResultBox.Text);
+                _window?.ShowToast(
+                    "\uE8C8",
+                    "OCR Text Copied",
+                    $"{OcrResultBox.Text.Length} characters copied to clipboard",
+                    ThemeBrushes.GreenColor,
+                    "capturestudio");
+                _window?.TriggerLiquidImpulse(18, -6, 2);
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[CaptureStudioView] Clipboard copy failed: {ex.Message}");
+            }
         }
     }
 

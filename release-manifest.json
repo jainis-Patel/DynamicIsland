@@ -1,22 +1,22 @@
 ﻿{
-    "version":  "0.7.0",
-    "releaseTag":  "v0.7.0",
-    "channel":  "stable",
-    "releaseDate":  "2026-11-20T00:00:00Z",
-    "minWindowsBuild":  "10.0.19041.0",
-    "changelogUrl":  "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.7.0",
-    "summary":  "Virtual Pet Sanctuary & Desktop Roam: Large 135x105 interactive playground stage, floating desktop companion roam window, 6 unique species signature moves (laser hunt, tennis ball fetch, binky flip, foxfire dance, panda kung-fu roll, stardust flame breath), and GitHub Auto-Update engine v2 with SHA-256 verification.",
-    "isCritical":  false,
-    "downloads":  {
-                      "installer":  {
-                                        "url":  "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.7.0/DynamicIsland-Setup.exe",
-                                        "sha256":  "ff95146ca131841df83a69a6965c8bc9b9354b793248b792c0aed9315ddc2051",
-                                        "sizeBytes":  175767086
-                                    },
-                      "portable":  {
-                                       "url":  "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.7.0/DynamicIsland-Portable.zip",
-                                       "sha256":  "07824bd5282e731a06fc9dbd3a01982cbb84b69fea13fdc624e092424d9ca188",
-                                       "sizeBytes":  68794342
-                                   }
-                  }
+    "version": "0.8.0",
+    "releaseTag": "v0.8.0",
+    "channel": "stable",
+    "releaseDate": "2026-11-21T02:13:00Z",
+    "minWindowsBuild": "10.0.19041.0",
+    "changelogUrl": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.8.0",
+    "summary": "Expanded Clipboard & Drop Shelf Bento Card Decks, full 5-phase performance/architecture overhaul, fixed GitHub self-updater handoff (--install --relaunch --target-dir), and native asset SHA-256 verification.",
+    "isCritical": false,
+    "downloads": {
+        "installer": {
+            "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.8.0/DynamicIsland-Setup.exe",
+            "sha256": "5cfd5fbe4cd270d35151904b42894d536d724f4bae201b5c7ec6f525ba180774",
+            "sizeBytes": 74286247
+        },
+        "portable": {
+            "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.8.0/DynamicIsland-Portable.zip",
+            "sha256": "a77acc91743c600e47561fc5b034811dd8906a59639c22efe21181cfd0f74195",
+            "sizeBytes": 68429737
+        }
+    }
 }

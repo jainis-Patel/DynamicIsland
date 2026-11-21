@@ -318,8 +318,9 @@ public partial class WidgetsGalleryView : UserControl
             var note = notes.Notes.Count > 0 ? notes.Notes[0] : null;
             if (note != null)
             {
-                string text = !string.IsNullOrWhiteSpace(note.Title) ? note.Title : note.Content;
-                string firstLine = text.Trim().Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)[0];
+                string text = !string.IsNullOrWhiteSpace(note.Title) ? note.Title : (note.Content ?? "");
+                string[] lines = text.Trim().Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                string firstLine = lines.Length > 0 ? lines[0] : "Empty Note";
                 NotesSnippetText.Text = firstLine.Length > 28 ? firstLine.Substring(0, 28) + "..." : firstLine;
             }
             else

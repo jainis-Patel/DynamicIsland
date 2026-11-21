@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 
 namespace DynamicIsland.Core;
@@ -9,6 +10,8 @@ namespace DynamicIsland.Core;
 /// </summary>
 internal static class AppPaths
 {
+    private static readonly ConcurrentDictionary<string, string> CachedDataPaths = new(StringComparer.OrdinalIgnoreCase);
+
     public static string DataDirectory { get; } = ResolveDataDirectory();
 
     public static string SettingsFile => GetDataFilePath("settings.json");
@@ -37,24 +40,27 @@ internal static class AppPaths
 
     public static string GetDataFilePath(string fileName)
     {
-        string targetPath = Path.Combine(DataDirectory, fileName);
-        if (!File.Exists(targetPath))
+        return CachedDataPaths.GetOrAdd(fileName, static name =>
         {
-            try
+            string targetPath = Path.Combine(DataDirectory, name);
+            if (!File.Exists(targetPath))
             {
-                string legacyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
-                if (!string.Equals(targetPath, legacyPath, StringComparison.OrdinalIgnoreCase) &&
-                    File.Exists(legacyPath))
+                try
                 {
-                    File.Copy(legacyPath, targetPath, overwrite: false);
+                    string legacyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, name);
+                    if (!string.Equals(targetPath, legacyPath, StringComparison.OrdinalIgnoreCase) &&
+                        File.Exists(legacyPath))
+                    {
+                        File.Copy(legacyPath, targetPath, overwrite: false);
+                    }
+                }
+                catch
+                {
+                    // Ignore migration errors
                 }
             }
-            catch
-            {
-                // Ignore migration errors
-            }
-        }
-        return targetPath;
+            return targetPath;
+        });
     }
 
     private static string ResolveDataDirectory()
@@ -68,7 +74,7 @@ internal static class AppPaths
                 Directory.CreateDirectory(dir);
 
                 // Verify write access (handles sandboxed or restricted environments gracefully)
-                string probe = Path.Combine(dir, ".write_probe");
+                string probe = Path.Combine(dir, $".write_probe_{Guid.NewGuid():N}");
                 File.WriteAllText(probe, "");
                 File.Delete(probe);
                 return dir;

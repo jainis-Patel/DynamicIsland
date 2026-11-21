@@ -57,6 +57,11 @@ public partial class TermiNotchView : UserControl
         Dispatcher.InvokeAsync(() =>
         {
             ConsoleOutputBox.AppendText($"{line}\n");
+            if (ConsoleOutputBox.Text.Length > 32768)
+            {
+                ConsoleOutputBox.Text = ConsoleOutputBox.Text[^24576..];
+                ConsoleOutputBox.CaretIndex = ConsoleOutputBox.Text.Length;
+            }
             ConsoleScrollViewer.ScrollToEnd();
         });
     }
@@ -101,9 +106,19 @@ public partial class TermiNotchView : UserControl
     {
         if (sender is FrameworkElement { Tag: string id } && Island?.TermiNotchServiceInstance is { } svc)
         {
+            if (svc.IsRunning) return;
             RunCommandBtn.IsEnabled = false;
             TermiStatusText.Text = "Running...";
-            await svc.RunSnippetAsync(id);
+            try
+            {
+                await svc.RunSnippetAsync(id);
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[TermiNotchView] Snippet run failed: {ex.Message}");
+                TermiStatusText.Text = "Failed";
+                RunCommandBtn.IsEnabled = true;
+            }
         }
     }
 
@@ -112,12 +127,22 @@ public partial class TermiNotchView : UserControl
         string cmd = CommandInputBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(cmd)) return;
 
-        CommandInputBox.Clear();
         if (Island?.TermiNotchServiceInstance is { } svc)
         {
+            if (svc.IsRunning) return;
+            CommandInputBox.Clear();
             RunCommandBtn.IsEnabled = false;
             TermiStatusText.Text = "Running...";
-            await svc.RunRawCommandAsync(cmd, "powershell");
+            try
+            {
+                await svc.RunRawCommandAsync(cmd, "powershell");
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[TermiNotchView] Command run failed: {ex.Message}");
+                TermiStatusText.Text = "Failed";
+                RunCommandBtn.IsEnabled = true;
+            }
         }
     }
 
@@ -156,7 +181,12 @@ public partial class TermiNotchView : UserControl
                 int spaceIdx = rawLine.IndexOf(' ');
                 if (spaceIdx >= 0)
                 {
-                    filename = rawLine[(spaceIdx + 1)..].TrimStart('b', '/');
+                    string candidate = rawLine[(spaceIdx + 1)..].Trim();
+                    if (candidate.StartsWith("b/", StringComparison.Ordinal))
+                        candidate = candidate[2..];
+                    else if (candidate.StartsWith("a/", StringComparison.Ordinal))
+                        candidate = candidate[2..];
+                    filename = candidate;
                 }
             }
 

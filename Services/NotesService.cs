@@ -44,6 +44,7 @@ internal sealed class NotesService : IDisposable
     private readonly string _filePath;
     private readonly object _lock = new();
     private readonly List<NoteItem> _notes = new();
+    private readonly DebouncedJsonStore<List<NoteItem>> _store;
     private bool _disposed;
 
     public event Action? Changed;
@@ -72,6 +73,10 @@ internal sealed class NotesService : IDisposable
     public NotesService(string? customFilePath = null)
     {
         _filePath = customFilePath ?? AppPaths.NotesFile;
+        _store = new DebouncedJsonStore<List<NoteItem>>(_filePath, () =>
+        {
+            lock (_lock) return _notes.ToList();
+        });
         Load();
     }
 
@@ -98,15 +103,9 @@ internal sealed class NotesService : IDisposable
     public void SaveNow()
     {
         if (_disposed) return;
-        List<NoteItem> snapshot;
-        lock (_lock)
-        {
-            snapshot = _notes.ToList();
-        }
-
         try
         {
-            AtomicJsonStore.Save(_filePath, snapshot, _lock);
+            _store.FlushNow();
         }
         catch (Exception ex)
         {
@@ -136,7 +135,7 @@ internal sealed class NotesService : IDisposable
             _notes.Add(note);
         }
 
-        SaveNow();
+        _store.ScheduleSave();
         Changed?.Invoke();
         return note;
     }
@@ -162,7 +161,7 @@ internal sealed class NotesService : IDisposable
             note.UpdatedAt = DateTimeOffset.Now;
         }
 
-        SaveNow();
+        _store.ScheduleSave();
         Changed?.Invoke();
         return true;
     }
@@ -177,7 +176,7 @@ internal sealed class NotesService : IDisposable
             note.UpdatedAt = DateTimeOffset.Now;
         }
 
-        SaveNow();
+        _store.ScheduleSave();
         Changed?.Invoke();
         return true;
     }
@@ -192,7 +191,7 @@ internal sealed class NotesService : IDisposable
 
         if (removed)
         {
-            SaveNow();
+            _store.ScheduleSave();
             Changed?.Invoke();
         }
         return removed;
@@ -204,7 +203,7 @@ internal sealed class NotesService : IDisposable
         {
             _notes.Clear();
         }
-        SaveNow();
+        _store.ScheduleSave();
         Changed?.Invoke();
     }
 
@@ -295,7 +294,7 @@ internal sealed class NotesService : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
+        _store.Dispose();
         _disposed = true;
-        SaveNow();
     }
 }

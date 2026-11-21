@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -31,6 +32,8 @@ public partial class SetupWindow : Window
     private readonly bool _isUpgrade;
     private string _customInstallDir;
     private string? _lastErrorDetails;
+    private bool _isInstalling;
+    private bool _isPreview;
 
     public SetupWindow()
     {
@@ -73,7 +76,10 @@ public partial class SetupWindow : Window
         InstallPathText.Text = _customInstallDir;
         UpdateDriveSpaceDisplay();
 
-        Closed += (_, _) => Application.Current?.Shutdown();
+        Closed += (_, _) =>
+        {
+            if (!_isPreview) Application.Current?.Shutdown();
+        };
 
         // Focus primary button on startup
         Loaded += (_, _) => ActionBtn.Focus();
@@ -168,17 +174,31 @@ public partial class SetupWindow : Window
     {
         if (e.LeftButton == MouseButtonState.Pressed)
         {
-            DragMove();
+            try { DragMove(); } catch (InvalidOperationException) { }
         }
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (_isInstalling && !_isPreview)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        InstallProgressBar?.BeginAnimation(RangeBase.ValueProperty, null);
+        base.OnClosing(e);
     }
 
     private void CloseBtn_Click(object sender, RoutedEventArgs e)
     {
+        if (_isInstalling) return;
         Application.Current?.Shutdown();
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
+        if (_isInstalling) return;
         Application.Current?.Shutdown();
     }
 
@@ -225,59 +245,84 @@ public partial class SetupWindow : Window
 
     private async void ActionBtn_Click(object sender, RoutedEventArgs e)
     {
-        await PerformInstallAsync();
+        try
+        {
+            await PerformInstallAsync();
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[SetupWindow] ActionBtn failed: {ex.Message}");
+        }
     }
 
     private async Task PerformInstallAsync()
     {
-        ShowState(SetupState.Progress);
+        if (_isInstalling) return;
+        _isInstalling = true;
 
-        InstallProgressBar.Value = 0;
-        ProgressStatusText.Text = _isUpgrade ? "Updating…" : "Installing…";
-
-        bool autoStart = AutoStartToggle.IsChecked == true;
-        bool desktop = DesktopShortcutToggle.IsChecked == true;
-        bool startMenu = StartMenuToggle.IsChecked == true;
-
-        var progress = new Progress<(int Percent, string StepMessage)>(report =>
+        try
         {
-            AnimateProgress(report.Percent);
-            if (report.Percent >= 60)
+            ShowState(SetupState.Progress);
+
+            InstallProgressBar.BeginAnimation(System.Windows.Controls.Primitives.RangeBase.ValueProperty, null);
+            InstallProgressBar.Value = 0;
+            ProgressStatusText.Text = _isUpgrade ? "Updating…" : "Installing…";
+
+            bool autoStart = AutoStartToggle.IsChecked == true;
+            bool desktop = DesktopShortcutToggle.IsChecked == true;
+            bool startMenu = StartMenuToggle.IsChecked == true;
+
+            var progress = new Progress<(int Percent, string StepMessage)>(report =>
             {
-                ProgressStatusText.Text = "Almost done…";
+                AnimateProgress(report.Percent);
+                if (report.Percent >= 60)
+                {
+                    ProgressStatusText.Text = "Almost done…";
+                }
+                else
+                {
+                    ProgressStatusText.Text = _isUpgrade ? "Updating…" : "Installing…";
+                }
+            });
+
+            var result = await Task.Run(() =>
+            {
+                bool success = InstallerService.Install(
+                    targetDir: _customInstallDir,
+                    createDesktopShortcut: desktop,
+                    createStartMenuShortcut: startMenu,
+                    autoStartOnBoot: autoStart,
+                    errorMessage: out string? err,
+                    progress: progress,
+                    initialSettings: null); // Preserves existing user settings, themes, clipboard history on upgrade
+
+                return (success, err);
+            });
+
+            if (result.success)
+            {
+                AnimateProgress(100);
+                await Task.Delay(260); // Brief natural settling time
+                ShowState(SetupState.Done);
             }
             else
             {
-                ProgressStatusText.Text = _isUpgrade ? "Updating…" : "Installing…";
+                _lastErrorDetails = result.err;
+                ErrorTitleText.Text = _isUpgrade ? "Couldn't finish the update." : "Couldn't finish the installation.";
+                ErrorMessageText.Text = CleanErrorMessage(result.err);
+                ShowState(SetupState.Error);
             }
-        });
-
-        var result = await Task.Run(() =>
-        {
-            bool success = InstallerService.Install(
-                targetDir: _customInstallDir,
-                createDesktopShortcut: desktop,
-                createStartMenuShortcut: startMenu,
-                autoStartOnBoot: autoStart,
-                errorMessage: out string? err,
-                progress: progress,
-                initialSettings: null); // Preserves existing user settings, themes, clipboard history on upgrade
-
-            return (success, err);
-        });
-
-        if (result.success)
-        {
-            AnimateProgress(100);
-            await Task.Delay(260); // Brief natural settling time
-            ShowState(SetupState.Done);
         }
-        else
+        catch (Exception ex)
         {
-            _lastErrorDetails = result.err;
+            _lastErrorDetails = ex.ToString();
             ErrorTitleText.Text = _isUpgrade ? "Couldn't finish the update." : "Couldn't finish the installation.";
-            ErrorMessageText.Text = CleanErrorMessage(result.err);
+            ErrorMessageText.Text = CleanErrorMessage(ex.Message);
             ShowState(SetupState.Error);
+        }
+        finally
+        {
+            _isInstalling = false;
         }
     }
 
@@ -345,7 +390,14 @@ public partial class SetupWindow : Window
 
     private async void Retry_Click(object sender, RoutedEventArgs e)
     {
-        await PerformInstallAsync();
+        try
+        {
+            await PerformInstallAsync();
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[SetupWindow] Retry failed: {ex.Message}");
+        }
     }
 
     private void CopyDetails_Click(object sender, RoutedEventArgs e)
@@ -434,45 +486,51 @@ public partial class SetupWindow : Window
     public static void RenderPreviews(string outputDir)
     {
         Directory.CreateDirectory(outputDir);
-        var win = new SetupWindow();
-
-        void Capture(string fileName)
+        var win = new SetupWindow { _isPreview = true };
+        try
         {
-            win.SetupWindowFrame.Measure(new Size(480, 360));
-            win.SetupWindowFrame.Arrange(new Rect(0, 0, 480, 360));
-            win.SetupWindowFrame.UpdateLayout();
+            void Capture(string fileName)
+            {
+                win.SetupWindowFrame.Measure(new Size(480, 360));
+                win.SetupWindowFrame.Arrange(new Rect(0, 0, 480, 360));
+                win.SetupWindowFrame.UpdateLayout();
 
-            var rtb = new RenderTargetBitmap(480, 360, 96, 96, PixelFormats.Pbgra32);
-            rtb.Render(win.SetupWindowFrame);
+                var rtb = new RenderTargetBitmap(480, 360, 96, 96, PixelFormats.Pbgra32);
+                rtb.Render(win.SetupWindowFrame);
 
-            var encoder = new PngBitmapEncoder();
-            encoder.Frames.Add(BitmapFrame.Create(rtb));
-            using var fs = File.Create(System.IO.Path.Combine(outputDir, fileName));
-            encoder.Save(fs);
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(rtb));
+                using var fs = File.Create(System.IO.Path.Combine(outputDir, fileName));
+                encoder.Save(fs);
+            }
+
+            // 1. Upgrade Ready
+            win.SetStateForPreview(SetupState.Ready, isUpgrade: true);
+            Capture("state1_upgrade_ready.png");
+
+            // 2. Fresh Install Ready
+            win.SetStateForPreview(SetupState.Ready, isUpgrade: false);
+            Capture("state1_fresh_ready.png");
+
+            // 3. Updating Progress
+            win.SetStateForPreview(SetupState.Progress, isUpgrade: true, progress: 68);
+            Capture("state2_updating.png");
+
+            // 4. Done
+            win.SetStateForPreview(SetupState.Done, isUpgrade: true);
+            Capture("state3_done.png");
+
+            // 5. Options
+            win.SetStateForPreview(SetupState.Ready, isUpgrade: true, showOptions: true);
+            Capture("state_options.png");
+
+            // 6. Error
+            win.SetStateForPreview(SetupState.Error, isUpgrade: true);
+            Capture("state4_error.png");
         }
-
-        // 1. Upgrade Ready
-        win.SetStateForPreview(SetupState.Ready, isUpgrade: true);
-        Capture("state1_upgrade_ready.png");
-
-        // 2. Fresh Install Ready
-        win.SetStateForPreview(SetupState.Ready, isUpgrade: false);
-        Capture("state1_fresh_ready.png");
-
-        // 3. Updating Progress
-        win.SetStateForPreview(SetupState.Progress, isUpgrade: true, progress: 68);
-        Capture("state2_updating.png");
-
-        // 4. Done
-        win.SetStateForPreview(SetupState.Done, isUpgrade: true);
-        Capture("state3_done.png");
-
-        // 5. Options
-        win.SetStateForPreview(SetupState.Ready, isUpgrade: true, showOptions: true);
-        Capture("state_options.png");
-
-        // 6. Error
-        win.SetStateForPreview(SetupState.Error, isUpgrade: true);
-        Capture("state4_error.png");
+        finally
+        {
+            win.Close();
+        }
     }
 }

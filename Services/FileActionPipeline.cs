@@ -171,18 +171,22 @@ internal static class FileActionPipeline
         {
             return kind switch
             {
-                FileActionKind.ConvertToPng => await Task.Run(() => ConvertImages(files, ".png", maxDim: 0, progress), ct),
-                FileActionKind.ConvertToJpg => await Task.Run(() => ConvertImages(files, ".jpg", maxDim: 0, progress), ct),
-                FileActionKind.StripExifAndResize => await Task.Run(() => ConvertImages(files, null, maxDim: 1920, progress), ct),
-                FileActionKind.ImagesToPdf => await Task.Run(() => ConvertImagesToPdf(files, progress), ct),
-                FileActionKind.MergePdfs => await Task.Run(() => MergePdfFiles(files, progress), ct),
+                FileActionKind.ConvertToPng => await Task.Run(() => ConvertImages(files, ".png", maxDim: 0, progress, ct), ct),
+                FileActionKind.ConvertToJpg => await Task.Run(() => ConvertImages(files, ".jpg", maxDim: 0, progress, ct), ct),
+                FileActionKind.StripExifAndResize => await Task.Run(() => ConvertImages(files, null, maxDim: 1920, progress, ct), ct),
+                FileActionKind.ImagesToPdf => await Task.Run(() => ConvertImagesToPdf(files, progress, ct), ct),
+                FileActionKind.MergePdfs => await Task.Run(() => MergePdfFiles(files, progress, ct), ct),
                 FileActionKind.CompressVideo720p => await TranscodeVideosAsync(files, VideoEncodingQuality.HD720p, progress, ct),
                 FileActionKind.CompressVideo1080p => await TranscodeVideosAsync(files, VideoEncodingQuality.HD1080p, progress, ct),
-                FileActionKind.UnzipArchive => await Task.Run(() => UnzipArchives(files, progress), ct),
-                FileActionKind.BatchRenameTimestamp => await Task.Run(() => BatchCopyRenamed(files, progress), ct),
+                FileActionKind.UnzipArchive => await Task.Run(() => UnzipArchives(files, progress, ct), ct),
+                FileActionKind.BatchRenameTimestamp => await Task.Run(() => BatchCopyRenamed(files, progress, ct), ct),
                 FileActionKind.CopyAsDataUri => await Task.Run(() => EncodeDataUri(files[0]), ct),
                 _ => new FileActionResult(false, "Unsupported Action", kind.ToString(), Array.Empty<string>())
             };
+        }
+        catch (OperationCanceledException)
+        {
+            return new FileActionResult(false, "Action Cancelled", "File operation was cancelled.", Array.Empty<string>());
         }
         catch (Exception ex)
         {
@@ -195,7 +199,8 @@ internal static class FileActionPipeline
         IReadOnlyList<string> files,
         string? targetExt,
         int maxDim = 0,
-        IProgress<double>? progress = null)
+        IProgress<double>? progress = null,
+        CancellationToken ct = default)
     {
         var images = files.Where(IsImageFile).ToList();
         if (images.Count == 0)
@@ -206,6 +211,7 @@ internal static class FileActionPipeline
         var outputs = new List<string>();
         for (int i = 0; i < images.Count; i++)
         {
+            ct.ThrowIfCancellationRequested();
             string src = images[i];
             string ext = targetExt ?? Path.GetExtension(src).ToLowerInvariant();
             if (ext is not (".png" or ".jpg" or ".jpeg" or ".bmp" or ".tif"))
@@ -218,38 +224,57 @@ internal static class FileActionPipeline
             string suffix = maxDim > 0 ? "_clean" : "_converted";
             string outPath = GetUniqueFilePath(dir, $"{stem}{suffix}", ext);
 
-            using (var fs = new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.Read))
+            try
             {
-                var decoder = BitmapDecoder.Create(fs, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
-                BitmapSource frame = decoder.Frames[0];
-
-                if (maxDim > 0 && (frame.PixelWidth > maxDim || frame.PixelHeight > maxDim))
+                using (var fs = new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
-                    double scale = Math.Min((double)maxDim / frame.PixelWidth, (double)maxDim / frame.PixelHeight);
-                    frame = new TransformedBitmap(frame, new ScaleTransform(scale, scale));
+                    var decoder = BitmapDecoder.Create(fs, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
+                    if (decoder.Frames.Count == 0)
+                    {
+                        throw new InvalidDataException($"Image '{Path.GetFileName(src)}' contains no readable frames.");
+                    }
+
+                    BitmapSource frame = decoder.Frames[0];
+
+                    if (maxDim > 0 && (frame.PixelWidth > maxDim || frame.PixelHeight > maxDim))
+                    {
+                        double scale = Math.Min((double)maxDim / frame.PixelWidth, (double)maxDim / frame.PixelHeight);
+                        frame = new TransformedBitmap(frame, new ScaleTransform(scale, scale));
+                    }
+
+                    // Re-materialize pixel buffer so EXIF/GPS metadata blocks are stripped cleanly
+                    var bgra = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
+                    int w = bgra.PixelWidth;
+                    int h = bgra.PixelHeight;
+                    int stride = checked(w * 4);
+                    long pixelBufferBytes = checked((long)h * stride);
+                    if (pixelBufferBytes <= 0 || pixelBufferBytes > 512L * 1024 * 1024)
+                    {
+                        throw new InvalidOperationException($"Image dimensions {w}x{h} exceed supported pixel buffer limit.");
+                    }
+
+                    byte[] pixels = new byte[pixelBufferBytes];
+                    bgra.CopyPixels(pixels, stride, 0);
+                    var cleanBmp = BitmapSource.Create(w, h, 96, 96, PixelFormats.Bgra32, null, pixels, stride);
+                    cleanBmp.Freeze();
+
+                    BitmapEncoder encoder = ext switch
+                    {
+                        ".jpg" or ".jpeg" => new JpegBitmapEncoder { QualityLevel = 90 },
+                        ".bmp" => new BmpBitmapEncoder(),
+                        ".tif" => new TiffBitmapEncoder(),
+                        _ => new PngBitmapEncoder()
+                    };
+                    encoder.Frames.Add(BitmapFrame.Create(cleanBmp));
+
+                    using var outStream = new FileStream(outPath, FileMode.Create, FileAccess.Write);
+                    encoder.Save(outStream);
                 }
-
-                // Re-materialize pixel buffer so EXIF/GPS metadata blocks are stripped cleanly
-                var bgra = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
-                int w = bgra.PixelWidth;
-                int h = bgra.PixelHeight;
-                int stride = w * 4;
-                byte[] pixels = new byte[h * stride];
-                bgra.CopyPixels(pixels, stride, 0);
-                var cleanBmp = BitmapSource.Create(w, h, 96, 96, PixelFormats.Bgra32, null, pixels, stride);
-                cleanBmp.Freeze();
-
-                BitmapEncoder encoder = ext switch
-                {
-                    ".jpg" or ".jpeg" => new JpegBitmapEncoder { QualityLevel = 90 },
-                    ".bmp" => new BmpBitmapEncoder(),
-                    ".tif" => new TiffBitmapEncoder(),
-                    _ => new PngBitmapEncoder()
-                };
-                encoder.Frames.Add(BitmapFrame.Create(cleanBmp));
-
-                using var outStream = new FileStream(outPath, FileMode.Create, FileAccess.Write);
-                encoder.Save(outStream);
+            }
+            catch
+            {
+                try { if (File.Exists(outPath)) File.Delete(outPath); } catch { }
+                throw;
             }
 
             outputs.Add(outPath);
@@ -263,7 +288,7 @@ internal static class FileActionPipeline
         return new FileActionResult(true, label, Path.GetFileName(outputs[0]), outputs);
     }
 
-    public static FileActionResult ConvertImagesToPdf(IReadOnlyList<string> files, IProgress<double>? progress = null)
+    public static FileActionResult ConvertImagesToPdf(IReadOnlyList<string> files, IProgress<double>? progress = null, CancellationToken ct = default)
     {
         var images = files.Where(IsImageFile).ToList();
         if (images.Count == 0)
@@ -286,6 +311,7 @@ internal static class FileActionPipeline
 
             for (int i = 0; i < images.Count; i++)
             {
+                ct.ThrowIfCancellationRequested();
                 string imgPath = images[i];
                 // Normalize via WIC to an in-memory PNG stream so PDFsharp can embed any WIC format (including BMP/WebP/TIFF)
                 var pngStream = new MemoryStream();
@@ -294,6 +320,10 @@ internal static class FileActionPipeline
                 using (var fs = new FileStream(imgPath, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
                     var decoder = BitmapDecoder.Create(fs, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
+                    if (decoder.Frames.Count == 0)
+                    {
+                        throw new InvalidDataException($"Image '{Path.GetFileName(imgPath)}' contains no readable frames.");
+                    }
                     var encoder = new PngBitmapEncoder();
                     encoder.Frames.Add(BitmapFrame.Create(decoder.Frames[0]));
                     encoder.Save(pngStream);
@@ -320,6 +350,11 @@ internal static class FileActionPipeline
                 Path.GetFileName(outPdf),
                 new[] { outPdf });
         }
+        catch
+        {
+            try { if (File.Exists(outPdf)) File.Delete(outPdf); } catch { }
+            throw;
+        }
         finally
         {
             foreach (var d in streamsToDispose)
@@ -329,7 +364,7 @@ internal static class FileActionPipeline
         }
     }
 
-    public static FileActionResult MergePdfFiles(IReadOnlyList<string> files, IProgress<double>? progress = null)
+    public static FileActionResult MergePdfFiles(IReadOnlyList<string> files, IProgress<double>? progress = null, CancellationToken ct = default)
     {
         var pdfs = files.Where(IsPdfFile).ToList();
         if (pdfs.Count < 2)
@@ -340,28 +375,38 @@ internal static class FileActionPipeline
         string dir = Path.GetDirectoryName(pdfs[0]) ?? Path.GetTempPath();
         string outPdf = GetUniqueFilePath(dir, $"Merged_{pdfs.Count}_PDFs", ".pdf");
 
-        using var outputDoc = new PdfDocument();
-        outputDoc.Info.Title = $"Merged ({pdfs.Count} documents)";
-        outputDoc.Info.Creator = "Dynamic Island for Windows";
-
-        int totalPages = 0;
-        for (int i = 0; i < pdfs.Count; i++)
+        try
         {
-            using var inputDoc = PdfReader.Open(pdfs[i], PdfDocumentOpenMode.Import);
-            for (int p = 0; p < inputDoc.PageCount; p++)
-            {
-                outputDoc.AddPage(inputDoc.Pages[p]);
-                totalPages++;
-            }
-            progress?.Report((double)(i + 1) / pdfs.Count);
-        }
+            using var outputDoc = new PdfDocument();
+            outputDoc.Info.Title = $"Merged ({pdfs.Count} documents)";
+            outputDoc.Info.Creator = "Dynamic Island for Windows";
 
-        outputDoc.Save(outPdf);
-        return new FileActionResult(
-            true,
-            $"Merged {pdfs.Count} PDFs ({totalPages} pages)",
-            Path.GetFileName(outPdf),
-            new[] { outPdf });
+            int totalPages = 0;
+            for (int i = 0; i < pdfs.Count; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                using var inputDoc = PdfReader.Open(pdfs[i], PdfDocumentOpenMode.Import);
+                for (int p = 0; p < inputDoc.PageCount; p++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    outputDoc.AddPage(inputDoc.Pages[p]);
+                    totalPages++;
+                }
+                progress?.Report((double)(i + 1) / pdfs.Count);
+            }
+
+            outputDoc.Save(outPdf);
+            return new FileActionResult(
+                true,
+                $"Merged {pdfs.Count} PDFs ({totalPages} pages)",
+                Path.GetFileName(outPdf),
+                new[] { outPdf });
+        }
+        catch
+        {
+            try { if (File.Exists(outPdf)) File.Delete(outPdf); } catch { }
+            throw;
+        }
     }
 
     public static async Task<FileActionResult> TranscodeVideosAsync(
@@ -381,32 +426,48 @@ internal static class FileActionPipeline
 
         for (int i = 0; i < videos.Count; i++)
         {
+            ct.ThrowIfCancellationRequested();
             string srcPath = videos[i];
             string dir = Path.GetDirectoryName(srcPath) ?? Path.GetTempPath();
             string stem = Path.GetFileNameWithoutExtension(srcPath);
             string outPath = GetUniqueFilePath(dir, $"{stem}_{tag}", ".mp4");
 
-            var srcFile = await StorageFile.GetFileFromPathAsync(srcPath);
-            var folder = await StorageFolder.GetFolderFromPathAsync(dir);
-            var destFile = await folder.CreateFileAsync(Path.GetFileName(outPath), CreationCollisionOption.ReplaceExisting);
-
-            var profile = MediaEncodingProfile.CreateMp4(quality);
-            var transcoder = new MediaTranscoder();
-            var prep = await transcoder.PrepareFileTranscodeAsync(srcFile, destFile, profile);
-            if (!prep.CanTranscode)
+            try
             {
-                return new FileActionResult(false, "Transcode Unsupported", $"Reason: {prep.FailureReason}", outputs);
+                var srcFile = await StorageFile.GetFileFromPathAsync(srcPath).AsTask(ct);
+                var folder = await StorageFolder.GetFolderFromPathAsync(dir).AsTask(ct);
+                var destFile = await folder.CreateFileAsync(Path.GetFileName(outPath), CreationCollisionOption.ReplaceExisting).AsTask(ct);
+
+                var profile = MediaEncodingProfile.CreateMp4(quality);
+                var transcoder = new MediaTranscoder();
+                var prep = await transcoder.PrepareFileTranscodeAsync(srcFile, destFile, profile).AsTask(ct);
+                if (!prep.CanTranscode)
+                {
+                    try { if (File.Exists(outPath)) File.Delete(outPath); } catch { }
+                    return new FileActionResult(false, "Transcode Unsupported", $"Reason: {prep.FailureReason}", outputs);
+                }
+
+                var transcodeOp = prep.TranscodeAsync();
+                transcodeOp.Progress = (_, pct) =>
+                {
+                    double overall = (i + (pct / 100.0)) / videos.Count;
+                    progress?.Report(overall);
+                };
+
+                await transcodeOp.AsTask(ct);
+                if (!File.Exists(outPath) || new FileInfo(outPath).Length == 0)
+                {
+                    try { if (File.Exists(outPath)) File.Delete(outPath); } catch { }
+                    return new FileActionResult(false, "Transcode Failed", $"Produced empty output for '{Path.GetFileName(srcPath)}'.", outputs);
+                }
+
+                outputs.Add(outPath);
             }
-
-            var transcodeOp = prep.TranscodeAsync();
-            transcodeOp.Progress = (_, pct) =>
+            catch
             {
-                double overall = (i + (pct / 100.0)) / videos.Count;
-                progress?.Report(overall);
-            };
-
-            await transcodeOp.AsTask(ct);
-            outputs.Add(outPath);
+                try { if (File.Exists(outPath)) File.Delete(outPath); } catch { }
+                throw;
+            }
         }
 
         return new FileActionResult(
@@ -416,8 +477,13 @@ internal static class FileActionPipeline
             outputs);
     }
 
-    public static FileActionResult UnzipArchives(IReadOnlyList<string> files, IProgress<double>? progress = null)
+    public static FileActionResult UnzipArchives(IReadOnlyList<string> files, IProgress<double>? progress = null, CancellationToken ct = default)
     {
+        const int maxEntries = 10_000;
+        const long maxTotalBytes = 4L * 1024 * 1024 * 1024;
+        const long bombCheckMinBytes = 10L * 1024 * 1024;
+        const double maxCompressionRatio = 100.0;
+
         var zips = files.Where(IsZipFile).ToList();
         if (zips.Count == 0)
         {
@@ -427,13 +493,92 @@ internal static class FileActionPipeline
         var outputs = new List<string>();
         for (int i = 0; i < zips.Count; i++)
         {
+            ct.ThrowIfCancellationRequested();
             string zipPath = zips[i];
             string parentDir = Path.GetDirectoryName(zipPath) ?? Path.GetTempPath();
             string folderName = Path.GetFileNameWithoutExtension(zipPath);
             string extractDir = GetUniqueDirectoryPath(parentDir, folderName);
             Directory.CreateDirectory(extractDir);
 
-            ZipFile.ExtractToDirectory(zipPath, extractDir, overwriteFiles: true);
+            string canonicalDest = Path.GetFullPath(extractDir)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+            try
+            {
+                using var archive = ZipFile.OpenRead(zipPath);
+                if (archive.Entries.Count > maxEntries)
+                {
+                    throw new InvalidDataException($"ZIP archive exceeds maximum allowed entry count ({maxEntries}).");
+                }
+
+                long totalExtractedBytes = 0;
+                int entriesProcessed = 0;
+                byte[] copyBuf = new byte[65536];
+
+                foreach (var entry in archive.Entries)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    if (++entriesProcessed > maxEntries)
+                    {
+                        throw new InvalidDataException($"ZIP archive exceeds maximum allowed entry count ({maxEntries}).");
+                    }
+
+                    string normalizedEntry = entry.FullName.Replace('/', Path.DirectorySeparatorChar);
+                    string targetPath = Path.GetFullPath(Path.Combine(canonicalDest, normalizedEntry));
+                    if (!targetPath.StartsWith(canonicalDest, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidDataException($"Blocked unsafe archive path traversal entry '{entry.FullName}'.");
+                    }
+
+                    if (entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\'))
+                    {
+                        Directory.CreateDirectory(targetPath);
+                        continue;
+                    }
+
+                    if (entry.Length > bombCheckMinBytes &&
+                        (entry.CompressedLength <= 0 || (double)entry.Length / entry.CompressedLength > maxCompressionRatio))
+                    {
+                        throw new InvalidDataException($"Blocked suspicious compression ratio in ZIP entry '{entry.FullName}'.");
+                    }
+
+                    string? entryParent = Path.GetDirectoryName(targetPath);
+                    if (!string.IsNullOrEmpty(entryParent))
+                    {
+                        Directory.CreateDirectory(entryParent);
+                    }
+
+                    using var inStream = entry.Open();
+                    using var outStream = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                    long entryWritten = 0;
+                    int read;
+                    while ((read = inStream.Read(copyBuf, 0, copyBuf.Length)) > 0)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        entryWritten += read;
+                        totalExtractedBytes += read;
+
+                        if (totalExtractedBytes > maxTotalBytes)
+                        {
+                            throw new InvalidDataException("ZIP extraction exceeded 4 GB safety limit.");
+                        }
+
+                        if (entryWritten > bombCheckMinBytes &&
+                            (entry.CompressedLength <= 0 || (double)entryWritten / entry.CompressedLength > maxCompressionRatio))
+                        {
+                            throw new InvalidDataException($"Blocked decompression bomb in ZIP entry '{entry.FullName}'.");
+                        }
+
+                        outStream.Write(copyBuf, 0, read);
+                    }
+                }
+            }
+            catch
+            {
+                try { if (Directory.Exists(extractDir)) Directory.Delete(extractDir, recursive: true); } catch { }
+                throw;
+            }
+
             outputs.Add(extractDir);
             progress?.Report((double)(i + 1) / zips.Count);
         }
@@ -445,13 +590,14 @@ internal static class FileActionPipeline
             outputs);
     }
 
-    public static FileActionResult BatchCopyRenamed(IReadOnlyList<string> files, IProgress<double>? progress = null)
+    public static FileActionResult BatchCopyRenamed(IReadOnlyList<string> files, IProgress<double>? progress = null, CancellationToken ct = default)
     {
         var outputs = new List<string>();
         string dateStamp = DateTime.Now.ToString("yyyyMMdd");
 
         for (int i = 0; i < files.Count; i++)
         {
+            ct.ThrowIfCancellationRequested();
             string src = files[i];
             if (!File.Exists(src)) continue;
             string dir = Path.GetDirectoryName(src) ?? Path.GetTempPath();

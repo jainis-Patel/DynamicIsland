@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Net.Http;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Windows.Threading;
 using DynamicIsland.Core;
 
@@ -17,8 +19,9 @@ internal sealed class UpdateManagerService : IDisposable
     private readonly SettingsService _settingsService;
     private readonly GitHubReleaseClient _client;
     private readonly Dispatcher? _dispatcher;
+    private readonly SemaphoreSlim _opLock = new(1, 1);
     private Timer? _dailyTimer;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     public string CurrentVersionString { get; }
     public SemVersion CurrentVersion { get; }
@@ -88,13 +91,23 @@ internal sealed class UpdateManagerService : IDisposable
             }
         }
 
-        _dailyTimer = new Timer(async _ =>
+        _dailyTimer = new Timer(_ => _ = RunScheduledCheckAsync(), null, initialDelay, TimeSpan.FromHours(24));
+    }
+
+    private async Task RunScheduledCheckAsync()
+    {
+        if (_disposed) return;
+        try
         {
             if (_settingsService.Current.AutoCheckUpdates)
             {
                 await CheckForUpdatesAsync(silent: true).ConfigureAwait(false);
             }
-        }, null, initialDelay, TimeSpan.FromHours(24));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            App.Log($"[UpdateManager] Scheduled update check failed: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -102,11 +115,24 @@ internal sealed class UpdateManagerService : IDisposable
     /// </summary>
     public async Task<UpdateManifest?> CheckForUpdatesAsync(bool silent = false, bool force = false, CancellationToken ct = default)
     {
-        SetStatus(UpdateStatus.Checking, "Checking GitHub for updates...");
-        LastErrorMessage = null;
+        if (_disposed) return null;
 
+        bool shouldAutoDownload = false;
+        UpdateManifest? resultManifest = null;
+
+        await _opLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            if (_disposed) return null;
+
+            bool alreadyDownloaded = Status == UpdateStatus.ReadyToInstall &&
+                                     !string.IsNullOrEmpty(DownloadedPackagePath) &&
+                                     File.Exists(DownloadedPackagePath);
+            string? downloadedVersion = LatestManifest?.Version;
+
+            SetStatus(UpdateStatus.Checking, "Checking GitHub for updates...");
+            LastErrorMessage = null;
+
             if (force)
             {
                 _client.ClearETagCache();
@@ -159,11 +185,20 @@ internal sealed class UpdateManagerService : IDisposable
                     }
 
                     // 7 days elapsed: reset skip state so user is reminded
-                    _settingsService.Update(s =>
+                    Dispatch(() =>
                     {
-                        s.SkippedVersion = null;
-                        s.SkippedVersionDate = null;
-                    }, nameof(AppSettings.SkippedVersion));
+                        _settingsService.Update(s =>
+                        {
+                            s.SkippedVersion = null;
+                            s.SkippedVersionDate = null;
+                        }, nameof(AppSettings.SkippedVersion));
+                    });
+                }
+
+                if (alreadyDownloaded && string.Equals(downloadedVersion, manifest.Version, StringComparison.OrdinalIgnoreCase))
+                {
+                    SetStatus(UpdateStatus.ReadyToInstall, $"Dynamic Island {manifest.Version} is ready to install.");
+                    return manifest;
                 }
 
                 SetStatus(UpdateStatus.UpdateAvailable, manifest.IsCritical
@@ -171,23 +206,8 @@ internal sealed class UpdateManagerService : IDisposable
                     : $"Update {manifest.Version} is available.");
                 Dispatch(() => UpdateAvailable?.Invoke(manifest));
 
-                // Auto-download update package silently in background if enabled
-                if (_settingsService.Current.AutoDownloadUpdates && Status != UpdateStatus.ReadyToInstall && Status != UpdateStatus.Downloading)
-                {
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            await DownloadUpdateAsync(ct).ConfigureAwait(false);
-                        }
-                        catch (Exception ex)
-                        {
-                            App.Log($"[UpdateManager] Background auto-download failed: {ex.Message}");
-                        }
-                    }, ct);
-                }
-
-                return manifest;
+                shouldAutoDownload = _settingsService.Current.AutoDownloadUpdates;
+                resultManifest = manifest;
             }
             else
             {
@@ -195,13 +215,34 @@ internal sealed class UpdateManagerService : IDisposable
                 return null;
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LastErrorMessage = ex.Message;
             SetStatus(UpdateStatus.Failed, $"Update check failed: {ex.Message}");
             App.Log($"[UpdateManager] Check failed: {ex}");
             return null;
         }
+        finally
+        {
+            _opLock.Release();
+        }
+
+        if (shouldAutoDownload && resultManifest != null && !_disposed)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await DownloadUpdateAsync(ct).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    App.Log($"[UpdateManager] Background auto-download failed: {ex.Message}");
+                }
+            }, ct);
+        }
+
+        return resultManifest;
     }
 
     /// <summary>
@@ -210,65 +251,104 @@ internal sealed class UpdateManagerService : IDisposable
     /// </summary>
     public async Task<bool> DownloadUpdateAsync(CancellationToken ct = default)
     {
-        if (LatestManifest == null)
-        {
-            SetStatus(UpdateStatus.Failed, "No update package available to download.");
-            return false;
-        }
+        if (_disposed) return false;
 
-        // Determine best download asset
-        UpdateDownloadAsset? asset = null;
-        bool isInstaller = true;
-
-        if (LatestManifest.Downloads.Installer != null && !string.IsNullOrWhiteSpace(LatestManifest.Downloads.Installer.Url))
-        {
-            asset = LatestManifest.Downloads.Installer;
-            isInstaller = true;
-        }
-        else if (LatestManifest.Downloads.Portable != null && !string.IsNullOrWhiteSpace(LatestManifest.Downloads.Portable.Url))
-        {
-            asset = LatestManifest.Downloads.Portable;
-            isInstaller = false;
-        }
-
-        if (asset == null || string.IsNullOrWhiteSpace(asset.Url))
-        {
-            SetStatus(UpdateStatus.Failed, "No valid download URLs found in release manifest.");
-            return false;
-        }
-
-        string tempDir = ResolveDownloadDirectory(asset.SizeBytes);
-        Directory.CreateDirectory(tempDir);
-
-        string ext = Path.GetExtension(asset.Url);
-        if (string.IsNullOrEmpty(ext)) ext = isInstaller ? ".exe" : ".zip";
-        string targetFile = Path.Combine(tempDir, $"DynamicIsland-{LatestManifest.Version}{ext}");
-
-        SetStatus(UpdateStatus.Downloading, "Downloading update package...");
-
-        var progress = new Progress<UpdateProgressInfo>(info =>
-        {
-            Dispatch(() => DownloadProgressChanged?.Invoke(info));
-        });
-
+        await _opLock.WaitAsync(ct).ConfigureAwait(false);
+        string? targetFile = null;
         try
         {
+            if (_disposed) return false;
+
+            if (Status == UpdateStatus.ReadyToInstall &&
+                !string.IsNullOrEmpty(DownloadedPackagePath) &&
+                File.Exists(DownloadedPackagePath))
+            {
+                return true;
+            }
+
+            if (LatestManifest == null)
+            {
+                SetStatus(UpdateStatus.Failed, "No update package available to download.");
+                return false;
+            }
+
+            // Determine best download asset
+            UpdateDownloadAsset? asset = null;
+            bool isInstaller = true;
+
+            if (LatestManifest.Downloads.Installer != null && !string.IsNullOrWhiteSpace(LatestManifest.Downloads.Installer.Url))
+            {
+                asset = LatestManifest.Downloads.Installer;
+                isInstaller = true;
+            }
+            else if (LatestManifest.Downloads.Portable != null && !string.IsNullOrWhiteSpace(LatestManifest.Downloads.Portable.Url))
+            {
+                asset = LatestManifest.Downloads.Portable;
+                isInstaller = false;
+            }
+
+            if (asset == null || string.IsNullOrWhiteSpace(asset.Url))
+            {
+                SetStatus(UpdateStatus.Failed, "No valid download URLs found in release manifest.");
+                return false;
+            }
+
+            if (!GitHubReleaseClient.IsTrustedGitHubUrl(asset.Url))
+            {
+                LastErrorMessage = "Refused untrusted download URL outside GitHub.";
+                SetStatus(UpdateStatus.Failed, LastErrorMessage);
+                App.Log($"[UpdateManager] Untrusted download URL blocked: {asset.Url}");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(asset.Sha256))
+            {
+                LastErrorMessage = "Missing cryptographic SHA-256 checksum. Update aborted for security.";
+                SetStatus(UpdateStatus.Failed, LastErrorMessage);
+                App.Log($"[UpdateManager] Update blocked because SHA-256 checksum is missing for {LatestManifest.Version}");
+                return false;
+            }
+
+            string tempDir = Path.GetFullPath(ResolveDownloadDirectory(asset.SizeBytes));
+            Directory.CreateDirectory(tempDir);
+
+            string uriPath = new Uri(asset.Url).AbsolutePath;
+            string ext = Path.GetExtension(uriPath);
+            if (string.IsNullOrEmpty(ext)) ext = isInstaller ? ".exe" : ".zip";
+
+            string safeVersion = Regex.Replace(LatestManifest.Version ?? "unknown", @"[^0-9A-Za-z._-]", "_");
+            if (string.IsNullOrWhiteSpace(safeVersion)) safeVersion = "unknown";
+
+            string filePrefix = isInstaller ? "DynamicIsland-Setup" : "DynamicIsland-Portable";
+            targetFile = Path.GetFullPath(Path.Combine(tempDir, $"{filePrefix}-{safeVersion}{ext}"));
+            string tempDirPrefix = tempDir.EndsWith(Path.DirectorySeparatorChar) ? tempDir : tempDir + Path.DirectorySeparatorChar;
+            if (!targetFile.StartsWith(tempDirPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                SetStatus(UpdateStatus.Failed, "Invalid update target file path.");
+                return false;
+            }
+
+            UpdateIntegrityVerifier.TryCleanFile(targetFile);
+            SetStatus(UpdateStatus.Downloading, "Downloading update package...");
+
+            var progress = new Progress<UpdateProgressInfo>(info =>
+            {
+                Dispatch(() => DownloadProgressChanged?.Invoke(info));
+            });
+
             await _client.DownloadFileWithProgressAsync(asset.Url, targetFile, progress, ct).ConfigureAwait(false);
 
-            // Step 2: Cryptographic SHA-256 integrity verification
+            // Step 2: Cryptographic SHA-256 integrity verification (fail closed)
             SetStatus(UpdateStatus.Verifying, "Verifying package integrity (SHA-256)...");
 
-            if (!string.IsNullOrWhiteSpace(asset.Sha256))
+            bool matches = await UpdateIntegrityVerifier.VerifyFileAsync(targetFile, asset.Sha256, ct).ConfigureAwait(false);
+            if (!matches)
             {
-                bool matches = await UpdateIntegrityVerifier.VerifyFileAsync(targetFile, asset.Sha256, ct).ConfigureAwait(false);
-                if (!matches)
-                {
-                    UpdateIntegrityVerifier.TryCleanFile(targetFile);
-                    LastErrorMessage = "SHA-256 checksum mismatch. Downloaded package was discarded for security.";
-                    SetStatus(UpdateStatus.Failed, LastErrorMessage);
-                    App.Log($"[UpdateManager] SHA-256 mismatch for {targetFile}");
-                    return false;
-                }
+                UpdateIntegrityVerifier.TryCleanFile(targetFile);
+                LastErrorMessage = "SHA-256 checksum mismatch. Downloaded package was discarded for security.";
+                SetStatus(UpdateStatus.Failed, LastErrorMessage);
+                App.Log($"[UpdateManager] SHA-256 mismatch for {targetFile}");
+                return false;
             }
 
             DownloadedPackagePath = targetFile;
@@ -279,21 +359,24 @@ internal sealed class UpdateManagerService : IDisposable
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
-            UpdateIntegrityVerifier.TryCleanFile(targetFile);
+            if (targetFile != null) UpdateIntegrityVerifier.TryCleanFile(targetFile);
             LastErrorMessage = "Release package has not been published to GitHub yet (404 Not Found).";
             SetStatus(UpdateStatus.Failed, LastErrorMessage);
-            App.Log($"[UpdateManager] Download 404: {asset.Url}");
             _client.ClearETagCache();
             LatestManifest = null;
             return false;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            UpdateIntegrityVerifier.TryCleanFile(targetFile);
+            if (targetFile != null) UpdateIntegrityVerifier.TryCleanFile(targetFile);
             LastErrorMessage = ex.Message;
             SetStatus(UpdateStatus.Failed, $"Download failed: {ex.Message}");
             App.Log($"[UpdateManager] Download failed: {ex}");
             return false;
+        }
+        finally
+        {
+            _opLock.Release();
         }
     }
 
@@ -308,8 +391,98 @@ internal sealed class UpdateManagerService : IDisposable
             return false;
         }
 
+        string handoffPath = DownloadedPackagePath;
+        if (!IsInstallerPackage && DownloadedPackagePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            string? extractedExe = ExtractPortableBinarySafe(DownloadedPackagePath);
+            if (string.IsNullOrEmpty(extractedExe))
+            {
+                SetStatus(UpdateStatus.Failed, "Failed to extract DynamicIsland.exe from portable update archive.");
+                return false;
+            }
+            handoffPath = extractedExe;
+        }
+
         SetStatus(UpdateStatus.Installing, "Launching updater and restarting Dynamic Island...");
-        return UpdateHandoffEngine.ExecuteHandoff(DownloadedPackagePath, IsInstallerPackage);
+        return UpdateHandoffEngine.ExecuteHandoff(handoffPath, IsInstallerPackage);
+    }
+
+    private static string? ExtractPortableBinarySafe(string zipPath)
+    {
+        const int MaxEntries = 5000;
+        const long MaxTotalBytes = 1024L * 1024 * 1024; // 1 GB cap
+
+        string parentDir = Path.GetDirectoryName(zipPath) ?? Path.GetTempPath();
+        string stagingDir = Path.GetFullPath(Path.Combine(parentDir, $"staged_{Guid.NewGuid():N}"));
+        string stagingPrefix = stagingDir.EndsWith(Path.DirectorySeparatorChar)
+            ? stagingDir
+            : stagingDir + Path.DirectorySeparatorChar;
+
+        try
+        {
+            Directory.CreateDirectory(stagingDir);
+            using var archive = ZipFile.OpenRead(zipPath);
+
+            int entryCount = 0;
+            long totalExtracted = 0;
+            byte[] buffer = new byte[64 * 1024];
+            string? foundExe = null;
+
+            foreach (var entry in archive.Entries)
+            {
+                if (++entryCount > MaxEntries)
+                    throw new InvalidOperationException("Portable archive exceeds maximum entry limit.");
+
+                if (string.IsNullOrEmpty(entry.Name))
+                    continue; // Directory entry
+
+                string fullDest = Path.GetFullPath(Path.Combine(stagingDir, entry.FullName));
+                if (!fullDest.StartsWith(stagingPrefix, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"Blocked Zip Slip entry: {entry.FullName}");
+
+                string? entryDir = Path.GetDirectoryName(fullDest);
+                if (!string.IsNullOrEmpty(entryDir))
+                    Directory.CreateDirectory(entryDir);
+
+                using var src = entry.Open();
+                using var dst = new FileStream(fullDest, FileMode.Create, FileAccess.Write, FileShare.None);
+                int read;
+                while ((read = src.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    totalExtracted += read;
+                    if (totalExtracted > MaxTotalBytes)
+                        throw new InvalidOperationException("Portable archive exceeds maximum uncompressed size limit.");
+                    dst.Write(buffer, 0, read);
+                }
+
+                if (string.Equals(Path.GetFileName(fullDest), "DynamicIsland.exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    foundExe ??= fullDest;
+                }
+            }
+
+            if (foundExe == null)
+            {
+                TryDeleteDirectory(stagingDir);
+            }
+            return foundExe;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[UpdateManager] Portable archive extraction failed: {ex.Message}");
+            TryDeleteDirectory(stagingDir);
+            return null;
+        }
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, recursive: true);
+        }
+        catch { }
     }
 
     /// <summary>
@@ -425,6 +598,7 @@ internal sealed class UpdateManagerService : IDisposable
 
         _dailyTimer?.Dispose();
         _dailyTimer = null;
+        _opLock.Dispose();
         _client.Dispose();
     }
 }

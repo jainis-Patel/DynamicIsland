@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 using System.Text.Json;
 
 namespace DynamicIsland.Core;
@@ -65,8 +66,25 @@ internal static class AtomicJsonStore
             }
 
             string json = JsonSerializer.Serialize(data, options ?? DefaultOptions);
-            File.WriteAllText(tmpPath, json);
-            File.Move(tmpPath, filePath, overwrite: true);
+            byte[] bytes = Encoding.UTF8.GetBytes(json);
+            using (var fs = new FileStream(tmpPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                fs.Write(bytes, 0, bytes.Length);
+                fs.Flush(flushToDisk: true);
+            }
+
+            for (int attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    File.Move(tmpPath, filePath, overwrite: true);
+                    break;
+                }
+                catch (Exception ex) when ((ex is IOException || ex is UnauthorizedAccessException) && attempt < 3)
+                {
+                    Thread.Sleep(15);
+                }
+            }
             return true;
         }
         catch (Exception ex)

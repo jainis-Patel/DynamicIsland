@@ -1,3 +1,7 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Media;
 using DynamicIsland.Core;
@@ -106,7 +110,25 @@ public sealed class AppSettings
     public DateTime? LastUpdateCheckTime { get; set; }
     public string? SkippedVersion { get; set; }
     public DateTime? SkippedVersionDate { get; set; }
+    public int PhoneBridgeDurationMinutes { get; set; } = 15;
+
+    [JsonIgnore]
+    public string? PhoneBridgePassword { get; set; }
+
+    [JsonPropertyName("PhoneBridgePasswordProtected")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PhoneBridgePasswordProtected { get; set; }
+
+    [JsonIgnore]
     public string? GitHubToken { get; set; }
+
+    [JsonPropertyName("GitHubTokenProtected")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? GitHubTokenProtected { get; set; }
+
+    [JsonPropertyName("GitHubToken")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LegacyGitHubToken { get; set; }
 }
 
 public sealed record ThemePalette(string Name, Color Accent, Color Glow, Color? LightAccent = null, Color? LightGlow = null)
@@ -119,9 +141,16 @@ public sealed record ThemePalette(string Name, Color Accent, Color Glow, Color? 
 /// Manages persistent application settings (Notch Y-offset, screen edge docking, accent themes, ambient glow,
 /// stable monitor device ID, DND, and hotkeys) saved atomically to a local JSON file with debounced disk writes.
 /// </summary>
-internal sealed class SettingsService
+internal sealed class SettingsService : IDisposable
 {
+    private const string DpapiPrefix = "dpapi:";
+    private static readonly byte[] TokenEntropy = Encoding.UTF8.GetBytes("DynamicIsland.Settings.GitHubToken.v1");
+    private static readonly byte[] PhoneBridgePasswordEntropy = Encoding.UTF8.GetBytes("DynamicIsland.Settings.PhoneBridgePassword.v1");
+    private static readonly JsonSerializerOptions SnapshotOptions = new() { WriteIndented = false };
+
     private readonly string _settingsFile;
+    private volatile bool _disposed;
+    private bool _hasPendingSave;
 
     public static readonly IReadOnlyList<ThemePalette> AvailableThemes = new[]
     {
@@ -417,11 +446,72 @@ internal sealed class SettingsService
         settings.PetSpecies = NormalizePetSpecies(settings.PetSpecies);
         settings.PetAccessory = NormalizePetAccessory(settings.PetAccessory);
         settings.UpdateChannel = NormalizeUpdateChannel(settings.UpdateChannel);
+        settings.PhoneBridgeDurationMinutes = settings.PhoneBridgeDurationMinutes <= 0
+            ? 15
+            : Math.Clamp(settings.PhoneBridgeDurationMinutes, 5, 120);
+
+        // Decrypt DPAPI-protected secrets
+        if (!string.IsNullOrWhiteSpace(settings.PhoneBridgePasswordProtected))
+        {
+            settings.PhoneBridgePassword = UnprotectSecret(settings.PhoneBridgePasswordProtected, PhoneBridgePasswordEntropy);
+        }
+
+        // Decrypt DPAPI-protected GitHub token or migrate legacy plaintext entry
+        if (!string.IsNullOrWhiteSpace(settings.GitHubTokenProtected))
+        {
+            settings.GitHubToken = UnprotectToken(settings.GitHubTokenProtected);
+            settings.LegacyGitHubToken = null;
+        }
+        else if (!string.IsNullOrWhiteSpace(settings.LegacyGitHubToken))
+        {
+            settings.GitHubToken = settings.LegacyGitHubToken;
+            settings.GitHubTokenProtected = ProtectToken(settings.LegacyGitHubToken);
+            settings.LegacyGitHubToken = null;
+        }
+
         if (settings.SchemaVersion < 3)
         {
             settings.SchemaVersion = 3;
         }
         return settings;
+    }
+
+    private static string? ProtectToken(string? plainToken) => ProtectSecret(plainToken, TokenEntropy);
+
+    private static string? UnprotectToken(string? stored) => UnprotectSecret(stored, TokenEntropy);
+
+    private static string? ProtectSecret(string? plainSecret, byte[] entropy)
+    {
+        if (string.IsNullOrWhiteSpace(plainSecret)) return null;
+        try
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(plainSecret.Trim());
+            byte[] cipher = ProtectedData.Protect(bytes, entropy, DataProtectionScope.CurrentUser);
+            return DpapiPrefix + Convert.ToBase64String(cipher);
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[SettingsService] DPAPI secret encryption failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static string? UnprotectSecret(string? stored, byte[] entropy)
+    {
+        if (string.IsNullOrWhiteSpace(stored)) return null;
+        if (!stored.StartsWith(DpapiPrefix, StringComparison.Ordinal))
+            return stored;
+
+        try
+        {
+            byte[] cipher = Convert.FromBase64String(stored[DpapiPrefix.Length..]);
+            byte[] plain = ProtectedData.Unprotect(cipher, entropy, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(plain);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public void ResetToDefaults()
@@ -489,12 +579,26 @@ internal sealed class SettingsService
             s.CustomHotkeys.Clear();
             s.EnabledDroplets = null;
             s.PinnedShelfFiles.Clear();
+            s.PhoneBridgeDurationMinutes = 15;
+            s.PhoneBridgePassword = null;
+            s.PhoneBridgePasswordProtected = null;
         });
     }
 
     public bool ExportToFile(string filePath)
     {
-        return AtomicJsonStore.Save(filePath, Current, _saveLock);
+        AppSettings sanitizedCopy;
+        lock (_saveLock)
+        {
+            string json = JsonSerializer.Serialize(Current, SnapshotOptions);
+            sanitizedCopy = JsonSerializer.Deserialize<AppSettings>(json, SnapshotOptions) ?? new AppSettings();
+            sanitizedCopy.GitHubToken = null;
+            sanitizedCopy.GitHubTokenProtected = null;
+            sanitizedCopy.LegacyGitHubToken = null;
+            sanitizedCopy.PhoneBridgePassword = null;
+            sanitizedCopy.PhoneBridgePasswordProtected = null;
+        }
+        return AtomicJsonStore.Save(filePath, sanitizedCopy, _saveLock);
     }
 
     public bool ImportFromFile(string filePath)
@@ -520,9 +624,13 @@ internal sealed class SettingsService
 
     private void ScheduleSave()
     {
+        if (_disposed) return;
+
         CancellationToken token;
         lock (_saveLock)
         {
+            if (_disposed) return;
+            _hasPendingSave = true;
             _saveDebounceCts?.Cancel();
             _saveDebounceCts?.Dispose();
             _saveDebounceCts = new CancellationTokenSource();
@@ -534,7 +642,10 @@ internal sealed class SettingsService
             try
             {
                 await Task.Delay(250, token).ConfigureAwait(false);
-                SaveNow();
+                if (!token.IsCancellationRequested && !_disposed)
+                {
+                    SaveNow();
+                }
             }
             catch (OperationCanceledException)
             {
@@ -544,6 +655,33 @@ internal sealed class SettingsService
 
     public void SaveNow()
     {
+        lock (_saveLock)
+        {
+            Current.GitHubTokenProtected = ProtectToken(Current.GitHubToken);
+            Current.LegacyGitHubToken = null;
+            Current.PhoneBridgePasswordProtected = ProtectSecret(Current.PhoneBridgePassword, PhoneBridgePasswordEntropy);
+            _hasPendingSave = false;
+        }
         AtomicJsonStore.Save(_settingsFile, Current, _saveLock);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        bool flush;
+        lock (_saveLock)
+        {
+            _saveDebounceCts?.Cancel();
+            _saveDebounceCts?.Dispose();
+            _saveDebounceCts = null;
+            flush = _hasPendingSave;
+        }
+
+        if (flush)
+        {
+            SaveNow();
+        }
     }
 }

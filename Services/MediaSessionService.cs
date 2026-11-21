@@ -104,10 +104,16 @@ internal sealed class MediaSessionService : IDisposable
             return;
         }
 
-        _manager.CurrentSessionChanged += (_, _) => _ui.InvokeAsync(AttachCurrentSession);
-        _manager.SessionsChanged += (_, _) => _ui.InvokeAsync(AttachCurrentSession);
+        _manager.CurrentSessionChanged += OnManagerCurrentSessionChanged;
+        _manager.SessionsChanged += OnManagerSessionsChanged;
         AttachCurrentSession();
     }
+
+    private void OnManagerCurrentSessionChanged(GlobalSystemMediaTransportControlsSessionManager sender, CurrentSessionChangedEventArgs args) =>
+        _ui.InvokeAsync(AttachCurrentSession);
+
+    private void OnManagerSessionsChanged(GlobalSystemMediaTransportControlsSessionManager sender, SessionsChangedEventArgs args) =>
+        _ui.InvokeAsync(AttachCurrentSession);
 
     // ── Commands ─────────────────────────────────────────────────────
 
@@ -319,36 +325,43 @@ internal sealed class MediaSessionService : IDisposable
         try
         {
             string searchKey = ResolveProcessSearchKey(source, aumid);
-            foreach (var p in Process.GetProcesses())
+            Process[] procs = Process.GetProcesses();
+            try
             {
-                try
+                foreach (var p in procs)
                 {
-                    if (p.MainWindowHandle == IntPtr.Zero) continue;
-                    string procName = p.ProcessName;
-                    string title = p.MainWindowTitle ?? "";
-
-                    bool matched = (!string.IsNullOrEmpty(searchKey) &&
-                                    (procName.Contains(searchKey, StringComparison.OrdinalIgnoreCase) ||
-                                     title.Contains(searchKey, StringComparison.OrdinalIgnoreCase))) ||
-                                   (!string.IsNullOrEmpty(source) &&
-                                    (procName.Contains(source, StringComparison.OrdinalIgnoreCase) ||
-                                     title.Contains(source, StringComparison.OrdinalIgnoreCase)));
-
-                    if (matched)
+                    try
                     {
-                        IntPtr hwnd = p.MainWindowHandle;
-                        if (IsIconic(hwnd))
+                        if (p.MainWindowHandle == IntPtr.Zero) continue;
+                        string procName = p.ProcessName;
+                        string title = p.MainWindowTitle ?? "";
+
+                        bool matched = (!string.IsNullOrEmpty(searchKey) &&
+                                        (procName.Contains(searchKey, StringComparison.OrdinalIgnoreCase) ||
+                                         title.Contains(searchKey, StringComparison.OrdinalIgnoreCase))) ||
+                                       (!string.IsNullOrEmpty(source) &&
+                                        (procName.Contains(source, StringComparison.OrdinalIgnoreCase) ||
+                                         title.Contains(source, StringComparison.OrdinalIgnoreCase)));
+
+                        if (matched)
                         {
-                            ShowWindow(hwnd, SW_RESTORE);
+                            IntPtr hwnd = p.MainWindowHandle;
+                            if (IsIconic(hwnd))
+                            {
+                                ShowWindow(hwnd, SW_RESTORE);
+                            }
+                            SetForegroundWindow(hwnd);
+                            return true;
                         }
-                        SetForegroundWindow(hwnd);
-                        return true;
                     }
+                    catch { }
                 }
-                catch { }
-                finally
+            }
+            finally
+            {
+                foreach (var p in procs)
                 {
-                    p.Dispose();
+                    try { p.Dispose(); } catch { }
                 }
             }
         }
@@ -617,5 +630,18 @@ internal sealed class MediaSessionService : IDisposable
         return name;
     }
 
-    public void Dispose() => DetachSession();
+    public void Dispose()
+    {
+        if (_manager != null)
+        {
+            try
+            {
+                _manager.CurrentSessionChanged -= OnManagerCurrentSessionChanged;
+                _manager.SessionsChanged -= OnManagerSessionsChanged;
+            }
+            catch { }
+            _manager = null;
+        }
+        DetachSession();
+    }
 }

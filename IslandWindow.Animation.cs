@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using DynamicIsland.Core;
 using DynamicIsland.Services;
 
@@ -26,8 +28,10 @@ public partial class IslandWindow
     private double _appliedDroplet = -1;
     private Point _lastMousePos;
     private DateTime _lastMouseMoveTime;
+    private static readonly Stopwatch NatureClock = Stopwatch.StartNew();
+    private DispatcherTimer? _natureThemeTimer;
     private bool _isPetScampering;
-    private double _scamperStartTime;
+    private double _scamperStartTime = -1.0;
     private double _nextScamperAllowedTime = 120.0;
 
     public void TriggerPetScamper()
@@ -37,7 +41,7 @@ public partial class IslandWindow
         if (state != IslandState.Idle && state != IslandState.Compact) return;
 
         _isPetScampering = true;
-        _scamperStartTime = _lastFrame.TotalSeconds;
+        _scamperStartTime = -1.0;
         EnsureRendering();
     }
 
@@ -199,6 +203,15 @@ public partial class IslandWindow
 
     private bool _isModalDialogOpen;
 
+    internal void SetModalDialogOpen(bool open)
+    {
+        _isModalDialogOpen = open;
+        if (!open)
+        {
+            _machine.ExpandNow();
+        }
+    }
+
     private bool ShouldHoldExpandedOpen =>
         _machine.IsPinned ||
         _isModalDialogOpen ||
@@ -206,7 +219,8 @@ public partial class IslandWindow
         (FloatingDockHost != null && (FloatingDockHost.IsMouseOver || FloatingDockHost.IsKeyboardFocusWithin)) ||
         (Pill != null && Pill.IsMouseOver) ||
         (CalcInputBox != null && CalcInputBox.IsKeyboardFocused && !string.IsNullOrWhiteSpace(CalcInputBox.Text)) ||
-        (ClipboardSearchBox != null && ClipboardSearchBox.IsKeyboardFocused);
+        (ClipboardSearchBox != null && ClipboardSearchBox.IsKeyboardFocused) ||
+        (Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase or PasswordBox);
 
     private void OnPointerInsideChanged(bool inside)
     {
@@ -253,6 +267,14 @@ public partial class IslandWindow
             else if (_currentExpandedView == ExpandedView.Network)
             {
                 _networkService?.SetExpanded(false);
+            }
+            else if (_currentExpandedView == ExpandedView.Battery)
+            {
+                _powerPlanService?.SetExpanded(false);
+            }
+            else if (_currentExpandedView == ExpandedView.Peripherals)
+            {
+                _peripheralService?.SetExpanded(false);
             }
             else if (_currentExpandedView == ExpandedView.WidgetsGallery)
             {
@@ -314,6 +336,7 @@ public partial class IslandWindow
         UpdateSecondaryDropletTarget();
         UpdateSpectrumActivity();
         UpdateClockTimerInterval();
+        UpdateNatureThemeTimerState();
         EnsureRendering();
         _memoryManager?.NotifyStateChanged(next);
 
@@ -684,27 +707,66 @@ public partial class IslandWindow
         _dropletOffset.Step(dt);
 
         ApplyGeometry(dt);
-        UpdateLiveBars(now.TotalSeconds);
+        UpdateLiveBars(now.TotalSeconds, dt);
         UpdateVirtualPet(now.TotalSeconds);
-        UpdateIslandNatureTheme(now.TotalSeconds);
-        bool glowSettled = UpdateAmbientHalo();
+        bool glowSettled = UpdateAmbientHalo(dt);
 
-        bool petActive = (_petService?.IsEnabled ?? false) && 
+        bool petActive = !_isSessionLocked &&
+            _machine.State != IslandState.Hidden &&
+            (_petService?.IsEnabled ?? false) &&
             (_isPetScampering || _petService.CurrentMood == PetMood.Dancing || _petService.CurrentMood == PetMood.Happy || _petService.CurrentMood == PetMood.Eating || _petService.CurrentMood == PetMood.Playing ||
              (IdlePetCompanion?.IsAnimatingTrick ?? false) || (CompactPetCompanion?.IsAnimatingTrick ?? false) || (SettingsHeroPet?.IsAnimatingTrick ?? false) ||
              (PetSanctuaryContainer?.StagePet?.IsAnimatingTrick ?? false) || (PetSanctuaryContainer?.StagePet?.IsAnimatingSpecialAction ?? false) ||
              (_pointerInside && (_machine.State == IslandState.Idle || _machine.State == IslandState.Compact || (SettingsHeroPet?.IsVisible ?? false) || (PetSanctuaryContainer?.IsVisible ?? false))));
 
-        bool themeActive = _isNatureThemeActive && !IsReducedMotion && _machine.State != IslandState.Hidden;
-
         if (_width.IsAtRest && _height.IsAtRest && _radius.IsAtRest && _dropletOffset.IsAtRest &&
-            !BarsAnimating && glowSettled && !petActive && !themeActive)
+            !BarsAnimating && glowSettled && !petActive)
         {
             StopRendering();
         }
     }
 
     private bool _isNatureThemeActive;
+
+    internal void UpdateNatureThemeTimerState()
+    {
+        bool shouldRun = _isNatureThemeActive
+                         && !_isClosing
+                         && !IsReducedMotion
+                         && !_isSessionLocked
+                         && _machine.State != IslandState.Hidden
+                         && !(_choreographer?.ShouldThrottleVisuals ?? false);
+
+        if (shouldRun)
+        {
+            if (_natureThemeTimer == null)
+            {
+                _natureThemeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(42), DispatcherPriority.Background, (_, _) =>
+                {
+                    if (_isClosing || _isSessionLocked || _machine.State == IslandState.Hidden || !_isNatureThemeActive)
+                    {
+                        _natureThemeTimer?.Stop();
+                        return;
+                    }
+                    UpdateIslandNatureTheme(NatureClock.Elapsed.TotalSeconds);
+                }, Dispatcher);
+            }
+
+            if (!_natureThemeTimer.IsEnabled)
+            {
+                UpdateIslandNatureTheme(NatureClock.Elapsed.TotalSeconds);
+                _natureThemeTimer.Start();
+            }
+        }
+        else
+        {
+            _natureThemeTimer?.Stop();
+            if (_isNatureThemeActive && !_isClosing && !_isSessionLocked && _machine.State != IslandState.Hidden)
+            {
+                UpdateIslandNatureTheme(NatureClock.Elapsed.TotalSeconds);
+            }
+        }
+    }
 
     private void UpdateIslandNatureTheme(double t)
     {
@@ -788,15 +850,21 @@ public partial class IslandWindow
             if (state != IslandState.Idle && state != IslandState.Compact)
             {
                 _isPetScampering = false;
+                _scamperStartTime = -1.0;
             }
             else
             {
+                if (_scamperStartTime < 0.0)
+                {
+                    _scamperStartTime = t;
+                }
                 double elapsed = t - _scamperStartTime;
                 const double TotalScamperDuration = 5.2;
 
                 if (elapsed >= TotalScamperDuration)
                 {
                     _isPetScampering = false;
+                    _scamperStartTime = -1.0;
                     _nextScamperAllowedTime = t + 150.0 + (Random.Shared.NextDouble() * 120.0); // P2d perf: avoid transient Random allocation
                     if (state == IslandState.Idle) IdlePetCompanion?.PetClickImpulse();
                     else CompactPetCompanion?.PetClickImpulse();
@@ -999,9 +1067,12 @@ public partial class IslandWindow
         }
     }
 
-    private bool UpdateAmbientHalo()
+    private bool UpdateAmbientHalo(double dt = 1.0 / 60.0)
     {
-        if (!(_settingsService?.Current.EnableAmbientGlow ?? true))
+        if (!(_settingsService?.Current.EnableAmbientGlow ?? true) ||
+            (_choreographer?.ShouldThrottleVisuals ?? false) ||
+            _isSessionLocked ||
+            _machine.State == IslandState.Hidden)
         {
             if (PillGlow.Visibility != Visibility.Collapsed)
             {
@@ -1020,7 +1091,8 @@ public partial class IslandWindow
             if (_machine.State != IslandState.Compact)
             {
                 _audioSpectrum.ReadBands(_bandLevels);
-                _smoothBands[0] += (_bandLevels[0] - _smoothBands[0]) * 0.40f;
+                float bassAlpha = (float)(1.0 - Math.Exp(-0.40 * 60.0 * Math.Clamp(dt, 0.001, 0.1)));
+                _smoothBands[0] += (_bandLevels[0] - _smoothBands[0]) * bassAlpha;
             }
             double bass = _smoothBands[0];
             targetGlow = 0.22 + 0.58 * Math.Clamp(bass, 0, 1);
@@ -1047,7 +1119,8 @@ public partial class IslandWindow
             rate = 0.22;
         }
 
-        double nextOpacity = PillGlow.Opacity + (targetGlow - PillGlow.Opacity) * rate;
+        double alpha = 1.0 - Math.Exp(-rate * 60.0 * Math.Clamp(dt, 0.001, 0.1));
+        double nextOpacity = PillGlow.Opacity + (targetGlow - PillGlow.Opacity) * alpha;
         bool settled = !isMusicPlaying && Math.Abs(targetGlow - nextOpacity) < 0.005;
         if (settled)
         {
@@ -1214,9 +1287,14 @@ public partial class IslandWindow
             double glowTopR = topR > 0 ? topR + 12 : 0;
             PillGlow.CornerRadius = new CornerRadius(glowTopR, glowTopR, effectiveR + 12, effectiveR + 12);
         }
+
+        if (_isNatureThemeActive && !(_natureThemeTimer?.IsEnabled ?? false) && !_isSessionLocked && _machine.State != IslandState.Hidden)
+        {
+            UpdateIslandNatureTheme(NatureClock.Elapsed.TotalSeconds);
+        }
     }
 
-    private void UpdateLiveBars(double t)
+    private void UpdateLiveBars(double t, double dt = 1.0 / 60.0)
     {
         if (_machine.State != IslandState.Compact) return;
 
@@ -1227,6 +1305,10 @@ public partial class IslandWindow
         bool isRecording = _voiceMemoService?.IsRecording ?? false;
         string style = _settingsService?.Current?.VisualizerStyle ?? "ClassicBars";
         bool active = isMusicPlaying || isTimerRunning || isCallActive || isRecording;
+
+        double clampedDt = Math.Clamp(dt, 0.001, 0.1);
+        float attackAlpha = (float)(1.0 - Math.Exp(-0.65 * 60.0 * clampedDt));
+        float decayAlpha = (float)(1.0 - Math.Exp(-0.22 * 60.0 * clampedDt));
 
         for (int i = 0; i < _bars.Length; i++)
         {
@@ -1249,14 +1331,8 @@ public partial class IslandWindow
             }
 
             // Apple iOS Dynamic Island ballistics: fast explosive attack, smooth organic decay
-            if (target > _smoothBands[i])
-            {
-                _smoothBands[i] += (target - _smoothBands[i]) * 0.65f;
-            }
-            else
-            {
-                _smoothBands[i] += (target - _smoothBands[i]) * 0.22f;
-            }
+            float alpha = target > _smoothBands[i] ? attackAlpha : decayAlpha;
+            _smoothBands[i] += (target - _smoothBands[i]) * alpha;
         }
 
         switch (style)

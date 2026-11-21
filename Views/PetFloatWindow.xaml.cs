@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -12,9 +13,13 @@ namespace DynamicIsland.Views;
 
 public partial class PetFloatWindow : Window
 {
+    private static readonly Stopwatch MonotonicClock = Stopwatch.StartNew();
+
     private readonly VirtualPetService _petService;
     private readonly IslandWindow _island;
     private bool _isMouseOverWindow;
+    private bool _isRenderingHooked;
+    private bool _isClosed;
 
     internal PetFloatWindow(VirtualPetService petService, IslandWindow island)
     {
@@ -26,8 +31,23 @@ public partial class PetFloatWindow : Window
         _petService.MoodChanged += OnMoodChanged;
         _petService.SpecialActionTriggered += OnSpecialActionTriggered;
 
-        CompositionTarget.Rendering += OnRenderingFrame;
+        IsVisibleChanged += (_, _) => UpdateRenderingSubscription();
         Loaded += PetFloatWindow_Loaded;
+    }
+
+    private void UpdateRenderingSubscription()
+    {
+        bool shouldRender = IsVisible && !_isClosed;
+        if (shouldRender && !_isRenderingHooked)
+        {
+            _isRenderingHooked = true;
+            CompositionTarget.Rendering += OnRenderingFrame;
+        }
+        else if (!shouldRender && _isRenderingHooked)
+        {
+            _isRenderingHooked = false;
+            CompositionTarget.Rendering -= OnRenderingFrame;
+        }
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -50,11 +70,14 @@ public partial class PetFloatWindow : Window
         catch { }
 
         RefreshUI();
+        UpdateRenderingSubscription();
     }
 
     protected override void OnClosed(EventArgs e)
     {
-        CompositionTarget.Rendering -= OnRenderingFrame;
+        _isClosed = true;
+        UpdateRenderingSubscription();
+        TopToolbar.BeginAnimation(OpacityProperty, null);
         _petService.AffectionChanged -= OnAffectionChanged;
         _petService.MoodChanged -= OnMoodChanged;
         _petService.SpecialActionTriggered -= OnSpecialActionTriggered;
@@ -63,8 +86,8 @@ public partial class PetFloatWindow : Window
 
     private void OnRenderingFrame(object? sender, EventArgs e)
     {
-        if (!IsVisible) return;
-        double t = DateTime.UtcNow.TimeOfDay.TotalSeconds;
+        if (!IsVisible || _isClosed) return;
+        double t = MonotonicClock.Elapsed.TotalSeconds;
 
         double gazeX = 0, gazeY = 0;
         if (_isMouseOverWindow)
@@ -129,7 +152,7 @@ public partial class PetFloatWindow : Window
     {
         if (e.LeftButton == MouseButtonState.Pressed)
         {
-            DragMove();
+            try { DragMove(); } catch (InvalidOperationException) { }
         }
     }
 
