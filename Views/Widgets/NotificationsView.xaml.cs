@@ -53,6 +53,30 @@ public partial class NotificationsView : UserControl
     private void ToggleGroupingButton_Click(object sender, RoutedEventArgs e) =>
         Island?.ToggleNotificationGrouping();
 
+    private void NotificationsDndButton_Click(object sender, RoutedEventArgs e) =>
+        Island?.NotificationsDndButton_Click(sender, e);
+
+    private void NotifFilter_Click(object sender, RoutedEventArgs e) =>
+        Island?.NotifFilter_Click(sender, e);
+
+    private void NotificationsSearchBox_TextChanged(object sender, TextChangedEventArgs e) =>
+        Island?.NotificationsSearchBox_TextChanged(sender, e);
+
+    private void NotificationsSearchBox_KeyDown(object sender, KeyEventArgs e) =>
+        Island?.NotificationsSearchBox_KeyDown(sender, e);
+
+    private void ClearNotificationsSearch_Click(object sender, RoutedEventArgs e) =>
+        Island?.ClearNotificationsSearch_Click(sender, e);
+
+    private void CopyNotificationItem_Click(object sender, RoutedEventArgs e) =>
+        Island?.CopyNotificationItem_Click(sender, e);
+
+    private void CopyOtpCode_Click(object sender, RoutedEventArgs e) =>
+        Island?.CopyOtpCode_Click(sender, e);
+
+    private void NotificationsEmptyActionBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.NotificationsEmptyActionBtn_Click(sender, e);
+
     private void ToggleGroupExpand_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: NotificationAppGroup group })
@@ -69,8 +93,9 @@ public partial class NotificationsView : UserControl
 
     private void NotificationCard_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        // Don't intercept clicks destined for buttons inside the card (Reply, Dismiss, Mute, Chevron)
-        if (FindVisualParent<Button>(e.OriginalSource as DependencyObject) != null)
+        // Don't intercept clicks destined for buttons or text boxes inside the card
+        if (FindVisualParent<Button>(e.OriginalSource as DependencyObject) != null ||
+            FindVisualParent<TextBox>(e.OriginalSource as DependencyObject) != null)
         {
             _draggedCard = null;
             return;
@@ -110,6 +135,12 @@ public partial class NotificationsView : UserControl
                 tt.X = dx;
                 double progress = Math.Clamp(Math.Abs(dx) / 250.0, 0.0, 1.0);
                 _draggedCard.Opacity = 1.0 - (progress * 0.55);
+
+                if (FindSwipeBackdrop(_draggedCard) is Border backdrop)
+                {
+                    backdrop.Opacity = Math.Clamp((Math.Abs(dx) - 10.0) / 75.0, 0.0, 1.0);
+                }
+
                 e.Handled = true;
             }
         }
@@ -153,6 +184,7 @@ public partial class NotificationsView : UserControl
                     {
                         tt.X = 0;
                         card.Opacity = 1.0;
+                        if (FindSwipeBackdrop(card) is Border b) b.Opacity = 0;
 
                         if (card.DataContext is NotificationAppGroup group)
                         {
@@ -187,9 +219,11 @@ public partial class NotificationsView : UserControl
                     {
                         tt.X = 0;
                         card.Opacity = 1.0;
+                        if (FindSwipeBackdrop(card) is Border b) b.Opacity = 0;
                     };
                     tt.X = 0;
                     card.Opacity = 1.0;
+                    if (FindSwipeBackdrop(card) is Border backdrop) backdrop.Opacity = 0;
 
                     tt.BeginAnimation(TranslateTransform.XProperty, bounceX);
                     card.BeginAnimation(UIElement.OpacityProperty, restoreOpacity);
@@ -220,7 +254,18 @@ public partial class NotificationsView : UserControl
             }
             card.BeginAnimation(UIElement.OpacityProperty, null);
             card.Opacity = 1.0;
+            if (FindSwipeBackdrop(card) is Border backdrop) backdrop.Opacity = 0;
         }
+    }
+
+    private static Border? FindSwipeBackdrop(Border card)
+    {
+        if (VisualTreeHelper.GetParent(card) is Grid parentGrid)
+        {
+            return parentGrid.FindName("SwipeBackdrop") as Border
+                ?? (parentGrid.Children.Count > 0 ? parentGrid.Children[0] as Border : null);
+        }
+        return null;
     }
 
     private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject

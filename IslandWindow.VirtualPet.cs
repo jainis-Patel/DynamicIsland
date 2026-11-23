@@ -54,57 +54,85 @@ public partial class IslandWindow
         ToggleFloatingMode();
     }
 
+    internal void NotchPresetBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string preset })
+        {
+            string normalized = SettingsService.NormalizeHardwareNotchPreset(preset);
+            var (w, h, r) = SettingsService.GetNotchPresetDimensions(normalized);
+            _settingsService.Update(s =>
+            {
+                s.HardwareNotchPreset = normalized;
+                s.HardwareNotchWidth = w;
+                s.HardwareNotchHeight = h;
+                s.HardwareNotchRadius = r;
+            }, nameof(AppSettings.HardwareNotchPreset));
+
+            _machine.PushToast(new ToastContent(
+                "\uE7F4",
+                "Notch Preset",
+                $"{normalized} ({w:0} \u00D7 {h:0} px)",
+                ThemeBrushes.BlueColor,
+                TimeSpan.FromSeconds(1.8),
+                TargetView: "settings",
+                Priority: ToastPriority.Feedback,
+                Category: "notch"));
+        }
+    }
+
     private void UpdateNotchBezelUI()
     {
         bool notchOn = _settingsService?.Current?.HardwareNotchMode ?? false;
         bool isDetached = _isDetachedPiP || (_settingsService?.Current.IsDetachedFloating ?? false);
+        var dp = SettingsContainer?.DisplayPowerPanel;
+        if (dp == null) return;
 
-        if (NotchBezelToggleText != null)
+        if (dp.NotchBezelToggleSwitch != null)
+            dp.NotchBezelToggleSwitch.IsChecked = notchOn;
+
+        if (dp.FloatingPiPToggleSwitch != null)
+            dp.FloatingPiPToggleSwitch.IsChecked = isDetached;
+
+        if (dp.NotchPresetsGroup != null)
+            dp.NotchPresetsGroup.Visibility = notchOn ? Visibility.Visible : Visibility.Collapsed;
+
+        UpdateNotchPresetUI();
+
+        if (dp.NotchOffsetSlider != null)
         {
-            NotchBezelToggleText.Text = notchOn ? "Notch On" : "Notch Off";
-            NotchBezelToggleText.Foreground = notchOn ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
+            dp.NotchOffsetSlider.IsEnabled = !notchOn && !isDetached;
+            dp.NotchOffsetSlider.Opacity = (notchOn || isDetached) ? 0.42 : 1.0;
         }
-        if (NotchBezelToggleBtn != null)
+        if (dp.NotchOffsetText != null)
         {
-            NotchBezelToggleBtn.BorderBrush = notchOn
-                ? ThemeBrushes.GreenBorderActive
-                : Brushes.Transparent;
+            dp.NotchOffsetText.Text = isDetached ? "PiP Free" : (notchOn ? "Locked (Notch)" : $"{_settingsService?.Current?.NotchYOffset ?? 0} px");
         }
-        if (FloatingPiPToggleText != null)
-        {
-            FloatingPiPToggleText.Text = isDetached ? "PiP On" : "PiP Off";
-            FloatingPiPToggleText.Foreground = isDetached ? ThemeBrushes.Blue : ThemeBrushes.SecondaryText;
-        }
-        if (FloatingPiPToggleBtn != null)
-        {
-            FloatingPiPToggleBtn.BorderBrush = isDetached
-                ? ThemeBrushes.BlueBorderActive
-                : Brushes.Transparent;
-        }
-        if (NotchOffsetSlider != null)
-        {
-            NotchOffsetSlider.IsEnabled = !notchOn && !isDetached;
-            NotchOffsetSlider.Opacity = (notchOn || isDetached) ? 0.42 : 1.0;
-        }
-        if (NotchOffsetText != null)
-        {
-            NotchOffsetText.Text = isDetached ? "PiP Free" : (notchOn ? "Locked (Notch)" : $"{_settingsService?.Current?.NotchYOffset ?? 0} px");
-        }
+    }
+
+    private void UpdateNotchPresetUI()
+    {
+        var dp = SettingsContainer?.DisplayPowerPanel;
+        if (dp?.NotchPresetMBP16Btn == null) return;
+
+        string current = SettingsService.NormalizeHardwareNotchPreset(_settingsService?.Current?.HardwareNotchPreset);
+        var accent = (Brush)Resources["AccentBrush"];
+        var defaultBorder = (Brush)FindResource("CardBorderBrush");
+        var defaultBg = (Brush)FindResource("CardSurfaceBrush");
+
+        StyleAccentToggleButton(dp.NotchPresetMBP16Btn, current == "MacBookPro16", accent, defaultBg, defaultBorder, dp.NotchPresetMBP16Text);
+        StyleAccentToggleButton(dp.NotchPresetMBP14Btn, current == "MacBookPro14", accent, defaultBg, defaultBorder, dp.NotchPresetMBP14Text);
+        StyleAccentToggleButton(dp.NotchPresetAirBtn, current == "MacBookAir", accent, defaultBg, defaultBorder, dp.NotchPresetAirText);
+        StyleAccentToggleButton(dp.NotchPresetXpsBtn, current == "DellXps", accent, defaultBg, defaultBorder, dp.NotchPresetXpsText);
+        StyleAccentToggleButton(dp.NotchPresetCustomBtn, current == "Custom", accent, defaultBg, defaultBorder, dp.NotchPresetCustomText);
     }
 
     private void UpdateFollowMonitorUI()
     {
         bool followOn = _settingsService?.Current?.FollowActiveMonitor ?? false;
-        if (FollowMonitorToggleText != null)
+        var dp = SettingsContainer?.DisplayPowerPanel;
+        if (dp?.FollowMonitorToggleSwitch != null)
         {
-            FollowMonitorToggleText.Text = followOn ? "Follow Mon On" : "Follow Mon Off";
-            FollowMonitorToggleText.Foreground = followOn ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
-        }
-        if (FollowMonitorToggleBtn != null)
-        {
-            FollowMonitorToggleBtn.BorderBrush = followOn
-                ? ThemeBrushes.GreenBorderActive
-                : Brushes.Transparent;
+            dp.FollowMonitorToggleSwitch.IsChecked = followOn;
         }
     }
 
@@ -438,33 +466,23 @@ public partial class IslandWindow
 
     private static string FormatSpeciesLabel(string species) => species switch
     {
-        "Dog" => "\U0001F436 Dog",
-        "Bunny" => "\U0001F430 Bunny",
-        "Fox" => "\U0001F98A Fox",
-        "Panda" => "\U0001F43C Panda",
-        "Dragon" => "\U0001F432 Dragon",
-        _ => "\U0001F431 Cat"
+        "Dog" => "Dog",
+        "Bunny" => "Bunny",
+        "Fox" => "Fox",
+        "Panda" => "Panda",
+        "Dragon" => "Dragon",
+        _ => "Cat"
     };
 
     private static string FormatAccessoryLabel(string accessory) => accessory switch
     {
-        "Crown" => "\U0001F451 Crown",
-        "WizardHat" => "\U0001F9D9 Wizard",
-        "Headphones" => "\U0001F3A7 DJ",
-        "Sunglasses" => "\U0001F60E Shades",
-        "Halo" => "\U0001F607 Halo",
-        "Sprout" => "\U0001F331 Sprout",
-        _ => "\U0001F3A9 None"
-    };
-
-    private static string GetSpeciesTreatIcon(string species) => species switch
-    {
-        "Dog" => "\U0001F9B4",
-        "Bunny" => "\U0001F955",
-        "Fox" => "\U0001FAD0",
-        "Panda" => "\U0001F38B",
-        "Dragon" => "\u2728",
-        _ => "\U0001F363"
+        "Crown" => "Crown",
+        "WizardHat" => "Wizard",
+        "Headphones" => "DJ",
+        "Sunglasses" => "Shades",
+        "Halo" => "Halo",
+        "Sprout" => "Sprout",
+        _ => "None"
     };
 
     private void UpdatePetSettingsUI()
@@ -477,57 +495,35 @@ public partial class IslandWindow
         int affection = _petService.AffectionScore;
         int interval = _petService.ReminderIntervalMinutes;
 
-        if (PetToggleText != null)
+        var pp = SettingsContainer?.PetPanel;
+        if (pp != null)
         {
-            PetToggleText.Text = enabled ? "Pet On" : "Pet Off";
-            PetToggleText.Foreground = enabled ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
-        }
-        if (PetToggleBtn != null)
-        {
-            PetToggleBtn.BorderBrush = enabled
-                ? ThemeBrushes.GreenBorderActive
-                : Brushes.Transparent;
-        }
+            if (pp.PetToggleSwitch != null)
+                pp.PetToggleSwitch.IsChecked = enabled;
 
-        if (PetSpeciesText != null)
-        {
-            PetSpeciesText.Text = FormatSpeciesLabel(species);
-        }
+            if (pp.PetSpeciesText != null)
+                pp.PetSpeciesText.Text = FormatSpeciesLabel(species);
 
-        if (PetAccessoryText != null)
-        {
-            PetAccessoryText.Text = FormatAccessoryLabel(accessory);
-        }
+            if (pp.PetAccessoryText != null)
+                pp.PetAccessoryText.Text = FormatAccessoryLabel(accessory);
 
-        if (PetNameBtnText != null)
-        {
-            PetNameBtnText.Text = $"\u270F\uFE0F {name}";
-        }
+            if (pp.PetNameBtnText != null)
+                pp.PetNameBtnText.Text = "Rename";
 
-        if (PetStatusSummaryText != null)
-        {
-            PetStatusSummaryText.Text = $"{name} \u00B7 {affection} \u2764\uFE0F";
-        }
+            if (pp.PetStatusSummaryText != null)
+                pp.PetStatusSummaryText.Text = $"{name} \u00B7 {affection} XP";
 
-        string treatIcon = GetSpeciesTreatIcon(species);
-        if (PetTreatText != null)
-        {
-            PetTreatText.Text = $"{treatIcon} Treat: {_petService.TreatCount}";
-        }
+            if (pp.PetTreatText != null)
+                pp.PetTreatText.Text = $"Treat: {_petService.TreatCount}";
 
-        if (PetHydrateText != null)
-        {
-            PetHydrateText.Text = $"\U0001F4A7 Water: {_petService.WaterCount}";
-        }
+            if (pp.PetHydrateText != null)
+                pp.PetHydrateText.Text = $"Water: {_petService.WaterCount}";
 
-        if (PetStretchText != null)
-        {
-            PetStretchText.Text = $"\U0001F9D8 Stretch: {_petService.StretchCount}";
-        }
+            if (pp.PetStretchText != null)
+                pp.PetStretchText.Text = $"Stretch: {_petService.StretchCount}";
 
-        if (PetReminderCycleText != null)
-        {
-            PetReminderCycleText.Text = interval > 0 ? $"Remind: {interval}m" : "Remind: Off";
+            if (pp.PetReminderCycleText != null)
+                pp.PetReminderCycleText.Text = interval > 0 ? $"Remind: {interval}m" : "Remind: Off";
         }
 
         if (IdlePetCompanion != null)
@@ -548,21 +544,19 @@ public partial class IslandWindow
         }
 
         // Hero Showcase Card updates
-        if (SettingsHeroPet != null)
+        if (pp?.SettingsHeroPet != null)
         {
-            SettingsHeroPet.Species = species;
-            SettingsHeroPet.Accessory = accessory;
-            SettingsHeroPet.Mood = _petService.CurrentMood;
-            SettingsHeroPet.PetName = name;
-            SettingsHeroPet.Affection = affection;
+            pp.SettingsHeroPet.Species = species;
+            pp.SettingsHeroPet.Accessory = accessory;
+            pp.SettingsHeroPet.Mood = _petService.CurrentMood;
+            pp.SettingsHeroPet.PetName = name;
+            pp.SettingsHeroPet.Affection = affection;
         }
 
-        if (SettingsHeroPetName != null)
-        {
-            SettingsHeroPetName.Text = name;
-        }
+        if (pp?.SettingsHeroPetName != null)
+            pp.SettingsHeroPetName.Text = name;
 
-        if (SettingsHeroPetRank != null || SettingsHeroPetScore != null || SettingsHeroPetProgressBar != null)
+        if (pp != null && (pp.SettingsHeroPetRank != null || pp.SettingsHeroPetScore != null || pp.SettingsHeroPetProgressBar != null))
         {
             string rankTitle;
             int prevThresh, nextThresh;
@@ -603,21 +597,21 @@ public partial class IslandWindow
                 nextThresh = 2000;
             }
 
-            if (SettingsHeroPetRank != null) SettingsHeroPetRank.Text = rankTitle;
-            if (SettingsHeroPetScore != null) SettingsHeroPetScore.Text = $"{affection} / {nextThresh} \u2764";
-            if (SettingsHeroPetProgressBar != null)
+            if (pp.SettingsHeroPetRank != null) pp.SettingsHeroPetRank.Text = rankTitle;
+            if (pp.SettingsHeroPetScore != null) pp.SettingsHeroPetScore.Text = $"{affection} / {nextThresh} XP";
+            if (pp.SettingsHeroPetProgressBar != null)
             {
                 double frac = Math.Clamp((double)(affection - prevThresh) / Math.Max(1, nextThresh - prevThresh), 0.05, 1.0);
-                SettingsHeroPetProgressBar.Width = frac * 110.0;
+                pp.SettingsHeroPetProgressBar.Width = frac * 110.0;
             }
         }
 
-        if (SettingsHeroPetWellnessMini != null)
+        if (pp?.SettingsHeroPetWellnessMini != null)
         {
-            SettingsHeroPetWellnessMini.Text = $"{treatIcon} {_petService.TreatCount}  \U0001F4A7 {_petService.WaterCount}  \U0001F9D8 {_petService.StretchCount}";
+            pp.SettingsHeroPetWellnessMini.Text = $"Treat {_petService.TreatCount} \u00B7 Water {_petService.WaterCount} \u00B7 Stretch {_petService.StretchCount}";
         }
 
-        if (SettingsHeroPetSub != null)
+        if (pp?.SettingsHeroPetSub != null)
         {
             string speciesDesc = species switch
             {
@@ -628,7 +622,7 @@ public partial class IslandWindow
                 "Dragon" => "Celestial Baby Sky Dragon",
                 _ => "Playful Ginger Tabby Cat"
             };
-            SettingsHeroPetSub.Text = accessory != "None"
+            pp.SettingsHeroPetSub.Text = accessory != "None"
                 ? $"{speciesDesc} \u00B7 Wearing {FormatAccessoryLabel(accessory)}"
                 : speciesDesc;
         }

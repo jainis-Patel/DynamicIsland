@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using DynamicIsland.Core;
 
 namespace DynamicIsland.Views.Widgets;
 
@@ -11,6 +12,11 @@ public partial class MediaView : UserControl
     public MediaView()
     {
         InitializeComponent();
+
+        BentoMotion.AttachInteractiveSpring(MediaArtworkSquircle, hoverScale: 1.04, pressScale: 0.96);
+        BentoMotion.AttachInteractiveSpring(PrevButton, hoverScale: 1.08, pressScale: 0.90);
+        BentoMotion.AttachInteractiveSpring(PlayPauseButton, hoverScale: 1.10, pressScale: 0.90);
+        BentoMotion.AttachInteractiveSpring(NextButton, hoverScale: 1.08, pressScale: 0.90);
     }
 
     // ── Forwarding Click Events to IslandWindow ──────────────────────────
@@ -49,6 +55,12 @@ public partial class MediaView : UserControl
 
     private void ClockSystemHudBadge_Click(object sender, MouseButtonEventArgs e) =>
         Island?.ClockSystemHudBadge_Click(sender, e);
+
+    private void AudioOutputQuickBtn_Click(object sender, RoutedEventArgs e)
+    {
+        Island?.SwitchExpandedView(ExpandedView.Audio);
+        e.Handled = true;
+    }
 
     private void DetachPlayer_Click(object sender, RoutedEventArgs e) =>
         Island?.DetachMiniPlayer();

@@ -222,7 +222,7 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
         {
             _endpointDebounceTimer.Change(150, Timeout.Infinite);
         }
-        catch { }
+        catch (Exception ex) { App.LogDebug("AudioEndpoint", ex); }
     }
 
     public void RefreshEndpoints(bool initial = false)
@@ -250,7 +250,7 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
                         using var def = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
                         defaultId = def?.ID;
                     }
-                    catch { }
+                    catch (Exception ex) { App.LogDebug("AudioEndpoint", ex); }
 
                     var list = new List<AudioEndpointInfo>();
                     var collection = _enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
@@ -271,7 +271,7 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
                                     vol = dev.AudioEndpointVolume.MasterVolumeLevelScalar;
                                     muted = dev.AudioEndpointVolume.Mute;
                                 }
-                                catch { }
+                                catch (Exception ex) { App.LogDebug("AudioEndpoint", ex); }
 
                                 var (type, glyph) = InferDeviceTypeAndGlyph(name);
                                 int? battery = FindBatteryForDevice(name);
@@ -472,7 +472,7 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
                                 using var proc = Process.GetProcessById((int)pid);
                                 exePath = proc.MainModule?.FileName;
                             }
-                            catch { }
+                            catch (Exception ex) { App.LogDebug("AudioEndpoint", ex); }
 
                             var appIcon = !string.IsNullOrEmpty(exePath) ? Core.AppIconLoader.GetAppIcon(exePath) : null;
 
@@ -487,8 +487,9 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
                                 IsMuted = muted
                             };
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            App.LogDebug("AudioEndpoint", ex);
                         }
                         finally
                         {
@@ -669,8 +670,9 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
                 return char.ToUpperInvariant(raw[0]) + raw[1..];
             }
         }
-        catch
+        catch (Exception ex)
         {
+            App.LogDebug("AudioEndpoint", ex);
         }
         return "";
     }

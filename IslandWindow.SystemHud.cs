@@ -414,6 +414,13 @@ public partial class IslandWindow
         var snap = _systemPerfService.LatestSnapshot;
         if (!snap.Runaway.HasRunaway || string.IsNullOrEmpty(snap.Runaway.ExeName)) return;
 
+        bool shiftHeld = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+        if (!_confirmGuard.TryConfirm("kill_runaway", sender, "Confirm Kill?", bypass: shiftHeld, dispatcher: Dispatcher))
+        {
+            TriggerLiquidImpulse(24, -8, 3);
+            return;
+        }
+
         string runawayExe = snap.Runaway.ExeName;
         uint runawayPid = snap.Runaway.Pid;
 
@@ -442,6 +449,13 @@ public partial class IslandWindow
     internal void HudPurgeRunawaysButton_Click(object sender, RoutedEventArgs e)
     {
         if (_systemPerfService == null) return;
+
+        bool shiftHeld = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+        if (!_confirmGuard.TryConfirm("purge_runaways", sender, "Confirm Purge?", explicitLabel: HudPurgeRunawaysText, bypass: shiftHeld, dispatcher: Dispatcher))
+        {
+            TriggerLiquidImpulse(24, -8, 3);
+            return;
+        }
 
         Task.Run(() =>
         {

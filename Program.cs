@@ -74,7 +74,21 @@ public static class Program
 
         if (args.Any(a => string.Equals(a, "--self-test", StringComparison.OrdinalIgnoreCase)))
         {
-            return Core.SelfTestRunner.RunAll();
+            string? filter = null;
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (args[i].StartsWith("--filter=", StringComparison.OrdinalIgnoreCase))
+                {
+                    filter = args[i].Substring("--filter=".Length);
+                    break;
+                }
+                if (string.Equals(args[i], "--filter", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                {
+                    filter = args[i + 1];
+                    break;
+                }
+            }
+            return Core.SelfTestRunner.RunAll(filter);
         }
 
         if (args.Any(a => string.Equals(a, "--render-golden-glass", StringComparison.OrdinalIgnoreCase)))

@@ -132,7 +132,7 @@ internal sealed class PrivacyIndicatorService : IDisposable
                     _captureDevice.AudioEndpointVolume.OnVolumeNotification += OnCaptureVolumeNotification;
                 }
             }
-            catch { }
+            catch (Exception ex) { App.LogDebug("PrivacyIndicator", ex); }
         }
     }
 
@@ -216,8 +216,9 @@ internal sealed class PrivacyIndicatorService : IDisposable
             _registryWatchers.Add(state);
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            App.LogDebug("PrivacyIndicator", ex);
             return false;
         }
     }
@@ -235,8 +236,9 @@ internal sealed class PrivacyIndicatorService : IDisposable
                 fAsynchronous: true);
             return res == 0;
         }
-        catch
+        catch (Exception ex)
         {
+            App.LogDebug("PrivacyIndicator", ex);
             return false;
         }
     }
@@ -361,7 +363,7 @@ internal sealed class PrivacyIndicatorService : IDisposable
                     }
                 });
             }
-            catch { }
+            catch (Exception ex) { App.LogDebug("PrivacyIndicator", ex); }
             finally
             {
                 Interlocked.Exchange(ref _polling, 0);
@@ -454,10 +456,10 @@ internal sealed class PrivacyIndicatorService : IDisposable
                     if (title.Contains("Slack", StringComparison.OrdinalIgnoreCase)) return "Slack";
                     if (title.Contains("Telegram", StringComparison.OrdinalIgnoreCase)) return "Telegram";
                 }
-                catch { }
+                catch (Exception ex) { App.LogDebug("PrivacyIndicator", ex); }
             }
         }
-        catch { }
+        catch (Exception ex) { App.LogDebug("PrivacyIndicator", ex); }
         finally
         {
             if (procs != null)
@@ -525,7 +527,7 @@ internal sealed class PrivacyIndicatorService : IDisposable
                                         anyActive = true;
                                     }
                                 }
-                                catch { }
+                                catch (Exception ex) { App.LogDebug("PrivacyIndicator", ex); }
                             }
                         }
                         finally
@@ -540,8 +542,9 @@ internal sealed class PrivacyIndicatorService : IDisposable
                     try { (sessionMgr as IDisposable)?.Dispose(); } catch { }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                App.LogDebug("PrivacyIndicator", ex);
                 return false;
             }
         }
@@ -573,10 +576,10 @@ internal sealed class PrivacyIndicatorService : IDisposable
                         return true;
                     }
                 }
-                catch { }
+                catch (Exception ex) { App.LogDebug("PrivacyIndicator", ex); }
             }
         }
-        catch { }
+        catch (Exception ex) { App.LogDebug("PrivacyIndicator", ex); }
         finally
         {
             if (procs != null)

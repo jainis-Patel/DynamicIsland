@@ -19,11 +19,48 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/DynamicIsland.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
       - name: Restore dependencies
         run: dotnet restore -r win-x64
 
       - name: Build Release
-        run: dotnet build -c Release -r win-x64 --no-restore
+        run: dotnet build -c Release -r win-x64 --no-restore -p:WarningsAsErrors=CS8600%3BCS8602%3BCS8603
+
+      - name: Validate Release & WinGet Manifests
+        shell: pwsh
+        run: |
+          [xml]$csproj = Get-Content DynamicIsland.csproj -Raw
+          $projVersion = ($csproj.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1).Version.Trim()
+          if ([string]::IsNullOrWhiteSpace($projVersion)) { throw "Missing <Version> in DynamicIsland.csproj" }
+
+          $manifest = Get-Content release-manifest.json -Raw | ConvertFrom-Json
+          foreach ($field in @('version', 'releaseTag')) {
+            if ([string]::IsNullOrWhiteSpace($manifest.$field)) { throw "Missing '$field' in release-manifest.json" }
+          }
+          if ([string]::IsNullOrWhiteSpace($manifest.downloads.installer.sha256) -or
+              [string]::IsNullOrWhiteSpace($manifest.downloads.portable.sha256)) {
+            throw "Missing download SHA-256 hashes in release-manifest.json"
+          }
+          if ($manifest.version -ne $projVersion) {
+            throw "Version mismatch: DynamicIsland.csproj=$projVersion vs release-manifest.json=$($manifest.version)"
+          }
+
+          foreach ($yaml in Get-ChildItem installer/winget -Filter *.yaml) {
+            $match = Select-String -Path $yaml.FullName -Pattern '^PackageVersion:\s*(.+)$' | Select-Object -First 1
+            if (-not $match) { throw "Missing PackageVersion in $($yaml.Name)" }
+            $yamlVer = $match.Matches[0].Groups[1].Value.Trim()
+            if ($yamlVer -ne $projVersion) {
+              throw "WinGet version mismatch in $($yaml.Name): $yamlVer vs $projVersion"
+            }
+          }
+          Write-Host "Verified release-manifest.json and WinGet manifests match v$projVersion."
 
       - name: Run Deterministic Self-Test Suite
         run: dotnet run -c Release -r win-x64 --no-build -- --self-test

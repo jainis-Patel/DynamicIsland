@@ -12,18 +12,21 @@ internal sealed class CursorTracker : IDisposable
 {
     private static readonly TimeSpan FastInterval = TimeSpan.FromMilliseconds(16);
     private static readonly TimeSpan SlowInterval = TimeSpan.FromMilliseconds(75);
+    private static readonly TimeSpan IdleInterval = TimeSpan.FromMilliseconds(250);
+    private const long DeepIdleThresholdMs = 3000;
     private const int ProximityXMarginPx = 220;
     private const int ProximityYMarginPx = 150;
 
     private readonly DispatcherTimer _timer;
     private readonly Func<RECT?> _getZone;
     private bool _inside;
-    private bool _fastMode = true;
+    private TimeSpan _currentInterval = FastInterval;
     private IntPtr _lastMonitor;
     private IntPtr _candidateMonitor;
     private long _candidateSinceTick;
     private POINT _lastPos;
     private long _lastPosTick;
+    private long _lastMoveTick;
     private double _velocityX;
 
     public bool EnableFastSwipeGuard { get; set; } = true;
@@ -35,6 +38,7 @@ internal sealed class CursorTracker : IDisposable
     public CursorTracker(Func<RECT?> getZone)
     {
         _getZone = getZone;
+        _lastMoveTick = Environment.TickCount64;
         _timer = new DispatcherTimer(DispatcherPriority.Input) { Interval = FastInterval };
         _timer.Tick += OnTick;
     }
@@ -54,6 +58,7 @@ internal sealed class CursorTracker : IDisposable
         }
         else if (!_timer.IsEnabled)
         {
+            _lastMoveTick = Environment.TickCount64;
             _timer.Start();
         }
     }
@@ -73,6 +78,12 @@ internal sealed class CursorTracker : IDisposable
         {
             _velocityX = 0.0;
         }
+
+        if (_lastPosTick == 0 || p.X != _lastPos.X || p.Y != _lastPos.Y)
+        {
+            _lastMoveTick = now;
+        }
+
         _lastPos = p;
         _lastPosTick = now;
 
@@ -95,10 +106,14 @@ internal sealed class CursorTracker : IDisposable
             inside = false;
         }
 
-        if (near != _fastMode)
+        TimeSpan targetInterval = near
+            ? FastInterval
+            : (now - _lastMoveTick >= DeepIdleThresholdMs ? IdleInterval : SlowInterval);
+
+        if (_currentInterval != targetInterval)
         {
-            _fastMode = near;
-            _timer.Interval = near ? FastInterval : SlowInterval;
+            _currentInterval = targetInterval;
+            _timer.Interval = targetInterval;
         }
 
         IntPtr currentMon = MonitorFromPoint(p, MONITOR_DEFAULTTONEAREST);

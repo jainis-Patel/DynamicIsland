@@ -654,6 +654,17 @@ public partial class IslandWindow
         SetWindowPos(_hwnd, HWND_TOPMOST, x, y, widthPx, heightPx, SWP_NOACTIVATE | SWP_SHOWWINDOW);
     }
 
+    internal void RepositionIfEdgeDocked()
+    {
+        bool isDetached = _isDetachedPiP || (_settingsService?.Current.IsDetachedFloating ?? false);
+        if (isDetached) return;
+        string dock = _settingsService?.Current.DockPosition ?? "Center";
+        if (dock == "Left" || dock == "Right")
+        {
+            PositionWindow();
+        }
+    }
+
     private IntPtr _lastForegroundHwnd;
     private bool _isSessionLocked;
 
@@ -1315,6 +1326,7 @@ public partial class IslandWindow
                 _peripheralService.SetSuspended(true);
                 _choreographer.SetSuspended(true);
                 _systemPerfService.SetFullscreenSuspended(true);
+                _notificationListener.SetSuspended(true);
                 IslandMemoryManager.ExecuteConservativeTrim();
             });
             return;
@@ -1335,6 +1347,7 @@ public partial class IslandWindow
                 _peripheralService.SetSuspended(false);
                 _choreographer.SetSuspended(false);
                 _systemPerfService.SetFullscreenSuspended(false);
+                _notificationListener.SetSuspended(false);
                 UpdateClockAndTimeline();
                 UpdateNatureThemeTimerState();
             });

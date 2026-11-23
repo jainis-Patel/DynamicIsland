@@ -18,6 +18,18 @@ public partial class MiniPlayerWindow : Window
     private enum DrawerState { None, Songs, Lyrics }
     private enum SongsTab { AlbumTracks, ActivePlayers, History }
 
+    private static readonly SolidColorBrush SubtleSurfaceBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF));
+    private static readonly SolidColorBrush SegmentActiveBgBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0x35, 0xFF, 0xFF, 0xFF));
+    private static readonly SolidColorBrush CurrentTrackBgBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0x28, 0xFF, 0x9F, 0x0A));
+    private static readonly SolidColorBrush IdleTrackBgBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0x0C, 0xFF, 0xFF, 0xFF));
+    private static readonly SolidColorBrush ActivePlayerBgBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0x24, 0x0A, 0x84, 0xFF));
+    private static readonly SolidColorBrush InactivePlayerBgBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF));
+    private static readonly SolidColorBrush ActivePlayerBorderBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0x60, 0x0A, 0x84, 0xFF));
+    private static readonly SolidColorBrush InactivePlayerBorderBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF));
+    private static readonly SolidColorBrush ArtFallbackBgBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF));
+    private static readonly SolidColorBrush BrandPipBgBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0xD5, 0x00, 0x00, 0x00));
+    private static readonly SolidColorBrush ActivePlayerBadgeBgBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0x40, 0x0A, 0x84, 0xFF));
+
     private readonly MediaSessionService _mediaService;
     private readonly LyricsService _lyricsService;
     private readonly VolumeService _volumeService;
@@ -637,9 +649,9 @@ public partial class MiniPlayerWindow : Window
         PinGlyph.Text = _isPinned ? "\uE718" : "\uE77A"; // Pin vs Unpin
         PinButton.Background = _isPinned
             ? (Brush)FindResource("AccentBrush")
-            : new SolidColorBrush(Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF));
+            : SubtleSurfaceBrush;
         PinGlyph.Foreground = _isPinned
-            ? new SolidColorBrush(Color.FromRgb(0x0A, 0x0A, 0x0C))
+            ? ThemeBrushes.DarkInkDark
             : (Brush)FindResource("PrimaryTextBrush");
     }
 
@@ -765,10 +777,10 @@ public partial class MiniPlayerWindow : Window
 
         ToggleSongListBtn.Background = drawer == DrawerState.Songs
             ? (Brush)FindResource("AccentBrush")
-            : new SolidColorBrush(Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF));
+            : SubtleSurfaceBrush;
         ToggleLyricsBtn.Background = drawer == DrawerState.Lyrics
             ? (Brush)FindResource("AccentBrush")
-            : new SolidColorBrush(Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF));
+            : SubtleSurfaceBrush;
 
         AnimateWindowSize(FullWidth, CalculateDrawerTargetHeight());
     }
@@ -813,8 +825,8 @@ public partial class MiniPlayerWindow : Window
         SongListDrawer.Visibility = Visibility.Collapsed;
         LyricsDrawer.Visibility = Visibility.Collapsed;
 
-        ToggleSongListBtn.Background = new SolidColorBrush(Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF));
-        ToggleLyricsBtn.Background = new SolidColorBrush(Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF));
+        ToggleSongListBtn.Background = SubtleSurfaceBrush;
+        ToggleLyricsBtn.Background = SubtleSurfaceBrush;
 
         AnimateWindowSize(FullWidth, FullHeightBase);
     }
@@ -858,7 +870,7 @@ public partial class MiniPlayerWindow : Window
 
     private void HighlightSegmentBtn(Button btn, bool active)
     {
-        btn.Background = active ? new SolidColorBrush(Color.FromArgb(0x35, 0xFF, 0xFF, 0xFF)) : Brushes.Transparent;
+        btn.Background = active ? SegmentActiveBgBrush : Brushes.Transparent;
         btn.Foreground = active ? (Brush)FindResource("PrimaryTextBrush") : (Brush)FindResource("SecondaryBrush");
         btn.FontWeight = active ? FontWeights.SemiBold : FontWeights.Medium;
     }
@@ -971,12 +983,10 @@ public partial class MiniPlayerWindow : Window
             var itemBorder = new Border
             {
                 Tag = track,
-                Background = isCurrent
-                    ? new SolidColorBrush(Color.FromArgb(0x28, 0xFF, 0x9F, 0x0A))
-                    : new SolidColorBrush(Color.FromArgb(0x0C, 0xFF, 0xFF, 0xFF)),
+                Background = isCurrent ? CurrentTrackBgBrush : IdleTrackBgBrush,
                 BorderBrush = isCurrent
                     ? (Brush)FindResource("AccentBrush")
-                    : new SolidColorBrush(Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF)),
+                    : SubtleSurfaceBrush,
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(8, 5, 8, 5),
@@ -1073,12 +1083,10 @@ public partial class MiniPlayerWindow : Window
             {
                 bool isCurrent = IsMatchingTrack(track.Title, currentTitle);
 
-                itemBorder.Background = isCurrent
-                    ? new SolidColorBrush(Color.FromArgb(0x28, 0xFF, 0x9F, 0x0A))
-                    : new SolidColorBrush(Color.FromArgb(0x0C, 0xFF, 0xFF, 0xFF));
+                itemBorder.Background = isCurrent ? CurrentTrackBgBrush : IdleTrackBgBrush;
                 itemBorder.BorderBrush = isCurrent
                     ? (Brush)FindResource("AccentBrush")
-                    : new SolidColorBrush(Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF));
+                    : SubtleSurfaceBrush;
 
                 if (itemBorder.Child is Grid grid && grid.Children.Count >= 2)
                 {
@@ -1152,12 +1160,8 @@ public partial class MiniPlayerWindow : Window
 
             var item = new Border
             {
-                Background = sess.IsCurrent
-                    ? new SolidColorBrush(Color.FromArgb(0x24, 0x0A, 0x84, 0xFF))
-                    : new SolidColorBrush(Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF)),
-                BorderBrush = sess.IsCurrent
-                    ? new SolidColorBrush(Color.FromArgb(0x60, 0x0A, 0x84, 0xFF))
-                    : new SolidColorBrush(Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF)),
+                Background = sess.IsCurrent ? ActivePlayerBgBrush : InactivePlayerBgBrush,
+                BorderBrush = sess.IsCurrent ? ActivePlayerBorderBrush : InactivePlayerBorderBrush,
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(10),
                 Padding = new Thickness(8, 6, 8, 6),
@@ -1176,7 +1180,7 @@ public partial class MiniPlayerWindow : Window
                 Width = 28,
                 Height = 28,
                 CornerRadius = new CornerRadius(7),
-                Background = new SolidColorBrush(Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF)),
+                Background = ArtFallbackBgBrush,
                 ClipToBounds = true,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -1191,7 +1195,7 @@ public partial class MiniPlayerWindow : Window
                     Width = 10,
                     Height = 10,
                     CornerRadius = new CornerRadius(5),
-                    Background = new SolidColorBrush(Color.FromArgb(0xD5, 0x00, 0x00, 0x00)),
+                    Background = BrandPipBgBrush,
                     HorizontalAlignment = HorizontalAlignment.Right,
                     VerticalAlignment = VerticalAlignment.Bottom,
                     Margin = new Thickness(0, 0, 1, 1)
@@ -1240,7 +1244,7 @@ public partial class MiniPlayerWindow : Window
             {
                 CornerRadius = new CornerRadius(5),
                 Padding = new Thickness(6, 2, 6, 2),
-                Background = sess.IsCurrent ? new SolidColorBrush(Color.FromArgb(0x40, 0x0A, 0x84, 0xFF)) : new SolidColorBrush(Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF)),
+                Background = sess.IsCurrent ? ActivePlayerBadgeBgBrush : InactivePlayerBorderBrush,
                 VerticalAlignment = VerticalAlignment.Center
             };
             badge.Child = new TextBlock
@@ -1295,8 +1299,8 @@ public partial class MiniPlayerWindow : Window
         {
             var item = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(0x0C, 0xFF, 0xFF, 0xFF)),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF)),
+                Background = IdleTrackBgBrush,
+                BorderBrush = SubtleSurfaceBrush,
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(7, 4.5, 7, 4.5),

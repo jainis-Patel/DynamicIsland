@@ -1,0 +1,152 @@
+<UserControl x:Class="DynamicIsland.Views.Widgets.Settings.DropletsSettingsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="340" d:DesignWidth="400"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Ideal"
+             TextOptions.TextRenderingMode="ClearType">
+
+    <ScrollViewer x:Name="PanelScrollViewer"
+                  PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  PanningMode="VerticalOnly">
+        <StackPanel Margin="0,0,4,6">
+
+            <!-- Compact Toolbar Header -->
+            <Border Style="{StaticResource SettingsGroupCard}" Padding="8,6" Margin="0,0,0,5">
+                <StackPanel>
+                    <DockPanel LastChildFill="True" Margin="0,0,0,5">
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="DropletEnableAllBtn" Click="DropletEnableAllBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
+                                <TextBlock Text="Enable All" FontSize="8" FontWeight="Medium" />
+                            </Button>
+                            <Button x:Name="DropletDisableAllBtn" Click="DropletDisableAllBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
+                                <TextBlock Text="Disable All" FontSize="8" FontWeight="Medium" />
+                            </Button>
+                            <Button x:Name="DropletResetBtn" Click="DropletResetBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,6,0">
+                                <TextBlock Text="Reset" FontSize="8" FontWeight="Medium" />
+                            </Button>
+                        </StackPanel>
+
+                        <Border DockPanel.Dock="Right" Background="{DynamicResource ChipBgBrush}" CornerRadius="5" Padding="6,2" Margin="6,0,0,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="DropletsHeaderSummaryText" Style="{StaticResource Digits}" Text="16 / 17 · ~500 KB" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                        </Border>
+
+                        <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="6,2" Height="20" VerticalAlignment="Center">
+                            <DockPanel LastChildFill="True">
+                                <TextBlock DockPanel.Dock="Left" Style="{StaticResource Glyph}" Text="&#xE721;" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                <TextBox x:Name="DropletSearchBox" TextChanged="DropletSearchBox_TextChanged" Background="Transparent" Foreground="{DynamicResource PrimaryTextBrush}" BorderThickness="0" FontSize="8.5" VerticalAlignment="Center" CaretBrush="{DynamicResource AccentBrush}" />
+                            </DockPanel>
+                        </Border>
+                    </DockPanel>
+
+                    <!-- Category Filter Bar (Monochrome Fluent Glyphs) -->
+                    <UniformGrid Columns="5">
+                        <Button x:Name="DropletFilterAllBtn" Tag="All" Click="DropletFilterBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="2,0" Margin="0,0,2,0">
+                            <TextBlock x:Name="DropletFilterAllText" Text="All" FontSize="8" HorizontalAlignment="Center" />
+                        </Button>
+                        <Button x:Name="DropletFilterProdBtn" Tag="Productivity" Click="DropletFilterBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="2,0" Margin="1,0">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE762;" FontSize="7.5" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.8" />
+                                <TextBlock x:Name="DropletFilterProdText" Text="Work" FontSize="8" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="DropletFilterMediaBtn" Tag="Media" Click="DropletFilterBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="2,0" Margin="1,0">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8D6;" FontSize="7.5" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.8" />
+                                <TextBlock x:Name="DropletFilterMediaText" Text="Media" FontSize="8" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="DropletFilterSysBtn" Tag="System" Click="DropletFilterBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="2,0" Margin="1,0">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE770;" FontSize="7.5" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.8" />
+                                <TextBlock x:Name="DropletFilterSysText" Text="System" FontSize="8" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="DropletFilterCapBtn" Tag="Capture" Click="DropletFilterBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="2,0" Margin="2,0,0,0">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE924;" FontSize="7.5" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.8" />
+                                <TextBlock x:Name="DropletFilterCapText" Text="Capture" FontSize="8" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </UniformGrid>
+                </StackPanel>
+            </Border>
+
+            <!-- Empty State -->
+            <Border x:Name="DropletsEmptyPlaceholder" Visibility="Collapsed" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="14,16" Margin="0,2,0,4">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE721;" FontSize="14" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,4" />
+                    <TextBlock Text="No matching modules" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" />
+                </StackPanel>
+            </Border>
+
+            <!-- Droplets ItemsControl -->
+            <ItemsControl x:Name="DropletsItemsControl">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{DynamicResource CardSurfaceBrush}"
+                                BorderBrush="{Binding CardBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="7"
+                                Padding="8,5"
+                                Margin="0,0,0,3"
+                                Opacity="{Binding CardOpacity}">
+                            <DockPanel LastChildFill="True">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                                    <Button Tag="{Binding Id}" Click="DropletActionBtn_Click"
+                                            Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,4,0"
+                                            VerticalAlignment="Center"
+                                            Visibility="{Binding IsEnabled, Converter={StaticResource BoolToVisibilityConverter}}"
+                                            ToolTipService.ToolTip="{Binding Description}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource Glyph}" Text="{Binding ActionGlyph}" FontSize="8" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding ActionLabel}" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <Button Tag="{Binding Id}" Click="DropletToggleBtn_Click"
+                                            Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0"
+                                            Background="{Binding ToggleBackground}"
+                                            BorderBrush="{Binding ToggleBorderBrush}"
+                                            VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Ellipse Width="4.5" Height="4.5" Fill="{Binding StatusForeground}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding StatusText}" FontSize="8" FontWeight="SemiBold" Foreground="{Binding StatusForeground}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+
+                                <Border DockPanel.Dock="Left" Width="24" Height="24" CornerRadius="6"
+                                        Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1"
+                                        Margin="0,0,8,0" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="10.5"
+                                               Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+
+                                <StackPanel VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                                        <Border Background="{DynamicResource ChipBgBrush}" CornerRadius="3.5" Padding="4,0.5" Margin="5,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding FeatureBadge}" FontSize="7" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" />
+                                        </Border>
+                                        <Border Background="{DynamicResource ChipBgBrush}" CornerRadius="3.5" Padding="4,0.5" Margin="3,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding RamCostText}" Style="{StaticResource Digits}" FontSize="7" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Subtitle}" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

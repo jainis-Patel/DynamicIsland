@@ -144,6 +144,13 @@ public partial class IslandWindow
         int initialCount = _clipboardService.Items.Count;
         if (initialCount == 0) return;
 
+        bool shiftHeld = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+        if (!_confirmGuard.TryConfirm("clear_clipboard", sender, "Confirm?", bypass: shiftHeld, dispatcher: Dispatcher))
+        {
+            TriggerLiquidImpulse(24, -8, 3);
+            return;
+        }
+
         _clipboardService.Clear();
         TriggerLiquidImpulse(140, -60, 20);
 

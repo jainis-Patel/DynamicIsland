@@ -1,0 +1,279 @@
+<UserControl x:Class="DynamicIsland.Views.Widgets.Settings.DockSettingsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="340" d:DesignWidth="400"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Ideal"
+             TextOptions.TextRenderingMode="ClearType">
+
+    <ScrollViewer x:Name="PanelScrollViewer"
+                  PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  PanningMode="VerticalOnly">
+        <StackPanel Margin="0,0,4,6">
+
+            <!-- Compact Dock Header Bar -->
+            <Border Style="{StaticResource SettingsGroupCard}" Padding="10,6" Margin="0,0,0,5">
+                <DockPanel LastChildFill="False">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Click="DockPinAllBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
+                            <TextBlock Text="Show All" FontSize="8" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="DockPinMinimalBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
+                            <TextBlock Text="Core 5" FontSize="8" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="DockPinResetBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
+                            <TextBlock Text="Reset" FontSize="8" FontWeight="Medium" />
+                        </Button>
+                    </StackPanel>
+                    <Border DockPanel.Dock="Right" Background="{DynamicResource ChipBgBrush}" CornerRadius="5" Padding="6,2" VerticalAlignment="Center">
+                        <TextBlock x:Name="DockHeaderSummaryText" Style="{StaticResource Digits}" Text="19 / 19 Visible in Dock" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                    </Border>
+                </DockPanel>
+            </Border>
+
+            <TextBlock Text="PRODUCTIVITY &amp; WORKFLOW" Style="{StaticResource SettingsOverlineHeader}" />
+            <UniformGrid Columns="2" Margin="0,0,0,4">
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinShelfBtn" Tag="shelf" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinShelfText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Drop Shelf" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinClipBtn" Tag="clipboard" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinClipText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE77F;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Clipboard" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinCalcBtn" Tag="calc" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinCalcText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE8EF;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Calculator" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinNotesBtn" Tag="notes" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinNotesText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE70B;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Quick Notes" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinLauncherBtn" Tag="launcher" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinLauncherText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE71D;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="App Launcher" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinNotifBtn" Tag="notifications" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinNotifText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E7;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Notifications" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinWidgetsBtn" Tag="widgets" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinWidgetsText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE74C;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Widgets Gallery" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </UniformGrid>
+
+            <TextBlock Text="HARDWARE &amp; SYSTEM VITALS" Style="{StaticResource SettingsOverlineHeader}" />
+            <UniformGrid Columns="2" Margin="0,0,0,4">
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinAudioBtn" Tag="audio" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinAudioText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE7F6;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Audio Output" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinBatteryBtn" Tag="battery" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinBatteryText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE945;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Battery &amp; Power" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinHudBtn" Tag="systemhud" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinHudText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE9D9;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="System HUD" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinWifiBtn" Tag="network" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinWifiText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE701;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Wi-Fi &amp; Net" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinDevicesBtn" Tag="peripherals" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinDevicesText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE702;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Peripherals" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinMicBtn" Tag="micmute" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinMicText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE720;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Mic Mute" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </UniformGrid>
+
+            <TextBlock Text="STUDIO &amp; UTILITIES" Style="{StaticResource SettingsOverlineHeader}" />
+            <UniformGrid Columns="2">
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinConverterBtn" Tag="converter" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinConverterText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xEA90;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="File Studio" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinTermiBtn" Tag="termi" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinTermiText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE756;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Termi-Notch" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinPhoneBridgeBtn" Tag="phonebridge" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinPhoneBridgeText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE8EA;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Phone Bridge" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinMechSoundsBtn" Tag="mechsounds" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinMechSoundsText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE765;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Mech Acoustics" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinCaptureStudioBtn" Tag="capturestudio" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinCaptureStudioText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE924;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Capture &amp; OCR" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
+                    <DockPanel LastChildFill="True">
+                        <Button Click="DockPinToggleBtn_Click" x:Name="DockPinMemoBtn" Tag="voicememo" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
+                            <TextBlock x:Name="DockPinMemoText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
+                        </Button>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE7C8;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
+                            <TextBlock Text="Voice Memos" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </UniformGrid>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

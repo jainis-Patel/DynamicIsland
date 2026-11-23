@@ -91,9 +91,14 @@
         <!-- ═════════════════════════════════════════════════════════════════ -->
         <!-- ROW 0: MODE SWITCHER & SHELF ACTIONS                              -->
         <!-- ═════════════════════════════════════════════════════════════════ -->
-        <DockPanel Grid.Row="0" Margin="0,0,0,10" LastChildFill="False">
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
             <!-- Left: Segmented View Switcher (Shelf | Clips) + Item Counter -->
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
                 <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="2" Margin="0,0,8,0">
                     <StackPanel Orientation="Horizontal">
                         <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="9,2.5">
@@ -113,7 +118,7 @@
 
                 <!-- Subtle Monospace Counter Pill -->
                 <Border x:Name="ShelfCountBadge" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="7,2.5" Margin="0,0,6,0" VerticalAlignment="Center">
-                    <TextBlock x:Name="ShelfCountText" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Text="0 items" />
+                    <TextBlock x:Name="ShelfCountText" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Text="0 items" TextTrimming="CharacterEllipsis" MaxWidth="135" />
                 </Border>
 
                 <!-- Scroll Pager Arrows -->
@@ -126,7 +131,7 @@
             </StackPanel>
 
             <!-- Right: Grouped Utility & Staging Action Strip -->
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                 <!-- Basket button: Always available to summon staging basket -->
                 <Button Click="SummonBasketButton_Click" x:Name="SummonBasketButton" Style="{StaticResource IslandButton}" Height="24" Padding="8,0" Margin="0" ToolTipService.ToolTip="Summon Floating Staging Basket (or jiggle cursor while dragging files)">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -166,7 +171,7 @@
                 <Button x:Name="WindowsShareButton" Visibility="Collapsed" Click="WindowsShareButton_Click" />
                 <Button x:Name="PhoneShareButton" Visibility="Collapsed" Click="PhoneShareButton_Click" />
             </Grid>
-        </DockPanel>
+        </Grid>
 
         <!-- ═════════════════════════════════════════════════════════════════ -->
         <!-- ROW 1: HORIZONTAL BENTO SHELF DECK & REFINED EMPTY STATE          -->

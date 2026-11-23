@@ -1,0 +1,248 @@
+<UserControl x:Class="DynamicIsland.Views.Widgets.Settings.AppearanceSettingsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="340" d:DesignWidth="400"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Ideal"
+             TextOptions.TextRenderingMode="ClearType">
+
+    <UserControl.Resources>
+        <!-- Color Swatch Dot Button Style with Active Selection Ring (Tag="Active") -->
+        <Style x:Key="SwatchDotStyle" TargetType="Button">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="Margin" Value="0,0,5,0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Ellipse x:Name="OuterRing"
+                                     Width="18" Height="18"
+                                     Stroke="{DynamicResource PrimaryTextBrush}"
+                                     StrokeThickness="1.5"
+                                     Opacity="0" />
+                            <Ellipse x:Name="SwatchCore"
+                                     Width="13" Height="13"
+                                     Fill="{TemplateBinding Background}"
+                                     Stroke="{DynamicResource CardBorderBrush}"
+                                     StrokeThickness="1" />
+                            <TextBlock x:Name="CheckGlyph"
+                                       Style="{StaticResource Glyph}"
+                                       Text="&#xE73E;"
+                                       FontSize="7"
+                                       FontWeight="Bold"
+                                       Foreground="#FF0A0A0C"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Opacity="0" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="SwatchCore" Property="Stroke" Value="{DynamicResource PrimaryTextBrush}" />
+                                <Setter TargetName="SwatchCore" Property="StrokeThickness" Value="1.3" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding BorderThickness.Left, RelativeSource={RelativeSource Self}}" Value="2">
+                                <Setter TargetName="OuterRing" Property="Opacity" Value="1" />
+                                <Setter TargetName="CheckGlyph" Property="Opacity" Value="0.95" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer x:Name="PanelScrollViewer"
+                  PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  PanningMode="VerticalOnly">
+        <StackPanel Margin="0,0,4,6">
+
+            <!-- Group 1: Theme & Color Surface -->
+            <Border Style="{StaticResource SettingsGroupCard}">
+                <StackPanel>
+                    <!-- Material Surface Style -->
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Material Surface" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock x:Name="ThemeStyleSubtext" Text="Classic OLED Capsule" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <Border DockPanel.Dock="Right" Background="{DynamicResource ChipBgBrush}" CornerRadius="6" Padding="2" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Click="ThemeStyleBtn_Click" x:Name="ThemeStyleDefaultBtn" Tag="Default" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0,0,2,0" ToolTipService.ToolTip="Pitch-black OLED capsule">
+                                    <TextBlock x:Name="ThemeStyleDefaultText" Text="OLED" FontSize="8.5" FontWeight="SemiBold" />
+                                </Button>
+                                <Button Click="ThemeStyleBtn_Click" x:Name="ThemeStyleLiquidGlassBtn" Tag="Liquid Glass" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0" ToolTipService.ToolTip="Refractive frosted glass with specular rims">
+                                    <TextBlock x:Name="ThemeStyleLiquidGlassText" Text="Liquid Glass" FontSize="8.5" FontWeight="SemiBold" />
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </DockPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <!-- Color Scheme Mode -->
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Color Mode" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock x:Name="ThemeModeSubtext" Text="Match Windows" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <Border DockPanel.Dock="Right" Background="{DynamicResource ChipBgBrush}" CornerRadius="6" Padding="2" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Click="ThemeModeBtn_Click" x:Name="ThemeModeSystemBtn" Tag="System" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,2,0">
+                                    <TextBlock x:Name="ThemeModeSystemText" Text="System" FontSize="8.5" FontWeight="SemiBold" />
+                                </Button>
+                                <Button Click="ThemeModeBtn_Click" x:Name="ThemeModeDarkBtn" Tag="Dark" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,2,0">
+                                    <TextBlock x:Name="ThemeModeDarkText" Text="Dark" FontSize="8.5" FontWeight="SemiBold" />
+                                </Button>
+                                <Button Click="ThemeModeBtn_Click" x:Name="ThemeModeLightBtn" Tag="Light" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
+                                    <TextBlock x:Name="ThemeModeLightText" Text="Light" FontSize="8.5" FontWeight="SemiBold" />
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </DockPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <!-- Accent Swatches -->
+                    <DockPanel LastChildFill="False">
+                        <TextBlock Text="Accent Tint" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        <StackPanel x:Name="AccentSwatchesPanel" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Click="ThemeSwatch_Click" Tag="Solar Amber" Background="#FF9F0A" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Solar Amber" />
+                            <Button Click="ThemeSwatch_Click" Tag="Apple Neon" Background="#0A84FF" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Apple Neon" />
+                            <Button Click="ThemeSwatch_Click" Tag="Cyberpunk Cyan" Background="#00F0FF" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Cyberpunk Cyan" />
+                            <Button Click="ThemeSwatch_Click" Tag="Emerald Green" Background="#30D158" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Emerald Green" />
+                            <Button Click="ThemeSwatch_Click" Tag="Monochrome Frost" Background="#E5E5EA" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Monochrome Frost" />
+                            <Button Click="ThemeSwatch_Click" Tag="Purple Haze" Background="#BF5AF2" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Purple Haze" />
+                            <Button Click="ThemeSwatch_Click" Tag="Coral Sunset" Background="#FF6442" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Coral Sunset" />
+                            <Button Click="ThemeSwatch_Click" Tag="Rose Velvet" Background="#FF375F" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Rose Velvet" />
+                            <Button Click="ThemeSwatch_Click" Tag="Windows Accent" Background="#0078D4" Style="{StaticResource SwatchDotStyle}" Margin="0" ToolTipService.ToolTip="Windows System Accent" />
+                        </StackPanel>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Group 2: Physics, Scale, Optics & Effects -->
+            <Border Style="{StaticResource SettingsGroupCard}" Margin="0">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="14" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="8" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Grid.Column="0">
+                            <DockPanel LastChildFill="False" Margin="0,0,0,3">
+                                <TextBlock Text="Elasticity" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                <TextBlock x:Name="LiquidIntensityText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Text="65%" />
+                            </DockPanel>
+                            <Slider ValueChanged="LiquidIntensitySlider_ValueChanged" x:Name="LiquidIntensitySlider" Style="{StaticResource IslandSlider}" Minimum="0" Maximum="100" Value="65" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="0" Grid.Column="2">
+                            <DockPanel LastChildFill="False" Margin="0,0,0,3">
+                                <TextBlock Text="Morph Speed" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                <TextBlock x:Name="AnimationSpeedText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" Text="100%" />
+                            </DockPanel>
+                            <Slider ValueChanged="AnimationSpeedSlider_ValueChanged" x:Name="AnimationSpeedSlider" Style="{StaticResource IslandSlider}" Minimum="50" Maximum="160" Value="100" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="2" Grid.Column="0">
+                            <DockPanel LastChildFill="False" Margin="0,0,0,3">
+                                <TextBlock Text="Capsule Scale" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                <TextBlock x:Name="IslandScaleText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" Text="100%" />
+                            </DockPanel>
+                            <Slider ValueChanged="IslandScaleSlider_ValueChanged" x:Name="IslandScaleSlider" Style="{StaticResource IslandSlider}" Minimum="85" Maximum="125" Value="100" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="2" Grid.Column="2">
+                            <DockPanel LastChildFill="False" Margin="0,0,0,3">
+                                <TextBlock Text="Surface Opacity" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                <TextBlock x:Name="BackdropOpacityText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" Text="100%" />
+                            </DockPanel>
+                            <Slider ValueChanged="BackdropOpacitySlider_ValueChanged" x:Name="BackdropOpacitySlider" Style="{StaticResource IslandSlider}" Minimum="65" Maximum="100" Value="100" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <!-- Liquid Glass Optics (auto-dimmed when OLED is active) -->
+                    <StackPanel x:Name="GlassOpticsGroup">
+                        <DockPanel LastChildFill="False" Margin="0,0,0,4">
+                            <TextBlock Text="Liquid Glass Optics" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" />
+                            <TextBlock x:Name="GlassFrostingStatusText" DockPanel.Dock="Right" FontSize="8" Foreground="{DynamicResource AccentBrush}" Text="Active" />
+                        </DockPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="14" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <DockPanel LastChildFill="False" Margin="0,0,0,3">
+                                    <TextBlock Text="Frosting Blur" FontSize="9" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                    <TextBlock x:Name="GlassBlurText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Text="100%" />
+                                </DockPanel>
+                                <Slider x:Name="GlassBlurSlider" ValueChanged="GlassBlurSlider_ValueChanged" Style="{StaticResource IslandSlider}" Minimum="20" Maximum="250" Value="100" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <DockPanel LastChildFill="False" Margin="0,0,0,3">
+                                    <TextBlock Text="Lens Refraction" FontSize="9" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                    <TextBlock x:Name="GlassRefractionText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" Text="100%" />
+                                </DockPanel>
+                                <Slider x:Name="GlassRefractionSlider" ValueChanged="GlassRefractionSlider_ValueChanged" Style="{StaticResource IslandSlider}" Minimum="0" Maximum="200" Value="100" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <!-- Edge Border Toggle -->
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Specular Edge Border" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock x:Name="EdgeBorderSubtext" Text="Subtle edge outline visible around island &amp; dock" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <CheckBox x:Name="EdgeBorderToggleSwitch" Click="EdgeBorderToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                    </DockPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <!-- Ambient Glow & Motion -->
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Ambient Glow &amp; Motion" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Backlight halo, reduced motion accessibility &amp; spring test" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Glow" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <CheckBox x:Name="HaloToggleSwitch" Click="HaloToggleBtn_Click" Style="{StaticResource IslandToggleSwitch}" Margin="0,0,6,0" />
+                            <Button Click="MotionModeBtn_Click" x:Name="MotionModeBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
+                                <TextBlock x:Name="MotionModeText" Text="Liquid" FontSize="8" FontWeight="Medium" />
+                            </Button>
+                            <Button Click="LiquidPulseBtn_Click" x:Name="LiquidPulseBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
+                                <TextBlock Text="Pulse" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                            </Button>
+                        </StackPanel>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

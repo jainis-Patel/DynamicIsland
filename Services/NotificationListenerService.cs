@@ -15,8 +15,16 @@ namespace DynamicIsland.Services;
 /// <summary>
 /// Represents a captured Windows notification stored in the in-memory Notification History ring buffer.
 /// </summary>
-public sealed class NotificationHistoryItem
+public sealed class NotificationHistoryItem : System.ComponentModel.INotifyPropertyChanged
 {
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+    private static readonly Regex OtpKeywordRegex = new(
+        @"\b(code|otp|verify|verification|passcode|pin|2fa|one-time|security|confirm|login|sign-in|sign in|auth)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex OtpDashedRegex = new(@"(?<!\d)(\d{3}-\d{3})(?!\d)", RegexOptions.Compiled);
+    private static readonly Regex OtpDigitsRegex = new(@"(?<!\d)(\d{4,8})(?!\d)", RegexOptions.Compiled);
+
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
     public uint UserNotificationId { get; init; }
     public string AppUserModelId { get; init; } = "";
@@ -29,7 +37,18 @@ public sealed class NotificationHistoryItem
     public Brush IconBgBrush { get; init; } = ThemeBrushes.DockActiveBg;
     public DateTime ReceivedAt { get; init; } = DateTime.Now;
     public bool IsMessagingApp { get; init; }
+    public string? DetectedOtpCode { get; init; }
+
+    public bool HasDistinctBody =>
+        !string.IsNullOrWhiteSpace(Body) &&
+        !string.Equals(Body.Trim(), Title.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    public Visibility BodyVisibility => HasDistinctBody ? Visibility.Visible : Visibility.Collapsed;
     public Visibility ReplyVisibility => IsMessagingApp ? Visibility.Visible : Visibility.Collapsed;
+    public bool HasOtpCode => !string.IsNullOrEmpty(DetectedOtpCode);
+    public Visibility OtpVisibility => HasOtpCode ? Visibility.Visible : Visibility.Collapsed;
+    public string OtpButtonText => HasOtpCode ? $"Copy {DetectedOtpCode}" : "";
+
     public string TimeText
     {
         get
@@ -40,6 +59,23 @@ public sealed class NotificationHistoryItem
             if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h ago";
             return ReceivedAt.ToString("HH:mm");
         }
+    }
+
+    public void RefreshTimeText() =>
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(TimeText)));
+
+    public static string? ExtractOtpCode(string? title, string? body)
+    {
+        string combined = $"{title} {body}".Trim();
+        if (string.IsNullOrWhiteSpace(combined) || !OtpKeywordRegex.IsMatch(combined))
+            return null;
+
+        var dashed = OtpDashedRegex.Match(combined);
+        if (dashed.Success)
+            return dashed.Groups[1].Value.Replace("-", "");
+
+        var digits = OtpDigitsRegex.Match(combined);
+        return digits.Success ? digits.Groups[1].Value : null;
     }
 }
 
@@ -69,7 +105,9 @@ public sealed class NotificationAppGroup : System.ComponentModel.INotifyProperty
                 _isExpanded = value;
                 PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsExpanded)));
                 PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(ExpandGlyph)));
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(ExpandLabel)));
                 PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(DetailsVisibility)));
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(CollapsedStackDeckVisibility)));
             }
         }
     }
@@ -79,14 +117,35 @@ public sealed class NotificationAppGroup : System.ComponentModel.INotifyProperty
     public Visibility MultipleBadgeVisibility => HasMultiple ? Visibility.Visible : Visibility.Collapsed;
     public string CountBadgeText => $"{Count} alerts";
     public string ExpandGlyph => _isExpanded ? "\uE70E" : "\uE70D";
+    public string ExpandLabel => _isExpanded ? "Hide" : $"+{Count - 1} more";
     public Visibility DetailsVisibility => (HasMultiple && _isExpanded) ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility CollapsedStackDeckVisibility => (HasMultiple && !_isExpanded) ? Visibility.Visible : Visibility.Collapsed;
     public NotificationHistoryItem? LatestItem => Notifications.FirstOrDefault();
+    public IEnumerable<NotificationHistoryItem> SecondaryNotifications => Notifications.Skip(1);
     public string LatestId => LatestItem?.Id ?? "";
     public string LatestTitle => LatestItem?.Title ?? AppName;
     public string LatestBody => LatestItem?.Body ?? "";
+    public bool HasDistinctLatestBody => LatestItem?.HasDistinctBody ?? false;
+    public Visibility LatestBodyVisibility => HasDistinctLatestBody ? Visibility.Visible : Visibility.Collapsed;
     public string LatestTimeText => LatestItem?.TimeText ?? "";
     public bool IsMessagingApp => LatestItem?.IsMessagingApp ?? false;
     public Visibility ReplyVisibility => LatestItem?.ReplyVisibility ?? Visibility.Collapsed;
+    public string? LatestOtpCode => LatestItem?.DetectedOtpCode;
+    public Visibility OtpVisibility => LatestItem?.OtpVisibility ?? Visibility.Collapsed;
+    public string OtpButtonText => LatestItem?.OtpButtonText ?? "";
+    public Visibility BottomActionsVisibility =>
+        (ReplyVisibility == Visibility.Visible || OtpVisibility == Visibility.Visible || MultipleBadgeVisibility == Visibility.Visible)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+    public void RefreshTimeText()
+    {
+        foreach (var n in Notifications)
+        {
+            n.RefreshTimeText();
+        }
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(LatestTimeText)));
+    }
 
     public static NotificationAppGroup FromSingle(NotificationHistoryItem item)
     {
@@ -134,11 +193,13 @@ internal sealed class NotificationListenerService : IDisposable
     private readonly Dispatcher _ui;
     private readonly Func<AppSettings>? _getSettings;
     private readonly HashSet<uint> _seenIds = new();
+    private readonly HashSet<uint> _currentIds = new();
     private readonly List<NotificationHistoryItem> _history = new();
     private UserNotificationListener? _listener;
     private DispatcherTimer? _pollTimer;
     private bool _eventSubscribed;
     private bool _polling;
+    private bool _suspended;
     private bool _disposed;
 
     public IReadOnlyList<NotificationHistoryItem> History
@@ -167,6 +228,22 @@ internal sealed class NotificationListenerService : IDisposable
     }
 
     public bool IsListening => _pollTimer?.IsEnabled ?? false;
+    public bool IsAccessDenied { get; private set; }
+
+    public void SetSuspended(bool suspended)
+    {
+        if (_disposed || _suspended == suspended) return;
+        _suspended = suspended;
+        if (_pollTimer == null) return;
+        if (suspended)
+        {
+            _pollTimer.Stop();
+        }
+        else
+        {
+            _pollTimer.Start();
+        }
+    }
 
     public async Task InitializeAsync()
     {
@@ -190,9 +267,11 @@ internal sealed class NotificationListenerService : IDisposable
 
             if (access != UserNotificationListenerAccessStatus.Allowed)
             {
+                IsAccessDenied = true;
                 App.Log("[NotificationListener] Access denied. Enable 'Settings > Privacy & security > Notifications > Let apps access your notifications'.");
                 return;
             }
+            IsAccessDenied = false;
 
             // Snapshot existing notifications so Action Center history isn't replayed on startup.
             var existing = await _listener.GetNotificationsAsync(NotificationKinds.Toast);
@@ -211,7 +290,10 @@ internal sealed class NotificationListenerService : IDisposable
 
             _pollTimer = new DispatcherTimer(DispatcherPriority.Background, _ui) { Interval = PollInterval };
             _pollTimer.Tick += async (_, _) => await PollAsync();
-            _pollTimer.Start();
+            if (!_suspended && !_disposed)
+            {
+                _pollTimer.Start();
+            }
             App.Log($"[NotificationListener] Listening ({_seenIds.Count} existing notifications ignored).");
         }
         catch (Exception ex)
@@ -222,15 +304,15 @@ internal sealed class NotificationListenerService : IDisposable
 
     private async Task PollAsync()
     {
-        if (_polling || _disposed || _listener == null) return;
+        if (_polling || _disposed || _suspended || _listener == null) return;
         _polling = true;
         try
         {
             var current = await _listener.GetNotificationsAsync(NotificationKinds.Toast);
-            var currentIds = new HashSet<uint>();
+            _currentIds.Clear();
             foreach (var notif in current)
             {
-                currentIds.Add(notif.Id);
+                _currentIds.Add(notif.Id);
                 if (_seenIds.Add(notif.Id))
                 {
                     ProcessNotification(notif);
@@ -238,7 +320,7 @@ internal sealed class NotificationListenerService : IDisposable
             }
 
             // Forget IDs that have left Action Center so the set doesn't grow unbounded.
-            _seenIds.IntersectWith(currentIds);
+            _seenIds.IntersectWith(_currentIds);
         }
         catch (Exception ex)
         {
@@ -382,19 +464,22 @@ internal sealed class NotificationListenerService : IDisposable
         string glyph = glyphOverride ?? GlyphForAppName(appName);
         Color accent = accentOverride ?? AccentForAppName(appName);
         bool isMessaging = IsMessagingApp(appName, aumid);
+        string cleanTitle = string.IsNullOrWhiteSpace(title) ? appName : title.Trim();
+        string cleanBody = string.IsNullOrWhiteSpace(body) ? "" : body.Trim();
         var item = new NotificationHistoryItem
         {
             AppName = string.IsNullOrWhiteSpace(appName) ? "Notification" : appName.Trim(),
             AppUserModelId = aumid ?? "",
             UserNotificationId = userNotificationId,
-            Title = string.IsNullOrWhiteSpace(title) ? appName : title.Trim(),
-            Body = string.IsNullOrWhiteSpace(body) ? title.Trim() : body.Trim(),
+            Title = cleanTitle,
+            Body = cleanBody,
             Glyph = glyph,
             Accent = accent,
             AccentBrush = ThemeBrushes.CreateFrozen(accent),
             IconBgBrush = ThemeBrushes.CreateFrozen(Color.FromArgb(0x28, accent.R, accent.G, accent.B)),
             ReceivedAt = DateTime.Now,
-            IsMessagingApp = isMessaging
+            IsMessagingApp = isMessaging,
+            DetectedOtpCode = NotificationHistoryItem.ExtractOtpCode(cleanTitle, cleanBody)
         };
 
         lock (_history)
@@ -484,6 +569,30 @@ internal sealed class NotificationListenerService : IDisposable
             groups.Add(appGroup);
         }
         return groups;
+    }
+
+    public static List<NotificationHistoryItem> FilterNotifications(
+        IEnumerable<NotificationHistoryItem> items,
+        string filter,
+        string? query)
+    {
+        IEnumerable<NotificationHistoryItem> result = items;
+
+        if (string.Equals(filter, "Messages", StringComparison.OrdinalIgnoreCase))
+        {
+            result = result.Where(i => i.IsMessagingApp);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            string q = query.Trim();
+            result = result.Where(i =>
+                i.AppName.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                i.Title.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                i.Body.Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return result.ToList();
     }
 
     public void RemoveNativeNotification(uint userNotificationId)

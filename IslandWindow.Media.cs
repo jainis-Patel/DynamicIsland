@@ -85,6 +85,23 @@ public partial class IslandWindow
     private bool _preferClockHeaderInMedia;
     private Color? _lastAppliedMediaAccent;
 
+    internal void SyncHomeCenterStageVisibility()
+    {
+        if (MediaContainer == null) return;
+        var media = _mediaService?.Current;
+        bool hasMedia = media is not null && !string.IsNullOrWhiteSpace(media.Title);
+        bool lyricsEnabled = _settingsService?.Current?.EnableSyncedLyrics ?? true;
+        bool showLyricsStage = hasMedia &&
+                               !_preferClockHeaderInMedia &&
+                               lyricsEnabled &&
+                               (_lyricsService?.HasLyrics == true || _lyricsService?.IsLoading == true);
+
+        if (KaraokeLyricsHost != null)
+        {
+            KaraokeLyricsHost.Visibility = showLyricsStage ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
     internal void ToggleClockMediaHeader_Click(object sender, MouseButtonEventArgs e)
     {
         var media = _mediaService.Current;
@@ -94,6 +111,7 @@ public partial class IslandWindow
         _preferClockHeaderInMedia = !_preferClockHeaderInMedia;
         ExpandedMediaHeader.Visibility = _preferClockHeaderInMedia ? Visibility.Collapsed : Visibility.Visible;
         ExpandedClockHeader.Visibility = _preferClockHeaderInMedia ? Visibility.Visible : Visibility.Collapsed;
+        SyncHomeCenterStageVisibility();
         RefreshTargetGeometry();
         e.Handled = true;
     }
@@ -168,6 +186,7 @@ public partial class IslandWindow
             }
 
             CompactTrackText.Text = media.Title;
+            SyncHomeCenterStageVisibility();
         }
         else
         {
@@ -189,7 +208,7 @@ public partial class IslandWindow
                 ExpandedClockHeader.Visibility = Visibility.Visible;
             }
             if (MediaTransportControlsGrid != null) MediaTransportControlsGrid.Visibility = Visibility.Collapsed;
-            if (KaraokeLyricsHost != null) KaraokeLyricsHost.Visibility = Visibility.Collapsed;
+            SyncHomeCenterStageVisibility();
 
             PlayPauseGlyph.Text = "\uE768";
         }

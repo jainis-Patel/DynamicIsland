@@ -1,0 +1,111 @@
+<UserControl x:Class="DynamicIsland.Views.Widgets.Settings.ShortcutsSettingsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="340" d:DesignWidth="400"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Ideal"
+             TextOptions.TextRenderingMode="ClearType">
+
+    <ScrollViewer x:Name="PanelScrollViewer"
+                  PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  PanningMode="VerticalOnly">
+        <StackPanel Margin="0,0,4,6">
+
+            <!-- Global Hotkeys Matrix -->
+            <Border Style="{StaticResource SettingsGroupCard}">
+                <StackPanel>
+                    <DockPanel LastChildFill="False" Margin="0,0,0,6">
+                        <TextBlock x:Name="HotkeySectionLabel" Text="Global Hotkeys (Ctrl + Alt)" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                        <TextBlock DockPanel.Dock="Right" Text="Click to record · Backspace to clear · Esc cancel" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <UniformGrid Columns="4">
+                        <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindClipboardBtn" Tag="Clipboard" Style="{StaticResource IslandButton}" Height="22" Margin="0,0,3,3">
+                            <TextBlock x:Name="HotkeyBindClipboardText" Style="{StaticResource Digits}" Text="Clip: V" FontSize="8" />
+                        </Button>
+                        <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindCalcBtn" Tag="Calculator" Style="{StaticResource IslandButton}" Height="22" Margin="1.5,0,1.5,3">
+                            <TextBlock x:Name="HotkeyBindCalcText" Style="{StaticResource Digits}" Text="Calc: C" FontSize="8" />
+                        </Button>
+                        <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindAudioBtn" Tag="AudioDevices" Style="{StaticResource IslandButton}" Height="22" Margin="1.5,0,1.5,3">
+                            <TextBlock x:Name="HotkeyBindAudioText" Style="{StaticResource Digits}" Text="Audio: O" FontSize="8" />
+                        </Button>
+                        <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindWifiBtn" Tag="Network" Style="{StaticResource IslandButton}" Height="22" Margin="3,0,0,3">
+                            <TextBlock x:Name="HotkeyBindWifiText" Style="{StaticResource Digits}" Text="Wi-Fi: W" FontSize="8" />
+                        </Button>
+                        <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindTimerBtn" Tag="Stopwatch" Style="{StaticResource IslandButton}" Height="22" Margin="0,0,3,3">
+                            <TextBlock x:Name="HotkeyBindTimerText" Style="{StaticResource Digits}" Text="Timer: A" FontSize="8" />
+                        </Button>
+                        <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindNotifBtn" Tag="Notifications" Style="{StaticResource IslandButton}" Height="22" Margin="1.5,0,1.5,3">
+                            <TextBlock x:Name="HotkeyBindNotifText" Style="{StaticResource Digits}" Text="Alerts: N" FontSize="8" />
+                        </Button>
+                        <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindHudBtn" Tag="SystemHud" Style="{StaticResource IslandButton}" Height="22" Margin="1.5,0,1.5,3">
+                            <TextBlock x:Name="HotkeyBindHudText" Style="{StaticResource Digits}" Text="HUD: H" FontSize="8" />
+                        </Button>
+                        <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindMemoBtn" Tag="VoiceMemo" Style="{StaticResource IslandButton}" Height="22" Margin="3,0,0,3">
+                            <TextBlock x:Name="HotkeyBindMemoText" Style="{StaticResource Digits}" Text="Memo: R" FontSize="8" />
+                        </Button>
+                        <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindDevicesBtn" Tag="Peripherals" Style="{StaticResource IslandButton}" Height="22" Margin="0,0,3,0">
+                            <TextBlock x:Name="HotkeyBindDevicesText" Style="{StaticResource Digits}" Text="BT: D" FontSize="8" />
+                        </Button>
+                        <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindPowerBtn" Tag="BatteryPower" Style="{StaticResource IslandButton}" Height="22" Margin="1.5,0,1.5,0">
+                            <TextBlock x:Name="HotkeyBindPowerText" Style="{StaticResource Digits}" Text="Power: P" FontSize="8" />
+                        </Button>
+                        <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindSettingsBtn" Tag="Settings" Style="{StaticResource IslandButton}" Height="22" Margin="1.5,0,1.5,0">
+                            <TextBlock x:Name="HotkeyBindSettingsText" Style="{StaticResource Digits}" Text="Cfg: S" FontSize="8" />
+                        </Button>
+                    </UniformGrid>
+                </StackPanel>
+            </Border>
+
+            <!-- System Input & Keyboard Hooks -->
+            <Border Style="{StaticResource SettingsGroupCard}" Margin="0">
+                <StackPanel>
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Volume Keys OSD" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Show sleek Island volume capsule when hardware volume keys are pressed" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <CheckBox x:Name="VolumeOsdToggleSwitch" Click="VolumeOsdBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                    </DockPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Caps / Num / Scroll Lock HUD" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Display a quick status toast when lock keys are toggled" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <CheckBox x:Name="LockKeyHudToggleSwitch" Click="LockKeyHudToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                    </DockPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Keyboard Layout HUD" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Notify in capsule when input language / IME layout changes" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <CheckBox x:Name="KeyboardLayoutHudToggleSwitch" Click="KeyboardLayoutHudToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                    </DockPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Developer Hotkeys" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Enable diagnostic test toast shortcut (Ctrl+Alt+T)" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <CheckBox x:Name="DevHotkeysToggleSwitch" Click="DevHotkeysToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

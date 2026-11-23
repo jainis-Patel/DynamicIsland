@@ -5,8 +5,8 @@
         xmlns:widgets="clr-namespace:DynamicIsland.Views.Widgets"
         Title="Dynamic Island"
         Icon="pack://application:,,,/Assets/app.ico"
-        Width="680" Height="580"
-        MinWidth="680" MinHeight="580"
+        Width="760" Height="580"
+        MinWidth="760" MinHeight="580"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False"
         Topmost="True" Focusable="False" AllowDrop="True"
@@ -924,7 +924,15 @@
 
                 <!-- 3. Drop Shelf & Files (Image 2) -->
                 <Button x:Name="ShelfButton" AutomationProperties.Name="Drop Shelf and Files" Style="{StaticResource DockIconButton}" ToolTip="Drop Shelf &amp; Files (Ctrl+3)">
-                    <TextBlock Style="{StaticResource Glyph}" FontSize="12.5" Text="&#xE8B7;" />
+                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" FontSize="12.5" Text="&#xE8B7;" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border x:Name="DockShelfBadgeHost" Visibility="Collapsed" Background="#32ADE6"
+                                CornerRadius="5" MinWidth="11" Height="11" Padding="2,0" Margin="6,-6,-6,0"
+                                HorizontalAlignment="Right" VerticalAlignment="Top">
+                            <TextBlock x:Name="DockShelfBadgeText" Text="0" FontSize="7.5" FontWeight="Bold" Foreground="#0B0B0E"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
                 </Button>
 
                 <!-- 4. Notification Center (Bell with Live Unread Badge) -->

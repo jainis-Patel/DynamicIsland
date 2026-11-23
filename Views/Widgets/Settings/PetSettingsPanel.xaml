@@ -1,0 +1,119 @@
+<UserControl x:Class="DynamicIsland.Views.Widgets.Settings.PetSettingsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:core="clr-namespace:DynamicIsland.Core"
+             mc:Ignorable="d"
+             d:DesignHeight="340" d:DesignWidth="400"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Ideal"
+             TextOptions.TextRenderingMode="ClearType">
+
+    <ScrollViewer x:Name="PanelScrollViewer"
+                  PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  PanningMode="VerticalOnly">
+        <StackPanel Margin="0,0,4,6">
+
+            <Border Style="{StaticResource SettingsGroupCard}" Padding="10,8" Margin="0">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Width="62" Height="54" CornerRadius="8" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Margin="0,0,10,0" VerticalAlignment="Center">
+                            <core:VirtualPetControl x:Name="SettingsHeroPet" MouseLeftButtonDown="PetCompanion_Click" Width="54" Height="46" HorizontalAlignment="Center" VerticalAlignment="Center" Cursor="Hand" />
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <DockPanel LastChildFill="False" Margin="0,0,0,2">
+                                <TextBlock x:Name="SettingsHeroPetName" Text="Mochi" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" Cursor="Hand" MouseLeftButtonDown="PetNameBtn_Click" />
+                                <TextBlock x:Name="SettingsHeroPetRank" DockPanel.Dock="Right" Text="Level 1 · Companion" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                            </DockPanel>
+                            <TextBlock x:Name="SettingsHeroPetSub" Text="Interactive Capsule Companion" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,0,5" />
+                            <Grid Height="4" Background="{DynamicResource IslandSliderTrackBrush}" Margin="0,0,0,4">
+                                <Border x:Name="SettingsHeroPetProgressBar" HorizontalAlignment="Left" Width="45" CornerRadius="2" Background="{DynamicResource AccentBrush}" />
+                            </Grid>
+                            <DockPanel LastChildFill="False">
+                                <TextBlock x:Name="SettingsHeroPetScore" Style="{StaticResource Digits}" Text="25 / 50 XP" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                                <TextBlock x:Name="SettingsHeroPetWellnessMini" DockPanel.Dock="Right" Style="{StaticResource Digits}" Text="Treat 0 · Water 0 · Stretch 0" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                            </DockPanel>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <!-- Profile Row -->
+                    <DockPanel LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <CheckBox x:Name="PetToggleSwitch" Click="PetToggleBtn_Click" Style="{StaticResource IslandToggleSwitch}" Margin="0,0,6,0" />
+                            <TextBlock Text="Active" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            <TextBlock x:Name="PetStatusSummaryText" Text="Mochi · 25 XP" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="6,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button Click="PetSpeciesBtn_Click" x:Name="PetSpeciesBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
+                                <TextBlock x:Name="PetSpeciesText" Text="Cat" FontSize="8" FontWeight="Medium" />
+                            </Button>
+                            <Button Click="PetAccessoryBtn_Click" x:Name="PetAccessoryBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
+                                <TextBlock x:Name="PetAccessoryText" Text="None" FontSize="8" FontWeight="Medium" />
+                            </Button>
+                            <Button Click="PetNameBtn_Click" x:Name="PetNameBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
+                                <TextBlock x:Name="PetNameBtnText" Text="Rename" FontSize="8" FontWeight="Medium" />
+                            </Button>
+                        </StackPanel>
+                    </DockPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <!-- Row 1: Surfaces & Reminder Cadence -->
+                    <DockPanel LastChildFill="False" Margin="0,0,0,6">
+                        <TextBlock Text="Surfaces" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button Click="OpenPetPlaygroundBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0,0,4,0" ToolTipService.ToolTip="Open full-sized interactive Pet Playground surface">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE7FC;" FontSize="8" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Playground" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="RoamDesktopBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0,0,4,0" ToolTipService.ToolTip="Detach companion to roam floating on desktop">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8A7;" FontSize="8" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Roam Desktop" FontSize="8" FontWeight="Medium" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="PetReminderCycleBtn_Click" x:Name="PetReminderCycleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0" ToolTipService.ToolTip="Cycle wellness reminder frequency">
+                                <TextBlock x:Name="PetReminderCycleText" Text="Remind: 30m" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
+                            </Button>
+                        </StackPanel>
+                    </DockPanel>
+
+                    <!-- Row 2: Care & Wellness Actions -->
+                    <DockPanel LastChildFill="False">
+                        <TextBlock Text="Care" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button Click="PetInteractBtn_Click" x:Name="PetInteractBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
+                                <TextBlock Text="Pet" FontSize="8" FontWeight="Medium" />
+                            </Button>
+                            <Button Click="PetTreatBtn_Click" x:Name="PetTreatBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
+                                <TextBlock x:Name="PetTreatText" Text="Treat: 0" FontSize="8" FontWeight="Medium" />
+                            </Button>
+                            <Button Click="PetTrickBtn_Click" x:Name="PetTrickBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
+                                <TextBlock Text="Flip" FontSize="8" FontWeight="Medium" />
+                            </Button>
+                            <Button Click="PetHydrateBtn_Click" x:Name="PetHydrateBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
+                                <TextBlock x:Name="PetHydrateText" Text="Water: 0" FontSize="8" FontWeight="Medium" />
+                            </Button>
+                            <Button Click="PetStretchBtn_Click" x:Name="PetStretchBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
+                                <TextBlock x:Name="PetStretchText" Text="Stretch: 0" FontSize="8" FontWeight="Medium" />
+                            </Button>
+                        </StackPanel>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -303,6 +303,7 @@ public partial class IslandWindow
         _width.Target = shape.Width;
         _height.Target = shape.Height;
         _radius.Target = shape.Radius;
+        RepositionIfEdgeDocked();
 
         if (next == IslandState.Toast)
         {
@@ -688,7 +689,7 @@ public partial class IslandWindow
         {
             UpdatePillLiquidGlass(Pill.ActualWidth > 0 ? Pill.ActualWidth : 148,
                 Pill.ActualHeight > 0 ? Pill.ActualHeight : 30,
-                15.0f, _dropletOffset?.Value ?? 0);
+                (float)(_appliedRadius > 0 ? _appliedRadius : 15.0), _dropletOffset?.Value ?? 0);
         }
     }
 

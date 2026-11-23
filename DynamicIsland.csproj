@@ -23,15 +23,17 @@
     <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
     <!-- Avoid emitting 13 unused localized satellite resource folders in bin/ and publish/ -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
-    <NuGetAudit>false</NuGetAudit>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditLevel>moderate</NuGetAuditLevel>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="scratch\**" />
-    <None Remove="scratch\**" />
+    <Compile Remove="scratch\**;old\**;dist\**;dist_*\**;publish\**;publish_*\**" />
+    <Page Remove="scratch\**;old\**;dist\**;dist_*\**;publish\**;publish_*\**" />
+    <None Remove="scratch\**;old\**;dist\**;dist_*\**;publish\**;publish_*\**" />
   </ItemGroup>
 
   <ItemGroup>

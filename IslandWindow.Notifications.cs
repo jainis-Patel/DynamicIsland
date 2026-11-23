@@ -21,8 +21,11 @@ public partial class IslandWindow
     // =================================================================
 
     private readonly HashSet<string> _expandedNotificationApps = new(StringComparer.OrdinalIgnoreCase);
+    private string _notificationFilter = "All";
+    private string _notificationSearchQuery = "";
+    private string _notificationEmptyAction = "";
 
-    private void OnNotificationHistoryChanged()
+    internal void OnNotificationHistoryChanged()
     {
         if (NotificationsBadgeText == null) return;
         var items = _notificationListener.History;
@@ -37,20 +40,24 @@ public partial class IslandWindow
         {
             NotificationsCountBadge.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
-        if (NotificationsDndBadge != null)
+        if (NotificationsFilterBar != null)
         {
-            NotificationsDndBadge.Visibility = _settingsService.Current.DoNotDisturb ? Visibility.Visible : Visibility.Collapsed;
+            NotificationsFilterBar.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
+
+        UpdateNotificationsDndUI();
         UpdateMutedAppsBadgeUI();
         UpdateGroupingButtonUI();
-        NotificationsEmptyPlaceholder.Visibility = items.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+        UpdateNotificationFilterButtonsUI();
+
+        var filtered = NotificationListenerService.FilterNotifications(items, _notificationFilter, _notificationSearchQuery);
         ClearNotificationsButton.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         SyncObservableCollection(_notificationHistoryItems, items);
 
         List<NotificationAppGroup> groups;
         if (_settingsService.Current.GroupNotificationsByApp)
         {
-            groups = NotificationListenerService.GroupNotifications(items);
+            groups = NotificationListenerService.GroupNotifications(filtered);
             foreach (var g in groups)
             {
                 if (_expandedNotificationApps.Contains(g.AppName))
@@ -61,15 +68,219 @@ public partial class IslandWindow
         }
         else
         {
-            groups = items.Select(NotificationAppGroup.FromSingle).ToList();
+            groups = filtered.Select(NotificationAppGroup.FromSingle).ToList();
         }
         SyncObservableCollection(_notificationAppGroups, groups);
+        UpdateNotificationsEmptyStateUI(items.Count, filtered.Count);
 
         // Dynamically adjust expanded height if currently viewing Notifications
         if (_machine.State == IslandState.Expanded && _currentExpandedView == ExpandedView.Notifications)
         {
             AdjustExpandedNotificationsHeight();
         }
+    }
+
+    internal void RefreshNotificationTimestamps()
+    {
+        foreach (var group in _notificationAppGroups)
+        {
+            group.RefreshTimeText();
+        }
+    }
+
+    internal void UpdateNotificationsEmptyStateOnDndChange()
+    {
+        if (_notificationListener == null) return;
+        var items = _notificationListener.History;
+        var filtered = NotificationListenerService.FilterNotifications(items, _notificationFilter, _notificationSearchQuery);
+        UpdateNotificationsEmptyStateUI(items.Count, filtered.Count);
+    }
+
+    internal void UpdateNotificationsDndUI()
+    {
+        if (NotificationsDndButton == null || NotificationsDndGlyph == null || NotificationsDndText == null) return;
+        bool dnd = _settingsService.Current.DoNotDisturb;
+        NotificationsDndText.Text = dnd ? "DND On" : "DND";
+        NotificationsDndGlyph.Foreground = dnd ? ThemeBrushes.Amber : ThemeBrushes.SecondaryText;
+        NotificationsDndText.Foreground = dnd ? ThemeBrushes.Amber : ThemeBrushes.SecondaryText;
+        NotificationsDndButton.ToolTip = dnd
+            ? "Do Not Disturb is On (Click to resume notification toasts)"
+            : "Do Not Disturb is Off (Click to silence incoming toasts)";
+    }
+
+    private void UpdateNotificationFilterButtonsUI()
+    {
+        if (NotifFilterAllBtn == null || NotifFilterMessagesBtn == null) return;
+        bool isMessages = string.Equals(_notificationFilter, "Messages", StringComparison.OrdinalIgnoreCase);
+        NotifFilterAllBtn.Background = !isMessages ? ThemeBrushes.CardSurface : Brushes.Transparent;
+        NotifFilterAllBtn.Foreground = !isMessages ? ThemeBrushes.PrimaryText : ThemeBrushes.SecondaryText;
+        NotifFilterMessagesBtn.Background = isMessages ? ThemeBrushes.CardSurface : Brushes.Transparent;
+        NotifFilterMessagesBtn.Foreground = isMessages ? ThemeBrushes.Accent : ThemeBrushes.SecondaryText;
+    }
+
+    private void UpdateNotificationsEmptyStateUI(int totalCount, int filteredCount)
+    {
+        if (NotificationsEmptyPlaceholder == null) return;
+        if (filteredCount > 0)
+        {
+            NotificationsEmptyPlaceholder.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        NotificationsEmptyPlaceholder.Visibility = Visibility.Visible;
+        if (NotificationsEmptyGlyph == null || NotificationsEmptyTitle == null ||
+            NotificationsEmptySubtitle == null || NotificationsEmptyActionBtn == null ||
+            NotificationsEmptyActionText == null)
+            return;
+
+        if (totalCount > 0)
+        {
+            _notificationEmptyAction = "clear_filter";
+            NotificationsEmptyGlyph.Text = "\uE721";
+            NotificationsEmptyGlyph.Foreground = ThemeBrushes.Accent;
+            NotificationsEmptyTitle.Text = "No Matching Alerts";
+            NotificationsEmptySubtitle.Text = "Try clearing your search or switching back to All";
+            NotificationsEmptyActionText.Text = "Clear Filter";
+            NotificationsEmptyActionBtn.Visibility = Visibility.Visible;
+        }
+        else if (_notificationListener.IsAccessDenied)
+        {
+            _notificationEmptyAction = "open_notif_settings";
+            NotificationsEmptyGlyph.Text = "\uE7BA";
+            NotificationsEmptyGlyph.Foreground = ThemeBrushes.Amber;
+            NotificationsEmptyTitle.Text = "Notification Access Needed";
+            NotificationsEmptySubtitle.Text = "Allow Dynamic Island to read Windows notifications in Settings";
+            NotificationsEmptyActionText.Text = "Open Windows Settings";
+            NotificationsEmptyActionBtn.Visibility = Visibility.Visible;
+        }
+        else if (_settingsService.Current.DoNotDisturb)
+        {
+            _notificationEmptyAction = "disable_dnd";
+            NotificationsEmptyGlyph.Text = "\uE708";
+            NotificationsEmptyGlyph.Foreground = ThemeBrushes.Amber;
+            NotificationsEmptyTitle.Text = "Do Not Disturb is On";
+            NotificationsEmptySubtitle.Text = "Incoming notification toasts are currently silenced";
+            NotificationsEmptyActionText.Text = "Turn Off DND";
+            NotificationsEmptyActionBtn.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            _notificationEmptyAction = "";
+            NotificationsEmptyGlyph.Text = "\uE7E7";
+            NotificationsEmptyGlyph.Foreground = ThemeBrushes.Accent;
+            NotificationsEmptyTitle.Text = "All Caught Up";
+            NotificationsEmptySubtitle.Text = "New alerts and Windows notifications will appear here";
+            NotificationsEmptyActionBtn.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    internal void NotificationsDndButton_Click(object sender, RoutedEventArgs e)
+    {
+        TactileFeedback.PlayTick();
+        SetDoNotDisturb(!_settingsService.Current.DoNotDisturb);
+        e.Handled = true;
+    }
+
+    internal void NotifFilter_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string tag })
+        {
+            _notificationFilter = tag;
+            TactileFeedback.PlayTick();
+            OnNotificationHistoryChanged();
+            e.Handled = true;
+        }
+    }
+
+    internal void NotificationsSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _notificationSearchQuery = NotificationsSearchBox?.Text ?? "";
+        if (ClearNotificationsSearchBtn != null)
+        {
+            ClearNotificationsSearchBtn.Visibility = string.IsNullOrEmpty(_notificationSearchQuery)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        }
+        OnNotificationHistoryChanged();
+    }
+
+    internal void NotificationsSearchBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && !string.IsNullOrEmpty(_notificationSearchQuery))
+        {
+            if (NotificationsSearchBox != null) NotificationsSearchBox.Text = "";
+            Keyboard.ClearFocus();
+            e.Handled = true;
+        }
+    }
+
+    internal void ClearNotificationsSearch_Click(object sender, RoutedEventArgs e)
+    {
+        if (NotificationsSearchBox != null) NotificationsSearchBox.Text = "";
+        _notificationSearchQuery = "";
+        OnNotificationHistoryChanged();
+        e.Handled = true;
+    }
+
+    internal void NotificationsEmptyActionBtn_Click(object sender, RoutedEventArgs e)
+    {
+        switch (_notificationEmptyAction)
+        {
+            case "clear_filter":
+                _notificationFilter = "All";
+                if (NotificationsSearchBox != null) NotificationsSearchBox.Text = "";
+                _notificationSearchQuery = "";
+                OnNotificationHistoryChanged();
+                break;
+            case "disable_dnd":
+                SetDoNotDisturb(false);
+                break;
+            case "open_notif_settings":
+                try
+                {
+                    Process.Start(new ProcessStartInfo("ms-settings:privacy-notifications") { UseShellExecute = true });
+                }
+                catch { }
+                break;
+        }
+        e.Handled = true;
+    }
+
+    internal async void CopyNotificationItem_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not FrameworkElement { Tag: NotificationHistoryItem item }) return;
+        string textToCopy = !item.HasDistinctBody
+            ? item.Title
+            : $"{item.Title}\n{item.Body}";
+        await SafeClipboard.TrySetTextAsync(textToCopy);
+        TactileFeedback.PlayTick();
+        TriggerLiquidImpulse(50, -15, 6);
+        _machine.PushToast(new ToastContent(
+            "\uE8C8",
+            item.AppName,
+            "Notification copied to clipboard",
+            item.Accent,
+            TimeSpan.FromSeconds(1.8),
+            TargetView: "notifications",
+            Priority: ToastPriority.Feedback));
+    }
+
+    internal async void CopyOtpCode_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not FrameworkElement { Tag: string code } || string.IsNullOrWhiteSpace(code)) return;
+        await SafeClipboard.TrySetTextAsync(code);
+        TactileFeedback.PlaySnap();
+        TriggerLiquidImpulse(80, -30, 10);
+        _machine.PushToast(new ToastContent(
+            "\uE8C8",
+            "Verification Code Copied",
+            $"{code} ready to paste",
+            ThemeBrushes.GreenColor,
+            TimeSpan.FromSeconds(2.0),
+            TargetView: "notifications",
+            Priority: ToastPriority.Feedback));
     }
 
     internal void AdjustExpandedNotificationsHeight()
@@ -508,6 +719,15 @@ public partial class IslandWindow
 
     internal void ClearNotificationsButton_Click(object sender, RoutedEventArgs e)
     {
+        if (_notificationListener.HistoryCount == 0) return;
+
+        bool shiftHeld = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+        if (!_confirmGuard.TryConfirm("clear_notifications", sender, "Confirm?", bypass: shiftHeld, dispatcher: Dispatcher))
+        {
+            TriggerLiquidImpulse(24, -8, 3);
+            return;
+        }
+
         _notificationListener.ClearHistory();
         TriggerLiquidImpulse(180, -90, 25);
     }

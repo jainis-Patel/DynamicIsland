@@ -5,7 +5,11 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:core="clr-namespace:DynamicIsland.Core"
              mc:Ignorable="d"
-             d:DesignHeight="150" d:DesignWidth="464">
+             d:DesignHeight="150" d:DesignWidth="464"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Ideal"
+             TextOptions.TextRenderingMode="ClearType">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -33,69 +37,70 @@
                                                     <StackPanel Orientation="Horizontal" />
                                                 </ItemsPanelTemplate>
                                             </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Width="154" Height="82" Margin="0,0,8,0" CornerRadius="10"
-                                                            BorderThickness="1" Padding="10,7" Cursor="Hand"
-                                                            Opacity="{Binding CardOpacity}"
-                                                            MouseLeftButtonDown="PeripheralCard_Click"
-                                                            ToolTip="Click to connect or switch audio output">
-                                                        <Border.Style>
-                                                            <Style TargetType="Border">
-                                                                <Setter Property="Background" Value="{StaticResource CardSurfaceBrush}" />
-                                                                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
-                                                                <Style.Triggers>
-                                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                                        <Setter Property="BorderBrush" Value="#38FFFFFF" />
-                                                                        <Setter Property="Background" Value="#1A1A22" />
-                                                                    </Trigger>
-                                                                    <DataTrigger Binding="{Binding IsConnected}" Value="True">
-                                                                        <Setter Property="BorderBrush" Value="#3830D158" />
-                                                                    </DataTrigger>
-                                                                    <DataTrigger Binding="{Binding IsLowBattery}" Value="True">
-                                                                        <Setter Property="BorderBrush" Value="#66FF453A" />
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </Border.Style>
-                                                        <Grid>
-                                                            <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto" />
-                                                                <RowDefinition Height="*" />
-                                                                <RowDefinition Height="Auto" />
-                                                            </Grid.RowDefinitions>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Width="154" Height="82" Margin="0,0,8,0" CornerRadius="12"
+                                                                Padding="10,8"
+                                                                Opacity="{Binding CardOpacity}"
+                                                                MouseLeftButtonDown="PeripheralCard_Click"
+                                                                ToolTip="Click to connect or switch audio output">
+                                                            <Border.Style>
+                                                                <Style TargetType="Border" BasedOn="{StaticResource BentoInteractiveCard}">
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                                                            <Setter Property="BorderBrush" Value="#3830D158" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding IsLowBattery}" Value="True">
+                                                                            <Setter Property="BorderBrush" Value="#66FF453A" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
+                                                            <Grid>
+                                                                <Grid.RowDefinitions>
+                                                                    <RowDefinition Height="Auto" />
+                                                                    <RowDefinition Height="*" />
+                                                                    <RowDefinition Height="Auto" />
+                                                                </Grid.RowDefinitions>
 
-                                                            <DockPanel Grid.Row="0" LastChildFill="False">
-                                                                <Border Width="22" Height="22" CornerRadius="11" Background="#1AFFFFFF" VerticalAlignment="Center">
-                                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="11.5" Foreground="#F5F5F7" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                                </Border>
+                                                                <DockPanel Grid.Row="0" LastChildFill="False">
+                                                                    <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource ChipBgBrush}" VerticalAlignment="Center">
+                                                                        <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="11.5" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                    </Border>
 
-                                                                <TextBlock DockPanel.Dock="Right" Text="{Binding RightHeaderText}"
-                                                                           Style="{StaticResource Digits}" FontSize="10.5" FontWeight="SemiBold"
-                                                                           Foreground="{Binding BatteryBrush}" VerticalAlignment="Center" />
-                                                            </DockPanel>
+                                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding RightHeaderText}"
+                                                                               Style="{StaticResource Digits}" FontSize="10.5" FontWeight="SemiBold"
+                                                                               Foreground="{Binding BatteryBrush}" VerticalAlignment="Center" />
+                                                                </DockPanel>
 
-                                                            <StackPanel Grid.Row="1" VerticalAlignment="Center">
-                                                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Medium" Foreground="#F5F5F7"
-                                                                           TextTrimming="CharacterEllipsis" />
-                                                                <TextBlock Text="{Binding BatteryStatusText}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" />
-                                                            </StackPanel>
+                                                                <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}"
+                                                                               TextTrimming="CharacterEllipsis" />
+                                                                    <TextBlock Text="{Binding BatteryStatusText}" FontSize="9.5" Foreground="{DynamicResource SecondaryBrush}" />
+                                                                </StackPanel>
 
-                                                            <Grid Grid.Row="2">
-                                                                <Border Height="3.5" Background="#20FFFFFF" CornerRadius="1.75" HorizontalAlignment="Stretch" />
-                                                                <Border Height="3.5" Width="{Binding BatteryFillWidth}" HorizontalAlignment="Left"
-                                                                        Background="{Binding BatteryBrush}" CornerRadius="1.75" />
+                                                                <Grid Grid.Row="2">
+                                                                    <Border Height="3.5" Background="{DynamicResource IslandSliderTrackBrush}" CornerRadius="1.75" HorizontalAlignment="Stretch" />
+                                                                    <Border Height="3.5" Width="{Binding BatteryFillWidth}" HorizontalAlignment="Left"
+                                                                            Background="{Binding BatteryBrush}" CornerRadius="1.75" />
+                                                                </Grid>
                                                             </Grid>
-                                                        </Grid>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
-            <StackPanel x:Name="PeripheralsEmptyPlaceholder" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock Style="{StaticResource Glyph}" Text="" FontSize="20" HorizontalAlignment="Center" />
-                <TextBlock Text="No wireless Bluetooth or XInput devices connected" FontSize="11" Foreground="{DynamicResource SecondaryBrush}" Margin="0,4,0,0" HorizontalAlignment="Center" />
-            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+                <StackPanel x:Name="PeripheralsEmptyPlaceholder" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="14" Padding="24,12">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,7">
+                                <TextBlock Style="{StaticResource Glyph}" Text="" FontSize="15" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="No Connected Devices" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="No wireless Bluetooth or XInput devices connected" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" Margin="0,2,0,0" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
         </Grid>
     </Grid>
 </UserControl>

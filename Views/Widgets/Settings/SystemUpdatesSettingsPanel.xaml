@@ -1,0 +1,207 @@
+<UserControl x:Class="DynamicIsland.Views.Widgets.Settings.SystemUpdatesSettingsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="340" d:DesignWidth="400"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Ideal"
+             TextOptions.TextRenderingMode="ClearType">
+
+    <ScrollViewer x:Name="PanelScrollViewer"
+                  PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  PanningMode="VerticalOnly">
+        <StackPanel Margin="0,0,4,6">
+
+            <!-- System & Performance Card -->
+            <Border Style="{StaticResource SettingsGroupCard}">
+                <StackPanel>
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Launch at Windows Startup" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Start Dynamic Island automatically on sign-in" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <CheckBox x:Name="StartupToggleSwitch" Click="StartupToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                    </DockPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Weather City Override" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Leave blank for automatic IP geolocation" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <Border DockPanel.Dock="Right" Width="125" Height="21" CornerRadius="6"
+                                Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1"
+                                Padding="6,0" VerticalAlignment="Center">
+                            <Grid>
+                                <TextBlock x:Name="WeatherCityPlaceholder" Text="Auto (IP location)" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Opacity="0.7" VerticalAlignment="Center" IsHitTestVisible="False" />
+                                <TextBox x:Name="WeatherCityBox" Background="Transparent" Foreground="{DynamicResource PrimaryTextBrush}" BorderThickness="0" FontSize="8"
+                                         VerticalAlignment="Center" CaretBrush="{DynamicResource AccentBrush}"
+                                         TextChanged="WeatherCityBox_TextChanged"
+                                         LostFocus="WeatherCityBox_LostFocus"
+                                         KeyDown="WeatherCityBox_KeyDown" />
+                            </Grid>
+                        </Border>
+                    </DockPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Low Memory Mode" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Force software rendering on restart to minimize VRAM usage" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <CheckBox x:Name="LowMemoryModeToggleSwitch" Click="LowMemoryModeToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                    </DockPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Vector &amp; Lottie Animations" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Enable rich decorative animations across compact &amp; expanded views" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <CheckBox x:Name="LottieAnimToggleSwitch" Click="LottieAnimToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Configuration Snapshot Card -->
+            <Border Style="{StaticResource SettingsGroupCard}">
+                <DockPanel LastChildFill="False">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Configuration Snapshot" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                        <TextBlock Text="Export, restore or factory reset JSON profile" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                    </StackPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Click="ExportSettingsBtn_Click" x:Name="ExportSettingsBtn" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0,0,3,0">
+                            <TextBlock Text="Export" FontSize="8.5" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="ImportSettingsBtn_Click" x:Name="ImportSettingsBtn" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0,0,3,0">
+                            <TextBlock Text="Import" FontSize="8.5" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="ResetSettingsBtn_Click" x:Name="ResetSettingsBtn" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0">
+                            <TextBlock x:Name="ResetSettingsText" Text="Reset" FontSize="8.5" FontWeight="Medium" Foreground="#FF453A" />
+                        </Button>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- GitHub Updates & Version Control Manager -->
+            <Border Style="{StaticResource SettingsGroupCard}" Padding="10,8" Margin="0">
+                <StackPanel>
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="GitHub Updates &amp; Version Control" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock x:Name="UpdateStatusSubtitleText" Text="Check releases, switch channels, or rollback" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Click="CheckUpdatesBtn_Click" x:Name="CheckUpdatesBtn" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0,0,4,0" ToolTipService.ToolTip="Query GitHub for new releases">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE895;" FontSize="8" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="CheckUpdatesBtnText" Text="Check" FontSize="8.5" FontWeight="Medium" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="UpdateChannelBtn_Click" x:Name="UpdateChannelBtn" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0" ToolTipService.ToolTip="Toggle release channel: Stable vs Beta">
+                                <TextBlock x:Name="UpdateChannelText" Text="Stable" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                            </Button>
+                        </StackPanel>
+                    </DockPanel>
+
+                    <!-- Update Available Banner -->
+                    <Border x:Name="UpdateAvailableBanner" Visibility="Collapsed" Background="#140A84FF" BorderBrush="#330A84FF" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="0,7,0,0">
+                        <StackPanel>
+                            <DockPanel LastChildFill="False">
+                                <StackPanel VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" FontSize="8.5" Foreground="#0A84FF" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                        <TextBlock x:Name="UpdateVersionTitleText" Text="v0.8.1 Available" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="UpdateSummaryText" Text="New liquid physics and performance improvements." FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" TextWrapping="Wrap" MaxWidth="250" Margin="0,2,0,0" />
+                                    <Button Click="ViewChangelogBtn_Click" x:Name="ViewChangelogBtn" Style="{StaticResource IslandButton}" Height="18" Padding="6,0" Margin="0,4,0,0" HorizontalAlignment="Left" Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE8A7;" FontSize="7" Margin="0,0,3,0" VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}" />
+                                            <TextBlock Text="View Changelog on GitHub" FontSize="7" Foreground="{DynamicResource AccentBrush}" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Click="InstallUpdateBtn_Click" x:Name="InstallUpdateBtn" Style="{StaticResource IslandButton}" Height="22" Padding="9,0" Background="#1F0A84FF" BorderBrush="#4D0A84FF">
+                                        <TextBlock x:Name="InstallUpdateBtnText" Text="Install &amp; Restart" FontSize="8.5" FontWeight="SemiBold" Foreground="#0A84FF" />
+                                    </Button>
+                                </StackPanel>
+                            </DockPanel>
+
+                            <ProgressBar x:Name="UpdateProgressBar" Visibility="Collapsed" Height="4" Margin="0,6,0,2" Minimum="0" Maximum="100" Value="0" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource IslandSliderTrackBrush}" BorderThickness="0" />
+                            <TextBlock x:Name="UpdateProgressText" Visibility="Collapsed" Text="Downloading: 0%" FontSize="7" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Right" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <!-- Auto-check Toggle -->
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Automatic Daily Update Checks" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock x:Name="LastCheckTimestampText" Text="Last checked: Never" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <CheckBox x:Name="AutoCheckToggleSwitch" Click="AutoCheckToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                    </DockPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <!-- Pre-Download Toggle -->
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Pre-Download Verified Updates" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Silently download &amp; verify in background for instant restart" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <CheckBox x:Name="AutoDownloadToggleSwitch" Click="AutoDownloadToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                    </DockPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <!-- GitHub API Token -->
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="GitHub API Token (Optional)" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Bypasses GitHub's 60 req/hr rate limit (5,000 req/hr)" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <PasswordBox x:Name="GitHubTokenBox" DockPanel.Dock="Right" Width="110" Height="20" FontSize="8"
+                                     VerticalAlignment="Center" Padding="4,1" Margin="6,0,0,0"
+                                     Background="{DynamicResource ChipBgBrush}" Foreground="{DynamicResource PrimaryTextBrush}"
+                                     BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1"
+                                     LostFocus="GitHubTokenBox_LostFocus"
+                                     KeyDown="GitHubTokenBox_KeyDown"
+                                     ToolTipService.ToolTip="GitHub Personal Access Token for high-rate API queries" />
+                    </DockPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <!-- Version History / Rollback -->
+                    <DockPanel LastChildFill="False">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Version History &amp; Rollback" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Switch to previous GitHub releases if experiencing conflicts" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <Button Click="ToggleVersionHistoryBtn_Click" x:Name="ToggleVersionHistoryBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="ToggleVersionHistoryText" Text="View Releases" FontSize="8.5" FontWeight="Medium" />
+                        </Button>
+                    </DockPanel>
+
+                    <StackPanel x:Name="VersionHistoryContainer" Visibility="Collapsed" Margin="0,6,0,0">
+                        <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="6,4">
+                            <StackPanel x:Name="VersionHistoryList" />
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

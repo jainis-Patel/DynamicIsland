@@ -24,6 +24,7 @@ public partial class BasketWindow : Window
     private readonly DropShelfService _shelfService;
     private readonly ObservableCollection<ShelfItem> _items = new();
     private readonly DispatcherTimer _autoCloseTimer;
+    private readonly InlineConfirmGuard _confirmGuard = new();
     private Point _dragStart;
     private bool _isClosing;
 
@@ -33,6 +34,7 @@ public partial class BasketWindow : Window
     {
         if (_isClosing) return;
         _isClosing = true;
+        _confirmGuard.DisarmAll();
         Close();
     }
 
@@ -323,6 +325,15 @@ public partial class BasketWindow : Window
 
     private void ClearAllBtn_Click(object sender, RoutedEventArgs e)
     {
+        if (_items.Count > 0)
+        {
+            bool shiftHeld = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+            if (!_confirmGuard.TryConfirm("basket_clear_all", sender, "Confirm?", bypass: shiftHeld, dispatcher: Dispatcher))
+            {
+                return;
+            }
+        }
+
         _items.Clear();
         RefreshUI();
         CloseSafely();

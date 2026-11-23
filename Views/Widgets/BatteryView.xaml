@@ -5,7 +5,11 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:core="clr-namespace:DynamicIsland.Core"
              mc:Ignorable="d"
-             d:DesignHeight="150" d:DesignWidth="464">
+             d:DesignHeight="150" d:DesignWidth="464"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Ideal"
+             TextOptions.TextRenderingMode="ClearType">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -37,7 +41,7 @@
                     <ColumnDefinition Width="6" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="11" Padding="10,6">
+                <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="11,7">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -70,7 +74,7 @@
                         </DockPanel>
                     </Grid>
                 </Border>
-                <Border Grid.Column="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="11" Padding="10,6">
+                <Border Grid.Column="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="11,7">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -108,16 +112,16 @@
                     </Grid>
                 </Border>
             </Grid>
-            <Border Grid.Row="2" BorderThickness="1" CornerRadius="9" Padding="2.5" Height="36">
+            <Border Grid.Row="2" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="11" Padding="3" Height="38">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="3" />
+                        <ColumnDefinition Width="4" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="3" />
+                        <ColumnDefinition Width="4" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Border MouseLeftButtonDown="PlanSaverCard_Click" x:Name="PlanSaverCard" Grid.Column="0" CornerRadius="7" Cursor="Hand" BorderThickness="1">
+                    <Border MouseLeftButtonDown="PlanSaverCard_Click" x:Name="PlanSaverCard" Grid.Column="0" Style="{StaticResource BentoSpringMotionBorder}" CornerRadius="8" BorderThickness="1">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock x:Name="PlanSaverIcon" Style="{StaticResource Glyph}" Text="" FontSize="10.5" Margin="0,0,4,0" VerticalAlignment="Center" />
@@ -126,7 +130,7 @@
                             <TextBlock x:Name="PlanSaverSub" Text="+2.5h Battery" FontSize="7.5" HorizontalAlignment="Center" Margin="0,1,0,0" />
                         </StackPanel>
                     </Border>
-                    <Border MouseLeftButtonDown="PlanBalancedCard_Click" x:Name="PlanBalancedCard" Grid.Column="2" CornerRadius="7" Cursor="Hand" BorderThickness="1">
+                    <Border MouseLeftButtonDown="PlanBalancedCard_Click" x:Name="PlanBalancedCard" Grid.Column="2" Style="{StaticResource BentoSpringMotionBorder}" CornerRadius="8" BorderThickness="1">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock x:Name="PlanBalancedIcon" Style="{StaticResource Glyph}" Text="" FontSize="10.5" Margin="0,0,4,0" VerticalAlignment="Center" />
@@ -135,7 +139,7 @@
                             <TextBlock x:Name="PlanBalancedSub" Text="Recommended" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,1,0,0" />
                         </StackPanel>
                     </Border>
-                    <Border MouseLeftButtonDown="PlanPerfCard_Click" x:Name="PlanPerfCard" Grid.Column="4" CornerRadius="7" Cursor="Hand" BorderThickness="1">
+                    <Border MouseLeftButtonDown="PlanPerfCard_Click" x:Name="PlanPerfCard" Grid.Column="4" Style="{StaticResource BentoSpringMotionBorder}" CornerRadius="8" BorderThickness="1">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock x:Name="PlanPerfIcon" Style="{StaticResource Glyph}" Text="" FontSize="10.5" Margin="0,0,4,0" VerticalAlignment="Center" />

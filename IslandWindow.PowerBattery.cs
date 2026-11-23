@@ -43,9 +43,10 @@ public partial class IslandWindow
                 : "Continuous AC";
         }
 
-        if (BatteryHealthSummaryText != null)
+        var dpHealthText = SettingsContainer?.DisplayPowerPanel?.BatteryHealthSummaryText;
+        if (dpHealthText != null)
         {
-            BatteryHealthSummaryText.Text = status.HasBattery
+            dpHealthText.Text = status.HasBattery
                 ? $"Health: {status.HealthPercent}% \u2022 {(status.IsCharging ? "Charging" : (status.IsAcOnline ? "AC" : "Batt"))}"
                 : "Continuous AC Power";
         }
@@ -212,6 +213,17 @@ public partial class IslandWindow
     private DispatcherTimer? _caffeineTimer;
     private int _caffeineTargetPid;
     private string _caffeineTargetAppName = string.Empty;
+
+    internal bool IsCaffeineActive => _isCaffeineActive;
+    internal string CaffeineShortLabel => _caffeineMode switch
+    {
+        CaffeineMode.Minutes15 => "Awake 15m",
+        CaffeineMode.Hour1 => "Awake 1h",
+        CaffeineMode.Indefinite => "Awake ∞",
+        CaffeineMode.WhileOnAc => "Awake AC",
+        CaffeineMode.UntilProcessExits => "Awake App",
+        _ => "Awake"
+    };
 
     internal void CaffeineQuickBtn_Click(object sender, RoutedEventArgs e)
     {
@@ -529,11 +541,12 @@ public partial class IslandWindow
 
     internal void NightLightWarmthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_isApplyingSettings || _settingsService == null || NightLightWarmthText == null) return;
+        var dp = SettingsContainer?.DisplayPowerPanel;
+        if (_isApplyingSettings || _settingsService == null || dp?.NightLightWarmthText == null) return;
         int kelvin = (int)Math.Round(e.NewValue);
         if (_settingsService.Current.NightLightWarmthKelvin == kelvin) return;
 
-        NightLightWarmthText.Text = $"{kelvin} K";
+        dp.NightLightWarmthText.Text = $"{kelvin} K";
         _settingsService.Update(s => s.NightLightWarmthKelvin = kelvin, nameof(AppSettings.NightLightWarmthKelvin));
 
         if (_settingsService.Current.EnableNightLightSim)
@@ -621,13 +634,45 @@ public partial class IslandWindow
     {
         if (_settingsService == null) return;
         var s = _settingsService.Current;
+        var dp = SettingsContainer?.DisplayPowerPanel;
 
-        // Night Light
-        if (NightLightSettingsText != null)
+        // Night Light (Settings panel switch + warmth dimming)
+        if (dp != null)
         {
-            NightLightSettingsText.Text = s.EnableNightLightSim ? "\U0001F319 Night Light On" : "\U0001F319 Night Light Off";
-            NightLightSettingsText.Foreground = s.EnableNightLightSim ? ThemeBrushes.Amber : ThemeBrushes.SecondaryText;
+            if (dp.NightLightToggleSwitch != null)
+            {
+                dp.NightLightToggleSwitch.IsChecked = s.EnableNightLightSim;
+            }
+            if (dp.NightLightWarmthGroup != null)
+            {
+                dp.NightLightWarmthGroup.IsEnabled = s.EnableNightLightSim;
+                dp.NightLightWarmthGroup.Opacity = s.EnableNightLightSim ? 1.0 : 0.45;
+            }
+            if (dp.NightLightWarmthText != null)
+            {
+                dp.NightLightWarmthText.Text = $"{s.NightLightWarmthKelvin} K";
+            }
+            if (dp.NightLightWarmthSlider != null && Math.Abs(dp.NightLightWarmthSlider.Value - s.NightLightWarmthKelvin) > 1)
+            {
+                dp.NightLightWarmthSlider.Value = s.NightLightWarmthKelvin;
+            }
+
+            if (dp.ChargingPulseToggleSwitch != null)
+                dp.ChargingPulseToggleSwitch.IsChecked = s.EnableChargingPulse;
+
+            if (dp.LowBattThresholdText != null)
+            {
+                dp.LowBattThresholdText.Text = s.LowBatteryAlertThreshold > 0 ? $"{s.LowBatteryAlertThreshold}%" : "Off";
+                dp.LowBattThresholdText.Foreground = s.LowBatteryAlertThreshold > 0 ? ThemeBrushes.Amber : ThemeBrushes.SecondaryText;
+            }
+
+            if (dp.AutoPowerSaverToggleSwitch != null)
+                dp.AutoPowerSaverToggleSwitch.IsChecked = s.AutoPowerPlanOnBattery;
+
+            if (dp.AutoPowerAcToggleSwitch != null)
+                dp.AutoPowerAcToggleSwitch.IsChecked = s.AutoPowerPlanOnAc;
         }
+
         if (NightLightQuickBtn != null && NightLightQuickText != null)
         {
             if (s.EnableNightLightSim)
@@ -644,42 +689,6 @@ public partial class IslandWindow
                 NightLightQuickText.Text = "Night Light";
                 NightLightQuickText.Foreground = ThemeBrushes.SecondaryText;
             }
-        }
-        if (NightLightWarmthText != null)
-        {
-            NightLightWarmthText.Text = $"{s.NightLightWarmthKelvin} K";
-        }
-        if (NightLightWarmthSlider != null && Math.Abs(NightLightWarmthSlider.Value - s.NightLightWarmthKelvin) > 1)
-        {
-            NightLightWarmthSlider.Value = s.NightLightWarmthKelvin;
-        }
-
-        // Charging pulse
-        if (ChargingPulseToggleText != null)
-        {
-            ChargingPulseToggleText.Text = s.EnableChargingPulse ? "\u26A1 MagSafe Pulse On" : "\u26A1 MagSafe Pulse Off";
-            ChargingPulseToggleText.Foreground = s.EnableChargingPulse ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
-        }
-
-        // Low battery threshold
-        if (LowBattThresholdText != null)
-        {
-            LowBattThresholdText.Text = s.LowBatteryAlertThreshold > 0 ? $"\u26A0\uFE0F Alert: {s.LowBatteryAlertThreshold}%" : "\u26A0\uFE0F Alert: Off";
-            LowBattThresholdText.Foreground = s.LowBatteryAlertThreshold > 0 ? ThemeBrushes.Amber : ThemeBrushes.SecondaryText;
-        }
-
-        // Auto saver
-        if (AutoPowerSaverToggleText != null)
-        {
-            AutoPowerSaverToggleText.Text = s.AutoPowerPlanOnBattery ? "Auto Saver On" : "Auto Saver Off";
-            AutoPowerSaverToggleText.Foreground = s.AutoPowerPlanOnBattery ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
-        }
-
-        // Auto AC perf
-        if (AutoPowerAcToggleText != null)
-        {
-            AutoPowerAcToggleText.Text = s.AutoPowerPlanOnAc ? "Auto AC Perf On" : "Auto AC Perf Off";
-            AutoPowerAcToggleText.Foreground = s.AutoPowerPlanOnAc ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
         }
 
         UpdateMonitorUI();

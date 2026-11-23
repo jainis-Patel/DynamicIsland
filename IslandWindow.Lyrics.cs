@@ -62,7 +62,6 @@ public partial class IslandWindow
                 MediaLyricsBadge.Opacity = 0.45;
             }
             if (MediaLyricsBadgeText != null) MediaLyricsBadgeText.Text = "No Lyrics";
-            if (KaraokeLyricsHost != null) KaraokeLyricsHost.Visibility = lyricsEnabled ? Visibility.Visible : Visibility.Collapsed;
             if (LyricCurrentLine != null)
             {
                 LyricCurrentLine.Text = _lyricsService.IsInstrumental ? "\u266A Instrumental Track" : "\u266A No synced lyrics available";
@@ -70,6 +69,8 @@ public partial class IslandWindow
             if (LyricPrevLine != null) LyricPrevLine.Text = "";
             if (LyricNextLine != null) LyricNextLine.Text = "";
         }
+
+        SyncHomeCenterStageVisibility();
 
         if (_machine.State == IslandState.Expanded)
         {
@@ -142,7 +143,6 @@ public partial class IslandWindow
 
         if (!newEnabled)
         {
-            KaraokeLyricsHost.Visibility = Visibility.Collapsed;
             MediaLyricsBadge.Opacity = 0.4;
         }
         else
@@ -152,10 +152,10 @@ public partial class IslandWindow
             {
                 _lyricsService.LoadLyricsForTrack(media.Title, media.Artist, media.Duration, forceRetry: true);
             }
-            KaraokeLyricsHost.Visibility = _lyricsService.HasLyrics ? Visibility.Visible : Visibility.Collapsed;
             MediaLyricsBadge.Opacity = 1.0;
         }
 
+        SyncHomeCenterStageVisibility();
         UpdateLyricsSettingsUI();
         ApplyGeometry();
         EnsureRendering();
@@ -234,16 +234,10 @@ public partial class IslandWindow
     private void UpdateCapsuleElementsUI()
     {
         bool camOn = _settingsService?.Current.ShowCameraLensIcon ?? true;
-        if (CameraLensToggleText != null)
+        var cp = SettingsContainer?.ClockAudioPanel;
+        if (cp?.CameraLensToggleSwitch != null)
         {
-            CameraLensToggleText.Text = camOn ? "Cam On" : "Cam Off";
-            CameraLensToggleText.Foreground = camOn ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
-        }
-        if (CameraLensToggleBtn != null)
-        {
-            CameraLensToggleBtn.BorderBrush = camOn
-                ? ThemeBrushes.GreenBorderActive
-                : Brushes.Transparent;
+            cp.CameraLensToggleSwitch.IsChecked = camOn;
         }
 
         OnPrivacyStateChanged();
@@ -251,65 +245,27 @@ public partial class IslandWindow
 
     private void UpdateLyricsSettingsUI()
     {
+        var cp = SettingsContainer?.ClockAudioPanel;
         bool lyricsOn = _settingsService?.Current?.EnableSyncedLyrics ?? true;
-        if (LyricsToggleSettingsText != null)
+        if (cp?.LyricsToggleSwitch != null)
         {
-            LyricsToggleSettingsText.Text = lyricsOn ? "Lyrics On" : "Lyrics Off";
-            LyricsToggleSettingsText.Foreground = lyricsOn ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
-        }
-        if (LyricsToggleBtnSettings != null)
-        {
-            LyricsToggleBtnSettings.BorderBrush = lyricsOn
-                ? ThemeBrushes.GreenBorderActive
-                : Brushes.Transparent;
+            cp.LyricsToggleSwitch.IsChecked = lyricsOn;
         }
 
         bool compactLyricsOn = _settingsService?.Current?.ShowLyricsInCompact ?? false;
-        if (CompactLyricsToggleText != null)
+        if (cp?.CompactLyricsToggleSwitch != null)
         {
-            CompactLyricsToggleText.Text = compactLyricsOn ? "Pill Lyrics On" : "Pill Lyrics Off";
-            CompactLyricsToggleText.Foreground = compactLyricsOn ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
-        }
-        if (CompactLyricsToggleBtn != null)
-        {
-            CompactLyricsToggleBtn.BorderBrush = compactLyricsOn
-                ? ThemeBrushes.GreenBorderActive
-                : Brushes.Transparent;
+            cp.CompactLyricsToggleSwitch.IsChecked = compactLyricsOn;
         }
     }
 
     private void UpdateNetSpeedIdleUI()
     {
         bool netOn = _settingsService?.Current?.ShowNetworkSpeedInIdle ?? false;
-
-        // Capsule Items compact button
-        if (NetSpeedIdleToggleText != null)
+        var cp = SettingsContainer?.ClockAudioPanel;
+        if (cp?.NetSpeedIdleToggleSwitch != null)
         {
-            NetSpeedIdleToggleText.Text = netOn ? "Speed On" : "Speed Off";
-            NetSpeedIdleToggleText.Foreground = netOn ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
-        }
-        if (NetSpeedIdleToggleBtn != null)
-        {
-            NetSpeedIdleToggleBtn.BorderBrush = netOn
-                ? ThemeBrushes.GreenBorderActive
-                : Brushes.Transparent;
-        }
-
-        // Dedicated Settings row toggle
-        if (NetSpeedSettingToggleText != null)
-        {
-            NetSpeedSettingToggleText.Text = netOn ? "Shown in Pill" : "Hidden from Pill";
-            NetSpeedSettingToggleText.Foreground = netOn ? ThemeBrushes.Green : ThemeBrushes.SecondaryText;
-        }
-        if (NetSpeedSettingStatusDot != null)
-        {
-            NetSpeedSettingStatusDot.Fill = netOn ? ThemeBrushes.Green : ThemeBrushes.MutedGrey;
-        }
-        if (NetSpeedSettingToggleBtn != null)
-        {
-            NetSpeedSettingToggleBtn.BorderBrush = netOn
-                ? ThemeBrushes.GreenBorderActive
-                : Brushes.Transparent;
+            cp.NetSpeedIdleToggleSwitch.IsChecked = netOn;
         }
 
         // Network Hub container button

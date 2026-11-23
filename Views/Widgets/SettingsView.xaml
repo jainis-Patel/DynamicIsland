@@ -3,1668 +3,231 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:core="clr-namespace:DynamicIsland.Core"
+             xmlns:sp="clr-namespace:DynamicIsland.Views.Widgets.Settings"
              mc:Ignorable="d"
-             d:DesignHeight="240" d:DesignWidth="464"
+             d:DesignHeight="348" d:DesignWidth="508"
              UseLayoutRounding="True"
              SnapsToDevicePixels="True"
              TextOptions.TextFormattingMode="Ideal"
              TextOptions.TextRenderingMode="ClearType">
 
-    <UserControl.Resources>
-        <!-- Hairline Divider for Inset Groups -->
-        <Style x:Key="GroupHairline" TargetType="Border">
-            <Setter Property="Height" Value="1" />
-            <Setter Property="Background" Value="{DynamicResource CardBorderBrush}" />
-            <Setter Property="Opacity" Value="0.55" />
-            <Setter Property="Margin" Value="0,6" />
-        </Style>
-
-        <!-- Clean Section Overline Header -->
-        <Style x:Key="OverlineHeader" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="8" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="Foreground" Value="{DynamicResource SecondaryBrush}" />
-            <Setter Property="Opacity" Value="0.75" />
-            <Setter Property="Margin" Value="4,4,0,4" />
-        </Style>
-
-        <!-- Interactive Clock Face Preview Card Style -->
-        <Style x:Key="ClockPreviewCardStyle" TargetType="Button">
-            <Setter Property="Width" Value="118" />
-            <Setter Property="Height" Value="64" />
-            <Setter Property="Margin" Value="0,0,6,0" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Background" Value="#0CFFFFFF" />
-            <Setter Property="BorderBrush" Value="#16FFFFFF" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="PillCardBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="9" Padding="6,5">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="PillCardBorder" Property="Background" Value="#18FFFFFF" />
-                                <Setter TargetName="PillCardBorder" Property="BorderBrush" Value="#30FFFFFF" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Color Swatch Dot Button Style -->
-        <Style x:Key="SwatchDotStyle" TargetType="Button">
-            <Setter Property="Width" Value="15" />
-            <Setter Property="Height" Value="15" />
-            <Setter Property="Margin" Value="0,0,6,0" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Grid>
-                            <Ellipse x:Name="SwatchRing" Fill="{TemplateBinding Background}" Stroke="#45FFFFFF" StrokeThickness="1" />
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="SwatchRing" Property="Stroke" Value="#CCFFFFFF" />
-                                <Setter TargetName="SwatchRing" Property="StrokeThickness" Value="1.5" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </UserControl.Resources>
-
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!-- ═════════════════════════════════════════════════════════════════ -->
-        <!-- TOP UTILITY HEADER                                                -->
+        <!-- TOP UTILITY HEADER + GLOBAL SEARCH                                -->
         <!-- ═════════════════════════════════════════════════════════════════ -->
-        <DockPanel Grid.Row="0" Margin="2,0,2,6" LastChildFill="False">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Border Width="18" Height="18" CornerRadius="4.5" Background="#121318" BorderBrush="#26FFFFFF" BorderThickness="1" Margin="0,0,7,0" VerticalAlignment="Center">
+        <DockPanel Grid.Row="0" Margin="2,0,2,8" LastChildFill="True">
+            <!-- Left Branding -->
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                <Border Width="18" Height="18" CornerRadius="4.5" Background="{DynamicResource ElevatedSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Margin="0,0,6,0" VerticalAlignment="Center">
                     <Image Source="pack://application:,,,/Assets/app.png" Width="13" Height="13" HorizontalAlignment="Center" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" />
                 </Border>
-                <TextBlock Style="{StaticResource SectionTitle}" Text="Dynamic Island" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
-                <Border Background="#14FFFFFF" BorderBrush="#1FFFFFFF" BorderThickness="1" CornerRadius="4" Padding="4,1" Margin="6,0,0,0" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource SectionTitle}" Text="Settings" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="4,1" Margin="5,0,0,0" VerticalAlignment="Center">
                     <TextBlock x:Name="AppVersionText" Text="0.8.0" Style="{StaticResource Digits}" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" />
                 </Border>
-                <TextBlock Text="Jainis Patel" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Opacity="0.65" VerticalAlignment="Center" Margin="6,0,0,0" />
             </StackPanel>
 
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Click="SettingsTrimRamBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,4,0" ToolTipService.ToolTip="Purge working set memory &amp; compact garbage collector">
+            <!-- Right Utilities -->
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                <Button Click="SettingsTrimRamBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0" ToolTipService.ToolTip="Purge working set memory &amp; compact garbage collector">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE945;" FontSize="8.5" Foreground="{DynamicResource GreenBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                        <TextBlock Text="Purge" FontSize="8" FontWeight="Medium" />
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE945;" FontSize="8" Foreground="{DynamicResource GreenBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="SettingsRamBadgeText" Text="Purge" Style="{StaticResource Digits}" FontSize="7.5" FontWeight="Medium" />
                     </StackPanel>
                 </Button>
-                <Button Click="SettingsOpenDataBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,5,0" ToolTipService.ToolTip="Open App Data directory in File Explorer">
+                <Button Click="SettingsOpenDataBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,4,0" ToolTipService.ToolTip="Open App Data directory in File Explorer">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xED25;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                        <TextBlock Text="Data" FontSize="8" FontWeight="Medium" />
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xED25;" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Data" FontSize="7.5" FontWeight="Medium" />
                     </StackPanel>
                 </Button>
                 <Border BorderThickness="1" BorderBrush="{DynamicResource CardBorderBrush}" Background="{DynamicResource ChipBgBrush}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
                         <Ellipse Width="5" Height="5" Fill="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                        <TextBlock x:Name="SelectedThemeName" Text="Solar Amber" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        <TextBlock x:Name="SelectedThemeName" Text="Solar Amber" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                     </StackPanel>
                 </Border>
             </StackPanel>
+
+            <!-- Global Search Input -->
+            <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="6,0" Height="21" VerticalAlignment="Center">
+                <DockPanel LastChildFill="True">
+                    <TextBlock DockPanel.Dock="Left" Style="{StaticResource Glyph}" Text="&#xE721;" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,5,0" VerticalAlignment="Center" />
+                    <Button x:Name="SettingsSearchClearBtn" DockPanel.Dock="Right" Click="SettingsSearchClearBtn_Click" Style="{StaticResource IslandButton}" Width="15" Height="15" Padding="0" Margin="3,0,0,0" Background="Transparent" Visibility="Collapsed" ToolTipService.ToolTip="Clear search (Esc)">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="6.5" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                    <Grid VerticalAlignment="Center">
+                        <TextBlock x:Name="SettingsSearchPlaceholder" Text="Search settings (Ctrl+F)" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Opacity="0.7" VerticalAlignment="Center" IsHitTestVisible="False" />
+                        <TextBox x:Name="SettingsSearchBox" TextChanged="SettingsSearchBox_TextChanged" Background="Transparent" Foreground="{DynamicResource PrimaryTextBrush}" BorderThickness="0" FontSize="8.5" VerticalAlignment="Center" CaretBrush="{DynamicResource AccentBrush}" />
+                    </Grid>
+                </DockPanel>
+            </Border>
         </DockPanel>
 
         <!-- ═════════════════════════════════════════════════════════════════ -->
-        <!-- SEGMENTED NAVIGATION BAR (Monochrome Fluent Icons, No Emoji Slop) -->
+        <!-- 2-COLUMN SPLIT: LEFT SIDEBAR RAIL + PANEL HOST                    -->
         <!-- ═════════════════════════════════════════════════════════════════ -->
-        <Border Grid.Row="1" Background="#0AFFFFFF" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="2" Margin="0,0,0,7">
-            <UniformGrid Columns="9" Rows="1">
-                <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabAppearanceBtn" Tag="Appearance" Style="{StaticResource SettingsTabButtonStyle}" ToolTipService.ToolTip="Appearance &amp; Physics">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE790;" FontSize="8.5" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.85" />
-                        <TextBlock x:Name="SettingsTabAppearanceText" Text="Style" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-                <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabThemesBtn" Tag="Themes" Style="{StaticResource SettingsTabButtonStyle}" ToolTipService.ToolTip="Botanical &amp; Living Themes">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xEC0A;" FontSize="8.5" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.85" />
-                        <TextBlock x:Name="SettingsTabThemesText" Text="Flora" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-                <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabDropletsBtn" Tag="Droplets" Style="{StaticResource SettingsTabButtonStyle}" ToolTipService.ToolTip="Modular Droplets">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xF158;" FontSize="8.5" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.85" />
-                        <TextBlock x:Name="SettingsTabDropletsText" Text="Mods" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-                <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabDockBtn" Tag="Dock" Style="{StaticResource SettingsTabButtonStyle}" ToolTipService.ToolTip="Dock Strip Manager">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE90D;" FontSize="8.5" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.85" />
-                        <TextBlock x:Name="SettingsTabDockText" Text="Dock" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-                <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabClockBtn" Tag="Clock" Style="{StaticResource SettingsTabButtonStyle}" ToolTipService.ToolTip="Clock &amp; Idle Capsule">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE823;" FontSize="8.5" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.85" />
-                        <TextBlock x:Name="SettingsTabClockText" Text="Clock" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-                <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabScreenBtn" Tag="Screen" Style="{StaticResource SettingsTabButtonStyle}" ToolTipService.ToolTip="Display, Notch &amp; Power">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE7F4;" FontSize="8.5" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.85" />
-                        <TextBlock x:Name="SettingsTabScreenText" Text="Screen" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-                <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabPetBtn" Tag="Pet" Style="{StaticResource SettingsTabButtonStyle}" ToolTipService.ToolTip="Desktop Companion">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xEB51;" FontSize="8.5" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.85" />
-                        <TextBlock x:Name="SettingsTabPetText" Text="Pet" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-                <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabShortcutsBtn" Tag="Shortcuts" Style="{StaticResource SettingsTabButtonStyle}" ToolTipService.ToolTip="Global Shortcuts &amp; Backup">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE765;" FontSize="8.5" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.85" />
-                        <TextBlock x:Name="SettingsTabShortcutsText" Text="Keys" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-                <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabNotifBtn" Tag="Notifications" Style="{StaticResource SettingsTabButtonStyle}" ToolTipService.ToolTip="Notifications &amp; Toast Interception">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xEA8F;" FontSize="8.5" Margin="0,0,3,0" VerticalAlignment="Center" Opacity="0.85" />
-                        <TextBlock x:Name="SettingsTabNotifText" Text="Alerts" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-            </UniformGrid>
-        </Border>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="106" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-        <!-- ═════════════════════════════════════════════════════════════════ -->
-        <!-- TAB CONTENT HOST                                                  -->
-        <!-- ═════════════════════════════════════════════════════════════════ -->
-        <Grid Grid.Row="2">
-
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <!-- 1. APPEARANCE & PHYSICS TAB                                   -->
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <ScrollViewer PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel" x:Name="SettingsAppearanceTab" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Visibility="Visible">
-                <StackPanel Margin="0,0,0,6">
-
-                    <!-- Group 1: Theme & Color Surface -->
-                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,7" Margin="0,0,0,6">
-                        <StackPanel>
-                            <!-- Row: Material Surface Style -->
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Material Surface" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock x:Name="ThemeStyleSubtext" Text="Classic OLED Capsule" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <Border DockPanel.Dock="Right" Background="{DynamicResource ChipBgBrush}" CornerRadius="6" Padding="2" VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal">
-                                        <Button Click="ThemeStyleBtn_Click" x:Name="ThemeStyleDefaultBtn" Tag="Default" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0,0,2,0" ToolTipService.ToolTip="Pitch-black OLED capsule">
-                                            <TextBlock x:Name="ThemeStyleDefaultText" Text="OLED" FontSize="8.5" FontWeight="SemiBold" />
-                                        </Button>
-                                        <Button Click="ThemeStyleBtn_Click" x:Name="ThemeStyleLiquidGlassBtn" Tag="Liquid Glass" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0" ToolTipService.ToolTip="Refractive frosted glass with specular rims">
-                                            <TextBlock x:Name="ThemeStyleLiquidGlassText" Text="Liquid Glass" FontSize="8.5" FontWeight="SemiBold" />
-                                        </Button>
-                                    </StackPanel>
-                                </Border>
-                            </DockPanel>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Row: Color Scheme Mode -->
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Color Mode" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock x:Name="ThemeModeSubtext" Text="Match Windows" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <Border DockPanel.Dock="Right" Background="{DynamicResource ChipBgBrush}" CornerRadius="6" Padding="2" VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal">
-                                        <Button Click="ThemeModeBtn_Click" x:Name="ThemeModeSystemBtn" Tag="System" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,2,0">
-                                            <TextBlock x:Name="ThemeModeSystemText" Text="System" FontSize="8.5" FontWeight="SemiBold" />
-                                        </Button>
-                                        <Button Click="ThemeModeBtn_Click" x:Name="ThemeModeDarkBtn" Tag="Dark" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,2,0">
-                                            <TextBlock x:Name="ThemeModeDarkText" Text="Dark" FontSize="8.5" FontWeight="SemiBold" />
-                                        </Button>
-                                        <Button Click="ThemeModeBtn_Click" x:Name="ThemeModeLightBtn" Tag="Light" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
-                                            <TextBlock x:Name="ThemeModeLightText" Text="Light" FontSize="8.5" FontWeight="SemiBold" />
-                                        </Button>
-                                    </StackPanel>
-                                </Border>
-                            </DockPanel>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Row: Accent Swatches -->
-                            <DockPanel LastChildFill="False">
-                                <TextBlock Text="Accent Tint" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Click="ThemeSwatch_Click" Tag="Solar Amber" Background="#FF9F0A" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Solar Amber" />
-                                    <Button Click="ThemeSwatch_Click" Tag="Apple Neon" Background="#0A84FF" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Apple Neon" />
-                                    <Button Click="ThemeSwatch_Click" Tag="Cyberpunk Cyan" Background="#00F0FF" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Cyberpunk Cyan" />
-                                    <Button Click="ThemeSwatch_Click" Tag="Emerald Green" Background="#30D158" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Emerald Green" />
-                                    <Button Click="ThemeSwatch_Click" Tag="Monochrome Frost" Background="#E5E5EA" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Monochrome Frost" />
-                                    <Button Click="ThemeSwatch_Click" Tag="Purple Haze" Background="#BF5AF2" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Purple Haze" />
-                                    <Button Click="ThemeSwatch_Click" Tag="Coral Sunset" Background="#FF6442" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Coral Sunset" />
-                                    <Button Click="ThemeSwatch_Click" Tag="Rose Velvet" Background="#FF375F" Style="{StaticResource SwatchDotStyle}" ToolTipService.ToolTip="Rose Velvet" />
-                                    <Button Click="ThemeSwatch_Click" Tag="Windows Accent" Background="#0078D4" Style="{StaticResource SwatchDotStyle}" Margin="0" ToolTipService.ToolTip="Windows System Accent" />
-                                </StackPanel>
-                            </DockPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Group 2: Physics, Scale & Geometry (2x2 Clean Grid) -->
-                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,7" Margin="0,0,0,6">
-                        <StackPanel>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="14" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="8" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-
-                                <!-- Gooey Physics -->
-                                <StackPanel Grid.Row="0" Grid.Column="0">
-                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
-                                        <TextBlock Text="Elasticity" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                        <TextBlock x:Name="LiquidIntensityText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Text="65%" />
-                                    </DockPanel>
-                                    <Slider ValueChanged="LiquidIntensitySlider_ValueChanged" x:Name="LiquidIntensitySlider" Style="{StaticResource IslandSlider}" Minimum="0" Maximum="100" Value="65" />
-                                </StackPanel>
-
-                                <!-- Animation Speed -->
-                                <StackPanel Grid.Row="0" Grid.Column="2">
-                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
-                                        <TextBlock Text="Morph Speed" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                        <TextBlock x:Name="AnimationSpeedText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" Text="100%" />
-                                    </DockPanel>
-                                    <Slider ValueChanged="AnimationSpeedSlider_ValueChanged" x:Name="AnimationSpeedSlider" Style="{StaticResource IslandSlider}" Minimum="50" Maximum="160" Value="100" />
-                                </StackPanel>
-
-                                <!-- Island Scale -->
-                                <StackPanel Grid.Row="2" Grid.Column="0">
-                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
-                                        <TextBlock Text="Capsule Scale" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                        <TextBlock x:Name="IslandScaleText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" Text="100%" />
-                                    </DockPanel>
-                                    <Slider ValueChanged="IslandScaleSlider_ValueChanged" x:Name="IslandScaleSlider" Style="{StaticResource IslandSlider}" Minimum="85" Maximum="125" Value="100" />
-                                </StackPanel>
-
-                                <!-- Backdrop Opacity -->
-                                <StackPanel Grid.Row="2" Grid.Column="2">
-                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
-                                        <TextBlock Text="Surface Opacity" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                        <TextBlock x:Name="BackdropOpacityText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" Text="100%" />
-                                    </DockPanel>
-                                    <Slider ValueChanged="BackdropOpacitySlider_ValueChanged" x:Name="BackdropOpacitySlider" Style="{StaticResource IslandSlider}" Minimum="65" Maximum="100" Value="100" />
-                                </StackPanel>
-                            </Grid>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Optics: Blur & Refraction side by side -->
-                            <DockPanel LastChildFill="False" Margin="0,0,0,4">
-                                <TextBlock Text="Liquid Glass Optics" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" />
-                                <TextBlock x:Name="GlassFrostingStatusText" DockPanel.Dock="Right" FontSize="8" Foreground="{DynamicResource AccentBrush}" Text="Active" />
-                            </DockPanel>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="14" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
-                                        <TextBlock Text="Frosting Blur" FontSize="9" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                        <TextBlock x:Name="GlassBlurText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Text="100%" />
-                                    </DockPanel>
-                                    <Slider x:Name="GlassBlurSlider" ValueChanged="GlassBlurSlider_ValueChanged" Style="{StaticResource IslandSlider}" Minimum="20" Maximum="250" Value="100" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
-                                        <TextBlock Text="Lens Refraction" FontSize="9" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                        <TextBlock x:Name="GlassRefractionText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" Text="100%" />
-                                    </DockPanel>
-                                    <Slider x:Name="GlassRefractionSlider" ValueChanged="GlassRefractionSlider_ValueChanged" Style="{StaticResource IslandSlider}" Minimum="0" Maximum="200" Value="100" />
-                                </StackPanel>
-                            </Grid>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Quick Surface Toggles Row -->
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Rim &amp; Motion Effects" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock x:Name="EdgeBorderSubtext" Text="Specular border, ambient halo &amp; impulse test" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Click="EdgeBorderToggleBtn_Click" x:Name="EdgeBorderToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock x:Name="EdgeBorderToggleText" Text="Border On" FontSize="8.5" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="HaloToggleBtn_Click" x:Name="HaloToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock x:Name="HaloToggleText" Text="Glow On" FontSize="8.5" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="MotionModeBtn_Click" x:Name="MotionModeBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock x:Name="MotionModeText" Text="Liquid" FontSize="8.5" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="LiquidPulseBtn_Click" x:Name="LiquidPulseBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
-                                        <TextBlock Text="Pulse" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
-                                    </Button>
-                                </StackPanel>
-                            </DockPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Hidden Compatibility Hooks for Duplicate Appearance Nature Card -->
-                    <StackPanel Visibility="Collapsed">
-                        <TextBlock x:Name="IslandThemeSubtext" />
-                        <Button x:Name="IslandThemeNoneBtn" Click="IslandThemeBtn_Click" Tag="None"><TextBlock x:Name="IslandThemeNoneText" /></Button>
-                        <Button x:Name="IslandThemeIvyBtn" Click="IslandThemeBtn_Click" Tag="Ivy &amp; Blooms"><TextBlock x:Name="IslandThemeIvyText" /></Button>
-                        <Button x:Name="IslandThemeMeadowBtn" Click="IslandThemeBtn_Click" Tag="Meadow"><TextBlock x:Name="IslandThemeMeadowText" /></Button>
-                    </StackPanel>
-                </StackPanel>
-            </ScrollViewer>
-
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <!-- 2. BOTANICAL NATURE THEMES TAB                                -->
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <ScrollViewer PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel" x:Name="SettingsThemesTab" CanContentScroll="False" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Visibility="Collapsed">
-                <StackPanel Margin="0,0,0,10">
-
-                    <!-- Consolidated Botanical Configuration Card -->
-                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,7" Margin="0,0,0,6">
-                        <StackPanel>
-                            <DockPanel LastChildFill="False" Margin="0,0,0,5">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Botanical Overlay" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock x:Name="NatureThemeSubtext" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Text="Procedural foliage &amp; blooms" />
-                                </StackPanel>
-                                <Border DockPanel.Dock="Right" Background="{DynamicResource ChipBgBrush}" CornerRadius="5" Padding="6,2" VerticalAlignment="Center">
-                                    <TextBlock x:Name="NatureActiveThemeBadge" Text="Ivy &amp; Blooms" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
-                                </Border>
-                            </DockPanel>
-
-                            <Border Background="{DynamicResource ChipBgBrush}" CornerRadius="7" Padding="2" Margin="0,0,0,4">
-                                <UniformGrid Columns="3">
-                                    <Button Click="IslandThemeBtn_Click" x:Name="ThemesTabNoneBtn" Tag="None" Style="{StaticResource IslandButton}" Height="21" Padding="4,0" Margin="0,0,2,0">
-                                        <TextBlock x:Name="ThemesTabNoneText" Text="Disabled" FontSize="8.5" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                    </Button>
-                                    <Button Click="IslandThemeBtn_Click" x:Name="ThemesTabIvyBtn" Tag="Ivy &amp; Blooms" Style="{StaticResource IslandButton}" Height="21" Padding="4,0" Margin="0,0,2,0">
-                                        <TextBlock x:Name="ThemesTabIvyText" Text="Ivy &amp; Blooms" FontSize="8.5" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                    </Button>
-                                    <Button Click="IslandThemeBtn_Click" x:Name="ThemesTabMeadowBtn" Tag="Meadow" Style="{StaticResource IslandButton}" Height="21" Padding="4,0" Margin="0">
-                                        <TextBlock x:Name="ThemesTabMeadowText" Text="Wild Meadow" FontSize="8.5" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                    </Button>
-                                </UniformGrid>
-                            </Border>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Density Profiles -->
-                            <DockPanel LastChildFill="False">
-                                <TextBlock Text="Density Profile" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                    <Button Click="NaturePresetBtn_Click" Tag="Minimalist" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0,0,3,0">
-                                        <TextBlock Text="Minimal" FontSize="8" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="NaturePresetBtn_Click" Tag="Subtle" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0,0,3,0">
-                                        <TextBlock Text="Subtle" FontSize="8" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="NaturePresetBtn_Click" Tag="Balanced" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0,0,3,0">
-                                        <TextBlock Text="Balanced" FontSize="8" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="NaturePresetBtn_Click" Tag="Lush" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0">
-                                        <TextBlock Text="Lush" FontSize="8" FontWeight="Medium" />
-                                    </Button>
-                                </StackPanel>
-                            </DockPanel>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- 2x2 Botanical Sliders -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="14" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="8" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-
-                                <StackPanel Grid.Row="0" Grid.Column="0">
-                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
-                                        <TextBlock Text="Vine Density" FontSize="9" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                        <TextBlock x:Name="NatureDensityText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Text="70%" />
-                                    </DockPanel>
-                                    <Slider x:Name="NatureDensitySlider" ValueChanged="NatureDensitySlider_ValueChanged" Style="{StaticResource IslandSlider}" Minimum="20" Maximum="150" Value="70" />
-                                </StackPanel>
-
-                                <StackPanel Grid.Row="0" Grid.Column="2">
-                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
-                                        <TextBlock Text="Bloom Frequency" FontSize="9" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                        <TextBlock x:Name="NatureBloomText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Text="75%" />
-                                    </DockPanel>
-                                    <Slider x:Name="NatureBloomSlider" ValueChanged="NatureBloomSlider_ValueChanged" Style="{StaticResource IslandSlider}" Minimum="20" Maximum="150" Value="75" />
-                                </StackPanel>
-
-                                <StackPanel Grid.Row="2" Grid.Column="0">
-                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
-                                        <TextBlock Text="Foliage Scale" FontSize="9" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                        <TextBlock x:Name="NatureScaleText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Text="85%" />
-                                    </DockPanel>
-                                    <Slider x:Name="NatureScaleSlider" ValueChanged="NatureScaleSlider_ValueChanged" Style="{StaticResource IslandSlider}" Minimum="40" Maximum="140" Value="85" />
-                                </StackPanel>
-
-                                <StackPanel Grid.Row="2" Grid.Column="2">
-                                    <DockPanel LastChildFill="False" Margin="0,0,0,3">
-                                        <TextBlock Text="Cascade Drop" FontSize="9" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                        <TextBlock x:Name="NatureDropText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Text="60 px" />
-                                    </DockPanel>
-                                    <Slider x:Name="NatureDropSlider" ValueChanged="NatureDropSlider_ValueChanged" Style="{StaticResource IslandSlider}" Minimum="20" Maximum="120" Value="60" />
-                                </StackPanel>
-                            </Grid>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Butterflies & Pollen -->
-                            <DockPanel LastChildFill="False" Margin="0,0,0,6">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Fluttering Companions" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock x:Name="NatureButterflySubtext" Text="2 · Monarch &amp; Morpho" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Click="NatureButterflyBtn_Click" x:Name="NatureButterfly0Btn" Tag="0" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0,0,2,0">
-                                        <TextBlock x:Name="NatureButterfly0Text" Text="0" Style="{StaticResource Digits}" FontSize="8.5" FontWeight="SemiBold" />
-                                    </Button>
-                                    <Button Click="NatureButterflyBtn_Click" x:Name="NatureButterfly1Btn" Tag="1" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0,0,2,0">
-                                        <TextBlock x:Name="NatureButterfly1Text" Text="1" Style="{StaticResource Digits}" FontSize="8.5" FontWeight="SemiBold" />
-                                    </Button>
-                                    <Button Click="NatureButterflyBtn_Click" x:Name="NatureButterfly2Btn" Tag="2" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0,0,2,0">
-                                        <TextBlock x:Name="NatureButterfly2Text" Text="2" Style="{StaticResource Digits}" FontSize="8.5" FontWeight="SemiBold" />
-                                    </Button>
-                                    <Button Click="NatureButterflyBtn_Click" x:Name="NatureButterfly3Btn" Tag="3" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0,0,2,0">
-                                        <TextBlock x:Name="NatureButterfly3Text" Text="3" Style="{StaticResource Digits}" FontSize="8.5" FontWeight="SemiBold" />
-                                    </Button>
-                                    <Button Click="NatureButterflyBtn_Click" x:Name="NatureButterfly4Btn" Tag="4" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0">
-                                        <TextBlock x:Name="NatureButterfly4Text" Text="4" Style="{StaticResource Digits}" FontSize="8.5" FontWeight="SemiBold" />
-                                    </Button>
-                                </StackPanel>
-                            </DockPanel>
-
-                            <DockPanel LastChildFill="False" Margin="0,0,0,3">
-                                <TextBlock Text="Ambient Pollen Motes" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock x:Name="NaturePollenText" Style="{StaticResource Digits}" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Text="14 motes" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                    <Button Click="NaturePollenToggleBtn_Click" x:Name="NaturePollenToggleBtn" Style="{StaticResource IslandButton}" Height="19" Padding="7,0">
-                                        <TextBlock x:Name="NaturePollenToggleText" Text="Active" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                    </Button>
-                                </StackPanel>
-                            </DockPanel>
-                            <Slider x:Name="NaturePollenSlider" ValueChanged="NaturePollenSlider_ValueChanged" Style="{StaticResource IslandSlider}" Minimum="0" Maximum="30" Value="14" />
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
-
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <!-- 3. MODULAR DROPLETS TAB                                       -->
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <ScrollViewer PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel" x:Name="SettingsDropletsTab" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Visibility="Collapsed">
-                <StackPanel Margin="0,0,0,6">
-
-                    <!-- Compact Toolbar Header -->
-                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="8,6" Margin="0,0,0,5">
-                        <StackPanel>
-                            <DockPanel LastChildFill="True" Margin="0,0,0,5">
-                                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button x:Name="DropletEnableAllBtn" Click="DropletEnableAllBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock Text="Enable All" FontSize="8" FontWeight="Medium" />
-                                    </Button>
-                                    <Button x:Name="DropletDisableAllBtn" Click="DropletDisableAllBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock Text="Disable All" FontSize="8" FontWeight="Medium" />
-                                    </Button>
-                                    <Button x:Name="DropletResetBtn" Click="DropletResetBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,6,0">
-                                        <TextBlock Text="Reset" FontSize="8" FontWeight="Medium" />
-                                    </Button>
-                                </StackPanel>
-
-                                <Border DockPanel.Dock="Right" Background="{DynamicResource ChipBgBrush}" CornerRadius="5" Padding="6,2" Margin="6,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="DropletsHeaderSummaryText" Style="{StaticResource Digits}" Text="16 / 17 · ~500 KB" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
-                                </Border>
-
-                                <Border Background="#0CFFFFFF" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="6,2" Height="20" VerticalAlignment="Center">
-                                    <DockPanel LastChildFill="True">
-                                        <TextBlock DockPanel.Dock="Left" Style="{StaticResource Glyph}" Text="&#xE721;" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                        <TextBox x:Name="DropletSearchBox" TextChanged="DropletSearchBox_TextChanged" Background="Transparent" Foreground="{DynamicResource PrimaryTextBrush}" BorderThickness="0" FontSize="8.5" VerticalAlignment="Center" CaretBrush="{DynamicResource AccentBrush}" />
-                                    </DockPanel>
-                                </Border>
-                            </DockPanel>
-
-                            <!-- Category Filter Bar (No Emojis) -->
-                            <UniformGrid Columns="5">
-                                <Button x:Name="DropletFilterAllBtn" Tag="All" Click="DropletFilterBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="2,0" Margin="0,0,2,0">
-                                    <TextBlock x:Name="DropletFilterAllText" Text="All (17)" FontSize="8" HorizontalAlignment="Center" />
-                                </Button>
-                                <Button x:Name="DropletFilterProdBtn" Tag="Productivity" Click="DropletFilterBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="2,0" Margin="1,0">
-                                    <TextBlock x:Name="DropletFilterProdText" Text="Productivity" FontSize="8" HorizontalAlignment="Center" />
-                                </Button>
-                                <Button x:Name="DropletFilterMediaBtn" Tag="Media" Click="DropletFilterBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="2,0" Margin="1,0">
-                                    <TextBlock x:Name="DropletFilterMediaText" Text="Media" FontSize="8" HorizontalAlignment="Center" />
-                                </Button>
-                                <Button x:Name="DropletFilterSysBtn" Tag="System" Click="DropletFilterBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="2,0" Margin="1,0">
-                                    <TextBlock x:Name="DropletFilterSysText" Text="System" FontSize="8" HorizontalAlignment="Center" />
-                                </Button>
-                                <Button x:Name="DropletFilterCapBtn" Tag="Capture" Click="DropletFilterBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="2,0" Margin="2,0,0,0">
-                                    <TextBlock x:Name="DropletFilterCapText" Text="Capture" FontSize="8" HorizontalAlignment="Center" />
-                                </Button>
-                            </UniformGrid>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Empty State -->
-                    <Border x:Name="DropletsEmptyPlaceholder" Visibility="Collapsed" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="14,16" Margin="0,2,0,4">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE721;" FontSize="14" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,4" />
-                            <TextBlock Text="No matching modules" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" />
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Droplets ItemsControl -->
-                    <ItemsControl x:Name="DropletsItemsControl">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Background="{DynamicResource CardSurfaceBrush}"
-                                        BorderBrush="{Binding CardBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="7"
-                                        Padding="8,5"
-                                        Margin="0,0,0,3"
-                                        Opacity="{Binding CardOpacity}">
-                                    <DockPanel LastChildFill="True">
-                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
-                                            <Button Tag="{Binding Id}" Click="DropletActionBtn_Click"
-                                                    Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,4,0"
-                                                    VerticalAlignment="Center"
-                                                    Visibility="{Binding IsEnabled, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                    ToolTipService.ToolTip="{Binding Description}">
-                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding ActionGlyph}" FontSize="8" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
-                                                    <TextBlock Text="{Binding ActionLabel}" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                            </Button>
-
-                                            <Button Tag="{Binding Id}" Click="DropletToggleBtn_Click"
-                                                    Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0"
-                                                    Background="{Binding ToggleBackground}"
-                                                    BorderBrush="{Binding ToggleBorderBrush}"
-                                                    VerticalAlignment="Center">
-                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <Ellipse Width="4.5" Height="4.5" Fill="{Binding StatusForeground}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                                    <TextBlock Text="{Binding StatusText}" FontSize="8" FontWeight="SemiBold" Foreground="{Binding StatusForeground}" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                            </Button>
-                                        </StackPanel>
-
-                                        <Border DockPanel.Dock="Left" Width="24" Height="24" CornerRadius="6"
-                                                Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1"
-                                                Margin="0,0,8,0" VerticalAlignment="Center">
-                                            <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="10.5"
-                                                       Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
-
-                                        <StackPanel VerticalAlignment="Center">
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Title}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                                <Border Background="{DynamicResource ChipBgBrush}" CornerRadius="3.5" Padding="4,0.5" Margin="5,0,0,0" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding FeatureBadge}" FontSize="7" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" />
-                                                </Border>
-                                                <Border Background="{DynamicResource ChipBgBrush}" CornerRadius="3.5" Padding="4,0.5" Margin="3,0,0,0" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding RamCostText}" Style="{StaticResource Digits}" FontSize="7" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
-                                                </Border>
-                                            </StackPanel>
-                                            <TextBlock Text="{Binding Subtitle}" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
-                                        </StackPanel>
-                                    </DockPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </ScrollViewer>
-
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <!-- 4. DOCK STRIP MANAGER TAB                                     -->
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <ScrollViewer PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel" x:Name="SettingsDockTab" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Visibility="Collapsed">
-                <StackPanel Margin="0,0,0,6">
-
-                    <!-- Compact Dock Header Bar -->
-                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,6" Margin="0,0,0,5">
-                        <DockPanel LastChildFill="False">
+            <!-- Left Sidebar Rail -->
+            <Border Grid.Column="0" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="4,5" VerticalAlignment="Stretch">
+                <ScrollViewer PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
+                        <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabAppearanceBtn" Tag="Appearance" Style="{StaticResource SettingsRailButtonStyle}" ToolTipService.ToolTip="Material, Color Mode, Accent &amp; Physics">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Click="DockPinAllBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                    <TextBlock Text="Show All" FontSize="8" FontWeight="Medium" />
-                                </Button>
-                                <Button Click="DockPinMinimalBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                    <TextBlock Text="Core 5" FontSize="8" FontWeight="Medium" />
-                                </Button>
-                                <Button Click="DockPinResetBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
-                                    <TextBlock Text="Reset" FontSize="8" FontWeight="Medium" />
-                                </Button>
+                                <Border x:Name="SettingsRailBarAppearance" Width="2.5" Height="11" CornerRadius="1.25" Background="{DynamicResource AccentBrush}" Margin="0,0,6,0" Visibility="Visible" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE790;" FontSize="9" Margin="0,0,6,0" Opacity="0.88" />
+                                <TextBlock x:Name="SettingsTabAppearanceText" Text="Appearance" FontSize="8.5" FontWeight="SemiBold" VerticalAlignment="Center" />
                             </StackPanel>
-                            <Border DockPanel.Dock="Right" Background="{DynamicResource ChipBgBrush}" CornerRadius="5" Padding="6,2" VerticalAlignment="Center">
-                                <TextBlock x:Name="DockHeaderSummaryText" Style="{StaticResource Digits}" Text="18 / 18 Pinned" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
-                            </Border>
-                        </DockPanel>
-                    </Border>
+                        </Button>
 
-                    <TextBlock Text="PRODUCTIVITY &amp; WORKFLOW" Style="{StaticResource OverlineHeader}" />
-                    <UniformGrid Columns="2" Margin="0,0,0,4">
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinShelfBtn" Tag="shelf" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinShelfText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Drop Shelf" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinClipBtn" Tag="clipboard" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinClipText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE77F;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Clipboard" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinCalcBtn" Tag="calc" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinCalcText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8EF;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Calculator" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinNotesBtn" Tag="notes" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinNotesText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE70B;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Quick Notes" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinLauncherBtn" Tag="launcher" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinLauncherText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE71D;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="App Launcher" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinNotifBtn" Tag="notifications" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinNotifText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E7;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Notifications" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-                    </UniformGrid>
-
-                    <TextBlock Text="HARDWARE &amp; SYSTEM VITALS" Style="{StaticResource OverlineHeader}" />
-                    <UniformGrid Columns="2" Margin="0,0,0,4">
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinAudioBtn" Tag="audio" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinAudioText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE7F6;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Audio Output" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinBatteryBtn" Tag="battery" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinBatteryText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE945;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Battery &amp; Power" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinHudBtn" Tag="systemhud" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinHudText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE9D9;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="System HUD" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinWifiBtn" Tag="network" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinWifiText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE701;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Wi-Fi &amp; Net" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinDevicesBtn" Tag="peripherals" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinDevicesText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE702;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Peripherals" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinMicBtn" Tag="micmute" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinMicText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE720;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Mic Mute" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-                    </UniformGrid>
-
-                    <TextBlock Text="STUDIO &amp; UTILITIES" Style="{StaticResource OverlineHeader}" />
-                    <UniformGrid Columns="2">
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinConverterBtn" Tag="converter" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinConverterText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xEA90;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="File Studio" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinTermiBtn" Tag="termi" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinTermiText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE756;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Termi-Notch" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinPhoneBridgeBtn" Tag="phonebridge" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinPhoneBridgeText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8EA;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Phone Bridge" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinMechSoundsBtn" Tag="mechsounds" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinMechSoundsText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE765;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Mech Acoustics" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="0,0,2,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinCaptureStudioBtn" Tag="capturestudio" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinCaptureStudioText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE924;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Capture &amp; OCR" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-
-                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="7,4" Margin="2,0,0,3">
-                            <DockPanel LastChildFill="True">
-                                <Button Click="DockPinToggleBtn_Click" x:Name="DockPinMemoBtn" Tag="voicememo" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0">
-                                    <TextBlock x:Name="DockPinMemoText" Text="Visible" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE7C8;" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" Width="18" VerticalAlignment="Center" />
-                                    <TextBlock Text="Voice Memos" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
-                    </UniformGrid>
-                </StackPanel>
-            </ScrollViewer>
-
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <!-- 5. CLOCK & IDLE CAPSULE TAB                                   -->
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <ScrollViewer PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel" x:Name="SettingsClockAudioTab" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Visibility="Collapsed">
-                <StackPanel Margin="0,0,0,6">
-
-                    <!-- Clock Face Gallery -->
-                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,7" Margin="0,0,0,6">
-                        <StackPanel>
-                            <DockPanel Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="Idle Clock Face" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                    <!-- Carousel Navigation Chevrons -->
-                                    <Button Click="ClockScrollLeft_Click" Style="{StaticResource CircleButton}" Width="19" Height="19" Padding="0" Margin="0,0,3,0" ToolTipService.ToolTip="Scroll Clocks Left">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE76B;" FontSize="7.5" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Button>
-                                    <Button Click="ClockScrollRight_Click" Style="{StaticResource CircleButton}" Width="19" Height="19" Padding="0" ToolTipService.ToolTip="Scroll Clocks Right">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE76C;" FontSize="7.5" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Button>
-                                </StackPanel>
-                                <TextBlock x:Name="ActiveClockStyleLabel" DockPanel.Dock="Right" Text="Minimal Digital" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-                            </DockPanel>
-
-                            <ScrollViewer x:Name="ClockStylesScrollViewer" PreviewMouseWheel="HorizontalScrollViewer_PreviewMouseWheel" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly">
-                                <StackPanel Orientation="Horizontal">
-                                    <!-- 1. Minimal -->
-                                    <Button Click="ClockStyleBtn_Click" x:Name="ClockStyleMinimalBtn" Tag="Minimal" Style="{StaticResource ClockPreviewCardStyle}">
-                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                            <Border Height="24" Width="92" CornerRadius="12" Background="#06070A" BorderBrush="#28FFFFFF" BorderThickness="1">
-                                                <TextBlock Text="12:45" Style="{StaticResource Digits}" FontSize="11" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Border>
-                                            <TextBlock Text="Minimal" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,5,0,0" />
-                                        </StackPanel>
-                                    </Button>
-
-                                    <!-- 2. Seconds -->
-                                    <Button Click="ClockStyleBtn_Click" x:Name="ClockStyleSecondsBtn" Tag="Seconds" Style="{StaticResource ClockPreviewCardStyle}">
-                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                            <Border Height="24" Width="96" CornerRadius="12" Background="#06070A" BorderBrush="#28FFFFFF" BorderThickness="1">
-                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <TextBlock Text="12:45" Style="{StaticResource Digits}" FontSize="11" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" />
-                                                    <Border Margin="3,0,0,0" Background="#25FF9F0A" CornerRadius="3" Padding="2.5,0.5" VerticalAlignment="Center">
-                                                        <TextBlock Text=":28" Style="{StaticResource Digits}" FontSize="8" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" />
-                                                    </Border>
-                                                </StackPanel>
-                                            </Border>
-                                            <TextBlock Text="Seconds" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,5,0,0" />
-                                        </StackPanel>
-                                    </Button>
-
-                                    <!-- 3. Date Badge -->
-                                    <Button Click="ClockStyleBtn_Click" x:Name="ClockStyleDateBtn" Tag="DateBadge" Style="{StaticResource ClockPreviewCardStyle}">
-                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                            <Border Height="24" Width="100" CornerRadius="12" Background="#06070A" BorderBrush="#28FFFFFF" BorderThickness="1">
-                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <Border Margin="0,0,4,0" Background="#222530" CornerRadius="3" Padding="3,0.5" VerticalAlignment="Center">
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="SAT " FontSize="7.5" FontWeight="Bold" Foreground="#FF453A" />
-                                                            <TextBlock Text="7" Style="{StaticResource Digits}" FontSize="7.5" FontWeight="Bold" Foreground="White" />
-                                                        </StackPanel>
-                                                    </Border>
-                                                    <TextBlock Text="12:45" Style="{StaticResource Digits}" FontSize="11" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                            </Border>
-                                            <TextBlock Text="Date Chip" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,5,0,0" />
-                                        </StackPanel>
-                                    </Button>
-
-                                    <!-- 4. Analog -->
-                                    <Button Click="ClockStyleBtn_Click" x:Name="ClockStyleAnalogBtn" Tag="Analog" Style="{StaticResource ClockPreviewCardStyle}">
-                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                            <Border Height="24" Width="96" CornerRadius="12" Background="#06070A" BorderBrush="#28FFFFFF" BorderThickness="1">
-                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <Grid Width="14" Height="14" Margin="0,0,5,0">
-                                                        <Ellipse Stroke="#40FFFFFF" StrokeThickness="1" Fill="#12131A" />
-                                                        <Line X1="7" Y1="7" X2="10" Y2="7" Stroke="White" StrokeThickness="1.2" StrokeEndLineCap="Round" />
-                                                        <Line X1="7" Y1="7" X2="7" Y2="3" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1" StrokeEndLineCap="Round" />
-                                                    </Grid>
-                                                    <TextBlock Text="12:45" Style="{StaticResource Digits}" FontSize="10.5" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                            </Border>
-                                            <TextBlock Text="Horology" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,5,0,0" />
-                                        </StackPanel>
-                                    </Button>
-
-                                    <!-- 5. Neon -->
-                                    <Button Click="ClockStyleBtn_Click" x:Name="ClockStyleNeonBtn" Tag="Neon" Style="{StaticResource ClockPreviewCardStyle}">
-                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                            <Border Height="24" Width="92" CornerRadius="12" Background="#06070A" BorderBrush="#28FFFFFF" BorderThickness="1">
-                                                <TextBlock Text="12:45" Style="{StaticResource Digits}" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <TextBlock.Effect>
-                                                        <DropShadowEffect BlurRadius="8" ShadowDepth="0" Color="#FF9F0A" Opacity="0.85" />
-                                                    </TextBlock.Effect>
-                                                </TextBlock>
-                                            </Border>
-                                            <TextBlock Text="Cathode" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,5,0,0" />
-                                        </StackPanel>
-                                    </Button>
-
-                                    <!-- 6. Flip -->
-                                    <Button Click="ClockStyleBtn_Click" x:Name="ClockStyleFlipBtn" Tag="Flip" Style="{StaticResource ClockPreviewCardStyle}">
-                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                            <Border Height="24" Width="92" CornerRadius="12" Background="#06070A" BorderBrush="#28FFFFFF" BorderThickness="1">
-                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <Border Background="#1E2029" CornerRadius="3" Padding="3,1">
-                                                        <TextBlock Text="12" Style="{StaticResource Digits}" FontSize="9" FontWeight="Bold" Foreground="White" />
-                                                    </Border>
-                                                    <TextBlock Text=":" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" Margin="2,0" VerticalAlignment="Center" />
-                                                    <Border Background="#1E2029" CornerRadius="3" Padding="3,1">
-                                                        <TextBlock Text="45" Style="{StaticResource Digits}" FontSize="9" FontWeight="Bold" Foreground="White" />
-                                                    </Border>
-                                                </StackPanel>
-                                            </Border>
-                                            <TextBlock Text="Split-Flap" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,5,0,0" />
-                                        </StackPanel>
-                                    </Button>
-
-                                    <!-- 7. Matrix -->
-                                    <Button Click="ClockStyleBtn_Click" x:Name="ClockStyleMatrixBtn" Tag="Matrix" Style="{StaticResource ClockPreviewCardStyle}">
-                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                            <Border Height="24" Width="96" CornerRadius="12" Background="#06070A" BorderBrush="#28FFFFFF" BorderThickness="1">
-                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <Ellipse Width="3.5" Height="3.5" Fill="#30D158" Margin="0,0,3.5,0" />
-                                                    <TextBlock Text="12:45" Style="{StaticResource Digits}" FontSize="10.5" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
-                                                    <Border Width="1" Height="8" Background="#33FFFFFF" Margin="3.5,0" VerticalAlignment="Center" />
-                                                    <TextBlock Text="28s" Style="{StaticResource Digits}" FontSize="7.5" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                            </Border>
-                                            <TextBlock Text="Matrix" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,5,0,0" />
-                                        </StackPanel>
-                                    </Button>
-
-                                    <!-- 8. Jump-Hour -->
-                                    <Button Click="ClockStyleBtn_Click" x:Name="ClockStyleJumpHourBtn" Tag="JumpHour" Style="{StaticResource ClockPreviewCardStyle}" Margin="0">
-                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                            <Border Height="24" Width="96" CornerRadius="12" Background="#06070A" BorderBrush="#28FFFFFF" BorderThickness="1">
-                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <Border CornerRadius="3" Background="#33000000" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0.8" Padding="3,0.5">
-                                                        <TextBlock Text="12" Style="{StaticResource Digits}" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" />
-                                                    </Border>
-                                                    <Ellipse Width="3" Height="3" Fill="#FF2D55" Margin="3,0" />
-                                                    <Border CornerRadius="3" Background="#33000000" BorderBrush="#33FFFFFF" BorderThickness="0.8" Padding="3,0.5">
-                                                        <TextBlock Text="45" Style="{StaticResource Digits}" FontSize="9" FontWeight="SemiBold" Foreground="White" />
-                                                    </Border>
-                                                </StackPanel>
-                                            </Border>
-                                            <TextBlock Text="Jump-Hour" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,5,0,0" />
-                                        </StackPanel>
-                                    </Button>
-                                </StackPanel>
-                            </ScrollViewer>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Consolidated Audio Visualizer & Capsule Telemetry Card -->
-                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,7">
-                        <StackPanel>
-                            <!-- Visualizer Row -->
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Audio Waveform" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock x:Name="ActiveVisualizerStyleLabel" Text="Classic Bars" FontSize="8" Foreground="{DynamicResource AccentBrush}" />
-                                </StackPanel>
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Click="VisualizerStyleBtn_Click" x:Name="VisualizerStyleBarsBtn" Tag="ClassicBars" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock Text="Bars" FontSize="8.5" />
-                                    </Button>
-                                    <Button Click="VisualizerStyleBtn_Click" x:Name="VisualizerStyleBlobBtn" Tag="LiquidBlob" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock Text="Blob" FontSize="8.5" />
-                                    </Button>
-                                    <Button Click="VisualizerStyleBtn_Click" x:Name="VisualizerStyleAuroraBtn" Tag="NeonAurora" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock Text="Aurora" FontSize="8.5" />
-                                    </Button>
-                                    <Button Click="VisualizerStyleBtn_Click" x:Name="VisualizerStyleSiriBtn" Tag="SiriOrb" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
-                                        <TextBlock Text="Orb" FontSize="8.5" />
-                                    </Button>
-                                </StackPanel>
-                            </DockPanel>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Idle Capsule Indicators -->
-                            <DockPanel LastChildFill="False">
-                                <TextBlock Text="Capsule Elements" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Click="CameraLensToggleBtn_Click" x:Name="CameraLensToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0" ToolTipService.ToolTip="TrueDepth sensor indicator">
-                                        <TextBlock x:Name="CameraLensToggleText" Text="Cam On" FontSize="8.5" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="LyricsToggleBtnSettings_Click" x:Name="LyricsToggleBtnSettings" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0" ToolTipService.ToolTip="Synced LRCLIB lyrics">
-                                        <TextBlock x:Name="LyricsToggleSettingsText" Text="Lyrics On" FontSize="8.5" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="CompactLyricsToggleBtn_Click" x:Name="CompactLyricsToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0" ToolTipService.ToolTip="Inline lyric line in compact pill">
-                                        <TextBlock x:Name="CompactLyricsToggleText" Text="Pill Lyrics Off" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
-                                    </Button>
-                                    <Button Click="NetSpeedIdleToggleBtn_Click" x:Name="NetSpeedIdleToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0" ToolTipService.ToolTip="Live network throughput">
-                                        <TextBlock x:Name="NetSpeedIdleToggleText" Text="Speed Off" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
-                                    </Button>
-                                </StackPanel>
-                            </DockPanel>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Split Secondary Droplet -->
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Split Secondary Droplet" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock x:Name="SecondaryDropletSubtext" Text="Detached side bubble when two activities run concurrently" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <Button Click="SecondaryDropletToggleBtn_Click" x:Name="SecondaryDropletToggleBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="SecondaryDropletToggleText" Text="Droplet On" FontSize="8.5" FontWeight="Medium" />
-                                </Button>
-                            </DockPanel>
-
-                            <!-- Hidden Compatibility Hook for Duplicate NetSpeed Button -->
-                            <StackPanel Visibility="Collapsed">
-                                <Button x:Name="NetSpeedSettingToggleBtn" Click="NetSpeedIdleToggleBtn_Click">
-                                    <StackPanel>
-                                        <Ellipse x:Name="NetSpeedSettingStatusDot" />
-                                        <TextBlock x:Name="NetSpeedSettingToggleText" />
-                                    </StackPanel>
-                                </Button>
+                        <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabThemesBtn" Tag="Themes" Style="{StaticResource SettingsRailButtonStyle}" ToolTipService.ToolTip="Botanical &amp; Living Flora Overlays">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border x:Name="SettingsRailBarThemes" Width="2.5" Height="11" CornerRadius="1.25" Background="{DynamicResource AccentBrush}" Margin="0,0,6,0" Visibility="Collapsed" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xEC0A;" FontSize="9" Margin="0,0,6,0" Opacity="0.88" />
+                                <TextBlock x:Name="SettingsTabThemesText" Text="Flora" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
                             </StackPanel>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
+                        </Button>
 
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <!-- 6. DISPLAY, POWER & SYSTEM TAB                                -->
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <ScrollViewer PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel" x:Name="SettingsScreenTab" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Visibility="Collapsed">
-                <StackPanel Margin="0,0,0,6">
-
-                    <!-- Display & Geometry Group -->
-                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,7" Margin="0,0,0,6">
-                        <StackPanel>
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Target Display" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                        <TextBlock x:Name="MonitorStatusBadge" Text="Active" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" Margin="6,0,0,0" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="MonitorDetailsText" Style="{StaticResource Digits}" Text="Display 1: 1920 × 1080 @ 60 Hz" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Click="MonitorSwitchBtn_Click" x:Name="MonitorSwitchBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock x:Name="MonitorSwitchText" Text="Screen 1" FontSize="8.5" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="FollowMonitorToggleBtn_Click" x:Name="FollowMonitorToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
-                                        <TextBlock x:Name="FollowMonitorToggleText" Text="Follow Cursor Off" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
-                                    </Button>
-                                </StackPanel>
-                            </DockPanel>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Alignment & Top Offset -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="14" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Click="DockButton_Click" x:Name="DockLeftBtn" Tag="Left" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,2,0">
-                                        <TextBlock Text="Left" FontSize="8.5" />
-                                    </Button>
-                                    <Button Click="DockButton_Click" x:Name="DockCenterBtn" Tag="Center" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,2,0">
-                                        <TextBlock Text="Center" FontSize="8.5" />
-                                    </Button>
-                                    <Button Click="DockButton_Click" x:Name="DockRightBtn" Tag="Right" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,4,0">
-                                        <TextBlock Text="Right" FontSize="8.5" />
-                                    </Button>
-                                    <Button Click="NotchBezelToggleBtn_Click" x:Name="NotchBezelToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0">
-                                        <TextBlock x:Name="NotchBezelToggleText" Text="Notch Off" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                    </Button>
-                                    <Button Click="FloatingPiPToggleBtn_Click" x:Name="FloatingPiPToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="3,0,0,0" ToolTipService.ToolTip="Detach into Floating Picture-in-Picture window (Ctrl+Alt+F)">
-                                        <TextBlock x:Name="FloatingPiPToggleText" Text="PiP Off" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                    </Button>
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                    <DockPanel LastChildFill="False" Margin="0,0,0,2">
-                                        <TextBlock Text="Top Margin" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
-                                        <TextBlock x:Name="NotchOffsetText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" Text="0 px" />
-                                    </DockPanel>
-                                    <Slider ValueChanged="NotchOffsetSlider_ValueChanged" x:Name="NotchOffsetSlider" Style="{StaticResource IslandSlider}" Minimum="0" Maximum="45" Value="0" />
-                                </StackPanel>
-                            </Grid>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Hardware Color Temperature -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="12" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Button Click="NightLightSettingsBtn_Click" x:Name="NightLightSettingsBtn" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="NightLightSettingsText" Text="Night Light Off" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
-                                </Button>
-                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                    <DockPanel LastChildFill="False" Margin="0,0,0,2">
-                                        <TextBlock Text="Color Temperature" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
-                                        <TextBlock x:Name="NightLightWarmthText" DockPanel.Dock="Right" Style="{StaticResource Digits}" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Text="3400 K" />
-                                    </DockPanel>
-                                    <Slider ValueChanged="NightLightWarmthSlider_ValueChanged" x:Name="NightLightWarmthSlider" Style="{StaticResource IslandSlider}" Minimum="2200" Maximum="5000" Value="3400" />
-                                </StackPanel>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Power & System Hooks Group -->
-                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,7">
-                        <StackPanel>
-                            <DockPanel LastChildFill="False" Margin="0,0,0,4">
-                                <TextBlock Text="Power Automation" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                <TextBlock x:Name="BatteryHealthSummaryText" DockPanel.Dock="Right" Style="{StaticResource Digits}" Text="Health: 98% · AC" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
-                            </DockPanel>
-                            <StackPanel Orientation="Horizontal">
-                                <Button Click="ChargingPulseToggleBtn_Click" x:Name="ChargingPulseToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                    <TextBlock x:Name="ChargingPulseToggleText" Text="MagSafe Pulse On" FontSize="8" FontWeight="Medium" />
-                                </Button>
-                                <Button Click="LowBattThresholdBtn_Click" x:Name="LowBattThresholdBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                    <TextBlock x:Name="LowBattThresholdText" Text="Alert: 20%" FontSize="8" FontWeight="Medium" />
-                                </Button>
-                                <Button Click="AutoPowerSaverToggleBtn_Click" x:Name="AutoPowerSaverToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                    <TextBlock x:Name="AutoPowerSaverToggleText" Text="Auto Saver Off" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
-                                </Button>
-                                <Button Click="AutoPowerAcToggleBtn_Click" x:Name="AutoPowerAcToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
-                                    <TextBlock x:Name="AutoPowerAcToggleText" Text="Auto AC Perf Off" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
-                                </Button>
+                        <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabClockBtn" Tag="Clock" Style="{StaticResource SettingsRailButtonStyle}" ToolTipService.ToolTip="Clock Faces, Audio Visualizer &amp; Capsule Elements">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border x:Name="SettingsRailBarClock" Width="2.5" Height="11" CornerRadius="1.25" Background="{DynamicResource AccentBrush}" Margin="0,0,6,0" Visibility="Collapsed" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE823;" FontSize="9" Margin="0,0,6,0" Opacity="0.88" />
+                                <TextBlock x:Name="SettingsTabClockText" Text="Clock &amp; Audio" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
                             </StackPanel>
+                        </Button>
 
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <DockPanel LastChildFill="False">
-                                <TextBlock Text="System Hooks" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                    <Button Click="DndToggleBtn_Click" x:Name="DndToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock x:Name="DndToggleText" Text="DND Off" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
-                                    </Button>
-                                    <Button Click="BannerModeBtn_Click" x:Name="BannerModeBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock x:Name="BannerModeText" Text="Island Only" FontSize="8" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="VolumeOsdBtn_Click" x:Name="VolumeOsdBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock x:Name="VolumeOsdText" Text="Vol Hook Off" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
-                                    </Button>
-                                    <Button Click="StartupToggleBtn_Click" x:Name="StartupToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
-                                        <TextBlock x:Name="StartupToggleText" Text="Startup Off" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
-                                    </Button>
-                                </StackPanel>
-                            </DockPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Tab Passthrough & Window Interop Group -->
-                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,7" Margin="0,0,0,6">
-                        <StackPanel>
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Browser &amp; Tab Passthrough" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock Text="Prevents blocking browser tabs, search bars, and top controls" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                            </DockPanel>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Expand Trigger Mode -->
-                            <DockPanel LastChildFill="False" Margin="0,0,0,4">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Expand Trigger" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock Text="Click Only prevents popups while switching tabs" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Click="ExpandTriggerBtn_Click" x:Name="ExpandTriggerClickBtn" Tag="ClickOnly" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,2,0">
-                                        <TextBlock Text="Click Only" FontSize="8" />
-                                    </Button>
-                                    <Button Click="ExpandTriggerBtn_Click" x:Name="ExpandTriggerSnappyBtn" Tag="HoverSnappy" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,2,0">
-                                        <TextBlock Text="Hover 150ms" FontSize="8" />
-                                    </Button>
-                                    <Button Click="ExpandTriggerBtn_Click" x:Name="ExpandTriggerRelaxedBtn" Tag="HoverRelaxed" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0">
-                                        <TextBlock Text="Hover 260ms" FontSize="8" />
-                                    </Button>
-                                </StackPanel>
-                            </DockPanel>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Ghost Passthrough Modifier -->
-                            <DockPanel LastChildFill="False" Margin="0,0,0,4">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Ghost Click-Through Key" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock Text="Hold key to make island transparent and click tabs directly behind it" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Click="GhostModifierBtn_Click" x:Name="GhostModCtrlBtn" Tag="Ctrl" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,2,0">
-                                        <TextBlock Text="Ctrl" FontSize="8" />
-                                    </Button>
-                                    <Button Click="GhostModifierBtn_Click" x:Name="GhostModAltBtn" Tag="Alt" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,2,0">
-                                        <TextBlock Text="Alt" FontSize="8" />
-                                    </Button>
-                                    <Button Click="GhostModifierBtn_Click" x:Name="GhostModNoneBtn" Tag="None" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
-                                        <TextBlock Text="Off" FontSize="8" />
-                                    </Button>
-                                </StackPanel>
-                            </DockPanel>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Quick Tuck & Hotkey -->
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Quick Tuck Gesture" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock Text="Double-click pill or Ctrl+Alt+Down to snooze for 5s" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <Button Click="QuickTuckToggleBtn_Click" x:Name="QuickTuckToggleBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0">
-                                    <TextBlock x:Name="QuickTuckToggleText" Text="Tuck Enabled" FontSize="8" />
-                                </Button>
-                            </DockPanel>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
-
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <!-- 7. VIRTUAL COMPANION TAB                                      -->
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <ScrollViewer PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel" x:Name="SettingsPetTab" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Visibility="Collapsed">
-                <StackPanel Margin="0,0,0,6">
-                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,8">
-                        <StackPanel>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Width="62" Height="54" CornerRadius="8" Background="#0CFFFFFF" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Margin="0,0,10,0" VerticalAlignment="Center">
-                                    <core:VirtualPetControl x:Name="SettingsHeroPet" MouseLeftButtonDown="PetCompanion_Click" Width="54" Height="46" HorizontalAlignment="Center" VerticalAlignment="Center" Cursor="Hand" />
+                        <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabDropletsBtn" Tag="Droplets" Style="{StaticResource SettingsRailButtonStyle}" ToolTipService.ToolTip="Modular Zero-RAM Droplets">
+                            <DockPanel LastChildFill="True">
+                                <Border x:Name="SettingsRailDropletsBadge" DockPanel.Dock="Right" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="3.5,0.5" VerticalAlignment="Center">
+                                    <TextBlock x:Name="SettingsRailDropletsCount" Style="{StaticResource Digits}" Text="17" FontSize="7" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" />
                                 </Border>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <DockPanel LastChildFill="False" Margin="0,0,0,2">
-                                        <TextBlock x:Name="SettingsHeroPetName" Text="Mochi" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" Cursor="Hand" MouseLeftButtonDown="PetNameBtn_Click" />
-                                        <TextBlock x:Name="SettingsHeroPetRank" DockPanel.Dock="Right" Text="Level 1 · Companion" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-                                    </DockPanel>
-                                    <TextBlock x:Name="SettingsHeroPetSub" Text="Interactive Capsule Companion" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,0,5" />
-                                    <Grid Height="4" Background="#14FFFFFF" Margin="0,0,0,4">
-                                        <Border x:Name="SettingsHeroPetProgressBar" HorizontalAlignment="Left" Width="45" CornerRadius="2" Background="{DynamicResource AccentBrush}" />
-                                    </Grid>
-                                    <DockPanel LastChildFill="False">
-                                        <TextBlock x:Name="SettingsHeroPetScore" Style="{StaticResource Digits}" Text="25 / 50 XP" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                        <TextBlock x:Name="SettingsHeroPetWellnessMini" DockPanel.Dock="Right" Style="{StaticResource Digits}" Text="Treat 0 · Water 0 · Stretch 0" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                    </DockPanel>
-                                </StackPanel>
-                            </Grid>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Customization Row -->
-                            <DockPanel LastChildFill="False">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="Profile" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock x:Name="PetStatusSummaryText" Text="Active" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="6,0,0,0" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                    <Button Click="PetToggleBtn_Click" x:Name="PetToggleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock x:Name="PetToggleText" Text="Pet On" FontSize="8.5" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="PetSpeciesBtn_Click" x:Name="PetSpeciesBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock x:Name="PetSpeciesText" Text="Species: Cat" FontSize="8.5" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="PetAccessoryBtn_Click" x:Name="PetAccessoryBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                        <TextBlock x:Name="PetAccessoryText" Text="Gear: None" FontSize="8.5" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="PetNameBtn_Click" x:Name="PetNameBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
-                                        <TextBlock x:Name="PetNameBtnText" Text="Rename" FontSize="8.5" FontWeight="Medium" />
-                                    </Button>
+                                    <Border x:Name="SettingsRailBarDroplets" Width="2.5" Height="11" CornerRadius="1.25" Background="{DynamicResource AccentBrush}" Margin="0,0,6,0" Visibility="Collapsed" />
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xF158;" FontSize="9" Margin="0,0,6,0" Opacity="0.88" />
+                                    <TextBlock x:Name="SettingsTabDropletsText" Text="Modules" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
                                 </StackPanel>
                             </DockPanel>
+                        </Button>
 
-                            <Border Style="{StaticResource GroupHairline}" />
+                        <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabDockBtn" Tag="Dock" Style="{StaticResource SettingsRailButtonStyle}" ToolTipService.ToolTip="Dock Strip Manager">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border x:Name="SettingsRailBarDock" Width="2.5" Height="11" CornerRadius="1.25" Background="{DynamicResource AccentBrush}" Margin="0,0,6,0" Visibility="Collapsed" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE90D;" FontSize="9" Margin="0,0,6,0" Opacity="0.88" />
+                                <TextBlock x:Name="SettingsTabDockText" Text="Dock Strip" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
 
-                            <!-- Care & Wellness Row -->
-                            <DockPanel LastChildFill="False">
-                                <TextBlock Text="Actions" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                    <Button Click="OpenPetPlaygroundBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0" ToolTipService.ToolTip="Open full-sized interactive Pet Playground surface">
-                                        <TextBlock Text="🏝️ Playground" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
-                                    </Button>
-                                    <Button Click="RoamDesktopBtn_Click" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0" ToolTipService.ToolTip="Detach companion to roam floating on desktop">
-                                        <TextBlock Text="🪟 Roam" FontSize="8" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="PetInteractBtn_Click" x:Name="PetInteractBtn" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
-                                        <TextBlock Text="Pet" FontSize="8" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="PetTreatBtn_Click" x:Name="PetTreatBtn" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
-                                        <TextBlock x:Name="PetTreatText" Text="Treat: 0" FontSize="8" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="PetTrickBtn_Click" x:Name="PetTrickBtn" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
-                                        <TextBlock Text="Flip" FontSize="8" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="PetHydrateBtn_Click" x:Name="PetHydrateBtn" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
-                                        <TextBlock x:Name="PetHydrateText" Text="Water: 0" FontSize="8" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="PetStretchBtn_Click" x:Name="PetStretchBtn" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,0">
-                                        <TextBlock x:Name="PetStretchText" Text="Stretch: 0" FontSize="8" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="PetReminderCycleBtn_Click" x:Name="PetReminderCycleBtn" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0">
-                                        <TextBlock x:Name="PetReminderCycleText" Text="30m" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
-                                    </Button>
+                        <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabScreenBtn" Tag="Screen" Style="{StaticResource SettingsRailButtonStyle}" ToolTipService.ToolTip="Display, Notch, Power &amp; Browser Passthrough">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border x:Name="SettingsRailBarScreen" Width="2.5" Height="11" CornerRadius="1.25" Background="{DynamicResource AccentBrush}" Margin="0,0,6,0" Visibility="Collapsed" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE7F4;" FontSize="9" Margin="0,0,6,0" Opacity="0.88" />
+                                <TextBlock x:Name="SettingsTabScreenText" Text="Display" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabNotifBtn" Tag="Notifications" Style="{StaticResource SettingsRailButtonStyle}" ToolTipService.ToolTip="Notifications, DND &amp; Muted Apps">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border x:Name="SettingsRailBarNotif" Width="2.5" Height="11" CornerRadius="1.25" Background="{DynamicResource AccentBrush}" Margin="0,0,6,0" Visibility="Collapsed" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xEA8F;" FontSize="9" Margin="0,0,6,0" Opacity="0.88" />
+                                <TextBlock x:Name="SettingsTabNotifText" Text="Alerts" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabPetBtn" Tag="Pet" Style="{StaticResource SettingsRailButtonStyle}" ToolTipService.ToolTip="Desktop Pet Companion">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border x:Name="SettingsRailBarPet" Width="2.5" Height="11" CornerRadius="1.25" Background="{DynamicResource AccentBrush}" Margin="0,0,6,0" Visibility="Collapsed" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xEB51;" FontSize="9" Margin="0,0,6,0" Opacity="0.88" />
+                                <TextBlock x:Name="SettingsTabPetText" Text="Companion" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabShortcutsBtn" Tag="Shortcuts" Style="{StaticResource SettingsRailButtonStyle}" ToolTipService.ToolTip="Global Shortcuts &amp; Keyboard Hooks">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border x:Name="SettingsRailBarShortcuts" Width="2.5" Height="11" CornerRadius="1.25" Background="{DynamicResource AccentBrush}" Margin="0,0,6,0" Visibility="Collapsed" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE765;" FontSize="9" Margin="0,0,6,0" Opacity="0.88" />
+                                <TextBlock x:Name="SettingsTabShortcutsText" Text="Shortcuts" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Click="SettingsTabBtn_Click" x:Name="SettingsTabUpdatesBtn" Tag="Updates" Style="{StaticResource SettingsRailButtonStyle}" ToolTipService.ToolTip="Startup, Backup, Performance &amp; GitHub Updates">
+                            <DockPanel LastChildFill="True">
+                                <Border x:Name="SettingsRailUpdateBadgeDot" DockPanel.Dock="Right" Width="6" Height="6" CornerRadius="3" Background="#0A84FF" Visibility="Collapsed" VerticalAlignment="Center" />
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border x:Name="SettingsRailBarUpdates" Width="2.5" Height="11" CornerRadius="1.25" Background="{DynamicResource AccentBrush}" Margin="0,0,6,0" Visibility="Collapsed" />
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE895;" FontSize="9" Margin="0,0,6,0" Opacity="0.88" />
+                                    <TextBlock x:Name="SettingsTabUpdatesText" Text="System" FontSize="8.5" FontWeight="Medium" VerticalAlignment="Center" />
                                 </StackPanel>
                             </DockPanel>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
 
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <!-- 8. KEYBOARD SHORTCUTS & BACKUP TAB                            -->
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <ScrollViewer PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel" x:Name="SettingsShortcutsTab" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Visibility="Collapsed">
-                <StackPanel Margin="0,0,0,6">
-                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,7">
-                        <StackPanel>
-                            <DockPanel LastChildFill="False" Margin="0,0,0,6">
-                                <TextBlock x:Name="HotkeySectionLabel" Text="Global Hotkeys (Ctrl + Alt)" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                <TextBlock DockPanel.Dock="Right" Text="Click any keybind to record" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                            </DockPanel>
+            <!-- Content Host -->
+            <Grid Grid.Column="2">
+                <sp:AppearanceSettingsPanel x:Name="AppearancePanel" Visibility="Visible" />
+                <sp:FloraSettingsPanel x:Name="FloraPanel" Visibility="Collapsed" />
+                <sp:ClockAudioSettingsPanel x:Name="ClockAudioPanel" Visibility="Collapsed" />
+                <sp:DropletsSettingsPanel x:Name="DropletsPanel" Visibility="Collapsed" />
+                <sp:DockSettingsPanel x:Name="DockPanel" Visibility="Collapsed" />
+                <sp:DisplayPowerSettingsPanel x:Name="DisplayPowerPanel" Visibility="Collapsed" />
+                <sp:NotificationsSettingsPanel x:Name="NotificationsPanel" Visibility="Collapsed" />
+                <sp:PetSettingsPanel x:Name="PetPanel" Visibility="Collapsed" />
+                <sp:ShortcutsSettingsPanel x:Name="ShortcutsPanel" Visibility="Collapsed" />
+                <sp:SystemUpdatesSettingsPanel x:Name="SystemUpdatesPanel" Visibility="Collapsed" />
 
-                            <!-- Structured 4-Column Keycap Matrix instead of cramped horizontal scroll -->
-                            <UniformGrid Columns="4" Margin="0,0,0,2">
-                                <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindClipboardBtn" Tag="Clipboard" Style="{StaticResource IslandButton}" Height="22" Margin="0,0,3,3">
-                                    <TextBlock x:Name="HotkeyBindClipboardText" Style="{StaticResource Digits}" Text="Clip · V" FontSize="8" />
-                                </Button>
-                                <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindCalcBtn" Tag="Calculator" Style="{StaticResource IslandButton}" Height="22" Margin="1.5,0,1.5,3">
-                                    <TextBlock x:Name="HotkeyBindCalcText" Style="{StaticResource Digits}" Text="Calc · C" FontSize="8" />
-                                </Button>
-                                <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindAudioBtn" Tag="AudioDevices" Style="{StaticResource IslandButton}" Height="22" Margin="1.5,0,1.5,3">
-                                    <TextBlock x:Name="HotkeyBindAudioText" Style="{StaticResource Digits}" Text="Audio · O" FontSize="8" />
-                                </Button>
-                                <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindWifiBtn" Tag="Network" Style="{StaticResource IslandButton}" Height="22" Margin="3,0,0,3">
-                                    <TextBlock x:Name="HotkeyBindWifiText" Style="{StaticResource Digits}" Text="Wi-Fi · W" FontSize="8" />
-                                </Button>
-                                <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindTimerBtn" Tag="Stopwatch" Style="{StaticResource IslandButton}" Height="22" Margin="0,0,3,3">
-                                    <TextBlock x:Name="HotkeyBindTimerText" Style="{StaticResource Digits}" Text="Timer · A" FontSize="8" />
-                                </Button>
-                                <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindNotifBtn" Tag="Notifications" Style="{StaticResource IslandButton}" Height="22" Margin="1.5,0,1.5,3">
-                                    <TextBlock x:Name="HotkeyBindNotifText" Style="{StaticResource Digits}" Text="Alerts · N" FontSize="8" />
-                                </Button>
-                                <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindHudBtn" Tag="SystemHud" Style="{StaticResource IslandButton}" Height="22" Margin="1.5,0,1.5,3">
-                                    <TextBlock x:Name="HotkeyBindHudText" Style="{StaticResource Digits}" Text="HUD · H" FontSize="8" />
-                                </Button>
-                                <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindMemoBtn" Tag="VoiceMemo" Style="{StaticResource IslandButton}" Height="22" Margin="3,0,0,3">
-                                    <TextBlock x:Name="HotkeyBindMemoText" Style="{StaticResource Digits}" Text="Memo · R" FontSize="8" />
-                                </Button>
-                                <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindDevicesBtn" Tag="Peripherals" Style="{StaticResource IslandButton}" Height="22" Margin="0,0,3,0">
-                                    <TextBlock x:Name="HotkeyBindDevicesText" Style="{StaticResource Digits}" Text="BT · D" FontSize="8" />
-                                </Button>
-                                <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindPowerBtn" Tag="BatteryPower" Style="{StaticResource IslandButton}" Height="22" Margin="1.5,0,1.5,0">
-                                    <TextBlock x:Name="HotkeyBindPowerText" Style="{StaticResource Digits}" Text="Power · P" FontSize="8" />
-                                </Button>
-                                <Button Click="HotkeyRecordBtn_Click" x:Name="HotkeyBindSettingsBtn" Tag="Settings" Style="{StaticResource IslandButton}" Height="22" Margin="1.5,0,1.5,0">
-                                    <TextBlock x:Name="HotkeyBindSettingsText" Style="{StaticResource Digits}" Text="Config · S" FontSize="8" />
-                                </Button>
-                            </UniformGrid>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Configuration Snapshot -->
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Configuration Snapshot" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock Text="Export, restore or factory reset JSON profile" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Click="ExportSettingsBtn_Click" x:Name="ExportSettingsBtn" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0,0,3,0">
-                                        <TextBlock Text="Export" FontSize="8.5" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="ImportSettingsBtn_Click" x:Name="ImportSettingsBtn" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0,0,3,0">
-                                        <TextBlock Text="Import" FontSize="8.5" FontWeight="Medium" />
-                                    </Button>
-                                    <Button Click="ResetSettingsBtn_Click" x:Name="ResetSettingsBtn" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0">
-                                        <TextBlock x:Name="ResetSettingsText" Text="Reset" FontSize="8.5" FontWeight="Medium" Foreground="#FF453A" />
-                                    </Button>
-                                </StackPanel>
-                            </DockPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- ───────────────────────────────────────────────────────────── -->
-                    <!-- GITHUB UPDATES & VERSION CONTROL MANAGER                     -->
-                    <!-- ───────────────────────────────────────────────────────────── -->
-                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,8" Margin="0,0,0,6">
-                        <StackPanel>
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="GitHub Updates &amp; Version Control" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock x:Name="UpdateStatusSubtitleText" Text="Check releases, switch channels, or rollback" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button Click="CheckUpdatesBtn_Click" x:Name="CheckUpdatesBtn" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0,0,4,0" ToolTipService.ToolTip="Query GitHub for new releases">
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE895;" FontSize="8" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
-                                            <TextBlock x:Name="CheckUpdatesBtnText" Text="Check" FontSize="8.5" FontWeight="Medium" />
-                                        </StackPanel>
-                                    </Button>
-                                    <Button Click="UpdateChannelBtn_Click" x:Name="UpdateChannelBtn" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0" ToolTipService.ToolTip="Toggle release channel: Stable vs Beta">
-                                        <TextBlock x:Name="UpdateChannelText" Text="Stable" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
-                                    </Button>
-                                </StackPanel>
-                            </DockPanel>
-
-                            <!-- Update Available Banner (visible when an update is found) -->
-                            <Border x:Name="UpdateAvailableBanner" Visibility="Collapsed" Background="#140A84FF" BorderBrush="#330A84FF" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="0,7,0,0">
-                                <StackPanel>
-                                    <DockPanel LastChildFill="False">
-                                        <StackPanel VerticalAlignment="Center">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" FontSize="8.5" Foreground="#0A84FF" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                                <TextBlock x:Name="UpdateVersionTitleText" Text="v0.5.0 Available" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                            </StackPanel>
-                                            <TextBlock x:Name="UpdateSummaryText" Text="New liquid physics and performance improvements." FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" TextWrapping="Wrap" MaxWidth="320" Margin="0,2,0,0" />
-                                            <Button Click="ViewChangelogBtn_Click" x:Name="ViewChangelogBtn" Style="{StaticResource IslandButton}" Height="18" Padding="6,0" Margin="0,4,0,0" HorizontalAlignment="Left" Visibility="Collapsed">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8A7;" FontSize="7" Margin="0,0,3,0" VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}" />
-                                                    <TextBlock Text="View Changelog on GitHub" FontSize="7" Foreground="{DynamicResource AccentBrush}" />
-                                                </StackPanel>
-                                            </Button>
-                                        </StackPanel>
-                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Button Click="InstallUpdateBtn_Click" x:Name="InstallUpdateBtn" Style="{StaticResource IslandButton}" Height="22" Padding="9,0" Background="#1F0A84FF" BorderBrush="#4D0A84FF">
-                                                <TextBlock x:Name="InstallUpdateBtnText" Text="Install &amp; Restart" FontSize="8.5" FontWeight="SemiBold" Foreground="#0A84FF" />
-                                            </Button>
-                                        </StackPanel>
-                                    </DockPanel>
-
-                                    <!-- Download Progress Indicator -->
-                                    <ProgressBar x:Name="UpdateProgressBar" Visibility="Collapsed" Height="4" Margin="0,6,0,2" Minimum="0" Maximum="100" Value="0" Foreground="{DynamicResource AccentBrush}" Background="#1FFFFFFF" BorderThickness="0" />
-                                    <TextBlock x:Name="UpdateProgressText" Visibility="Collapsed" Text="Downloading: 0%" FontSize="7" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Right" />
+                <!-- Global Search Results Overlay -->
+                <Grid x:Name="SettingsSearchResultsHost" Visibility="Collapsed">
+                    <ScrollViewer x:Name="SettingsSearchResultsScroll"
+                                  PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  PanningMode="VerticalOnly">
+                        <StackPanel Margin="0,0,4,6">
+                            <Border x:Name="SettingsSearchEmptyPlaceholder" Visibility="Collapsed" Style="{StaticResource SettingsGroupCard}" Padding="14,18" Margin="0">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE721;" FontSize="14" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,4" />
+                                    <TextBlock Text="No matching settings found" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </Border>
 
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Auto-check Toggle & History -->
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Automatic Daily Update Checks" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock x:Name="LastCheckTimestampText" Text="Last checked: Never" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <Button Click="AutoCheckToggleBtn_Click" x:Name="AutoCheckToggleBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="AutoCheckToggleText" Text="On" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                            </DockPanel>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- Pre-Download Verified Updates Toggle -->
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Pre-Download Verified Updates" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock Text="Silently download &amp; verify in background for instant restart" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <Button Click="AutoDownloadToggleBtn_Click" x:Name="AutoDownloadToggleBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="AutoDownloadToggleText" Text="On" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                            </DockPanel>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <!-- GitHub API Token (Optional) -->
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="GitHub API Token (Optional)" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock Text="Bypasses GitHub's 60 req/hr rate limit (increases to 5,000 req/hr)" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <PasswordBox x:Name="GitHubTokenBox" DockPanel.Dock="Right" Width="110" Height="20" FontSize="8"
-                                             VerticalAlignment="Center" Padding="4,1" Margin="6,0,0,0"
-                                             Background="#14FFFFFF" Foreground="{DynamicResource PrimaryTextBrush}"
-                                             BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1"
-                                             LostFocus="GitHubTokenBox_LostFocus"
-                                             KeyDown="GitHubTokenBox_KeyDown"
-                                             ToolTipService.ToolTip="GitHub Personal Access Token for high-rate API queries" />
-                            </DockPanel>
-
-                            <!-- Version History / Rollback Drawer Toggle -->
-                            <Border Style="{StaticResource GroupHairline}" />
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Version History &amp; Rollback" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock Text="Switch to previous GitHub releases if experiencing hardware conflicts" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <Button Click="ToggleVersionHistoryBtn_Click" x:Name="ToggleVersionHistoryBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="ToggleVersionHistoryText" Text="View Releases" FontSize="8.5" FontWeight="Medium" />
-                                </Button>
-                            </DockPanel>
-
-                            <!-- Version History Items Container -->
-                            <StackPanel x:Name="VersionHistoryContainer" Visibility="Collapsed" Margin="0,6,0,0">
-                                <Border Background="#08FFFFFF" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="6,4">
-                                    <StackPanel x:Name="VersionHistoryList" />
-                                </Border>
-                            </StackPanel>
+                            <ItemsControl x:Name="SettingsSearchResultsList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Click="SearchResultItem_Click" Tag="{Binding CategoryKey}" Style="{StaticResource IslandButton}"
+                                                Height="Auto" Padding="9,6" Margin="0,0,0,4" HorizontalContentAlignment="Stretch"
+                                                Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}">
+                                            <DockPanel LastChildFill="True">
+                                                <Border DockPanel.Dock="Right" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="4.5" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding CategoryLabel}" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                                                </Border>
+                                                <Border DockPanel.Dock="Left" Width="22" Height="22" CornerRadius="6" Background="{DynamicResource ChipBgBrush}" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="9.5" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Title}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                                    <TextBlock Text="{Binding Subtitle}" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
-
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <!-- 9. NOTIFICATIONS & ALERTS TAB                                 -->
-            <!-- ───────────────────────────────────────────────────────────── -->
-            <ScrollViewer PreviewMouseWheel="VerticalScrollViewer_PreviewMouseWheel" x:Name="SettingsNotifTab" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Visibility="Collapsed">
-                <StackPanel Margin="0,0,0,6">
-                    <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="10,8">
-                        <StackPanel>
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Notification Center" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock Text="Inspect ring buffer history and intercepted system toasts" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <Button Click="OpenNotifCenterBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="22" Padding="9,0" VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8A7;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                        <TextBlock Text="Open Center" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </Button>
-                            </DockPanel>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Do Not Disturb" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock Text="Suppress incoming banner animations and alert chimes" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <Button Click="DndToggleBtn_Click" x:Name="SettingsDndToggleBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="SettingsDndToggleText" Text="Off" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" />
-                                </Button>
-                            </DockPanel>
-
-                            <Border Style="{StaticResource GroupHairline}" />
-
-                            <DockPanel LastChildFill="False">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Intercept Windows Toast Banners" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                                    <TextBlock Text="Dismiss native bottom-right popups and route exclusively to the capsule" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
-                                </StackPanel>
-                                <Button Click="ReplaceBannersToggleBtn_Click" x:Name="ReplaceBannersToggleBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="ReplaceBannersToggleText" Text="Active" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource GreenBrush}" />
-                                </Button>
-                            </DockPanel>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </ScrollViewer>
-
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>

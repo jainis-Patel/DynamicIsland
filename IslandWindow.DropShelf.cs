@@ -92,6 +92,11 @@ public partial class IslandWindow
     {
         ShelfBadgeText.Text = _shelfService.Count.ToString();
         ShelfBadgeText.Visibility = _shelfService.HasItems ? Visibility.Visible : Visibility.Collapsed;
+        if (DockShelfBadgeHost != null && DockShelfBadgeText != null)
+        {
+            DockShelfBadgeText.Text = _shelfService.Count.ToString();
+            DockShelfBadgeHost.Visibility = _shelfService.HasItems ? Visibility.Visible : Visibility.Collapsed;
+        }
         ShelfCountText.Text = _shelfService.HasItems
             ? $"{_shelfService.Count} item{(_shelfService.Count == 1 ? "" : "s")} \u00B7 {_shelfService.TotalSizeFormatted}"
             : "0 items";
@@ -158,6 +163,14 @@ public partial class IslandWindow
     internal void ClearShelfButton_Click(object sender, RoutedEventArgs e)
     {
         if (!_shelfService.HasItems) return;
+
+        bool shiftHeld = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+        if (!_confirmGuard.TryConfirm("clear_shelf", sender, "Confirm?", bypass: shiftHeld, dispatcher: Dispatcher))
+        {
+            TriggerLiquidImpulse(24, -8, 3);
+            return;
+        }
+
         _shelfService.Clear();
         TriggerLiquidImpulse(180, -90, 25);
     }

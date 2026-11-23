@@ -87,6 +87,7 @@ public partial class IslandWindow
                                  or ExpandedView.Converter
                                  or ExpandedView.PhoneBridge
                                  or ExpandedView.QuickReply
+                                 or ExpandedView.Notifications
                                  or ExpandedView.Settings);
 
         // Morph the pill smoothly to target shape (496x338 for Settings, 496x192 for Media/Clock, etc.)
@@ -98,6 +99,7 @@ public partial class IslandWindow
         _width.Target = targetShape.Width;
         _height.Target = targetShape.Height;
         _radius.Target = targetShape.Radius;
+        RepositionIfEdgeDocked();
 
         if (view == ExpandedView.WidgetsGallery)
         {
@@ -189,6 +191,7 @@ public partial class IslandWindow
             UpdateVolumeOsdUI();
             UpdateHotkeysUI();
             UpdateDockVisibilityUI();
+            UpdateSettingsHeaderRamBadge();
         }
         else if (previousView != view)
         {
@@ -249,6 +252,10 @@ public partial class IslandWindow
         else if (view == ExpandedView.Shelf)
         {
             Dispatcher.InvokeAsync(UpdateShelfScrollButtons, System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+        else if (view == ExpandedView.Notifications)
+        {
+            RefreshNotificationTimestamps();
         }
     }
 
@@ -493,18 +500,7 @@ public partial class IslandWindow
 
         if (_currentExpandedView == ExpandedView.Settings)
         {
-            ScrollViewer? activeSettingsSv = _currentSettingsTab switch
-            {
-                "Themes" => SettingsThemesTab,
-                "Droplets" => SettingsDropletsTab,
-                "Dock" => SettingsDockTab,
-                "Clock" => SettingsClockAudioTab,
-                "Screen" => SettingsScreenTab,
-                "Pet" => SettingsPetTab,
-                "Shortcuts" => SettingsShortcutsTab,
-                "Notifications" => SettingsNotifTab,
-                _ => SettingsAppearanceTab
-            };
+            var activeSettingsSv = SettingsContainer?.ActiveScrollViewer;
             if (activeSettingsSv != null)
             {
                 SmoothScrollVertical(activeSettingsSv, -delta * 0.85);
@@ -727,9 +723,25 @@ public partial class IslandWindow
 
             string action = _recordingHotkeyAction;
             _recordingHotkeyAction = null;
-            SetKeyboardFocusable(false);
+            if (_currentExpandedView != ExpandedView.Settings)
+            {
+                SetKeyboardFocusable(false);
+            }
 
-            if (key != Key.Escape)
+            if (key == Key.Back || key == Key.Delete)
+            {
+                _settingsService.Update(s => s.CustomHotkeys[action] = 0, nameof(AppSettings.CustomHotkeys));
+                _machine.PushToast(new ToastContent(
+                    "\uE765",
+                    "Hotkey Cleared",
+                    $"{action} shortcut disabled",
+                    ThemeBrushes.AmberColor,
+                    TimeSpan.FromSeconds(1.8),
+                    TargetView: "settings",
+                    Priority: ToastPriority.Feedback,
+                    Category: "hotkey"));
+            }
+            else if (key != Key.Escape)
             {
                 int vk = KeyInterop.VirtualKeyFromKey(key);
                 if (vk > 0)
@@ -751,8 +763,24 @@ public partial class IslandWindow
             return;
         }
 
+        if (_machine.State == IslandState.Expanded &&
+            _currentExpandedView == ExpandedView.Settings &&
+            (Keyboard.Modifiers & ModifierKeys.Control) != 0 &&
+            e.Key == Key.F)
+        {
+            SettingsContainer?.FocusSearch();
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.Escape && _machine.State == IslandState.Expanded)
         {
+            if (_currentExpandedView == ExpandedView.Settings && (SettingsContainer?.ClearSearchIfActive() ?? false))
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (_currentExpandedView == ExpandedView.QuickReply)
             {
                 CancelQuickReply();
@@ -848,19 +876,8 @@ public partial class IslandWindow
 
         if (_machine.State == IslandState.Expanded && _currentExpandedView == ExpandedView.Settings)
         {
-            ScrollViewer? activeSettingsSv = _currentSettingsTab switch
-            {
-                "Themes" => SettingsThemesTab,
-                "Droplets" => SettingsDropletsTab,
-                "Dock" => SettingsDockTab,
-                "Clock" => SettingsClockAudioTab,
-                "Screen" => SettingsScreenTab,
-                "Pet" => SettingsPetTab,
-                "Shortcuts" => SettingsShortcutsTab,
-                "Notifications" => SettingsNotifTab,
-                _ => SettingsAppearanceTab
-            };
-            if (activeSettingsSv != null)
+            var activeSettingsSv = SettingsContainer?.ActiveScrollViewer;
+            if (activeSettingsSv != null && Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase and not PasswordBox)
             {
                 if (e.Key == Key.Up || e.Key == Key.PageUp)
                 {

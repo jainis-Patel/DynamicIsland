@@ -22,7 +22,7 @@ public partial class IslandWindow : Window
 {
     private readonly record struct PillShape(double Width, double Height, double Radius);
 
-    public const double CanvasWidthDip = 680.0;
+    public const double CanvasWidthDip = 760.0;
     public const double CanvasHeightDip = 580.0;
 
     /// <summary>
@@ -37,8 +37,8 @@ public partial class IslandWindow : Window
         [IslandState.Hidden]   = new(120, 24, 12),
     };
 
-    // Unified width (484 DIP) with harmonized vertical rhythm steps (multiples of 8px)
-    private static readonly PillShape SettingsExpandedShape   = new(484, 348, 38);
+    // Unified width (484 DIP) with harmonized vertical rhythm steps (multiples of 8px); Settings uses Left-Rail (536x368)
+    private static readonly PillShape SettingsExpandedShape   = new(536, 368, 36);
     private static readonly PillShape ClipboardExpandedShape  = new(588, 296, 36);
     private static readonly PillShape NetworkExpandedShape    = new(484, 196, 34);
     private static readonly PillShape BatteryExpandedShape    = new(484, 216, 34);
@@ -66,15 +66,16 @@ public partial class IslandWindow : Window
 
     private PillShape GetNotificationsExpandedShape()
     {
-        int count = _notificationAppGroups.Count > 0 ? _notificationAppGroups.Count : (_notificationListener?.HistoryCount ?? _notificationHistoryItems.Count);
+        int totalCount = _notificationListener?.HistoryCount ?? _notificationHistoryItems.Count;
+        int count = _notificationAppGroups.Count;
         if (count <= 0)
         {
-            return new PillShape(484, 184, 36);
+            return new PillShape(484, totalCount > 0 ? 228 : 196, 36);
         }
 
         int expandedExtraItems = _notificationAppGroups.Where(g => g.IsExpanded).Sum(g => Math.Min(g.Notifications.Count - 1, 3));
         int visibleCount = Math.Clamp(count + expandedExtraItems, 1, 5);
-        double targetHeight = Math.Clamp(88 + (visibleCount * 64), 176, 420);
+        double targetHeight = Math.Clamp(118 + (visibleCount * 76), 210, 448);
         return new PillShape(484, targetHeight, 38);
     }
 
@@ -162,8 +163,9 @@ public partial class IslandWindow : Window
                 ExpandedView.Notifications => GetNotificationsExpandedShape(),
                 ExpandedView.Media when _mediaService.Current == null || string.IsNullOrWhiteSpace(_mediaService.Current.Title)
                                            => new PillShape(484, 114, 28),
-                ExpandedView.Media when _lyricsService?.HasLyrics == true && _settingsService?.Current?.EnableSyncedLyrics != false
+                ExpandedView.Media when _lyricsService?.HasLyrics == true && _settingsService?.Current?.EnableSyncedLyrics != false && !_preferClockHeaderInMedia
                                            => LyricsExpandedShape,
+                ExpandedView.Media         => new PillShape(484, 152, 34),
                 _                          => Shapes[IslandState.Expanded]
             };
         }
@@ -265,6 +267,7 @@ public partial class IslandWindow : Window
     private readonly NotesService _notesService;
     private readonly QuickLauncherService _quickLauncherService;
     private readonly TouchpadGestureProcessor _touchpadProcessor = new();
+    private readonly InlineConfirmGuard _confirmGuard = new();
     private readonly TermiNotchService _termiNotchService;
     private readonly WindowSnapService _windowSnapService;
     private readonly KeyboardSoundService _keyboardSoundService;
@@ -284,6 +287,10 @@ public partial class IslandWindow : Window
     internal PowerPlanService? PowerPlanServiceInstance => _powerPlanService;
     internal DropShelfService? DropShelfServiceInstance => _shelfService;
     internal CalendarService? CalendarServiceInstance => _calendarService;
+    internal WeatherService? WeatherServiceInstance => _weatherService;
+    internal CountdownTimerService? CountdownServiceInstance => _countdownService;
+    internal AudioEndpointService? AudioEndpointServiceInstance => _audioEndpointService;
+    internal VolumeService? VolumeServiceInstance => _volumeService;
     internal TaskService? TaskServiceInstance => _taskService;
     internal NotesService? NotesServiceInstance => _notesService;
     internal QuickLauncherService? QuickLauncherServiceInstance => _quickLauncherService;
@@ -421,6 +428,14 @@ public partial class IslandWindow : Window
         }
 
         SetDockActive(MediaHomeButton);
+
+        foreach (var dockBtn in new[] { MediaHomeButton, CalendarButton, ShelfButton, NotificationsButton, WidgetsGalleryButton, LauncherButton, AudioButton, PinExpandedButton, SettingsButton, CollapseButton })
+        {
+            if (dockBtn != null)
+            {
+                BentoMotion.AttachInteractiveSpring(dockBtn, hoverScale: 1.12, pressScale: 0.90);
+            }
+        }
 
         _bars = new[] { Bar0, Bar1, Bar2, Bar3 }.Select(bar =>
         {
@@ -1123,6 +1138,12 @@ public partial class IslandWindow : Window
         _countdownService?.PollCompletion();
 
         bool isCountdown = _countdownService is { IsActive: true } || (_countdownService?.TargetDuration > TimeSpan.Zero && !_stopwatch.IsRunning);
+        bool timerRunning = (_countdownService?.IsRunning ?? false) || _stopwatch.IsRunning;
+        if (MediaContainer?.MiniClockTimerActiveDot != null)
+        {
+            MediaContainer.MiniClockTimerActiveDot.Visibility = timerRunning ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         if (isCountdown && _countdownService != null)
         {
             string formatted = _countdownService.FormatRemaining();
@@ -1293,6 +1314,7 @@ public partial class IslandWindow : Window
 
         try { if (_miniPlayerWindow != null) { _miniPlayerWindow.Close(); _miniPlayerWindow = null; } } catch { }
         try { if (_petFloatWindow != null) { _petFloatWindow.Close(); _petFloatWindow = null; } } catch { }
+        try { Views.DesktopWidgetWindow.CloseAll(); } catch { }
 
         UnregisterAllHotKeys();
         UninstallVolumeKeyHook();

@@ -5,7 +5,11 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:core="clr-namespace:DynamicIsland.Core"
              mc:Ignorable="d"
-             d:DesignHeight="150" d:DesignWidth="464">
+             d:DesignHeight="150" d:DesignWidth="464"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Ideal"
+             TextOptions.TextRenderingMode="ClearType">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -40,7 +44,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <Border Grid.Row="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="11,7" Margin="0,0,0,5">
+                <Border Grid.Row="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="12,8" Margin="0,0,0,6">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -89,7 +93,7 @@
                         <ColumnDefinition Width="5" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Border MouseLeftButtonDown="WifiToggleCard_Click" x:Name="WifiToggleCard" Grid.Column="0" BorderThickness="1" CornerRadius="9" Padding="8,5" Cursor="Hand" ToolTipService.ToolTip="Toggle Wi-Fi Radio On/Off">
+                    <Border MouseLeftButtonDown="WifiToggleCard_Click" x:Name="WifiToggleCard" Grid.Column="0" Style="{StaticResource BentoSpringMotionBorder}" BorderThickness="1" CornerRadius="11" Padding="9,6" ToolTipService.ToolTip="Toggle Wi-Fi Radio On/Off">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                                 <TextBlock x:Name="WifiToggleGlyph" Style="{StaticResource Glyph}" Text="" FontSize="11" VerticalAlignment="Center" Margin="0,0,5,0" />
@@ -98,7 +102,7 @@
                             <TextBlock x:Name="WifiToggleStateText" Text="On" FontSize="9" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                     </Border>
-                    <Border MouseLeftButtonDown="BtToggleCard_Click" x:Name="BtToggleCard" Grid.Column="2" BorderThickness="1" CornerRadius="9" Padding="8,5" Cursor="Hand" ToolTipService.ToolTip="Toggle Bluetooth Radio On/Off">
+                    <Border MouseLeftButtonDown="BtToggleCard_Click" x:Name="BtToggleCard" Grid.Column="2" Style="{StaticResource BentoSpringMotionBorder}" BorderThickness="1" CornerRadius="11" Padding="9,6" ToolTipService.ToolTip="Toggle Bluetooth Radio On/Off">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                                 <TextBlock x:Name="BtToggleGlyph" Style="{StaticResource Glyph}" Text="" FontSize="11" VerticalAlignment="Center" Margin="0,0,5,0" />
@@ -107,7 +111,7 @@
                             <TextBlock x:Name="BtToggleStateText" Text="On" FontSize="9" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                     </Border>
-                    <Border MouseLeftButtonDown="WifiNetworksCard_Click" x:Name="WifiNetworksCard" Grid.Column="4" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="8,5" Cursor="Hand" ToolTipService.ToolTip="Scan &amp; Connect to Nearby Wi-Fi SSIDs">
+                    <Border MouseLeftButtonDown="WifiNetworksCard_Click" x:Name="WifiNetworksCard" Grid.Column="4" Style="{StaticResource BentoInteractiveCard}" CornerRadius="11" Padding="9,6" ToolTipService.ToolTip="Scan &amp; Connect to Nearby Wi-Fi SSIDs">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                                 <TextBlock Style="{StaticResource Glyph}" Text="" FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,5,0" />
@@ -116,7 +120,7 @@
                             <TextBlock Text="Scan SSIDs" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                     </Border>
-                    <Border MouseLeftButtonDown="HotspotCard_Click" x:Name="HotspotCard" Grid.Column="6" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="8,5" Cursor="Hand" ToolTipService.ToolTip="Open Windows Mobile Hotspot Settings">
+                    <Border MouseLeftButtonDown="HotspotCard_Click" x:Name="HotspotCard" Grid.Column="6" Style="{StaticResource BentoInteractiveCard}" CornerRadius="11" Padding="9,6" ToolTipService.ToolTip="Open Windows Mobile Hotspot Settings">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                                 <TextBlock Style="{StaticResource Glyph}" Text="" FontSize="11" VerticalAlignment="Center" Margin="0,0,5,0" />
@@ -139,18 +143,12 @@
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border Width="148" Height="96" Margin="0,0,8,0" CornerRadius="10"
-                                                                BorderThickness="1" Padding="10,7" Cursor="Hand"
+                                                        <Border Width="148" Height="96" Margin="0,0,8,0" CornerRadius="12"
+                                                                Padding="10,8"
                                                                 MouseLeftButtonDown="WifiNetworkCard_Click">
                                                             <Border.Style>
-                                                                <Style TargetType="Border">
-                                                                    <Setter Property="Background" Value="{StaticResource CardSurfaceBrush}" />
-                                                                    <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                                                                <Style TargetType="Border" BasedOn="{StaticResource BentoInteractiveCard}">
                                                                     <Style.Triggers>
-                                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                                            <Setter Property="BorderBrush" Value="#38FFFFFF" />
-                                                                            <Setter Property="Background" Value="#1A1A22" />
-                                                                        </Trigger>
                                                                         <DataTrigger Binding="{Binding IsConnected}" Value="True">
                                                                             <Setter Property="BorderBrush" Value="#4830D158" />
                                                                             <Setter Property="Background" Value="#142219" />
@@ -166,31 +164,33 @@
                                                                 </Grid.RowDefinitions>
 
                                                                 <DockPanel Grid.Row="0" LastChildFill="False">
-                                                                    <Border Width="22" Height="22" CornerRadius="11" Background="#1AFFFFFF" VerticalAlignment="Center">
-                                                                        <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="11.5" Foreground="#F5F5F7" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                    <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource ChipBgBrush}" VerticalAlignment="Center">
+                                                                        <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="11.5" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                                     </Border>
-                                                                    <Border DockPanel.Dock="Right" Background="#1AFFFFFF" CornerRadius="4" Padding="6,1.5" VerticalAlignment="Center">
+                                                                    <Border DockPanel.Dock="Right" Background="{DynamicResource ChipBgBrush}" CornerRadius="5" Padding="6,1.5" VerticalAlignment="Center">
                                                                         <TextBlock Text="{Binding ActionText}" FontSize="9" FontWeight="SemiBold" Foreground="{Binding ActionForeground}" />
                                                                     </Border>
                                                                 </DockPanel>
 
                                                                 <StackPanel Grid.Row="1" VerticalAlignment="Center">
-                                                                    <TextBlock Text="{Binding Ssid}" FontSize="11.5" FontWeight="SemiBold" Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" />
-                                                                    <TextBlock Text="{Binding Subtitle}" FontSize="9.5" Foreground="{StaticResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                                    <TextBlock Text="{Binding Ssid}" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
+                                                                    <TextBlock Text="{Binding Subtitle}" FontSize="9.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                                                                 </StackPanel>
 
-                                                                <TextBlock Grid.Row="2" Text="{Binding SecurityText}" FontSize="8.5" Foreground="{StaticResource TertiaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Grid.Row="2" Text="{Binding SecurityText}" FontSize="8.5" Foreground="{DynamicResource TertiaryBrush}" TextTrimming="CharacterEllipsis" />
                                                             </Grid>
                                                         </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
-                <Border x:Name="WifiScannerStatusPlaceholder" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18,10">
+                <Border x:Name="WifiScannerStatusPlaceholder" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="14" Padding="24,12">
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE701;" FontSize="14" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,3" />
+                        <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,7">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE701;" FontSize="15" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
                         <TextBlock x:Name="WifiScannerStatusTitle" Text="Scanning Wi-Fi..." FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
-                        <TextBlock x:Name="WifiScannerStatusSubtitle" Text="Searching for nearby wireless access points" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,1,0,0" />
+                        <TextBlock x:Name="WifiScannerStatusSubtitle" Text="Searching for nearby wireless access points" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,2,0,0" />
                     </StackPanel>
                 </Border>
             </Grid>

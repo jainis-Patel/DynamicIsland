@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 using System.Text;
 using System.Threading.Channels;
@@ -23,6 +24,8 @@ public partial class App : Application
     private static readonly string LogFile = AppPaths.LogFile;
     private const long MaxLogSizeBytes = 512 * 1024; // Cap log file at 512 KB
     private static readonly object LogWriteLock = new();
+    private static readonly ConcurrentDictionary<string, long> DebugLogLastTicks = new(StringComparer.Ordinal);
+    private const long DebugLogCooldownMs = 60_000;
 
     private static readonly Channel<string> LogChannel = Channel.CreateBounded<string>(
         new BoundedChannelOptions(256)
@@ -47,6 +50,24 @@ public partial class App : Application
     public static void Log(string msg)
     {
         LogChannel.Writer.TryWrite($"[{DateTime.Now:HH:mm:ss.fff}] {msg}");
+    }
+
+    /// <summary>
+    /// Rate-limited debug exception logger (60s cooldown per category + exception type)
+    /// for expected or noisy runtime catches that should remain observable without flooding logs.
+    /// </summary>
+    public static void LogDebug(string category, Exception ex)
+    {
+        if (ex == null) return;
+        string key = $"{category}:{ex.GetType().Name}";
+        long now = Environment.TickCount64;
+        if (DebugLogLastTicks.TryGetValue(key, out long last) && (now - last) < DebugLogCooldownMs)
+        {
+            return;
+        }
+
+        DebugLogLastTicks[key] = now;
+        Log($"[Debug:{category}] {ex.GetType().Name}: {ex.Message}");
     }
 
     public static void LogMemorySnapshot(string tag)

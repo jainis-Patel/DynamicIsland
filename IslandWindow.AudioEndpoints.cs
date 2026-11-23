@@ -153,6 +153,7 @@ public partial class IslandWindow
     {
         float vol = volume ?? _volumeService.CurrentVolume;
         bool isMuted = muted ?? _volumeService.IsMuted;
+        int pct = (int)Math.Round(Math.Clamp(vol, 0f, 1f) * 100f);
 
         if (HeroMasterVolumeSlider != null && !HeroMasterVolumeSlider.IsMouseCaptureWithin)
         {
@@ -161,7 +162,7 @@ public partial class IslandWindow
 
         if (HeroMasterVolumePercentText != null)
         {
-            HeroMasterVolumePercentText.Text = isMuted ? "0%" : $"{Math.Round(vol * 100)}%";
+            HeroMasterVolumePercentText.Text = isMuted ? "0%" : $"{pct}%";
         }
 
         if (HeroSpeakerIcon != null)

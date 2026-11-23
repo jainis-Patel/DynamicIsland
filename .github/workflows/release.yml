@@ -78,20 +78,25 @@ jobs:
             }
           }
           Write-Host "Using Inno Setup compiler: $iscc"
+          if (-not $iscc -or -not (Test-Path $iscc)) {
+            Write-Error "ISCC.exe (Inno Setup compiler) was not found. Aborting release build instead of shipping an uncompiled installer."
+            exit 1
+          }
           New-Item -ItemType Directory -Path publish\installer -Force
-          if ($iscc -and (Test-Path $iscc)) {
-            & $iscc /DMyAppVersion="${{ env.VERSION }}" installer/DynamicIsland.iss
-          } else {
-            Write-Warning "ISCC compiler not found. Falling back to native SetupWindow binary."
+          & $iscc /DMyAppVersion="${{ env.VERSION }}" installer/DynamicIsland.iss
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Inno Setup compilation failed with exit code $LASTEXITCODE."
+            exit $LASTEXITCODE
           }
           
-          # Standardize installer naming: ensure publish\installer\DynamicIsland-Setup.exe always exists
+          # Standardize installer naming: ensure publish\installer\DynamicIsland-Setup.exe exists
           $innoOut = "publish\installer\DynamicIsland-Setup-Inno.exe"
           $stdOut = "publish\installer\DynamicIsland-Setup.exe"
           if (Test-Path $innoOut) {
             Move-Item -Path $innoOut -Destination $stdOut -Force
           } elseif (-not (Test-Path $stdOut)) {
-            Copy-Item -Path "publish\DynamicIsland.exe" -Destination $stdOut -Force
+            Write-Error "Expected Inno Setup installer output was not produced at '$innoOut' or '$stdOut'."
+            exit 1
           }
 
       - name: Package Portable Distribution ZIP
