@@ -1082,4 +1082,248 @@ SSID 3 : Home_Router
             if (File.Exists(tempPath)) File.Delete(tempPath);
         }
     }
+
+    private static void TestLazyServiceContainer()
+    {
+        int createdCount = 0;
+        int disposedCount = 0;
+        var container = new ServiceContainer();
+
+        container.RegisterLazy(() =>
+        {
+            createdCount++;
+            return new TrackingDisposable(() => disposedCount++);
+        });
+
+        Assert(container.Count == 1, "Lazy-registered service must count toward registered services");
+        Assert(!container.IsMaterialized<TrackingDisposable>(), "Lazy service must not be materialized before Get");
+        Assert(createdCount == 0, "Lazy factory must not run before Get");
+
+        var resolved = container.Get<TrackingDisposable>();
+        Assert(createdCount == 1, "Lazy factory must run exactly once on first Get");
+        Assert(container.IsMaterialized<TrackingDisposable>(), "Service must be marked materialized after Get");
+        Assert(ReferenceEquals(resolved, container.Get<TrackingDisposable>()), "Subsequent Get must return cached instance");
+        Assert(createdCount == 1, "Cached Get must not re-invoke factory");
+
+        container.Dispose();
+        Assert(disposedCount == 1, "Materialized IDisposable lazy service must be disposed on container disposal");
+
+        // Unmaterialized lazy service must not be created or disposed on Dispose()
+        int unmaterializedCreated = 0;
+        var container2 = new ServiceContainer();
+        container2.RegisterLazy(() =>
+        {
+            unmaterializedCreated++;
+            return new TrackingDisposable(() => { });
+        });
+        container2.Dispose();
+        Assert(unmaterializedCreated == 0, "Unmaterialized lazy service must not be instantiated during Dispose");
+    }
+
+    private sealed class TrackingDisposable : IDisposable
+    {
+        private readonly Action _onDispose;
+        public TrackingDisposable(Action onDispose) => _onDispose = onDispose;
+        public void Dispose() => _onDispose();
+    }
+
+    private static void TestAsyncSafeFireAndForget()
+    {
+        // Faulted task must be observed cleanly without throwing
+        Task.FromException(new InvalidOperationException("Simulated background failure"))
+            .FireAndForget("SelfTest.Faulted");
+
+        // Cancelled task must be ignored cleanly
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        Task.FromCanceled(cts.Token).FireAndForget("SelfTest.Cancelled");
+
+        // Completed task must be a no-op
+        Task.CompletedTask.FireAndForget("SelfTest.Completed");
+    }
+
+    private static void TestWindowPlacementHelper()
+    {
+        var (cx, cy) = WindowPlacementHelper.ClampToWorkArea(
+            x: -50, y: 2000, width: 200, height: 100,
+            workLeft: 0, workTop: 0, workRight: 1920, workBottom: 1040, margin: 8);
+        Assert(Math.Abs(cx - 8) < 1e-6, $"Clamped X expected 8, got {cx}");
+        Assert(Math.Abs(cy - 932) < 1e-6, $"Clamped Y expected 932, got {cy}");
+
+        var rect = WindowPlacementHelper.ComputeDockedWindowRectPx(
+            monLeft: 0, monTop: 0, monWidth: 2560, workLeft: 0, workRight: 2560,
+            canvasWidthDip: 680, canvasHeightDip: 580, refWidthDip: 484, dpiScale: 1.5,
+            dockPosition: "Center", hardwareNotchMode: false, notchYOffsetDip: 4);
+        Assert(rect.Width == 1020 && rect.Height == 870, $"Expected 1020x870 physical px at 1.5x, got {rect.Width}x{rect.Height}");
+        Assert(rect.Left == (2560 - 1020) / 2, $"Expected centered X=770, got {rect.Left}");
+        Assert(rect.Top == 6, $"Expected Top=6px at 1.5x, got {rect.Top}");
+    }
+
+    private static void TestAutoHideSettingRoundTrip()
+    {
+        string tempPath = Path.Combine(Path.GetTempPath(), $"di_autohide_test_{Guid.NewGuid():N}.json");
+        try
+        {
+            var settings = new SettingsService(tempPath);
+            Assert(settings.Current.AutoHideIsland == false, "AutoHideIsland must default to false (Always Visible)");
+
+            settings.Update(s => s.AutoHideIsland = true, nameof(AppSettings.AutoHideIsland));
+            settings.SaveNow();
+
+            var reloaded = new SettingsService(tempPath);
+            Assert(reloaded.Current.AutoHideIsland == true, "AutoHideIsland=true must persist across reload");
+
+            reloaded.ResetToDefaults();
+            Assert(reloaded.Current.AutoHideIsland == false, "ResetToDefaults must restore AutoHideIsland=false (Always Visible)");
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
+    }
+
+    private static void TestPhase1ChoreographerIntegration()
+    {
+        string tempEvents = Path.Combine(Path.GetTempPath(), $"di_cal_chore_test_{Guid.NewGuid():N}.json");
+        try
+        {
+            using var choreographer = new Choreographer(Dispatcher.CurrentDispatcher);
+            using var calendar = new CalendarService(Dispatcher.CurrentDispatcher, tempEvents);
+
+            calendar.AttachChoreographer(choreographer);
+            calendar.Start();
+            Assert(choreographer.Trigger("calendar_refresh"), "CalendarService.Start with attached Choreographer must register 'calendar_refresh'");
+
+            calendar.Dispose();
+            Assert(!choreographer.Unregister("calendar_refresh"), "CalendarService.Dispose must unregister 'calendar_refresh'");
+        }
+        finally
+        {
+            if (File.Exists(tempEvents)) File.Delete(tempEvents);
+        }
+    }
+
+    private static void TestHighLoadDropletResolution()
+    {
+        var none = ActivityResolver.ResolveHighLoadAlert(false, 40, false, 60);
+        Assert(!none.IsActive, "Normal CPU/RAM should not activate high-load droplet");
+
+        var cpuWarn = ActivityResolver.ResolveHighLoadAlert(true, 84, false, 50);
+        Assert(cpuWarn.IsActive && !cpuWarn.IsRamPriority && !cpuWarn.IsCritical && cpuWarn.Label == "CPU" && cpuWarn.Percent == 84,
+            "CPU 84% should resolve as non-critical CPU droplet alert");
+
+        var cpuCrit = ActivityResolver.ResolveHighLoadAlert(true, 92, false, 50);
+        Assert(cpuCrit.IsActive && cpuCrit.IsCritical && cpuCrit.Label == "CPU" && cpuCrit.Percent == 92,
+            "CPU 92% should resolve as critical CPU droplet alert");
+
+        var ramPrio = ActivityResolver.ResolveHighLoadAlert(true, 84, true, 88);
+        Assert(ramPrio.IsActive && ramPrio.IsRamPriority && ramPrio.IsCritical && ramPrio.Label == "RAM" && ramPrio.Percent == 88,
+            "RAM 88% >= CPU 84% should prioritize critical RAM droplet alert");
+
+        var cpuBeatsRam = ActivityResolver.ResolveHighLoadAlert(true, 95, true, 88);
+        Assert(cpuBeatsRam.IsActive && !cpuBeatsRam.IsRamPriority && cpuBeatsRam.IsCritical && cpuBeatsRam.Label == "CPU" && cpuBeatsRam.Percent == 95,
+            "CPU 95% > RAM 88% should prioritize CPU droplet alert");
+    }
+
+    private static void TestWave3SettingsAndSafeLauncher()
+    {
+        string tempPath = Path.Combine(Path.GetTempPath(), $"di_wave3_test_{Guid.NewGuid():N}.json");
+        try
+        {
+            var settings = new SettingsService(tempPath);
+            Assert(settings.Current.EnableHighLoadAlerts, "EnableHighLoadAlerts must default to true");
+            Assert(settings.Current.HighCpuAlertThreshold == 80, "HighCpuAlertThreshold must default to 80");
+            Assert(settings.Current.HighRamAlertThreshold == 85, "HighRamAlertThreshold must default to 85");
+
+            settings.Update(s =>
+            {
+                s.EnableHighLoadAlerts = false;
+                s.HighCpuAlertThreshold = 90;
+                s.HighRamAlertThreshold = 92;
+            }, nameof(AppSettings.HighCpuAlertThreshold));
+            settings.SaveNow();
+
+            var reloaded = new SettingsService(tempPath);
+            Assert(!reloaded.Current.EnableHighLoadAlerts && reloaded.Current.HighCpuAlertThreshold == 90 && reloaded.Current.HighRamAlertThreshold == 92,
+                "High-load threshold settings must persist across reload");
+
+            reloaded.ResetToDefaults();
+            Assert(reloaded.Current.EnableHighLoadAlerts && reloaded.Current.HighCpuAlertThreshold == 80 && reloaded.Current.HighRamAlertThreshold == 85,
+                "ResetToDefaults must restore high-load alert defaults");
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
+
+        Assert(!SafeProcessLauncher.TryOpenUrl("javascript:alert(1)"), "TryOpenUrl must block javascript: scheme");
+        Assert(!SafeProcessLauncher.TryOpenShellUri("file:///C:/Windows/notepad.exe"), "TryOpenShellUri must block file:// scheme");
+    }
+
+    private static void TestClipboardTransforms()
+    {
+        var jsonPretty = ClipboardTransformer.TryTransform("{\"a\":1,\"b\":[2,3]}", ClipboardTransformKind.JsonPretty);
+        Assert(jsonPretty.Success && jsonPretty.Result.Contains('\n'), "JsonPretty should indent JSON");
+
+        var jsonMin = ClipboardTransformer.TryTransform("{\n  \"a\": 1\n}", ClipboardTransformKind.JsonMinify);
+        Assert(jsonMin.Success && jsonMin.Result == "{\"a\":1}", $"JsonMinify expected {{\"a\":1}}, got {jsonMin.Result}");
+
+        var b64Enc = ClipboardTransformer.TryTransform("hello", ClipboardTransformKind.Base64Encode);
+        Assert(b64Enc.Success && b64Enc.Result == "aGVsbG8=", "Base64Encode failed");
+
+        var b64Dec = ClipboardTransformer.TryTransform("aGVsbG8=", ClipboardTransformKind.Base64Decode);
+        Assert(b64Dec.Success && b64Dec.Result == "hello", "Base64Decode failed");
+
+        var b64Bad = ClipboardTransformer.TryTransform("not_valid_base64!!!", ClipboardTransformKind.Base64Decode);
+        Assert(!b64Bad.Success, "Invalid Base64 must return Success=false");
+
+        var camel = ClipboardTransformer.TryTransform("hello_world_test", ClipboardTransformKind.CamelCase);
+        Assert(camel.Success && camel.Result == "helloWorldTest", $"CamelCase expected helloWorldTest, got {camel.Result}");
+
+        var snake = ClipboardTransformer.TryTransform("helloWorldTest", ClipboardTransformKind.SnakeCase);
+        Assert(snake.Success && snake.Result == "hello_world_test", $"SnakeCase expected hello_world_test, got {snake.Result}");
+
+        var urls = ClipboardTransformer.TryTransform("visit https://example.com and https://github.com", ClipboardTransformKind.ExtractUrls);
+        Assert(urls.Success && urls.Result.Contains("https://example.com") && urls.Result.Contains("https://github.com"), "ExtractUrls failed");
+
+        var emails = ClipboardTransformer.TryTransform("mail a@b.com or c@d.org", ClipboardTransformKind.ExtractEmails);
+        Assert(emails.Success && emails.Result.Contains("a@b.com") && emails.Result.Contains("c@d.org"), "ExtractEmails failed");
+    }
+
+    private static void TestWebcamMirrorInvariants()
+    {
+        Assert(ExpandedView.Mirror.ToKey() == "mirror", "ExpandedView.Mirror.ToKey must be 'mirror'");
+        Assert(ExpandedViewExtensions.TryParseKey("webcam", out var parsed) && parsed == ExpandedView.Mirror, "TryParseKey('webcam') must resolve to Mirror");
+
+        using var mirror = new WebcamMirrorService(Dispatcher.CurrentDispatcher);
+        Assert(!mirror.IsRunning, "WebcamMirrorService must stay idle (IsRunning=false) on construction");
+    }
+
+    private static void TestMeetingMirrorAction()
+    {
+        var ev = new CalendarEventInfo(
+            Subject: "Design Sync",
+            StartTime: DateTimeOffset.Now.AddMinutes(1),
+            Duration: TimeSpan.FromMinutes(30),
+            Location: "Zoom",
+            JoinUrl: "https://zoom.us/j/123456789");
+
+        var activity = MeetingModeService.BuildUpcomingMeetingActivity(ev, 1, null, Dispatcher.CurrentDispatcher);
+        Assert(activity.Id == MeetingModeService.MeetingJoinActivityId, "Activity Id mismatch");
+        Assert(activity.TargetViewKey == "calendar", "TargetViewKey must point to calendar");
+        Assert(activity.Actions != null && activity.Actions.Count == 2, $"Expected 2 meeting actions (Join + Mirror), got {activity.Actions?.Count ?? 0}");
+        Assert(activity.Actions![0].Label == "Join" && activity.Actions[0].Glyph == "\uE717", "First action must be Join");
+        Assert(activity.Actions[1].Label == "Mirror" && activity.Actions[1].Glyph == "\uE714", "Second action must be Mirror");
+    }
+
+    private static void TestSettingsSearchHighLoadEntry()
+    {
+        var matches = SettingsSearchIndex.Search("high load");
+        Assert(matches.Any(e => e.CategoryKey == "Screen" && e.Title.Contains("High-Load", StringComparison.OrdinalIgnoreCase)),
+            "SettingsSearchIndex.Search('high load') must return the Display & Power High-Load Droplet Alerts entry");
+
+        var ramMatches = SettingsSearchIndex.Search("ram threshold");
+        Assert(ramMatches.Any(e => e.CategoryKey == "Screen"),
+            "SettingsSearchIndex.Search('ram threshold') must return the Screen/Display category entry");
+    }
 }

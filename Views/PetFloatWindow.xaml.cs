@@ -6,6 +6,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using DynamicIsland.Core;
+using DynamicIsland.Interop;
 using DynamicIsland.Services;
 using static DynamicIsland.Interop.NativeMethods;
 
@@ -20,6 +21,7 @@ public partial class PetFloatWindow : Window
     private bool _isMouseOverWindow;
     private bool _isRenderingHooked;
     private bool _isClosed;
+    private double _lastRenderTime;
 
     internal PetFloatWindow(VirtualPetService petService, IslandWindow island)
     {
@@ -53,9 +55,7 @@ public partial class PetFloatWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        var hwnd = new WindowInteropHelper(this).Handle;
-        long exStyle = GetExStyle(hwnd);
-        SetExStyle(hwnd, exStyle | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
+        FloatingWindowHelper.ApplyToolWindowStyles(this, noActivate: true);
     }
 
     private void PetFloatWindow_Loaded(object sender, RoutedEventArgs e)
@@ -87,7 +87,14 @@ public partial class PetFloatWindow : Window
     private void OnRenderingFrame(object? sender, EventArgs e)
     {
         if (!IsVisible || _isClosed) return;
+        if (_island.IsFullscreenSuppressed || !SystemParameters.ClientAreaAnimation) return;
+
         double t = MonotonicClock.Elapsed.TotalSeconds;
+        double minInterval = _island.ShouldThrottleVisuals
+            ? (1.0 / 10.0)
+            : (_isMouseOverWindow ? (1.0 / 60.0) : (1.0 / 30.0));
+        if ((t - _lastRenderTime) < minInterval) return;
+        _lastRenderTime = t;
 
         double gazeX = 0, gazeY = 0;
         if (_isMouseOverWindow)

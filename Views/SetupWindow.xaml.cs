@@ -409,14 +409,14 @@ public partial class SetupWindow : Window
                              $"Install Directory: {_customInstallDir}\n" +
                              $"Error: {_lastErrorDetails ?? "Unknown error."}";
 
-            Clipboard.SetText(details);
+            SafeClipboard.TrySetText(details);
             CopyDetailsBtn.Content = "Copied to clipboard";
 
-            _ = Task.Run(async () =>
+            Task.Run(async () =>
             {
                 await Task.Delay(2000);
                 Dispatcher.Invoke(() => CopyDetailsBtn.Content = "Copy details");
-            });
+            }).FireAndForget("SetupWindow.CopyFeedback");
         }
         catch (Exception ex)
         {

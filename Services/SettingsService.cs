@@ -68,6 +68,9 @@ public sealed class AppSettings
     public bool ShowCameraLensIcon { get; set; } = true;
     public bool ShowLottieAnimation { get; set; } = true;
     public bool LowMemoryMode { get; set; } = false;
+    public bool EnableHighLoadAlerts { get; set; } = true;
+    public int HighCpuAlertThreshold { get; set; } = 80;
+    public int HighRamAlertThreshold { get; set; } = 85;
     public string VisualizerStyle { get; set; } = "ClassicBars";
     public bool HardwareNotchMode { get; set; } = false;
     public double HardwareNotchWidth { get; set; } = 188.0;
@@ -104,6 +107,10 @@ public sealed class AppSettings
     public string GhostModifierKey { get; set; } = "Ctrl";
     public bool EnableFastSwipeGuard { get; set; } = true;
     public bool EnableQuickTuck { get; set; } = true;
+    public bool AutoHideIsland { get; set; } = false;
+    public double? MiniPlayerX { get; set; }
+    public double? MiniPlayerY { get; set; }
+    public bool MiniPlayerCompact { get; set; } = false;
     public bool AutoCheckUpdates { get; set; } = true;
     public bool AutoDownloadUpdates { get; set; } = true;
     public string UpdateChannel { get; set; } = "Stable";
@@ -557,6 +564,9 @@ internal sealed class SettingsService : IDisposable
             s.ShowCameraLensIcon = true;
             s.ShowLottieAnimation = true;
             s.LowMemoryMode = false;
+            s.EnableHighLoadAlerts = true;
+            s.HighCpuAlertThreshold = 80;
+            s.HighRamAlertThreshold = 85;
             s.VisualizerStyle = "ClassicBars";
             s.HardwareNotchMode = false;
             s.HardwareNotchWidth = 188.0;
@@ -594,6 +604,10 @@ internal sealed class SettingsService : IDisposable
             s.GhostModifierKey = "Ctrl";
             s.EnableFastSwipeGuard = true;
             s.EnableQuickTuck = true;
+            s.AutoHideIsland = false;
+            s.MiniPlayerX = null;
+            s.MiniPlayerY = null;
+            s.MiniPlayerCompact = false;
             s.AutoCheckUpdates = true;
             s.AutoDownloadUpdates = true;
             s.UpdateChannel = "Stable";

@@ -17,7 +17,9 @@ $patterns = @(
     '*.runtimeconfig.json',
     'DynamicIsland.exe',
     'msbuild.log',
-    'test_output.tmp'
+    'test_output.tmp',
+    '*.tmp',
+    'screenshot_*.png'
 )
 
 $removed = 0
@@ -31,4 +33,15 @@ foreach ($pattern in $patterns) {
     }
 }
 
-Write-Host "CleanWorkspace complete ($removed file(s) removed)."
+$objDir = Join-Path $repoRoot 'obj'
+if (Test-Path -LiteralPath $objDir) {
+    $wpfTmpDirs = Get-ChildItem -Path $objDir -Filter 'DynamicIsland_*_wpftmp*' -Directory -ErrorAction SilentlyContinue
+    foreach ($dir in $wpfTmpDirs) {
+        if ($PSCmdlet.ShouldProcess($dir.FullName, 'Remove stale WPF temp build directory')) {
+            Remove-Item -LiteralPath $dir.FullName -Recurse -Force
+            $removed++
+        }
+    }
+}
+
+Write-Host "CleanWorkspace complete ($removed item(s) removed)."

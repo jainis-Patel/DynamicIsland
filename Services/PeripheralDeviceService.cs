@@ -98,7 +98,7 @@ internal sealed class PeripheralDeviceService : IDisposable
     public void Start()
     {
         UpdatePollTimerState();
-        _ = RefreshAsync();
+        RefreshAsync().FireAndForget("Peripherals.Start");
     }
 
     public void Stop()
@@ -113,7 +113,7 @@ internal sealed class PeripheralDeviceService : IDisposable
         UpdatePollTimerState();
         if (expanded && !_isSuspended)
         {
-            _ = RefreshAsync();
+            RefreshAsync().FireAndForget("Peripherals.Expanded");
         }
     }
 

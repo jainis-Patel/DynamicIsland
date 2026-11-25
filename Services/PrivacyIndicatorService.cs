@@ -44,7 +44,7 @@ internal sealed class PrivacyIndicatorService : IDisposable
                         done.WaitOne(200);
                     }
                 }
-                catch { }
+                catch (Exception ex) { App.LogDebug("PrivacyIndicator.UnregisterWait", ex); }
                 RegisteredWait = null;
             }
             try { WaitEvent.Dispose(); } catch { }

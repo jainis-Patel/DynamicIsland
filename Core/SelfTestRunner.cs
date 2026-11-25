@@ -24,11 +24,12 @@ namespace DynamicIsland.Core;
 /// </summary>
 internal static partial class SelfTestRunner
 {
-    public static int RunAll(string? filter = null)
+    public static int RunAll(string? filter = null, string? reportPath = null)
     {
         int passed = 0;
         int failed = 0;
         int skipped = 0;
+        var reportLines = new List<string>(96);
 
         void Run(string name, Action test)
         {
@@ -42,12 +43,16 @@ internal static partial class SelfTestRunner
             {
                 test();
                 passed++;
-                Console.WriteLine($"[PASS] {name}");
+                string line = $"[PASS] {name}";
+                Console.WriteLine(line);
+                reportLines.Add(line);
             }
             catch (Exception ex)
             {
                 failed++;
-                Console.Error.WriteLine($"[FAIL] {name}: {ex.Message}");
+                string line = $"[FAIL] {name}: {ex.Message}";
+                Console.Error.WriteLine(line);
+                reportLines.Add(line);
             }
         }
 
@@ -114,7 +119,7 @@ internal static partial class SelfTestRunner
         Run("SpringAndHaptics: Impulse, Retarget, SnapTo & zero-allocation synthesized RIFF WAVE haptics", TestSpringDynamicsAndTactileHaptics);
         Run("Phase3Visuals: Windows 11 Fluent 2 Mica/Acrylic, WM_DPICHANGED & HDR tone mapping", TestWindows11BackdropAndHdrToneMapping);
         Run("Phase4Ecosystem: Live Activity IPC 2.0 multi-phase pipelines & clipboard secret redaction", TestLiveActivityIpcV2AndClipboardSecretDetection);
-        Run("Phase5Packaging: Inno Setup, WinGet manifest specification & v0.8.0 version invariants", TestWinGetManifestAndReleasePackageInvariants);
+        Run("Phase5Packaging: Inno Setup, WinGet manifest specification & v0.9.0 version invariants", TestWinGetManifestAndReleasePackageInvariants);
         Run("Pillar1PrecisionTouchpad: Fluid trackpad scrubbing, velocity flick skip & multi-touch pinch morphing", TestTouchpadGesturesAndVelocityInvariants);
         Run("Pillar2AiAgentApprovals: Two-way IPC prompt RPC, diff HUD parser & interactive buttons", TestAiAgentInteractiveApprovalsAndDiffViewer);
         Run("Pillar3FloatingPiPAndNotch: Tear-off drag gesture, magnetic corner snapping & hardware notch fillets", TestPillar3DetachableFloatingIslandAndHardwareNotch);
@@ -126,10 +131,38 @@ internal static partial class SelfTestRunner
         Run("InlineConfirmAndBentoWidgets: 2-step destructive confirmation guard & Bento card motion styling", TestInlineConfirmGuardAndBentoWidgets);
         Run("WidgetsGalleryAndDesktopWidgets: 5 new live Bento cards & detachable desktop widget lifecycle", TestWidgetsGalleryAndDesktopWidgets);
         Run("SettingsOverhaul: Left-rail panels, full ResetToDefaults, SettingsSearchIndex & exposed settings round-trip", TestSettingsOverhaulInvariants);
+        Run("ServiceContainer: Lazy registration, single materialization & dispose-if-created", TestLazyServiceContainer);
+        Run("AsyncSafe: FireAndForget fault & cancellation observation", TestAsyncSafeFireAndForget);
+        Run("WindowPlacementHelper: Work-area clamping & DPI-scaled docked rect math", TestWindowPlacementHelper);
+        Run("AutoHideIsland: Default Always Visible, persistence & ResetToDefaults round-trip", TestAutoHideSettingRoundTrip);
+        Run("Phase1Choreographer: CalendarService registers & unregisters 'calendar_refresh' chore", TestPhase1ChoreographerIntegration);
+        Run("HighLoadDroplet: CPU/RAM alert priority, severity & label resolution", TestHighLoadDropletResolution);
+        Run("Wave3SettingsAndSafeLauncher: High-load thresholds persistence & SafeProcessLauncher scheme blocking", TestWave3SettingsAndSafeLauncher);
+        Run("ClipboardTransformer: JSON, Base64, URL, case & entity extraction transforms", TestClipboardTransforms);
+        Run("WebcamMirror: ExpandedView.Mirror routing & zero-idle service invariant", TestWebcamMirrorInvariants);
+        Run("MeetingMirrorAction: Upcoming meeting activity offers both Join and Mirror actions", TestMeetingMirrorAction);
+        Run("SettingsSearchHighLoad: High-load droplet settings are indexed & searchable", TestSettingsSearchHighLoadEntry);
 
-        Console.WriteLine(skipped > 0
+        string summary = skipped > 0
             ? $"\nSelf-Test Summary: {passed} passed, {failed} failed, {skipped} skipped (filter: '{filter}')."
-            : $"\nSelf-Test Summary: {passed} passed, {failed} failed.");
+            : $"\nSelf-Test Summary: {passed} passed, {failed} failed.";
+        Console.WriteLine(summary);
+        reportLines.Add(summary.TrimStart('\n'));
+
+        if (!string.IsNullOrWhiteSpace(reportPath))
+        {
+            try
+            {
+                string? dir = Path.GetDirectoryName(Path.GetFullPath(reportPath));
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                File.WriteAllLines(reportPath, reportLines, System.Text.Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[WARN] Failed to write self-test report '{reportPath}': {ex.Message}");
+            }
+        }
+
         return failed == 0 ? 0 : 1;
     }
 

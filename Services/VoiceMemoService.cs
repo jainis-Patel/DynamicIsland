@@ -68,7 +68,7 @@ internal sealed class VoiceMemoService : IDisposable
             else
                 LoadMostRecentMemo();
         }
-        catch { }
+        catch (Exception ex) { App.LogDebug("VoiceMemo.InitDir", ex); }
     }
 
     private void LoadMostRecentMemo()
@@ -89,13 +89,13 @@ internal sealed class VoiceMemoService : IDisposable
                     using var reader = new WaveFileReader(file.FullName);
                     _recentMemos.Add(new VoiceMemoInfo(file.FullName, file.Name, reader.TotalTime, file.CreationTime));
                 }
-                catch { }
+                catch (Exception ex) { App.LogDebug("VoiceMemo.ReadHeader", ex); }
             }
 
             LastSavedMemo = _recentMemos.FirstOrDefault();
             _currentFilePath = LastSavedMemo?.FilePath;
         }
-        catch { }
+        catch (Exception ex) { App.LogDebug("VoiceMemo.LoadRecent", ex); }
     }
 
     public bool StartRecording()
@@ -205,7 +205,7 @@ internal sealed class VoiceMemoService : IDisposable
         {
             _player?.Stop();
         }
-        catch { }
+        catch (Exception ex) { App.LogDebug("VoiceMemo.StopPlayback", ex); }
         finally
         {
             CleanupPlayer();
@@ -281,7 +281,7 @@ internal sealed class VoiceMemoService : IDisposable
 
             _currentPeak = Math.Clamp(max * 1.8f, 0.05f, 1.0f);
         }
-        catch { }
+        catch (Exception ex) { App.LogDebug("VoiceMemo.OnAudioData", ex); }
     }
 
     private void OnCaptureStopped(object? sender, StoppedEventArgs e)

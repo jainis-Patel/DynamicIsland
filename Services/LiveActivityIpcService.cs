@@ -184,7 +184,7 @@ internal sealed class LiveActivityIpcService : IDisposable
                 var connectedServer = server;
                 server = null;
 
-                _ = Task.Run(async () =>
+                Task.Run(async () =>
                 {
                     try
                     {
@@ -194,7 +194,7 @@ internal sealed class LiveActivityIpcService : IDisposable
                     {
                         try { _clientGate.Release(); } catch (ObjectDisposedException) { }
                     }
-                }, CancellationToken.None);
+                }, CancellationToken.None).FireAndForget("LiveActivityIpc.Client");
             }
             catch (OperationCanceledException)
             {
@@ -267,7 +267,7 @@ internal sealed class LiveActivityIpcService : IDisposable
                     var timeoutResp = new ActivityIpcResponse { Ok = false, Error = "IPC request timed out or cancelled." };
                     await writer.WriteLineAsync(JsonSerializer.Serialize(timeoutResp));
                 }
-                catch { }
+                catch (Exception writeEx) { App.LogDebug("LiveActivityIpc.WriteTimeout", writeEx); }
             }
             catch (Exception ex)
             {
@@ -276,7 +276,7 @@ internal sealed class LiveActivityIpcService : IDisposable
                     var errResp = new ActivityIpcResponse { Ok = false, Error = ex.Message };
                     await writer.WriteLineAsync(JsonSerializer.Serialize(errResp));
                 }
-                catch { }
+                catch (Exception writeEx) { App.LogDebug("LiveActivityIpc.WriteError", writeEx); }
             }
         }
     }
@@ -351,7 +351,7 @@ internal sealed class LiveActivityIpcService : IDisposable
                 var parsed = ColorConverter.ConvertFromString(req.Accent);
                 if (parsed is Color c) accentColor = c;
             }
-            catch { }
+            catch (Exception ex) { App.LogDebug("LiveActivityIpc.ParsePromptAccent", ex); }
         }
 
         var actions = new List<LiveActivityAction>();
@@ -371,7 +371,7 @@ internal sealed class LiveActivityIpcService : IDisposable
                     {
                         IslandWindow.Instance?.Dispatcher.InvokeAsync(() =>
                         {
-                            IslandWindow.Instance.TermiContainer?.StageDiff(
+                            IslandWindow.Instance.EnsureTermiContainer().StageDiff(
                                 req.Title ?? "AI Agent Change",
                                 req.Subtitle,
                                 req.Diff,
@@ -485,7 +485,7 @@ internal sealed class LiveActivityIpcService : IDisposable
                         var parsed = ColorConverter.ConvertFromString(req.Accent);
                         if (parsed is Color c) accentColor = c;
                     }
-                    catch { }
+                    catch (Exception ex) { App.LogDebug("LiveActivityIpc.ParseAccent", ex); }
                 }
 
                 string subtitle = req.Subtitle?.Trim() ?? "";

@@ -60,7 +60,7 @@ public partial class CaptureStudioView : UserControl
 
     private void CopyHexBtn_Click(object sender, RoutedEventArgs e)
     {
-        Clipboard.SetText(HexCodeText.Text);
+        SafeClipboard.TrySetText(HexCodeText.Text);
         _window?.ShowToast(
             "\uE8C8",
             "Hex Copied",
@@ -173,6 +173,7 @@ public partial class CaptureStudioView : UserControl
                 }
                 catch (Exception ex)
                 {
+                    App.LogDebug("CaptureStudio.OcrDrop", ex);
                     OcrStatusText.Text = "OCR error: " + ex.Message;
                     OcrStatusText.Foreground = ThemeBrushes.Red;
                 }
@@ -191,7 +192,7 @@ public partial class CaptureStudioView : UserControl
         {
             try
             {
-                Clipboard.SetText(OcrResultBox.Text);
+                SafeClipboard.TrySetText(OcrResultBox.Text);
                 _window?.ShowToast(
                     "\uE8C8",
                     "OCR Text Copied",

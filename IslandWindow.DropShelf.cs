@@ -294,7 +294,7 @@ public partial class IslandWindow
             int duration = _settingsService.Current.PhoneBridgeDurationMinutes;
             string? password = _settingsService.Current.PhoneBridgePassword;
             var session = _lanQuickShareService.StartSession(duration, password: password);
-            try { Clipboard.SetText(session.Url); } catch { }
+            try { SafeClipboard.TrySetText(session.Url); } catch { }
             string lockTag = session.RequiresPassword ? " · Password protected" : string.Empty;
             _machine.PushToast(new ToastContent(
                 "\uE8EA",
@@ -406,7 +406,7 @@ public partial class IslandWindow
                 if (_isClosing) return;
                 if (!string.IsNullOrWhiteSpace(text))
                 {
-                    try { Clipboard.SetText(text); } catch { }
+                    try { SafeClipboard.TrySetText(text); } catch { }
                     string preview = text.Replace("\r", " ").Replace("\n", " ").Trim();
                     if (preview.Length > 36) preview = preview[..33] + "...";
                     NotifyCaptureAction("OCR Copied to Clipboard", preview);
@@ -511,6 +511,26 @@ public partial class IslandWindow
         phoneShareItem.Click += (_, _) => PhoneShareButton_Click(phoneShareItem, new RoutedEventArgs());
         menu.Items.Add(phoneShareItem);
 
+        var copyPathsItem = new MenuItem
+        {
+            Header = paths.Count > 1 ? $"📋 Copy All File Paths ({paths.Count})" : "📋 Copy File Path"
+        };
+        copyPathsItem.Click += (_, _) =>
+        {
+            if (SafeClipboard.TrySetText(string.Join(Environment.NewLine, paths)))
+            {
+                NotifyCaptureAction("Paths Copied", paths.Count > 1 ? $"{paths.Count} paths copied to clipboard" : System.IO.Path.GetFileName(paths[0]));
+            }
+        };
+        menu.Items.Add(copyPathsItem);
+
+        if (singleItem == null && paths.Count > 0)
+        {
+            var revealFirstItem = new MenuItem { Header = "📂 Show First in Explorer" };
+            revealFirstItem.Click += (_, _) => DropShelfService.Reveal(paths[0]);
+            menu.Items.Add(revealFirstItem);
+        }
+
         if (singleItem != null)
         {
             if (singleItem.IsImage)
@@ -524,7 +544,7 @@ public partial class IslandWindow
                         if (_isClosing) return;
                         if (!string.IsNullOrWhiteSpace(text))
                         {
-                            try { Clipboard.SetText(text); } catch { }
+                            try { SafeClipboard.TrySetText(text); } catch { }
                             string preview = text.Replace("\r", " ").Replace("\n", " ").Trim();
                             if (preview.Length > 36) preview = preview[..33] + "...";
                             NotifyCaptureAction("OCR Copied to Clipboard", preview);
@@ -580,7 +600,7 @@ public partial class IslandWindow
         {
             if (!string.IsNullOrEmpty(res.CopiedClipboardText))
             {
-                try { Clipboard.SetText(res.CopiedClipboardText); } catch { }
+                try { SafeClipboard.TrySetText(res.CopiedClipboardText); } catch { }
             }
             if (res.OutputPaths.Count > 0)
             {

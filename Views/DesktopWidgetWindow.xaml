@@ -1,6 +1,7 @@
 <Window x:Class="DynamicIsland.Views.DesktopWidgetWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:core="clr-namespace:DynamicIsland.Core"
         Title="Dynamic Island Desktop Widget"
         Width="264" Height="162"
         WindowStyle="None"
@@ -223,6 +224,7 @@
                             BorderThickness="1"
                             Margin="0,0,9,0"
                             ClipToBounds="True"
+                            core:RoundedClip.ClipChild="True"
                             Visibility="Collapsed"
                             Cursor="Hand"
                             MouseLeftButtonDown="MediaArtworkHost_Click"
@@ -246,12 +248,13 @@
                     <Border x:Name="CalendarDateLeafHost"
                             Grid.Column="0"
                             Width="36" Height="38"
-                            CornerRadius="9"
+                            CornerRadius="10"
                             Background="#16FFFFFF"
                             BorderBrush="#26FFFFFF"
                             BorderThickness="1"
                             Margin="0,0,9,0"
                             ClipToBounds="True"
+                            core:RoundedClip.ClipChild="True"
                             Visibility="Collapsed">
                         <Grid>
                             <Grid.RowDefinitions>

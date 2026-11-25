@@ -46,6 +46,9 @@ public partial class ClipboardView : UserControl
     private void CopyPlainClipboardItem_Click(object sender, RoutedEventArgs e) =>
         Island?.CopyPlainClipboardItem_Click(sender, e);
 
+    private void TransformClipboardItem_Click(object sender, RoutedEventArgs e) =>
+        Island?.TransformClipboardItem_Click(sender, e);
+
     private void EyedropperButton_Click(object sender, RoutedEventArgs e) =>
         Island?.EyedropperButton_Click(sender, e);
 

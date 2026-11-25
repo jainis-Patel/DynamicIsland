@@ -242,6 +242,7 @@ public sealed class SystemPerformanceService : IDisposable
     private readonly uint _currentPid;
     private readonly GpuTelemetryProvider _gpuProvider;
     private readonly PerCoreCpuSampler _cpuCoreSampler;
+    private readonly Func<AppSettings>? _getSettings;
 
     public string HardwareSummary { get; }
     public SystemVitalsSnapshot LatestSnapshot { get; private set; }
@@ -252,8 +253,9 @@ public sealed class SystemPerformanceService : IDisposable
 
     #endregion
 
-    public SystemPerformanceService()
+    public SystemPerformanceService(Func<AppSettings>? getSettings = null)
     {
+        _getSettings = getSettings;
         _currentPid = (uint)Environment.ProcessId;
         HardwareSummary = ReadHardwareSummaryOnce();
         _gpuProvider = new GpuTelemetryProvider();
@@ -361,14 +363,19 @@ public sealed class SystemPerformanceService : IDisposable
             ReadMemoryStatus(out int ramPercent, out double usedGb, out double totalGb, out double availGb);
             bool onBattery = IsRunningOnBattery();
 
-            bool rawHighLoad = cpuPercent >= 80 || ramPercent >= 85;
+            var cfg = _getSettings?.Invoke();
+            bool alertsEnabled = cfg?.EnableHighLoadAlerts ?? true;
+            int cpuThresh = Math.Clamp(cfg?.HighCpuAlertThreshold ?? 80, 50, 98);
+            int ramThresh = Math.Clamp(cfg?.HighRamAlertThreshold ?? 85, 50, 98);
+
+            bool rawHighLoad = alertsEnabled && (cpuPercent >= cpuThresh || ramPercent >= ramThresh);
             if (rawHighLoad)
                 _consecutiveHighLoadTicks = Math.Min(_consecutiveHighLoadTicks + 1, 10);
             else
                 _consecutiveHighLoadTicks = 0;
 
-            bool isHighCpu = _consecutiveHighLoadTicks >= 2 && cpuPercent >= 80;
-            bool isHighRam = _consecutiveHighLoadTicks >= 2 && ramPercent >= 85;
+            bool isHighCpu = alertsEnabled && _consecutiveHighLoadTicks >= 2 && cpuPercent >= cpuThresh;
+            bool isHighRam = alertsEnabled && _consecutiveHighLoadTicks >= 2 && ramPercent >= ramThresh;
 
             // 2. Tier 2: Process Enumeration ONLY if HUD is open, forced, or high-load spike just triggered
             ProcessHogInfo hog1 = LatestSnapshot.Hog1;

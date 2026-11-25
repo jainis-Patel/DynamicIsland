@@ -85,6 +85,7 @@ public sealed class DropletDescriptor : INotifyPropertyChanged
         "window_snap" => "Snap",
         "mech_sounds" => "Sound",
         "pet_sanctuary" => "Play",
+        "webcam_mirror" => "Mirror",
         _ => "Open"
     };
 
@@ -109,6 +110,7 @@ public sealed class DropletDescriptor : INotifyPropertyChanged
         "window_snap" => "\uE7C4",
         "mech_sounds" => "\uE765",
         "pet_sanctuary" => "\uE708",
+        "webcam_mirror" => "\uE714",
         _ => "\uE8A7"
     };
 
@@ -141,6 +143,7 @@ public sealed class DropletDescriptor : INotifyPropertyChanged
         "voice_transcription" => "Offline STT",
         "mech_sounds" => "Cherry/Thock",
         "phone_bridge" => "LAN Wi-Fi Share",
+        "webcam_mirror" => "Pre-Call Check",
         _ => "Modular"
     };
 
@@ -344,6 +347,18 @@ public sealed class DropletRegistry
             TargetView = ExpandedView.WidgetsGallery,
             DockPinKey = "widgets",
             EstimatedRamKb = 28,
+            IsDefaultEnabled = true
+        });
+
+        Register(new DropletDescriptor
+        {
+            Id = "webcam_mirror",
+            Name = "Webcam Mirror",
+            Description = "1-click pre-call camera preview, screen ring light & live mic check",
+            Glyph = "\uE714",
+            Category = DropletCategory.Capture,
+            TargetView = ExpandedView.Mirror,
+            EstimatedRamKb = 0,
             IsDefaultEnabled = true
         });
 

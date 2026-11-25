@@ -836,6 +836,11 @@ public partial class CalendarTaskView : UserControl
         CalendarService.LaunchEventOrCalendar(null);
     }
 
+    private void OpenMirrorBtn_Click(object sender, RoutedEventArgs e)
+    {
+        Island?.NavigateToView(Core.ExpandedView.Mirror);
+    }
+
     private void QuickTaskInput_TextChanged(object sender, TextChangedEventArgs e)
     {
         QuickTaskPlaceholder.Visibility = string.IsNullOrEmpty(QuickTaskInput.Text)

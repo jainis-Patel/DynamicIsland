@@ -269,7 +269,7 @@ public partial class CaptureOverlayWindow : Window
                 string? text = await ScreenToolsService.ExtractTextFromBitmapAsync(bmp);
                 if (!string.IsNullOrWhiteSpace(text))
                 {
-                    try { Clipboard.SetText(text); } catch { }
+                    try { SafeClipboard.TrySetText(text); } catch { }
                     IslandWindow.Instance?.NotifyCaptureAction("OCR Text Copied", text);
                 }
                 else

@@ -120,4 +120,24 @@ public static class ActivityResolver
         CompactActivityKind.LiveActivity => "Live Activity \u00B7 Click to swap \u00B7 Middle-click to inspect",
         _ => "Secondary Live Activity \u00B7 Click to expand"
     };
+
+    /// <summary>
+    /// Resolves high-load CPU/RAM warning state for the detached SecondaryDroplet bubble.
+    /// RAM >= 85% takes priority over CPU unless CPU is strictly higher; CPU >= 90% or any RAM alert is Critical (red).
+    /// </summary>
+    public static (bool IsActive, bool IsRamPriority, int Percent, bool IsCritical, string Label) ResolveHighLoadAlert(
+        bool isHighCpu,
+        int cpuPercent,
+        bool isHighRam,
+        int ramPercent)
+    {
+        if (!isHighCpu && !isHighRam)
+            return (false, false, 0, false, string.Empty);
+
+        bool isRamPriority = isHighRam && (!isHighCpu || ramPercent >= cpuPercent);
+        int percent = isRamPriority ? ramPercent : cpuPercent;
+        bool isCritical = isRamPriority || cpuPercent >= 90;
+        string label = isRamPriority ? "RAM" : "CPU";
+        return (true, isRamPriority, percent, isCritical, label);
+    }
 }

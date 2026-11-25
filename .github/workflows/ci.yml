@@ -63,7 +63,16 @@ jobs:
           Write-Host "Verified release-manifest.json and WinGet manifests match v$projVersion."
 
       - name: Run Deterministic Self-Test Suite
-        run: dotnet run -c Release -r win-x64 --no-build -- --self-test
+        shell: pwsh
+        run: |
+          dotnet run -c Release -r win-x64 --no-build -- --self-test --self-test-report=self-test-report.txt
+          if (Test-Path self-test-report.txt) {
+            Get-Content self-test-report.txt
+            Remove-Item self-test-report.txt -Force
+          }
+
+      - name: Memory Diagnostic Smoke Check
+        run: dotnet run -c Release -r win-x64 --no-build -- --diagnose-memory
 
       - name: Publish Single-File Release
         run: dotnet publish DynamicIsland.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish/

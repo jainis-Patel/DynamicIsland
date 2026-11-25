@@ -25,6 +25,8 @@ internal sealed class TrayIconOptions
     public Action? OnShelf { get; init; }
     public Action? OnClipboard { get; init; }
     public Action? OnNotes { get; init; }
+    public Action? OnCalc { get; init; }
+    public Action? OnMirror { get; init; }
     public Func<bool>? IsCaffeineEnabled { get; init; }
     public Action<bool>? SetCaffeineEnabled { get; init; }
     public Func<bool>? IsDndEnabled { get; init; }
@@ -65,6 +67,8 @@ internal sealed class TrayIconService : IDisposable
     private readonly Action? _onShelf;
     private readonly Action? _onClipboard;
     private readonly Action? _onNotes;
+    private readonly Action? _onCalc;
+    private readonly Action? _onMirror;
     private readonly Func<bool>? _isCaffeineEnabled;
     private readonly Action<bool>? _setCaffeineEnabled;
     private readonly Func<bool>? _isDndEnabled;
@@ -100,6 +104,8 @@ internal sealed class TrayIconService : IDisposable
             options.OnShelf,
             options.OnClipboard,
             options.OnNotes,
+            options.OnCalc,
+            options.OnMirror,
             options.IsCaffeineEnabled,
             options.SetCaffeineEnabled,
             options.IsDndEnabled,
@@ -134,6 +140,8 @@ internal sealed class TrayIconService : IDisposable
         Action? onShelf = null,
         Action? onClipboard = null,
         Action? onNotes = null,
+        Action? onCalc = null,
+        Action? onMirror = null,
         Func<bool>? isCaffeineEnabled = null,
         Action<bool>? setCaffeineEnabled = null,
         Func<bool>? isDndEnabled = null,
@@ -165,6 +173,8 @@ internal sealed class TrayIconService : IDisposable
         _onShelf = onShelf;
         _onClipboard = onClipboard;
         _onNotes = onNotes;
+        _onCalc = onCalc;
+        _onMirror = onMirror;
         _isCaffeineEnabled = isCaffeineEnabled;
         _setCaffeineEnabled = setCaffeineEnabled;
         _isDndEnabled = isDndEnabled;
@@ -233,155 +243,152 @@ internal sealed class TrayIconService : IDisposable
     {
         SetForegroundWindow(_hwnd);
 
-        var menu = new ContextMenu
+        var menu = new ContextMenu();
+
+        static MenuItem CreateItem(string header, string? glyph = null, System.Windows.Media.Brush? iconBrush = null) => new()
         {
-            Background = ThemeBrushes.MenuBackground,
-            Foreground = ThemeBrushes.PrimaryText,
-            BorderBrush = ThemeBrushes.MenuBorder,
-            BorderThickness = new Thickness(1),
-            FontSize = 12.5
+            Header = header,
+            Icon = glyph != null ? ThemeBrushes.CreateMenuIcon(glyph, iconBrush) : null
         };
 
         var itemBrand = new MenuItem
         {
             Header = "Dynamic Island · by Jainis Patel",
+            Icon = ThemeBrushes.CreateMenuIcon("\uE7E7", ThemeBrushes.Accent),
             IsEnabled = false,
             Foreground = ThemeBrushes.MutedGrey,
-            FontSize = 11.5
+            FontSize = 10
         };
         menu.Items.Add(itemBrand);
-        menu.Items.Add(new Separator { Background = ThemeBrushes.MenuSeparator });
+        menu.Items.Add(new Separator());
 
-        var itemExpand = new MenuItem { Header = "Expand Dynamic Island", FontWeight = FontWeights.SemiBold };
+        var itemExpand = CreateItem("Expand Dynamic Island", "\uE70D", ThemeBrushes.Accent);
+        itemExpand.FontWeight = FontWeights.SemiBold;
         itemExpand.Click += (_, _) => _onExpand();
         menu.Items.Add(itemExpand);
 
         if (_onShelf != null)
         {
-            var itemShelf = new MenuItem { Header = "Drop Shelf..." };
+            var itemShelf = CreateItem("Drop Shelf...", "\uE8F4");
             itemShelf.Click += (_, _) => _onShelf();
             menu.Items.Add(itemShelf);
         }
 
         if (_onClipboard != null)
         {
-            var itemClip = new MenuItem { Header = "Clipboard History... (Ctrl+Alt+V)" };
+            var itemClip = CreateItem("Clipboard History... (Ctrl+Alt+V)", "\uE77F");
             itemClip.Click += (_, _) => _onClipboard();
             menu.Items.Add(itemClip);
         }
 
-        var itemAudio = new MenuItem { Header = "Audio Output & Bluetooth... (Ctrl+Alt+O)" };
+        if (_onCalc != null)
+        {
+            var itemCalc = CreateItem("Calculator & Converter...", "\uE8EF");
+            itemCalc.Click += (_, _) => _onCalc();
+            menu.Items.Add(itemCalc);
+        }
+
+        if (_onMirror != null)
+        {
+            var itemMirror = CreateItem("Webcam Mirror & Mic Check...", "\uE714");
+            itemMirror.Click += (_, _) => _onMirror();
+            menu.Items.Add(itemMirror);
+        }
+
+        var itemAudio = CreateItem("Audio Output & Bluetooth... (Ctrl+Alt+O)", "\uE7F6");
         itemAudio.Click += (_, _) => _onAudioSwitch();
         menu.Items.Add(itemAudio);
 
-        var itemPower = new MenuItem { Header = "Power & Battery Widget... (Ctrl+Alt+P)" };
+        var itemPower = CreateItem("Power & Battery Widget... (Ctrl+Alt+P)", "\uEBA0");
         itemPower.Click += (_, _) => _onPower();
         menu.Items.Add(itemPower);
 
         if (_onSystemHud != null)
         {
-            var itemHud = new MenuItem { Header = "Activity & System HUD... (Ctrl+Alt+H)" };
+            var itemHud = CreateItem("Activity & System HUD... (Ctrl+Alt+H)", "\uE9D9");
             itemHud.Click += (_, _) => _onSystemHud();
             menu.Items.Add(itemHud);
         }
 
-        var itemVoice = new MenuItem { Header = "Voice Memo & Dictation... (Ctrl+Alt+R)" };
+        var itemVoice = CreateItem("Voice Memo & Dictation... (Ctrl+Alt+R)", "\uE720");
         itemVoice.Click += (_, _) => _onVoiceMemo();
         menu.Items.Add(itemVoice);
 
-        var itemPeripherals = new MenuItem { Header = "Peripheral Battery Hub... (Ctrl+Alt+D)" };
+        var itemPeripherals = CreateItem("Peripheral Battery Hub... (Ctrl+Alt+D)", "\uE702");
         itemPeripherals.Click += (_, _) => _onPeripherals();
         menu.Items.Add(itemPeripherals);
 
         if (_onNotes != null)
         {
-            var itemNotes = new MenuItem { Header = "Quick Notes & Scratchpad... (Ctrl+Alt+J)" };
+            var itemNotes = CreateItem("Quick Notes & Scratchpad... (Ctrl+Alt+J)", "\uE70B");
             itemNotes.Click += (_, _) => _onNotes();
             menu.Items.Add(itemNotes);
         }
 
-        var itemSettings = new MenuItem { Header = "Customize & Notch Settings..." };
+        var itemSettings = CreateItem("Customize & Notch Settings...", "\uE713");
         itemSettings.Click += (_, _) => _onSettings();
         menu.Items.Add(itemSettings);
 
-        var itemStopwatch = new MenuItem { Header = "Toggle Stopwatch (Ctrl+Alt+A)" };
+        var itemStopwatch = CreateItem("Toggle Stopwatch (Ctrl+Alt+A)", "\uE916");
         itemStopwatch.Click += (_, _) => _onToggleStopwatch();
         menu.Items.Add(itemStopwatch);
 
-        menu.Items.Add(new Separator { Background = ThemeBrushes.MenuSeparator });
+        menu.Items.Add(new Separator());
 
         if (_isCaffeineEnabled != null && _setCaffeineEnabled != null)
         {
-            var itemCaffeine = new MenuItem
-            {
-                Header = "Keep Awake / Caffeine Mode (Prevent Sleep)",
-                IsCheckable = true,
-                IsChecked = _isCaffeineEnabled()
-            };
+            var itemCaffeine = CreateItem("Keep Awake / Caffeine Mode (Prevent Sleep)", "\uEC32");
+            itemCaffeine.IsCheckable = true;
+            itemCaffeine.IsChecked = _isCaffeineEnabled();
             itemCaffeine.Click += (_, _) => _setCaffeineEnabled(itemCaffeine.IsChecked);
             menu.Items.Add(itemCaffeine);
         }
 
         if (_isDndEnabled != null && _setDndEnabled != null)
         {
-            var itemDnd = new MenuItem
-            {
-                Header = "Do Not Disturb (Silence Notification Toasts)",
-                IsCheckable = true,
-                IsChecked = _isDndEnabled()
-            };
+            var itemDnd = CreateItem("Do Not Disturb (Silence Notification Toasts)", "\uE708");
+            itemDnd.IsCheckable = true;
+            itemDnd.IsChecked = _isDndEnabled();
             itemDnd.Click += (_, _) => _setDndEnabled(itemDnd.IsChecked);
             menu.Items.Add(itemDnd);
         }
 
         if (_isReplaceBannersEnabled != null && _setReplaceBannersEnabled != null)
         {
-            var itemReplace = new MenuItem
-            {
-                Header = "Show Notifications in Island Only (Hide Windows Banners)",
-                IsCheckable = true,
-                IsChecked = _isReplaceBannersEnabled()
-            };
+            var itemReplace = CreateItem("Show Notifications in Island Only (Hide Windows Banners)", "\uE7E7");
+            itemReplace.IsCheckable = true;
+            itemReplace.IsChecked = _isReplaceBannersEnabled();
             itemReplace.Click += (_, _) => _setReplaceBannersEnabled(itemReplace.IsChecked);
             menu.Items.Add(itemReplace);
         }
 
         if (_isNetworkSpeedEnabled != null && _setNetworkSpeedEnabled != null)
         {
-            var itemNetSpeed = new MenuItem
-            {
-                Header = "Show Internet Speed in Pill",
-                IsCheckable = true,
-                IsChecked = _isNetworkSpeedEnabled()
-            };
+            var itemNetSpeed = CreateItem("Show Internet Speed in Pill", "\uE774");
+            itemNetSpeed.IsCheckable = true;
+            itemNetSpeed.IsChecked = _isNetworkSpeedEnabled();
             itemNetSpeed.Click += (_, _) => _setNetworkSpeedEnabled(itemNetSpeed.IsChecked);
             menu.Items.Add(itemNetSpeed);
         }
 
         if (_isEdgeBorderEnabled != null && _setEdgeBorderEnabled != null)
         {
-            var itemBorder = new MenuItem
-            {
-                Header = "Island Edge Border",
-                IsCheckable = true,
-                IsChecked = _isEdgeBorderEnabled()
-            };
+            var itemBorder = CreateItem("Island Edge Border", "\uE73A");
+            itemBorder.IsCheckable = true;
+            itemBorder.IsChecked = _isEdgeBorderEnabled();
             itemBorder.Click += (_, _) => _setEdgeBorderEnabled(itemBorder.IsChecked);
             menu.Items.Add(itemBorder);
         }
 
-        var itemStartup = new MenuItem
-        {
-            Header = "Run at Windows Startup",
-            IsCheckable = true,
-            IsChecked = StartupService.IsStartupEnabled()
-        };
+        var itemStartup = CreateItem("Run at Windows Startup", "\uE7E8");
+        itemStartup.IsCheckable = true;
+        itemStartup.IsChecked = StartupService.IsStartupEnabled();
         itemStartup.Click += (_, _) => StartupService.SetStartup(itemStartup.IsChecked);
         menu.Items.Add(itemStartup);
 
         if (_getThemeMode != null && _setThemeMode != null)
         {
-            var menuTheme = new MenuItem { Header = "Appearance Mode" };
+            var menuTheme = CreateItem("Appearance Mode", "\uE706");
             string mode = SettingsService.NormalizeThemeMode(_getThemeMode());
 
             var itemSystem = new MenuItem
@@ -416,7 +423,7 @@ internal sealed class TrayIconService : IDisposable
 
         if (_getThemeStyle != null && _setThemeStyle != null)
         {
-            var menuStyle = new MenuItem { Header = "UI Theme" };
+            var menuStyle = CreateItem("UI Theme", "\uE790");
             string style = _getThemeStyle();
             bool isLiquid = string.Equals(style, "Liquid Glass", StringComparison.OrdinalIgnoreCase);
 
@@ -443,7 +450,7 @@ internal sealed class TrayIconService : IDisposable
 
         if (_getIslandTheme != null && _setIslandTheme != null)
         {
-            var menuNature = new MenuItem { Header = "Living Island Theme" };
+            var menuNature = CreateItem("Living Island Theme", "\uEC0A");
             string currentTheme = SettingsService.NormalizeIslandTheme(_getIslandTheme());
 
             foreach (var t in SettingsService.AvailableIslandThemes)
@@ -462,14 +469,14 @@ internal sealed class TrayIconService : IDisposable
         }
 
 #if DEBUG
-        var itemToast = new MenuItem { Header = "Send Test Alert (Ctrl+Alt+T)" };
+        var itemToast = CreateItem("Send Test Alert (Ctrl+Alt+T)", "\uEA8F");
         itemToast.Click += (_, _) => _onTestToast();
         menu.Items.Add(itemToast);
 #endif
 
-        menu.Items.Add(new Separator { Background = ThemeBrushes.MenuSeparator });
+        menu.Items.Add(new Separator());
 
-        var itemExit = new MenuItem { Header = "Exit Dynamic Island (Ctrl+Alt+Q)" };
+        var itemExit = CreateItem("Exit Dynamic Island (Ctrl+Alt+Q)", "\uE7E8", ThemeBrushes.Red);
         itemExit.Click += (_, _) => _onExit();
         menu.Items.Add(itemExit);
 

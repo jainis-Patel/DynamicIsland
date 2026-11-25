@@ -210,12 +210,12 @@ if exist ""%DI_NEWFILE%"" del /f /q ""%DI_NEWFILE%"" >nul 2>&1
             }
 
             // Watchdog fallback in case a modal/hanging resource blocks Shutdown
-            _ = Task.Run(async () =>
+            Task.Run(async () =>
             {
                 await Task.Delay(5000).ConfigureAwait(false);
                 App.FlushLogs();
                 Environment.Exit(0);
-            });
+            }).FireAndForget("UpdateHandoff.Launch");
             return;
         }
 

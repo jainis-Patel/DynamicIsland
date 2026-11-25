@@ -2,7 +2,7 @@
 name: dynamic-island-release-packaging
 description: >-
   Use this skill when building, self-testing, publishing, or creating deployment installers
-  for Dynamic Island. Covers running the deterministic 52-test verification suite, single-file
+  for Dynamic Island. Covers running the deterministic 86-test verification suite, single-file
   native publishing (win-x64), Inno Setup packaging, dark-mode SetupWindow/UninstallWindow
   wizards, Windows startup autostart integration, and firewall helper scripts.
 ---
@@ -11,7 +11,7 @@ description: >-
 
 Windows customization communities on Reddit place heavy emphasis on clean, portable, and transparent distribution:
 * **No Admin Elevation Required**: Installs into `%LocalAppData%\Programs\DynamicIsland` without nagging UAC prompts.
-* **Deterministic Verification**: Every release must pass the 52-point automated verification suite.
+* **Deterministic Verification**: Every release must pass the 86-point automated verification suite.
 * **Clean Uninstall Guarantee**: Zero orphaned registry keys or lingering autostart entries (`UninstallWindow.xaml`).
 * **Single-File Native Executable**: Zero external framework dependencies for end users.
 
@@ -28,7 +28,7 @@ This runbook documents the complete lifecycle from build to verification and rel
                 │
                 ▼
 ┌─────────────────────────────────┐
-│  dotnet run -- --self-test      │ ──► [SelfTestRunner.cs: 52 Deterministic Checks]
+│  dotnet run -- --self-test      │ ──► [SelfTestRunner.cs: 86 Deterministic Checks]
 └───────────────┬─────────────────┘
                 │ (All Passed)
                 ▼
@@ -52,7 +52,7 @@ Before publishing any code change, execute the deterministic test suite:
 dotnet run -c Release -- --self-test
 ```
 
-### What It Verifies (52 Checks):
+### What It Verifies (84 Checks):
 * **Spring Physics**: Frame-rate invariance across 60Hz, 144Hz, and 240Hz, stalled frame recovery, and liquid intensity damping.
 * **State Machine**: Priority hierarchy (`Hidden > Expanded > Toast > Compact > Idle`), toast queues, and category coalescing.
 * **Fullscreen Detection**: Borderless & standard taskbar handling.

@@ -14,6 +14,27 @@ public partial class IslandWindow
     //  Activity & System Performance HUD (Zero-Allocation Engine)
     // ═════════════════════════════════════════════════════════════════
     private bool _isHighLoadAlertActive;
+    private bool _highLoadIsRamPriority;
+    private bool _highLoadIsCritical;
+    private int _highLoadPercent;
+    private string _highLoadTooltip = string.Empty;
+    private DateTime _highLoadSnoozedUntilUtc = DateTime.MinValue;
+
+    internal void SnoozeHighLoadAlerts(TimeSpan duration)
+    {
+        _highLoadSnoozedUntilUtc = DateTime.UtcNow + duration;
+        UpdateHighLoadSnoozeUI();
+        UpdateSecondaryDropletTarget();
+        _machine.PushToast(new ToastContent(
+            "\uE916",
+            "High-Load Alerts Snoozed",
+            $"Muted for {(int)duration.TotalMinutes} minutes",
+            ThemeBrushes.BlueColor,
+            TimeSpan.FromSeconds(2.2),
+            TargetView: "systemhud",
+            Priority: ToastPriority.Feedback,
+            Category: "system"));
+    }
 
     private void OnSystemVitalsUpdated(SystemVitalsSnapshot snap)
     {
@@ -33,52 +54,36 @@ public partial class IslandWindow
                 SystemHudBadgeText.Foreground = snap.CpuPercent >= 80 ? ThemeBrushes.Amber : ThemeBrushes.PrimaryText;
             }
 
-            // 2. Idle Ambient High-Load Alert Pill
-            bool shouldAlert = _machine.State != IslandState.Expanded && (snap.IsHighCpu || snap.IsHighRam);
-            bool alertStateChanged = shouldAlert != _isHighLoadAlertActive;
-            _isHighLoadAlertActive = shouldAlert;
+            // 2. High-Load Alert State (rendered in detached SecondaryDroplet instead of main bar)
+            var alert = ActivityResolver.ResolveHighLoadAlert(snap.IsHighCpu, snap.CpuPercent, snap.IsHighRam, snap.RamPercent);
+            bool alertStateChanged = alert.IsActive != _isHighLoadAlertActive;
+            _isHighLoadAlertActive = alert.IsActive;
 
-            if (SystemHudAlertPill != null)
+            if (alert.IsActive)
             {
-                SystemHudAlertPill.Visibility = shouldAlert ? Visibility.Visible : Visibility.Collapsed;
-                if (shouldAlert && SystemHudAlertText != null)
+                _highLoadIsRamPriority = alert.IsRamPriority;
+                _highLoadPercent = alert.Percent;
+                _highLoadIsCritical = alert.IsCritical;
+                if (alert.IsRamPriority)
                 {
-                    // Prioritize RAM if RAM is high and greater than or equal to CPU load, or if only RAM is high
-                    bool isRamPriority = snap.IsHighRam && (!snap.IsHighCpu || snap.RamPercent >= snap.CpuPercent);
-                    if (isRamPriority)
-                    {
-                        SystemHudAlertText.Text = $"⚠️ {snap.RamPercent}% RAM";
-                        SystemHudAlertText.Foreground = ThemeBrushes.Red;
-                        SystemHudAlertPill.Background = ThemeBrushes.AlertRedBg;
-                        SystemHudAlertPill.BorderBrush = ThemeBrushes.AlertRedBorder;
-                        SystemHudAlertPill.ToolTip = $"⚠️ High Memory Load ({snap.RamPercent}% • {snap.RamUsedGb:0.0} / {snap.RamTotalGb:0.0} GB)\nClick to open System HUD & Purge Standby RAM";
-                    }
-                    else
-                    {
-                        bool isCriticalCpu = snap.CpuPercent >= 90;
-                        SystemHudAlertText.Text = $"🔥 {snap.CpuPercent}% CPU";
-                        SystemHudAlertText.Foreground = isCriticalCpu ? ThemeBrushes.Red : ThemeBrushes.Amber;
-                        SystemHudAlertPill.Background = isCriticalCpu ? ThemeBrushes.AlertRedBg : ThemeBrushes.AlertAmberBg;
-                        SystemHudAlertPill.BorderBrush = isCriticalCpu ? ThemeBrushes.AlertRedBorder : ThemeBrushes.AlertAmberBorder;
-                        string hogHint = snap.HogCount > 0 ? $"\nTop Process: {snap.Hog1.DisplayName} ({snap.Hog1.StatsText})" : string.Empty;
-                        SystemHudAlertPill.ToolTip = $"🔥 High Processor Load ({snap.CpuPercent}%){hogHint}\nClick to open System HUD & inspect processes";
-                    }
+                    _highLoadTooltip = $"High Memory Load ({snap.RamPercent}% \u00B7 {snap.RamUsedGb:0.0} / {snap.RamTotalGb:0.0} GB)\nClick to open System HUD \u00B7 Middle-click to purge Standby RAM\nRight-click to snooze 15m";
+                }
+                else
+                {
+                    string hogHint = snap.HogCount > 0 ? $"\nTop Process: {snap.Hog1.DisplayName} ({snap.Hog1.StatsText})" : string.Empty;
+                    _highLoadTooltip = $"High Processor Load ({snap.CpuPercent}%){hogHint}\nClick to open System HUD & inspect processes\nRight-click to snooze 15m";
                 }
             }
 
-            // Smooth spring animation if alert toggles in Idle state
-            if (alertStateChanged && _machine.State == IslandState.Idle)
+            if (alertStateChanged || alert.IsActive)
             {
-                RefreshTargetGeometry();
-                if (shouldAlert && !IsReducedMotion)
-                {
-                    TriggerLiquidImpulse(35, -12, 6);
-                }
+                UpdateSecondaryDropletTarget();
             }
 
             // 3. Render Expanded HUD card elements when expanded or visible
             if (SystemHudContainer != null && (SystemHudContainer.Visibility == Visibility.Visible || _currentExpandedView == ExpandedView.SystemHud))
             {
+                UpdateHighLoadSnoozeUI();
                 if (HudHardwareSubtitle != null && _systemPerfService != null && !string.IsNullOrWhiteSpace(_systemPerfService.HardwareSummary))
                 {
                     HudHardwareSubtitle.Text = _systemPerfService.HardwareSummary;
@@ -238,13 +243,9 @@ public partial class IslandWindow
         });
     }
 
-    private void SystemHudAlertPill_Click(object sender, MouseButtonEventArgs e)
-    {
-        e.Handled = true;
-        SwitchExpandedView(ExpandedView.SystemHud);
-    }
+    internal void HudPurgeRamButton_Click(object sender, RoutedEventArgs e) => PurgeIdleRamWithToast();
 
-    internal void HudPurgeRamButton_Click(object sender, RoutedEventArgs e)
+    private void PurgeIdleRamWithToast()
     {
         if (_systemPerfService == null) return;
 
@@ -256,7 +257,7 @@ public partial class IslandWindow
                 TriggerLiquidImpulse(55, -20, 8);
                 if (result.OnCooldown)
                 {
-                    if (HudPurgeRamText != null) HudPurgeRamText.Text = "⏳ Cooldown (10s)";
+                    if (HudPurgeRamText != null) HudPurgeRamText.Text = "Cooldown (10s)";
                     _machine.PushToast(new ToastContent(
                         "\uE7BA",
                         "RAM Purge on Cooldown",
@@ -269,7 +270,7 @@ public partial class IslandWindow
                 }
                 else
                 {
-                    if (HudPurgeRamText != null) HudPurgeRamText.Text = $"✨ Purged {result.FreedMb:N0} MB";
+                    if (HudPurgeRamText != null) HudPurgeRamText.Text = $"Purged {result.FreedMb:N0} MB";
                     _machine.PushToast(new ToastContent(
                         "\uE777",
                         "Idle Memory Purged",
@@ -466,7 +467,7 @@ public partial class IslandWindow
                 if (result.KilledProcesses > 0)
                 {
                     if (HudPurgeRunawaysText != null)
-                        HudPurgeRunawaysText.Text = $"⚡ Purged ({result.KilledProcesses})";
+                        HudPurgeRunawaysText.Text = $"Purged ({result.KilledProcesses})";
 
                     _machine.PushToast(new ToastContent(
                         "\uE777",
@@ -481,7 +482,7 @@ public partial class IslandWindow
                 else
                 {
                     if (HudPurgeRunawaysText != null)
-                        HudPurgeRunawaysText.Text = "✓ All Clear";
+                        HudPurgeRunawaysText.Text = "All Clear";
 
                     _machine.PushToast(new ToastContent(
                         "\uE73E",
@@ -507,5 +508,33 @@ public partial class IslandWindow
         {
             // Ignore if canceled or blocked by policy
         }
+    }
+
+    private void UpdateHighLoadSnoozeUI()
+    {
+        if (HudSnoozeResetBtn == null) return;
+        bool isSnoozed = DateTime.UtcNow < _highLoadSnoozedUntilUtc;
+        HudSnoozeResetBtn.Visibility = isSnoozed ? Visibility.Visible : Visibility.Collapsed;
+        if (isSnoozed && HudSnoozeResetText != null)
+        {
+            int minsLeft = Math.Max(1, (int)Math.Ceiling((_highLoadSnoozedUntilUtc - DateTime.UtcNow).TotalMinutes));
+            HudSnoozeResetText.Text = $"Snoozed {minsLeft}m · Resume";
+        }
+    }
+
+    internal void HudSnoozeResetBtn_Click(object sender, RoutedEventArgs e)
+    {
+        _highLoadSnoozedUntilUtc = DateTime.MinValue;
+        UpdateHighLoadSnoozeUI();
+        UpdateSecondaryDropletTarget();
+        _machine.PushToast(new ToastContent(
+            "\uEA8F",
+            "High-Load Alerts Resumed",
+            "CPU and RAM alert droplet monitoring re-enabled",
+            ThemeBrushes.GreenColor,
+            TimeSpan.FromSeconds(2.0),
+            TargetView: "systemhud",
+            Priority: ToastPriority.Feedback,
+            Category: "system"));
     }
 }

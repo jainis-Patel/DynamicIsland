@@ -9,11 +9,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <WarningsAsErrors>CS8600;CS8602;CS8603</WarningsAsErrors>
     <RootNamespace>DynamicIsland</RootNamespace>
     <AssemblyName>DynamicIsland</AssemblyName>
     <!-- Per-Monitor V2 DPI awareness so GetCursorPos/GetWindowRect return physical pixels. -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.8.0</Version>
+    <Version>0.9.0</Version>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Authors>Jainis Patel</Authors>
     <Company>Jainis Patel</Company>
@@ -28,6 +29,8 @@
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-minimum</AnalysisLevel>
   </PropertyGroup>
 
   <ItemGroup>

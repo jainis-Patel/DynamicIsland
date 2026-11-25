@@ -113,7 +113,7 @@ internal sealed class LyricsService : IDisposable
         _ui = ui;
         _diskCachePath = Path.Combine(AppPaths.DataDirectory, "lyrics_cache.json");
         _diskCacheStore = new DebouncedJsonStore<List<CachedLyricsEntry>>(_diskCachePath, BuildDiskCacheSnapshot, delayMs: 500);
-        _ = Task.Run(LoadDiskCache);
+        Task.Run(LoadDiskCache).FireAndForget("Lyrics.LoadCache");
     }
 
     /// <summary>
@@ -167,7 +167,7 @@ internal sealed class LyricsService : IDisposable
         IsLoading = true;
         LyricsLoaded?.Invoke();
 
-        _ = Task.Run(async () =>
+        Task.Run(async () =>
         {
             TrackLyrics? result = null;
             bool gotServerResponse = false;
@@ -204,7 +204,7 @@ internal sealed class LyricsService : IDisposable
                     }
                 });
             }
-        }, ct);
+        }, ct).FireAndForget("Lyrics.Fetch");
     }
 
     /// <summary>

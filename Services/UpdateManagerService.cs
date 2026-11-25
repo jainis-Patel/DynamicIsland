@@ -229,7 +229,7 @@ internal sealed class UpdateManagerService : IDisposable
 
         if (shouldAutoDownload && resultManifest != null && !_disposed)
         {
-            _ = Task.Run(async () =>
+            Task.Run(async () =>
             {
                 try
                 {
@@ -239,7 +239,7 @@ internal sealed class UpdateManagerService : IDisposable
                 {
                     App.Log($"[UpdateManager] Background auto-download failed: {ex.Message}");
                 }
-            }, ct);
+            }, ct).FireAndForget("UpdateManager.Check");
         }
 
         return resultManifest;

@@ -37,4 +37,7 @@ public partial class SystemHudView : UserControl
     private void HudTaskManagerButton_Click(object sender, RoutedEventArgs e) =>
         Island?.HudTaskManagerButton_Click(sender, e);
 
+    private void HudSnoozeResetBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.HudSnoozeResetBtn_Click(sender, e);
+
 }

@@ -61,7 +61,7 @@ public partial class QuickReplyView : UserControl
             else
             {
                 // Enter sends the reply
-                SendReply();
+                SendReplyAsync().FireAndForget("QuickReplyView.SendReply");
             }
             e.Handled = true;
         }
@@ -74,10 +74,10 @@ public partial class QuickReplyView : UserControl
 
     private void SendButton_Click(object sender, RoutedEventArgs e)
     {
-        SendReply();
+        SendReplyAsync().FireAndForget("QuickReplyView.SendReply");
     }
 
-    private async void SendReply()
+    private async Task SendReplyAsync()
     {
         if (_isSending) return;
         string text = ReplyTextBox.Text?.Trim() ?? string.Empty;

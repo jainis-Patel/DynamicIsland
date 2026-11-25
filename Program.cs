@@ -6,11 +6,20 @@ namespace DynamicIsland;
 
 public static class Program
 {
+    private static void TryAttachParentConsole()
+    {
+        if (!Console.IsOutputRedirected)
+        {
+            AttachConsole(ATTACH_PARENT_PROCESS);
+        }
+    }
+
     [STAThread]
     public static int Main(string[] args)
     {
         if (args.Any(a => string.Equals(a, "--diagnose-memory", StringComparison.OrdinalIgnoreCase)))
         {
+            TryAttachParentConsole();
             var p = System.Diagnostics.Process.GetCurrentProcess();
             var gc = GC.GetGCMemoryInfo();
             Console.WriteLine($"[Process] WorkingSet={p.WorkingSet64 / 1024 / 1024} MB, PrivateBytes={p.PrivateMemorySize64 / 1024 / 1024} MB, PagedMemory={p.PagedMemorySize64 / 1024 / 1024} MB");
@@ -26,6 +35,7 @@ public static class Program
 
         if (args.Any(a => string.Equals(a, "--diagnose-window", StringComparison.OrdinalIgnoreCase)))
         {
+            TryAttachParentConsole();
             App.IsDiagnosticMode = true;
             var app = new App();
             app.InitializeComponent();
@@ -46,6 +56,7 @@ public static class Program
 
         if (args.Any(a => string.Equals(a, "--diagnose-software", StringComparison.OrdinalIgnoreCase)))
         {
+            TryAttachParentConsole();
             App.IsDiagnosticMode = true;
             System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
             var app = new App();
@@ -74,21 +85,34 @@ public static class Program
 
         if (args.Any(a => string.Equals(a, "--self-test", StringComparison.OrdinalIgnoreCase)))
         {
+            TryAttachParentConsole();
             string? filter = null;
+            string? reportPath = null;
             for (int i = 0; i < args.Length; i++)
             {
                 if (args[i].StartsWith("--filter=", StringComparison.OrdinalIgnoreCase))
                 {
                     filter = args[i].Substring("--filter=".Length);
-                    break;
                 }
-                if (string.Equals(args[i], "--filter", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                else if (string.Equals(args[i], "--filter", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
                 {
-                    filter = args[i + 1];
-                    break;
+                    filter = args[++i];
+                }
+                else if (args[i].StartsWith("--self-test-report=", StringComparison.OrdinalIgnoreCase))
+                {
+                    reportPath = args[i].Substring("--self-test-report=".Length);
+                }
+                else if (args[i].StartsWith("--report=", StringComparison.OrdinalIgnoreCase))
+                {
+                    reportPath = args[i].Substring("--report=".Length);
+                }
+                else if ((string.Equals(args[i], "--self-test-report", StringComparison.OrdinalIgnoreCase) ||
+                          string.Equals(args[i], "--report", StringComparison.OrdinalIgnoreCase)) && i + 1 < args.Length)
+                {
+                    reportPath = args[++i];
                 }
             }
-            return Core.SelfTestRunner.RunAll(filter);
+            return Core.SelfTestRunner.RunAll(filter, reportPath);
         }
 
         if (args.Any(a => string.Equals(a, "--render-golden-glass", StringComparison.OrdinalIgnoreCase)))
@@ -109,6 +133,7 @@ public static class Program
         if (args.Length > 0 && (string.Equals(args[0], "activity", StringComparison.OrdinalIgnoreCase) ||
                                 string.Equals(args[0], "--activity", StringComparison.OrdinalIgnoreCase)))
         {
+            TryAttachParentConsole();
             return Services.LiveActivityIpcService.RunCliAsync(args).GetAwaiter().GetResult();
         }
 

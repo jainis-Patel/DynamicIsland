@@ -55,6 +55,15 @@ public partial class DisplayPowerSettingsPanel : UserControl
     private void AutoPowerAcToggleBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.AutoPowerAcToggleBtn_Click(sender, e);
 
+    private void HighLoadAlertsToggleBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.HighLoadAlertsToggleBtn_Click(sender, e);
+
+    private void HighCpuThresholdBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.HighCpuThresholdBtn_Click(sender, e);
+
+    private void HighRamThresholdBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.HighRamThresholdBtn_Click(sender, e);
+
     private void ExpandTriggerBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.ExpandTriggerBtn_Click(sender, e);
 
@@ -66,4 +75,7 @@ public partial class DisplayPowerSettingsPanel : UserControl
 
     private void QuickTuckToggleBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.QuickTuckToggleBtn_Click(sender, e);
+
+    private void AutoHideModeBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.AutoHideModeBtn_Click(sender, e);
 }

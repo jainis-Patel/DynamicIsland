@@ -985,7 +985,7 @@ public partial class DesktopWidgetWindow : Window
                 {
                     try
                     {
-                        Clipboard.SetText(ip);
+                        SafeClipboard.TrySetText(ip);
                         SetTransientFooter($"Copied {ip} to clipboard");
                     }
                     catch { }

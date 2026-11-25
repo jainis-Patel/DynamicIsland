@@ -71,7 +71,7 @@
         <!-- ── Top Header Toolbar & Segmented Switcher ──────────────── -->
         <DockPanel Grid.Row="0" Margin="2,0,2,8" LastChildFill="False">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Left">
-                <Border Width="24" Height="24" CornerRadius="8" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" Margin="0,0,8,0">
+                <Border Width="24" Height="24" CornerRadius="12" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" Margin="0,0,8,0">
                     <TextBlock Style="{StaticResource Glyph}" Text="&#xE8D6;" FontSize="11.5" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <StackPanel VerticalAlignment="Center">
@@ -98,7 +98,7 @@
         </DockPanel>
 
         <!-- ── Hero Master Volume Card (Apple Control Center Spec) ────── -->
-        <Border Grid.Row="1" Margin="0,0,0,8" Padding="12,9" CornerRadius="14"
+        <Border Grid.Row="1" Margin="0,0,0,8" Padding="12,9" CornerRadius="16"
                 Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1">
             <Grid>
                 <Grid.RowDefinitions>

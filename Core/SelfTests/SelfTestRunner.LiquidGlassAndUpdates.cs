@@ -630,8 +630,8 @@ internal static partial class SelfTestRunner
         if (File.Exists(issPath))
         {
             string issContent = File.ReadAllText(issPath);
-            Assert(issContent.Contains("#define MyAppVersion \"0.8.0\""),
-                "DynamicIsland.iss must define MyAppVersion as '0.8.0'");
+            Assert(issContent.Contains("#define MyAppVersion \"0.9.0\""),
+                "DynamicIsland.iss must define MyAppVersion as '0.9.0'");
         }
 
         // 2. release-manifest.json validation
@@ -641,11 +641,11 @@ internal static partial class SelfTestRunner
             string manifestJson = File.ReadAllText(manifestPath);
             var manifest = System.Text.Json.JsonSerializer.Deserialize<UpdateManifest>(manifestJson);
             Assert(manifest != null, "release-manifest.json must deserialize cleanly");
-            Assert(manifest!.Version == "0.8.0", $"release-manifest.json version must be '0.8.0', got '{manifest.Version}'");
-            Assert(manifest.ReleaseTag == "v0.8.0", $"release-manifest.json releaseTag must be 'v0.8.0', got '{manifest.ReleaseTag}'");
+            Assert(manifest!.Version == "0.9.0", $"release-manifest.json version must be '0.9.0', got '{manifest.Version}'");
+            Assert(manifest.ReleaseTag == "v0.9.0", $"release-manifest.json releaseTag must be 'v0.9.0', got '{manifest.ReleaseTag}'");
         }
 
-        Assert(InstallerService.AppVersion == "0.8.0", $"InstallerService.AppVersion must be '0.8.0', got '{InstallerService.AppVersion}'");
+        Assert(InstallerService.AppVersion == "0.9.0", $"InstallerService.AppVersion must be '0.9.0', got '{InstallerService.AppVersion}'");
 
         // 3. WinGet Manifest Files validation
         string wingetDir = Path.Combine(projectRoot, "installer", "winget");
@@ -661,14 +661,14 @@ internal static partial class SelfTestRunner
 
             string vContent = File.ReadAllText(versionYaml);
             Assert(vContent.Contains("PackageIdentifier: JainisPatel.DynamicIsland"), "Version YAML must specify identifier");
-            Assert(vContent.Contains("PackageVersion: 0.8.0"), "Version YAML must specify version 0.8.0");
+            Assert(vContent.Contains("PackageVersion: 0.9.0"), "Version YAML must specify version 0.9.0");
 
             string iContent = File.ReadAllText(installerYaml);
-            Assert(iContent.Contains("PackageVersion: 0.8.0"), "Installer YAML must specify version 0.8.0");
+            Assert(iContent.Contains("PackageVersion: 0.9.0"), "Installer YAML must specify version 0.9.0");
             Assert(iContent.Contains("Architecture: x64"), "Installer YAML must specify x64 architecture");
 
             string lContent = File.ReadAllText(localeYaml);
-            Assert(lContent.Contains("PackageVersion: 0.8.0"), "Locale YAML must specify version 0.8.0");
+            Assert(lContent.Contains("PackageVersion: 0.9.0"), "Locale YAML must specify version 0.9.0");
             Assert(lContent.Contains("PackageName: Dynamic Island for Windows"), "Locale YAML must specify package name");
         }
     }

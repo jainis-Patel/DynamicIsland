@@ -166,6 +166,9 @@ public partial class IslandWindow
         e.Handled = true;
     }
 
+    internal bool IsHardwareMicMuted => _privacyService.IsMicrophoneMuted;
+    internal void ToggleHardwareMicMute() => ToggleMicMute();
+
     private void ToggleMicMute()
     {
         bool muted = _privacyService.ToggleMicrophoneMute();

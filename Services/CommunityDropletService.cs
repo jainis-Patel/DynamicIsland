@@ -273,7 +273,7 @@ public sealed class CommunityDropletService : IDisposable
         timer.Start();
 
         // Immediate background poll
-        _ = Task.Run(() => PollEndpointGuardedAsync(def));
+        Task.Run(() => PollEndpointGuardedAsync(def)).FireAndForget("CommunityDroplet.Poll");
     }
 
     private async Task PollEndpointGuardedAsync(CommunityDropletDefinition def)
@@ -564,7 +564,7 @@ public sealed class CommunityDropletService : IDisposable
                 };
 
                 string url = action.Command.Trim();
-                _ = Task.Run(async () =>
+                Task.Run(async () =>
                 {
                     try
                     {
@@ -581,7 +581,7 @@ public sealed class CommunityDropletService : IDisposable
                     {
                         App.Log($"[CommunityDropletService] HttpRequest action error: {ex.Message}");
                     }
-                });
+                }).FireAndForget("CommunityDroplet.HttpAction");
             }
         }
         catch (Exception ex)
@@ -690,7 +690,7 @@ public sealed class CommunityDropletService : IDisposable
         }
         _debounceTokens[key] = cts;
 
-        _ = Task.Run(async () =>
+        Task.Run(async () =>
         {
             try
             {
@@ -715,7 +715,7 @@ public sealed class CommunityDropletService : IDisposable
                 _debounceTokens.TryRemove(KeyValuePair.Create(key, cts));
                 cts.Dispose();
             }
-        });
+        }).FireAndForget("CommunityDroplet.Reload");
     }
 
     public void Dispose()

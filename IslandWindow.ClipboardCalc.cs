@@ -194,23 +194,30 @@ public partial class IslandWindow
         }
     }
 
-    internal void CopyColorAsRgb_Click(object sender, RoutedEventArgs e)
+    internal async void CopyColorAsRgb_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: string rgb } && !string.IsNullOrEmpty(rgb))
         {
-            if (SafeClipboard.TrySetText(rgb))
-            {
-                _machine.PushToast(new ToastContent(
-                    "\uE8C8",
-                    "RGB Copied",
-                    rgb,
-                    ThemeBrushes.AmberColor,
-                    TimeSpan.FromSeconds(1.8),
-                    TargetView: "clipboard",
-                    Priority: ToastPriority.Feedback,
-                    Category: "clipboard"));
-            }
             e.Handled = true;
+            try
+            {
+                if (await SafeClipboard.TrySetTextAsync(rgb) && !_isClosing)
+                {
+                    _machine.PushToast(new ToastContent(
+                        "\uE8C8",
+                        "RGB Copied",
+                        rgb,
+                        ThemeBrushes.AmberColor,
+                        TimeSpan.FromSeconds(1.8),
+                        TargetView: "clipboard",
+                        Priority: ToastPriority.Feedback,
+                        Category: "clipboard"));
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Clipboard] CopyColorAsRgb failed: {ex.Message}");
+            }
         }
     }
 
@@ -225,6 +232,80 @@ public partial class IslandWindow
                 CopyClipboardItem(item, plainTextOnly: true);
             }
         }
+    }
+
+    internal void TransformClipboardItem_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not FrameworkElement { Tag: string id } anchor) return;
+        var item = _clipboardService.Items.FirstOrDefault(i => i.Id == id);
+        if (item == null || string.IsNullOrWhiteSpace(item.RawText)) return;
+
+        var menu = new ContextMenu
+        {
+            PlacementTarget = anchor,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+            VerticalOffset = 4
+        };
+
+        void AddTransform(string header, ClipboardTransformKind kind)
+        {
+            var mi = new MenuItem { Header = header };
+            mi.Click += (_, _) => ApplyClipboardTransform(item.RawText, kind);
+            menu.Items.Add(mi);
+        }
+
+        AddTransform("JSON Pretty", ClipboardTransformKind.JsonPretty);
+        AddTransform("JSON Minify", ClipboardTransformKind.JsonMinify);
+        AddTransform("Trim Empty Lines", ClipboardTransformKind.TrimLines);
+        menu.Items.Add(new Separator());
+        AddTransform("Base64 Encode", ClipboardTransformKind.Base64Encode);
+        AddTransform("Base64 Decode", ClipboardTransformKind.Base64Decode);
+        AddTransform("URL Encode", ClipboardTransformKind.UrlEncode);
+        AddTransform("URL Decode", ClipboardTransformKind.UrlDecode);
+        menu.Items.Add(new Separator());
+        AddTransform("UPPERCASE", ClipboardTransformKind.UpperCase);
+        AddTransform("lowercase", ClipboardTransformKind.LowerCase);
+        AddTransform("Title Case", ClipboardTransformKind.TitleCase);
+        AddTransform("camelCase", ClipboardTransformKind.CamelCase);
+        AddTransform("snake_case", ClipboardTransformKind.SnakeCase);
+        menu.Items.Add(new Separator());
+        AddTransform("Extract URLs", ClipboardTransformKind.ExtractUrls);
+        AddTransform("Extract Emails", ClipboardTransformKind.ExtractEmails);
+
+        menu.IsOpen = true;
+    }
+
+    private void ApplyClipboardTransform(string input, ClipboardTransformKind kind)
+    {
+        var (success, result, label) = ClipboardTransformer.TryTransform(input, kind);
+        if (!success)
+        {
+            _machine.PushToast(new ToastContent(
+                "\uE7BA",
+                "Transform Skipped",
+                label,
+                ThemeBrushes.AmberColor,
+                TimeSpan.FromSeconds(2.0),
+                TargetView: "clipboard",
+                Priority: ToastPriority.Feedback,
+                Category: "clipboard"));
+            return;
+        }
+
+        SafeClipboard.TrySetText(result);
+        TriggerLiquidImpulse(45, -14, 6);
+        string preview = result.Replace("\r", " ").Replace("\n", " ").Trim();
+        if (preview.Length > 36) preview = preview[..33] + "...";
+        _machine.PushToast(new ToastContent(
+            "\uE73E",
+            $"Transformed · {label}",
+            preview,
+            ThemeBrushes.GreenColor,
+            TimeSpan.FromSeconds(2.5),
+            TargetView: "clipboard",
+            Priority: ToastPriority.Feedback,
+            Category: "clipboard"));
     }
 
     internal async void OcrCardItem_Click(object sender, RoutedEventArgs e)
@@ -252,7 +333,7 @@ public partial class IslandWindow
 
                     if (!string.IsNullOrWhiteSpace(text))
                     {
-                        try { Clipboard.SetText(text); } catch { }
+                        SafeClipboard.TrySetText(text);
                         string preview = text.Replace("\r", " ").Replace("\n", " ").Trim();
                         if (preview.Length > 36) preview = preview[..33] + "...";
 
@@ -516,7 +597,7 @@ public partial class IslandWindow
             if (_isClosing) return;
 
             var sample = ScreenToolsService.SampleCursorPixelColor();
-            try { Clipboard.SetText(sample.Hex); } catch { }
+            SafeClipboard.TrySetText(sample.Hex);
 
             _machine.PushToast(new ToastContent(
                 "\uEF3C",
@@ -546,7 +627,10 @@ public partial class IslandWindow
                     bmp = Clipboard.GetImage();
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                App.LogDebug("ClipboardCalc.OcrGetImage", ex);
+            }
 
             bmp ??= _clipboardService.Items.FirstOrDefault(i => i.ImagePreview != null)?.ImagePreview as System.Windows.Media.Imaging.BitmapSource;
             if (bmp == null)
@@ -580,7 +664,7 @@ public partial class IslandWindow
                 return;
             }
 
-            try { Clipboard.SetText(text); } catch { }
+            SafeClipboard.TrySetText(text);
             string preview = text.Replace("\r", " ").Replace("\n", " ").Trim();
             if (preview.Length > 36) preview = preview[..33] + "...";
 
@@ -722,7 +806,7 @@ public partial class IslandWindow
                 }
             }
 
-            try { Clipboard.SetText(res); } catch { }
+            SafeClipboard.TrySetText(res);
             _machine.PushToast(new ToastContent(
                 "\uE73E",
                 "Copied to Clipboard",
@@ -741,7 +825,7 @@ public partial class IslandWindow
 
         if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
         {
-            try { Clipboard.SetText(entry.Result); } catch { }
+            SafeClipboard.TrySetText(entry.Result);
             _machine.PushToast(new ToastContent(
                 "\uE73E",
                 "Result Copied",

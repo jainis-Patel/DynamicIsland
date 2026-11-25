@@ -250,37 +250,53 @@ public partial class IslandWindow
     {
         e.Handled = true;
         if (sender is not FrameworkElement { Tag: NotificationHistoryItem item }) return;
-        string textToCopy = !item.HasDistinctBody
-            ? item.Title
-            : $"{item.Title}\n{item.Body}";
-        await SafeClipboard.TrySetTextAsync(textToCopy);
-        TactileFeedback.PlayTick();
-        TriggerLiquidImpulse(50, -15, 6);
-        _machine.PushToast(new ToastContent(
-            "\uE8C8",
-            item.AppName,
-            "Notification copied to clipboard",
-            item.Accent,
-            TimeSpan.FromSeconds(1.8),
-            TargetView: "notifications",
-            Priority: ToastPriority.Feedback));
+        try
+        {
+            string textToCopy = !item.HasDistinctBody
+                ? item.Title
+                : $"{item.Title}\n{item.Body}";
+            await SafeClipboard.TrySetTextAsync(textToCopy);
+            if (_isClosing) return;
+            TactileFeedback.PlayTick();
+            TriggerLiquidImpulse(50, -15, 6);
+            _machine.PushToast(new ToastContent(
+                "\uE8C8",
+                item.AppName,
+                "Notification copied to clipboard",
+                item.Accent,
+                TimeSpan.FromSeconds(1.8),
+                TargetView: "notifications",
+                Priority: ToastPriority.Feedback));
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Notifications] CopyNotificationItem failed: {ex.Message}");
+        }
     }
 
     internal async void CopyOtpCode_Click(object sender, RoutedEventArgs e)
     {
         e.Handled = true;
         if (sender is not FrameworkElement { Tag: string code } || string.IsNullOrWhiteSpace(code)) return;
-        await SafeClipboard.TrySetTextAsync(code);
-        TactileFeedback.PlaySnap();
-        TriggerLiquidImpulse(80, -30, 10);
-        _machine.PushToast(new ToastContent(
-            "\uE8C8",
-            "Verification Code Copied",
-            $"{code} ready to paste",
-            ThemeBrushes.GreenColor,
-            TimeSpan.FromSeconds(2.0),
-            TargetView: "notifications",
-            Priority: ToastPriority.Feedback));
+        try
+        {
+            await SafeClipboard.TrySetTextAsync(code);
+            if (_isClosing) return;
+            TactileFeedback.PlaySnap();
+            TriggerLiquidImpulse(80, -30, 10);
+            _machine.PushToast(new ToastContent(
+                "\uE8C8",
+                "Verification Code Copied",
+                $"{code} ready to paste",
+                ThemeBrushes.GreenColor,
+                TimeSpan.FromSeconds(2.0),
+                TargetView: "notifications",
+                Priority: ToastPriority.Feedback));
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Notifications] CopyOtpCode failed: {ex.Message}");
+        }
     }
 
     internal void AdjustExpandedNotificationsHeight()
@@ -356,10 +372,11 @@ public partial class IslandWindow
     public void OpenQuickReply(NotificationHistoryItem item)
     {
         if (item == null) return;
-        QuickReplyContainer.SetNotification(item);
+        var quickReply = EnsureQuickReplyContainer();
+        quickReply.SetNotification(item);
         _machine.SetPinned(true);
         SwitchExpandedView(ExpandedView.QuickReply);
-        QuickReplyContainer.FocusInput();
+        quickReply.FocusInput();
     }
 
     public void CancelQuickReply()
@@ -377,7 +394,7 @@ public partial class IslandWindow
         {
             try
             {
-                Clipboard.SetText(pendingReplyText.Trim());
+                SafeClipboard.TrySetText(pendingReplyText.Trim());
             }
             catch { }
         }
@@ -583,7 +600,7 @@ public partial class IslandWindow
         var active = _machine.ActiveToast;
         if (!string.IsNullOrWhiteSpace(active?.DiffText))
         {
-            TermiContainer.StageDiff(
+            EnsureTermiContainer().StageDiff(
                 active.Title,
                 active.Subtitle,
                 active.DiffText,
@@ -702,7 +719,7 @@ public partial class IslandWindow
                 string textToCopy = string.IsNullOrWhiteSpace(item.Body) || item.Body == item.Title
                     ? item.Title
                     : $"{item.Title}\n{item.Body}";
-                Clipboard.SetText(textToCopy);
+                SafeClipboard.TrySetText(textToCopy);
 
                 _machine.PushToast(new ToastContent(
                     item.Glyph,

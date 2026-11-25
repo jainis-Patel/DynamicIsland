@@ -23,6 +23,14 @@
                         <TextBlock x:Name="HudSystemHealthChip" Text="Optimal" Foreground="#30D158" FontSize="8.5" FontWeight="SemiBold" />
                     </StackPanel>
                 </Border>
+                <Button x:Name="HudSnoozeResetBtn" Click="HudSnoozeResetBtn_Click" Style="{StaticResource IslandButton}"
+                        Visibility="Collapsed" Height="18" Padding="6,0" Margin="6,0,0,0" VerticalAlignment="Center"
+                        ToolTipService.ToolTip="High-load droplet alerts are snoozed · Click to re-enable immediately">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xEA8F;" FontSize="8" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="HudSnoozeResetText" Text="Snoozed · Resume" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
             <Border DockPanel.Dock="Right" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="9" Padding="7,2" VerticalAlignment="Center">
                 <TextBlock x:Name="HudHardwareSubtitle" Text="Hardware &amp; Vitals" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
@@ -45,7 +53,7 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <!-- CPU Card -->
-                <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="7,5">
+                <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="14" Padding="7,5">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -69,7 +77,7 @@
                     </Grid>
                 </Border>
                 <!-- GPU Card -->
-                <Border Grid.Column="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="7,5">
+                <Border Grid.Column="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="14" Padding="7,5">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -90,7 +98,7 @@
                     </Grid>
                 </Border>
                 <!-- RAM Card -->
-                <Border Grid.Column="4" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="7,5">
+                <Border Grid.Column="4" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="14" Padding="7,5">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -119,7 +127,10 @@
                         <TextBlock x:Name="HudRunawayText" Text="Runaway background task detected" FontSize="8.5" FontWeight="SemiBold" Foreground="#FF453A" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                     <Button Click="HudKillRunaway_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="18" Padding="6,0" ToolTipService.ToolTip="Terminate the runaway background task immediately">
-                        <TextBlock Text="⚡ Terminate Task" FontSize="8" FontWeight="Bold" Foreground="#FF453A" VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E8;" FontSize="8" Foreground="#FF453A" Margin="0,0,4,0" VerticalAlignment="Center" />
+                            <TextBlock Text="Terminate Task" FontSize="8" FontWeight="Bold" Foreground="#FF453A" VerticalAlignment="Center" />
+                        </StackPanel>
                     </Button>
                 </DockPanel>
             </Border>
@@ -169,21 +180,22 @@
                 <StackPanel Orientation="Horizontal">
                     <Button Click="HudPurgeRamButton_Click" x:Name="HudPurgeRamButton" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,6,0" ToolTipService.ToolTip="Safely trim idle background working sets">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE74D;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
-                            <TextBlock x:Name="HudPurgeRamText" Text="✨ Purge RAM" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE74D;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="HudPurgeRamText" Text="Purge RAM" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Button Click="HudPurgeRunawaysButton_Click" x:Name="HudPurgeRunawaysButton" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" ToolTipService.ToolTip="Purge idle background tasks consuming excessive CPU">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE777;" FontSize="8.5" Foreground="#FF9F0A" Margin="0,0,3,0" VerticalAlignment="Center" />
-                            <TextBlock x:Name="HudPurgeRunawaysText" Text="⚡ Clean Runaways" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE777;" FontSize="8.5" Foreground="#FF9F0A" Margin="0,0,4,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="HudPurgeRunawaysText" Text="Clean Runaways" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                 </StackPanel>
                 <Button Click="HudTaskManagerButton_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" ToolTipService.ToolTip="Launch Windows Task Manager">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE756;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
-                        <TextBlock Text="Task Manager ↗" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE756;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Task Manager" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8A7;" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" Margin="4,0,0,0" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
             </DockPanel>

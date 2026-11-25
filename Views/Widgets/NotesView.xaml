@@ -66,7 +66,7 @@
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <DockPanel LastChildFill="False">
                                             <TextBlock Text="{Binding Title}" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" MaxWidth="110" />
-                                            <TextBlock Visibility="{Binding IsPinned, Converter={StaticResource BoolToVisibilityConverter}}" Text="📌" FontSize="6.5" Margin="3,0,0,0" VerticalAlignment="Center" />
+                                            <TextBlock Visibility="{Binding IsPinned, Converter={StaticResource BoolToVisibilityConverter}}" Style="{StaticResource Glyph}" Text="&#xE718;" FontSize="7" Foreground="{DynamicResource AccentBrush}" Margin="4,0,0,0" VerticalAlignment="Center" />
                                         </DockPanel>
                                         <TextBlock Text="{Binding PreviewSnippet}" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
                                     </StackPanel>
@@ -147,6 +147,9 @@
                             <TextBlock Text="Shelf" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
+                    <Button x:Name="TransformNoteBtn" Click="TransformNoteBtn_Click" Style="{StaticResource IslandButton}" Height="19" Width="19" Padding="0" Margin="0,0,3,0" ToolTip="Transform Note Text (Case, JSON, Base64, URL)">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8AB;" FontSize="7.5" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
                     <Button Click="CopyNoteBtn_Click" Style="{StaticResource IslandButton}" Height="19" Width="19" Padding="0" Margin="0,0,3,0" ToolTip="Copy Markdown">
                         <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Button>
@@ -187,7 +190,7 @@
             <!-- Footer Status -->
             <DockPanel Grid.Row="2" Margin="0,4,0,0" LastChildFill="False">
                 <TextBlock x:Name="NoteStatusText" Text="Auto-saved locally" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                <TextBlock DockPanel.Dock="Right" Text="Markdown ready" FontSize="7" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                <TextBlock x:Name="NoteStatsText" DockPanel.Dock="Right" Text="0w · 0c" FontSize="7" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
             </DockPanel>
         </Grid>
     </Grid>

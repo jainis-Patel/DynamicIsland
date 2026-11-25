@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using DynamicIsland.Core;
 using DynamicIsland.Services;
 
 namespace DynamicIsland.Views.Widgets;
@@ -66,6 +67,7 @@ public partial class NotesView : UserControl
             NoteEditorBox.Text = note.Content;
             EditorPlaceholder.Visibility = string.IsNullOrEmpty(note.Content) ? Visibility.Visible : Visibility.Collapsed;
             UpdatePinVisual(note.IsPinned);
+            UpdateWordStats(note.Content);
             NoteStatusText.Text = $"Updated {note.FormattedDate}";
         }
         finally
@@ -84,6 +86,7 @@ public partial class NotesView : UserControl
             NoteEditorBox.Text = "";
             EditorPlaceholder.Visibility = Visibility.Visible;
             UpdatePinVisual(false);
+            UpdateWordStats(string.Empty);
             NoteStatusText.Text = "New blank note";
             NoteEditorBox.Focus();
         }
@@ -107,6 +110,7 @@ public partial class NotesView : UserControl
 
         string text = NoteEditorBox.Text;
         EditorPlaceholder.Visibility = string.IsNullOrEmpty(text) ? Visibility.Visible : Visibility.Collapsed;
+        UpdateWordStats(text);
 
         if (string.IsNullOrWhiteSpace(text) && _currentNoteId == null) return;
 
@@ -159,15 +163,102 @@ public partial class NotesView : UserControl
 
     private void CopyNoteBtn_Click(object sender, RoutedEventArgs e)
     {
-        if (!string.IsNullOrEmpty(NoteEditorBox.Text))
+        if (!string.IsNullOrEmpty(NoteEditorBox.Text) && SafeClipboard.TrySetText(NoteEditorBox.Text))
         {
-            try
-            {
-                Clipboard.SetText(NoteEditorBox.Text);
-                NoteStatusText.Text = "Markdown copied to clipboard";
-            }
-            catch { }
+            NoteStatusText.Text = "Markdown copied to clipboard";
         }
+    }
+
+    private void UpdateWordStats(string text)
+    {
+        if (NoteStatsText == null) return;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            NoteStatsText.Text = $"0w · {(text?.Length ?? 0)}c";
+            return;
+        }
+
+        int words = 0;
+        bool inWord = false;
+        foreach (char c in text)
+        {
+            if (char.IsWhiteSpace(c))
+            {
+                inWord = false;
+            }
+            else if (!inWord)
+            {
+                words++;
+                inWord = true;
+            }
+        }
+        NoteStatsText.Text = $"{words}w · {text.Length}c";
+    }
+
+    private void TransformNoteBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (NoteEditorBox == null || string.IsNullOrWhiteSpace(NoteEditorBox.Text))
+        {
+            NoteStatusText.Text = "Type note text to transform";
+            return;
+        }
+
+        var menu = new ContextMenu
+        {
+            PlacementTarget = TransformNoteBtn,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+            VerticalOffset = 4
+        };
+
+        void AddItem(string header, ClipboardTransformKind kind)
+        {
+            var mi = new MenuItem { Header = header };
+            mi.Click += (_, _) => ApplyNoteTransform(kind);
+            menu.Items.Add(mi);
+        }
+
+        AddItem("JSON Pretty", ClipboardTransformKind.JsonPretty);
+        AddItem("JSON Minify", ClipboardTransformKind.JsonMinify);
+        AddItem("Trim Empty Lines", ClipboardTransformKind.TrimLines);
+        menu.Items.Add(new Separator());
+        AddItem("UPPERCASE", ClipboardTransformKind.UpperCase);
+        AddItem("lowercase", ClipboardTransformKind.LowerCase);
+        AddItem("Title Case", ClipboardTransformKind.TitleCase);
+        AddItem("camelCase", ClipboardTransformKind.CamelCase);
+        AddItem("snake_case", ClipboardTransformKind.SnakeCase);
+        menu.Items.Add(new Separator());
+        AddItem("Base64 Encode", ClipboardTransformKind.Base64Encode);
+        AddItem("Base64 Decode", ClipboardTransformKind.Base64Decode);
+        AddItem("URL Encode", ClipboardTransformKind.UrlEncode);
+        AddItem("URL Decode", ClipboardTransformKind.UrlDecode);
+        menu.Items.Add(new Separator());
+        AddItem("Extract URLs", ClipboardTransformKind.ExtractUrls);
+        AddItem("Extract Emails", ClipboardTransformKind.ExtractEmails);
+
+        menu.IsOpen = true;
+    }
+
+    private void ApplyNoteTransform(ClipboardTransformKind kind)
+    {
+        bool hasSelection = NoteEditorBox.SelectionLength > 0;
+        string source = hasSelection ? NoteEditorBox.SelectedText : NoteEditorBox.Text;
+        var (success, result, label) = ClipboardTransformer.TryTransform(source, kind);
+        if (!success)
+        {
+            NoteStatusText.Text = $"Skipped: {label}";
+            return;
+        }
+
+        if (hasSelection)
+        {
+            NoteEditorBox.SelectedText = result;
+        }
+        else
+        {
+            NoteEditorBox.Text = result;
+            NoteEditorBox.CaretIndex = result.Length;
+        }
+        NoteStatusText.Text = $"Applied {label}";
     }
 
     private void TogglePinBtn_Click(object sender, RoutedEventArgs e)

@@ -28,7 +28,8 @@ public enum ExpandedView
     Calendar,
     QuickReply,
     WidgetsGallery,
-    Pet
+    Pet,
+    Mirror
 }
 
 public static class ExpandedViewExtensions
@@ -57,6 +58,7 @@ public static class ExpandedViewExtensions
         ExpandedView.QuickReply => "quickreply",
         ExpandedView.WidgetsGallery => "widgetsgallery",
         ExpandedView.Pet => "pet",
+        ExpandedView.Mirror => "mirror",
         _ => "media"
     };
 
@@ -168,6 +170,11 @@ public static class ExpandedViewExtensions
             case "companion":
             case "sanctuary":
                 view = ExpandedView.Pet;
+                return true;
+            case "mirror":
+            case "camera":
+            case "webcam":
+                view = ExpandedView.Mirror;
                 return true;
             default:
                 view = ExpandedView.Media;

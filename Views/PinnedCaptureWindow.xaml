@@ -1,18 +1,19 @@
 <Window x:Class="DynamicIsland.Views.PinnedCaptureWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:core="clr-namespace:DynamicIsland.Core"
         Title="Pinned Screen Capture"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         MouseLeftButtonDown="Window_MouseLeftButtonDown"
         MouseWheel="Window_MouseWheel">
-    <Border Margin="8" CornerRadius="10" Background="{DynamicResource PillBackgroundBrush}" BorderBrush="{DynamicResource PillStrokeBrush}" BorderThickness="1.2">
+    <Border Margin="8" CornerRadius="14" Background="{DynamicResource PillBackgroundBrush}" BorderBrush="{DynamicResource PillStrokeBrush}" BorderThickness="1.2">
         <Border.Effect>
             <DropShadowEffect BlurRadius="14" ShadowDepth="3" Direction="270" Opacity="0.55" Color="Black" />
         </Border.Effect>
         <Grid>
-            <Border CornerRadius="9" ClipToBounds="True">
+            <Border CornerRadius="13" ClipToBounds="True" core:RoundedClip.ClipChild="True">
                 <Image x:Name="CaptureImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
             </Border>
 

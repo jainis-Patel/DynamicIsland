@@ -58,7 +58,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Profile 1: Cherry MX Blue -->
-                <Border Grid.Column="0" x:Name="CherryCard" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5" CornerRadius="8" Padding="7,6" Cursor="Hand" MouseLeftButtonDown="SelectCherry_Click">
+                <Border Grid.Column="0" x:Name="CherryCard" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5" CornerRadius="14" Padding="7,6" Cursor="Hand" MouseLeftButtonDown="SelectCherry_Click">
                     <StackPanel>
                         <DockPanel LastChildFill="False">
                             <TextBlock Text="Cherry Blue" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
@@ -70,7 +70,7 @@
                 </Border>
 
                 <!-- Profile 2: Tactile Brown -->
-                <Border Grid.Column="2" x:Name="BrownCard" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5" CornerRadius="8" Padding="7,6" Cursor="Hand" MouseLeftButtonDown="SelectBrown_Click">
+                <Border Grid.Column="2" x:Name="BrownCard" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5" CornerRadius="14" Padding="7,6" Cursor="Hand" MouseLeftButtonDown="SelectBrown_Click">
                     <StackPanel>
                         <DockPanel LastChildFill="False">
                             <TextBlock Text="Tactile Brown" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
@@ -82,7 +82,7 @@
                 </Border>
 
                 <!-- Profile 3: Retro Typewriter -->
-                <Border Grid.Column="4" x:Name="TypewriterCard" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5" CornerRadius="8" Padding="7,6" Cursor="Hand" MouseLeftButtonDown="SelectTypewriter_Click">
+                <Border Grid.Column="4" x:Name="TypewriterCard" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1.5" CornerRadius="14" Padding="7,6" Cursor="Hand" MouseLeftButtonDown="SelectTypewriter_Click">
                     <StackPanel>
                         <DockPanel LastChildFill="False">
                             <TextBlock Text="Typewriter" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />

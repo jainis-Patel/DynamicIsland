@@ -136,6 +136,10 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="6" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="6" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="6" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
                         <DockPanel Grid.Row="0" Grid.Column="0" LastChildFill="False">
@@ -159,6 +163,25 @@
                             <TextBlock Text="Auto AC Perf" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                             <CheckBox x:Name="AutoPowerAcToggleSwitch" Click="AutoPowerAcToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
                         </DockPanel>
+
+                        <DockPanel Grid.Row="4" Grid.Column="0" LastChildFill="False">
+                            <TextBlock Text="High-Load Droplet" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            <CheckBox x:Name="HighLoadAlertsToggleSwitch" Click="HighLoadAlertsToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                        </DockPanel>
+
+                        <DockPanel Grid.Row="4" Grid.Column="2" LastChildFill="False">
+                            <TextBlock Text="CPU Alert Threshold" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            <Button Click="HighCpuThresholdBtn_Click" x:Name="HighCpuThresholdBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="7,0" Margin="0">
+                                <TextBlock x:Name="HighCpuThresholdText" Text="80%" Style="{StaticResource Digits}" FontSize="8" FontWeight="SemiBold" />
+                            </Button>
+                        </DockPanel>
+
+                        <DockPanel Grid.Row="6" Grid.Column="0" LastChildFill="False">
+                            <TextBlock Text="RAM Alert Threshold" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            <Button Click="HighRamThresholdBtn_Click" x:Name="HighRamThresholdBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="7,0" Margin="0">
+                                <TextBlock x:Name="HighRamThresholdText" Text="85%" Style="{StaticResource Digits}" FontSize="8" FontWeight="SemiBold" />
+                            </Button>
+                        </DockPanel>
                     </Grid>
                 </StackPanel>
             </Border>
@@ -170,6 +193,26 @@
                         <TextBlock Text="Browser &amp; Tab Passthrough" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
                         <TextBlock Text="Prevents blocking browser tabs, search bars, and top controls" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
                     </StackPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <!-- Visibility Mode: Always Visible vs Taskbar-Style Auto-Hide -->
+                    <DockPanel LastChildFill="False" Margin="0,0,0,2">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Visibility Mode" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock x:Name="AutoHideModeSubtext" Text="Always visible at top edge" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <Border DockPanel.Dock="Right" Background="{DynamicResource ChipBgBrush}" CornerRadius="6" Padding="2" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Click="AutoHideModeBtn_Click" x:Name="AutoHideAlwaysBtn" Tag="AlwaysVisible" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,2,0" ToolTipService.ToolTip="Keep Dynamic Island always visible">
+                                    <TextBlock Text="Always Visible" FontSize="7.5" FontWeight="SemiBold" />
+                                </Button>
+                                <Button Click="AutoHideModeBtn_Click" x:Name="AutoHideAutoBtn" Tag="AutoHide" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0" ToolTipService.ToolTip="Hide like Windows taskbar; hover top edge to pull back">
+                                    <TextBlock Text="Auto-Hide" FontSize="7.5" FontWeight="SemiBold" />
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </DockPanel>
 
                     <Border Style="{StaticResource SettingsHairline}" />
 

@@ -345,7 +345,7 @@
                                     <!-- Card Body: Multi-Modal Content Well (Image Crop / Color Swatch Banner / 6-line Snippet Well) -->
                                     <Grid Grid.Row="1" Margin="0,6,0,6">
                                         <!-- Mode A: Large Image Preview -->
-                                        <Border CornerRadius="8" ClipToBounds="True"
+                                        <Border CornerRadius="10" ClipToBounds="True" core:RoundedClip.ClipChild="True"
                                                 Background="{DynamicResource ChipBgBrush}"
                                                 BorderBrush="{DynamicResource CardBorderBrush}"
                                                 BorderThickness="1"
@@ -446,6 +446,27 @@
                                                 Visibility="{Binding IsImage, Converter={StaticResource BoolToVisibilityConverter}}"
                                                 Style="{StaticResource CardBadgeActionBtn}" ToolTip="Extract Text (OCR)">
                                             <TextBlock Text="OCR" FontSize="8" FontWeight="SemiBold" Foreground="#C084FC" />
+                                        </Button>
+
+                                        <Button DockPanel.Dock="Right" Tag="{Binding Id}" Click="TransformClipboardItem_Click"
+                                                ToolTip="Smart Transform (JSON, Base64, URL, Case, Extract)">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource CardBadgeActionBtn}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsText}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsCode}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsUrl}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <TextBlock Text="Transform" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
                                         </Button>
 
                                         <Button DockPanel.Dock="Right" Tag="{Binding Id}" Click="CopyPlainClipboardItem_Click"

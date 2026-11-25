@@ -111,7 +111,7 @@
 
         <!-- Unified Fluent App Tile Template (Native Floating Icons, Soft Hover Highlight) -->
         <DataTemplate x:Key="UnifiedAppTileTemplate">
-            <Border Width="142" Height="62" CornerRadius="11"
+            <Border Width="142" Height="62" CornerRadius="14"
                     BorderThickness="1" Margin="0,0,5,5" Padding="4,2"
                     Cursor="Hand"
                     ToolTipService.InitialShowDelay="350" ToolTipService.BetweenShowDelay="100"

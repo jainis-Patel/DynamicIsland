@@ -57,6 +57,7 @@ public partial class IslandWindow : Window
     private static readonly PillShape ShelfExpandedShape      = new(588, 268, 36);
     private static readonly PillShape QuickReplyExpandedShape = new(484, 156, 36);
     private static readonly PillShape PetExpandedShape        = new(484, 216, 34);
+    private static readonly PillShape MirrorExpandedShape     = new(484, 248, 36);
 
     // Tactile interaction constants (WWDC Fluid Interfaces spec)
     private const double HoverWidthSwell = 10.0;
@@ -81,7 +82,7 @@ public partial class IslandWindow : Window
 
     /// <summary>
     /// Enforces a strict 2-signal visual budget in Idle state so the pill never turns into a cluttered taskbar.
-    /// Priority: HighLoadAlert -> NetworkSpeed -> VirtualPet/Lottie -> Base Clock.
+    /// Priority: NetworkSpeed -> VirtualPet/Lottie -> Base Clock.
     /// </summary>
     private PillShape GetIdleShape()
     {
@@ -111,11 +112,7 @@ public partial class IslandWindow : Window
 
         // Cap concurrent idle complications to prevent visual bloat
         double complicationExtra = 0;
-        if (_isHighLoadAlertActive)
-        {
-            complicationExtra = 76; // Alert takes sole secondary slot
-        }
-        else if (_settingsService?.Current?.ShowNetworkSpeedInIdle == true)
+        if (_settingsService?.Current?.ShowNetworkSpeedInIdle == true)
         {
             complicationExtra = 44; // Clean bandwidth pill
         }
@@ -160,6 +157,7 @@ public partial class IslandWindow : Window
                 ExpandedView.CaptureStudio => CaptureStudioExpandedShape,
                 ExpandedView.QuickReply    => QuickReplyExpandedShape,
                 ExpandedView.Pet           => PetExpandedShape,
+                ExpandedView.Mirror        => MirrorExpandedShape,
                 ExpandedView.Notifications => GetNotificationsExpandedShape(),
                 ExpandedView.Media when _mediaService.Current == null || string.IsNullOrWhiteSpace(_mediaService.Current.Title)
                                            => new PillShape(484, 114, 28),
@@ -216,13 +214,64 @@ public partial class IslandWindow : Window
     private readonly CursorTracker _cursor = null!;
     private readonly FullscreenWatcher _fullscreen = null!;
     private readonly DispatcherTimer _clockTimer;
-    private readonly DispatcherTimer _topmostTimer;
     private readonly FrameworkElement[] _panels;
-    private readonly FrameworkElement[] _allContainers;
+    private readonly List<FrameworkElement> _materializedContainers;
     private readonly Button[] _dockButtons;
-    private readonly IReadOnlyDictionary<ExpandedView, (FrameworkElement Container, Button DockButton)> _viewRegistry;
+    private readonly IReadOnlyDictionary<ExpandedView, (Func<FrameworkElement> ResolveContainer, Button DockButton)> _viewRegistry;
     private readonly List<ExpandedView> _orderedViews;
     private readonly ScaleTransform[] _bars;
+
+    // Lazy-instantiated self-contained expanded widget views (allocated on first navigation)
+    private Views.Widgets.CalendarTaskView? _calendarContainer;
+    private Views.Widgets.NotesView? _notesContainer;
+    private Views.Widgets.ConverterView? _converterContainer;
+    private Views.Widgets.WidgetsGalleryView? _widgetsGalleryContainer;
+    private Views.Widgets.LauncherView? _launcherContainer;
+    private Views.Widgets.TermiNotchView? _termiContainer;
+    private Views.Widgets.PhoneBridgeView? _phoneBridgeContainer;
+    private Views.Widgets.MechSoundsView? _mechSoundsContainer;
+    private Views.Widgets.CaptureStudioView? _captureStudioContainer;
+    private Views.Widgets.QuickReplyView? _quickReplyContainer;
+    private Views.Widgets.PetSanctuaryView? _petSanctuaryContainer;
+    private Views.Widgets.MirrorView? _mirrorContainer;
+
+    internal Views.Widgets.CalendarTaskView? CalendarContainer => _calendarContainer;
+    internal Views.Widgets.NotesView? NotesContainer => _notesContainer;
+    internal Views.Widgets.ConverterView? ConverterContainer => _converterContainer;
+    internal Views.Widgets.WidgetsGalleryView? WidgetsGalleryContainer => _widgetsGalleryContainer;
+    internal Views.Widgets.LauncherView? LauncherContainer => _launcherContainer;
+    internal Views.Widgets.TermiNotchView? TermiContainer => _termiContainer;
+    internal Views.Widgets.PhoneBridgeView? PhoneBridgeContainer => _phoneBridgeContainer;
+    internal Views.Widgets.MechSoundsView? MechSoundsContainer => _mechSoundsContainer;
+    internal Views.Widgets.CaptureStudioView? CaptureStudioContainer => _captureStudioContainer;
+    internal Views.Widgets.QuickReplyView? QuickReplyContainer => _quickReplyContainer;
+    internal Views.Widgets.PetSanctuaryView? PetSanctuaryContainer => _petSanctuaryContainer;
+    internal Views.Widgets.MirrorView? MirrorContainer => _mirrorContainer;
+
+    private T MaterializeExpandedView<T>(ref T? slot) where T : FrameworkElement, new()
+    {
+        if (slot != null) return slot;
+
+        var view = new T
+        {
+            Visibility = Visibility.Collapsed,
+            Opacity = 0,
+            RenderTransformOrigin = new Point(0.5, 0.5)
+        };
+        var tg = new TransformGroup();
+        tg.Children.Add(new ScaleTransform(1, 1));
+        tg.Children.Add(new TranslateTransform(0, 0));
+        view.RenderTransform = tg;
+
+        ExpandedViewsHost.Children.Add(view);
+        slot = view;
+        _materializedContainers.Add(view);
+        return view;
+    }
+
+    internal Views.Widgets.TermiNotchView EnsureTermiContainer() => MaterializeExpandedView(ref _termiContainer);
+    internal Views.Widgets.QuickReplyView EnsureQuickReplyContainer() => MaterializeExpandedView(ref _quickReplyContainer);
+    internal Views.Widgets.NotesView EnsureNotesContainer() => MaterializeExpandedView(ref _notesContainer);
 
     // Observable collections for zero-teardown ItemsControl bindings
     private readonly ObservableCollection<ShelfItem> _shelfItems = new();
@@ -252,7 +301,7 @@ public partial class IslandWindow : Window
     private readonly CountdownTimerService _countdownService;
     private readonly NetworkService _networkService;
     private readonly LyricsService _lyricsService;
-    private readonly MediaSongListService _mediaSongListService;
+    private MediaSongListService _mediaSongListService => _services.Get<MediaSongListService>();
     private readonly WeatherService _weatherService;
     private readonly CalendarService _calendarService;
     private readonly BrightnessService _brightnessService;
@@ -264,22 +313,26 @@ public partial class IslandWindow : Window
     private readonly LiveActivityIpcService _liveActivityIpcService;
     private readonly MeetingModeService _meetingModeService;
     private readonly JiggleBasketService _jiggleBasketService;
-    private readonly NotesService _notesService;
-    private readonly QuickLauncherService _quickLauncherService;
+    private NotesService _notesService => _services.Get<NotesService>();
+    private QuickLauncherService _quickLauncherService => _services.Get<QuickLauncherService>();
     private readonly TouchpadGestureProcessor _touchpadProcessor = new();
     private readonly InlineConfirmGuard _confirmGuard = new();
-    private readonly TermiNotchService _termiNotchService;
+    private TermiNotchService _termiNotchService => _services.Get<TermiNotchService>();
     private readonly WindowSnapService _windowSnapService;
-    private readonly KeyboardSoundService _keyboardSoundService;
-    private readonly WindowsShareService _windowsShareService;
-    private readonly LanQuickShareService _lanQuickShareService;
-    private readonly TaskService _taskService;
+    private KeyboardSoundService _keyboardSoundService => _services.Get<KeyboardSoundService>();
+    private WindowsShareService _windowsShareService => _services.Get<WindowsShareService>();
+    private LanQuickShareService _lanQuickShareService => _services.Get<LanQuickShareService>();
+    private TaskService _taskService => _services.Get<TaskService>();
     private readonly CommunityDropletService _communityDropletService;
     private readonly UpdateManagerService _updateService;
     private readonly Choreographer _choreographer;
     private Views.MiniPlayerWindow? _miniPlayerWindow;
     private TrayIconService? _trayIcon;
     private bool _isClosing;
+    private bool _isFullscreenSuppressed;
+
+    internal bool IsFullscreenSuppressed => _isFullscreenSuppressed;
+    internal bool ShouldThrottleVisuals => _choreographer?.ShouldThrottleVisuals ?? false;
 
     internal SystemPerformanceService? SystemPerfServiceInstance => _systemPerfService;
     internal NetworkService? NetworkServiceInstance => _networkService;
@@ -298,6 +351,7 @@ public partial class IslandWindow : Window
     internal KeyboardSoundService? KeyboardSoundServiceInstance => _keyboardSoundService;
     internal LanQuickShareService LanQuickShare => _lanQuickShareService;
     internal KeyboardSoundService KeyboardSound => _keyboardSoundService;
+    internal WebcamMirrorService WebcamMirror => _services.Get<WebcamMirrorService>();
     internal CommunityDropletService CommunityDroplets => _communityDropletService;
     internal DropletRegistry? Droplets => _dropletRegistry;
     internal ClipboardHistoryService ClipboardService => _clipboardService;
@@ -386,39 +440,54 @@ public partial class IslandWindow : Window
             panel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        _viewRegistry = new Dictionary<ExpandedView, (FrameworkElement, Button)>
+        _viewRegistry = new Dictionary<ExpandedView, (Func<FrameworkElement>, Button)>
         {
-            [ExpandedView.Media]          = (MediaContainer, MediaHomeButton),
-            [ExpandedView.Calendar]       = (CalendarContainer, CalendarButton),
-            [ExpandedView.Shelf]          = (ShelfContainer, ShelfButton),
-            [ExpandedView.Notifications]  = (NotificationsContainer, NotificationsButton),
-            [ExpandedView.WidgetsGallery] = (WidgetsGalleryContainer, WidgetsGalleryButton),
-            [ExpandedView.Launcher]       = (LauncherContainer, LauncherButton),
-            [ExpandedView.Audio]          = (AudioContainer, AudioButton),
-            [ExpandedView.Clipboard]      = (ClipboardContainer, ShelfButton),
-            [ExpandedView.SystemHud]      = (SystemHudContainer, WidgetsGalleryButton),
-            [ExpandedView.Battery]        = (BatteryContainer, WidgetsGalleryButton),
-            [ExpandedView.Network]        = (NetworkContainer, WidgetsGalleryButton),
-            [ExpandedView.Peripherals]    = (PeripheralsContainer, WidgetsGalleryButton),
-            [ExpandedView.Calc]           = (CalcContainer, LauncherButton),
-            [ExpandedView.Notes]          = (NotesContainer, LauncherButton),
-            [ExpandedView.VoiceMemo]      = (VoiceMemoContainer, LauncherButton),
-            [ExpandedView.Converter]      = (ConverterContainer, LauncherButton),
-            [ExpandedView.Termi]          = (TermiContainer, LauncherButton),
-            [ExpandedView.PhoneBridge]    = (PhoneBridgeContainer, LauncherButton),
-            [ExpandedView.MechSounds]     = (MechSoundsContainer, LauncherButton),
-            [ExpandedView.CaptureStudio]  = (CaptureStudioContainer, LauncherButton),
-            [ExpandedView.QuickReply]     = (QuickReplyContainer, NotificationsButton),
-            [ExpandedView.Pet]            = (PetSanctuaryContainer, WidgetsGalleryButton),
-            [ExpandedView.Settings]       = (SettingsContainer, SettingsButton),
+            [ExpandedView.Media]          = (() => MediaContainer, MediaHomeButton),
+            [ExpandedView.Calendar]       = (() => MaterializeExpandedView(ref _calendarContainer), CalendarButton),
+            [ExpandedView.Shelf]          = (() => ShelfContainer, ShelfButton),
+            [ExpandedView.Notifications]  = (() => NotificationsContainer, NotificationsButton),
+            [ExpandedView.WidgetsGallery] = (() => MaterializeExpandedView(ref _widgetsGalleryContainer), WidgetsGalleryButton),
+            [ExpandedView.Launcher]       = (() => MaterializeExpandedView(ref _launcherContainer), LauncherButton),
+            [ExpandedView.Audio]          = (() => AudioContainer, AudioButton),
+            [ExpandedView.Clipboard]      = (() => ClipboardContainer, ShelfButton),
+            [ExpandedView.SystemHud]      = (() => SystemHudContainer, WidgetsGalleryButton),
+            [ExpandedView.Battery]        = (() => BatteryContainer, WidgetsGalleryButton),
+            [ExpandedView.Network]        = (() => NetworkContainer, WidgetsGalleryButton),
+            [ExpandedView.Peripherals]    = (() => PeripheralsContainer, WidgetsGalleryButton),
+            [ExpandedView.Calc]           = (() => CalcContainer, LauncherButton),
+            [ExpandedView.Notes]          = (() => MaterializeExpandedView(ref _notesContainer), LauncherButton),
+            [ExpandedView.VoiceMemo]      = (() => VoiceMemoContainer, LauncherButton),
+            [ExpandedView.Converter]      = (() => MaterializeExpandedView(ref _converterContainer), LauncherButton),
+            [ExpandedView.Termi]          = (() => MaterializeExpandedView(ref _termiContainer), LauncherButton),
+            [ExpandedView.PhoneBridge]    = (() => MaterializeExpandedView(ref _phoneBridgeContainer), LauncherButton),
+            [ExpandedView.MechSounds]     = (() => MaterializeExpandedView(ref _mechSoundsContainer), LauncherButton),
+            [ExpandedView.CaptureStudio]  = (() => MaterializeExpandedView(ref _captureStudioContainer), LauncherButton),
+            [ExpandedView.QuickReply]     = (() => MaterializeExpandedView(ref _quickReplyContainer), NotificationsButton),
+            [ExpandedView.Pet]            = (() => MaterializeExpandedView(ref _petSanctuaryContainer), WidgetsGalleryButton),
+            [ExpandedView.Mirror]         = (() => MaterializeExpandedView(ref _mirrorContainer), LauncherButton),
+            [ExpandedView.Settings]       = (() => SettingsContainer, SettingsButton),
         };
 
         _orderedViews = _viewRegistry.Keys.ToList();
-        _allContainers = _viewRegistry.Values.Select(v => v.Container).ToArray();
+        _materializedContainers = new List<FrameworkElement>
+        {
+            MediaContainer,
+            ShelfContainer,
+            ClipboardContainer,
+            CalcContainer,
+            SettingsContainer,
+            AudioContainer,
+            BatteryContainer,
+            VoiceMemoContainer,
+            PeripheralsContainer,
+            NetworkContainer,
+            NotificationsContainer,
+            SystemHudContainer
+        };
         _dockButtons = _viewRegistry.Values.Select(v => v.DockButton).ToArray();
 
-        // Prepare each expanded container with a TransformGroup for spatial tab transitions
-        foreach (var container in _allContainers)
+        // Prepare each eager expanded container with a TransformGroup for spatial tab transitions
+        foreach (var container in _materializedContainers)
         {
             container.RenderTransformOrigin = new Point(0.5, 0.5);
             var tg = new TransformGroup();
@@ -473,6 +542,7 @@ public partial class IslandWindow : Window
         _fullscreen = _services.Register(new FullscreenWatcher(() => (_hwnd, GetTargetMonitor())));
         _fullscreen.Changed += fullscreen =>
         {
+            _isFullscreenSuppressed = fullscreen;
             _machine.SetSuppressed(fullscreen);
             _systemPerfService?.SetFullscreenSuspended(fullscreen);
             _networkService?.SetSuspended(fullscreen);
@@ -503,7 +573,7 @@ public partial class IslandWindow : Window
         _countdownService = _services.Register(new CountdownTimerService());
         _networkService = _services.Register(new NetworkService(Dispatcher, () => _settingsService.Current));
         _lyricsService = _services.Register(new LyricsService(Dispatcher));
-        _mediaSongListService = _services.Register(new MediaSongListService(Dispatcher, _mediaService));
+        _services.RegisterLazy(() => new MediaSongListService(Dispatcher, _mediaService));
         _weatherService = _services.Register(new WeatherService(Dispatcher, () => _settingsService.Current));
         _calendarService = _services.Register(new CalendarService(Dispatcher));
         _brightnessService = _services.Register(new BrightnessService(Dispatcher, GetTargetMonitor));
@@ -511,7 +581,7 @@ public partial class IslandWindow : Window
         _petService.WellnessAlertTriggered += OnPetWellnessAlert;
         _petService.AffectionChanged += _ => Dispatcher.InvokeAsync(UpdatePetSettingsUI);
         _petService.MoodChanged += _ => Dispatcher.InvokeAsync(UpdatePetSettingsUI);
-        _systemPerfService = _services.Register(new SystemPerformanceService());
+        _systemPerfService = _services.Register(new SystemPerformanceService(() => _settingsService.Current));
         _systemPerfService.VitalsUpdated += OnSystemVitalsUpdated;
         _systemPerfService.Start();
 
@@ -525,19 +595,22 @@ public partial class IslandWindow : Window
         _communityDropletService = _services.Register(new CommunityDropletService(_dropletRegistry, _liveActivityHub));
         _communityDropletService.Start();
         _jiggleBasketService = _services.Register(new JiggleBasketService(Dispatcher, _shelfService, () => _dropletRegistry.IsEnabled("jiggle_basket")));
-        _notesService = _services.Register(new NotesService());
-        _taskService = _services.Register(new TaskService());
-        _quickLauncherService = _services.Register(new QuickLauncherService());
-        _termiNotchService = _services.Register(new TermiNotchService());
+        _services.RegisterLazy(() => new NotesService());
+        _services.RegisterLazy(() => new TaskService());
+        _services.RegisterLazy(() => new QuickLauncherService());
+        _services.RegisterLazy(() => new TermiNotchService());
         _windowSnapService = _services.Register(new WindowSnapService(Dispatcher, () => _hwnd, () => _dropletRegistry.IsEnabled("window_snap")));
-        _keyboardSoundService = _services.Register(new KeyboardSoundService());
-        _windowsShareService = _services.Register(new WindowsShareService(() => _hwnd));
-        _lanQuickShareService = _services.Register(new LanQuickShareService(Dispatcher, _shelfService, _clipboardService));
+        _services.RegisterLazy(() => new KeyboardSoundService());
+        _services.RegisterLazy(() => new WindowsShareService(() => _hwnd));
+        _services.RegisterLazy(() => new LanQuickShareService(Dispatcher, _shelfService, _clipboardService));
+        _services.RegisterLazy(() => new WebcamMirrorService(Dispatcher));
         _updateService = _services.Register(new UpdateManagerService(_settingsService, dispatcher: Dispatcher));
         _updateService.UpdateAvailable += OnUpdateAvailable;
         _updateService.StatusChanged += OnUpdateStatusChanged;
         _updateService.DownloadProgressChanged += OnUpdateDownloadProgressChanged;
         _choreographer = _services.Register(new Choreographer(Dispatcher));
+        _weatherService.AttachChoreographer(_choreographer);
+        _calendarService.AttachChoreographer(_choreographer);
         _choreographer.PowerModeChanged += (prev, next) => Dispatcher.InvokeAsync(() =>
         {
             UpdateSpectrumActivity();
@@ -555,11 +628,17 @@ public partial class IslandWindow : Window
             }
             else if (dropletId == "mech_sounds")
             {
-                _keyboardSoundService.SetEnabled(enabled);
+                if (enabled || _services.IsMaterialized<KeyboardSoundService>())
+                {
+                    _keyboardSoundService.SetEnabled(enabled);
+                }
             }
             else if (dropletId == "phone_bridge" && !enabled)
             {
-                _lanQuickShareService.StopSession();
+                if (_services.IsMaterialized<LanQuickShareService>())
+                {
+                    _lanQuickShareService.StopSession();
+                }
             }
             else if (dropletId == "caffeine" && !enabled && _isCaffeineActive)
             {
@@ -586,7 +665,7 @@ public partial class IslandWindow : Window
         _powerPlanService.DisconnectedTriggered += OnPowerDisconnectedTriggered;
         _powerPlanService.LowBatteryTriggered += OnLowBatteryTriggered;
         _bluetoothMonitor.Alert += toast => _machine.PushToast(toast);
-        _bluetoothMonitor.DevicesChanged += () => _ = _peripheralService.RefreshAsync();
+        _bluetoothMonitor.DevicesChanged += () => _peripheralService.RefreshAsync().FireAndForget("Bluetooth.DevicesChanged");
         _volumeService.VolumeChanged += OnVolumeChanged;
         _shelfService.Changed += OnShelfChanged;
         _privacyService.StateChanged += OnPrivacyStateChanged;
@@ -619,8 +698,7 @@ public partial class IslandWindow : Window
 
         _clockTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background,
             (_, _) => UpdateClockAndTimeline(), Dispatcher);
-        _topmostTimer = new DispatcherTimer(TimeSpan.FromSeconds(2.5), DispatcherPriority.Background,
-            (_, _) => ReassertTopmost(), Dispatcher);
+        SetTopmostReassertEnabled(true);
 
         WireEvents();
         ApplyGeometry();
@@ -919,9 +997,15 @@ public partial class IslandWindow : Window
         double islandCenterDipX = IslandCenterDipX;
         double islandTopDipY = IslandTopDipY;
 
-        double targetLeft = islandCenterDipX - (_miniPlayerWindow.Width / 2.0);
+        double? savedX = _settingsService.Current.MiniPlayerX;
+        double? savedY = _settingsService.Current.MiniPlayerY;
+        bool hasSavedPos = savedX.HasValue && savedY.HasValue &&
+                           !double.IsNaN(savedX.Value) && !double.IsInfinity(savedX.Value) &&
+                           !double.IsNaN(savedY.Value) && !double.IsInfinity(savedY.Value);
+
+        double targetLeft = hasSavedPos ? savedX!.Value : islandCenterDipX - (_miniPlayerWindow.Width / 2.0);
         // Position comfortably right below the collapsed island pill (which is ~36 DIPs tall)
-        double targetTop = islandTopDipY + 54.0;
+        double targetTop = hasSavedPos ? savedY!.Value : islandTopDipY + 54.0;
 
         var monitor = GetTargetMonitor();
         if (monitor != IntPtr.Zero)
@@ -929,13 +1013,16 @@ public partial class IslandWindow : Window
             var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
             if (GetMonitorInfo(monitor, ref mi))
             {
-                double workLeft = mi.rcWork.Left / scale;
-                double workRight = mi.rcWork.Right / scale;
-                double workTop = mi.rcWork.Top / scale;
-                double workBottom = mi.rcWork.Bottom / scale;
-
-                targetLeft = Math.Clamp(targetLeft, workLeft + 12.0, Math.Max(workLeft + 12.0, workRight - _miniPlayerWindow.Width - 12.0));
-                targetTop = Math.Clamp(targetTop, workTop + 48.0, Math.Max(workTop + 48.0, workBottom - _miniPlayerWindow.Height - 12.0));
+                (targetLeft, targetTop) = WindowPlacementHelper.ClampToWorkArea(
+                    targetLeft,
+                    targetTop,
+                    _miniPlayerWindow.Width,
+                    _miniPlayerWindow.Height,
+                    mi.rcWork.Left / scale,
+                    mi.rcWork.Top / scale,
+                    mi.rcWork.Right / scale,
+                    mi.rcWork.Bottom / scale,
+                    margin: 12.0);
             }
         }
 
@@ -943,6 +1030,11 @@ public partial class IslandWindow : Window
         _miniPlayerWindow.Top = targetTop;
         _miniPlayerWindow.Show();
         _miniPlayerWindow.Activate();
+
+        if (_settingsService.Current.MiniPlayerCompact)
+        {
+            _miniPlayerWindow.SetCompactModeExternal(true);
+        }
 
         _machine.CollapseNow();
     }
@@ -958,347 +1050,13 @@ public partial class IslandWindow : Window
     internal NotesService NotesService => _notesService;
     internal DropShelfService ShelfService => _shelfService;
 
-    // ═════════════════════════════════════════════════════════════════
-    //  Activity & Clock/Timeline Coordination
-    // ═════════════════════════════════════════════════════════════════
-
-    private void EvaluateActivity()
+    private void SetTopmostReassertEnabled(bool enabled)
     {
-        bool mediaPlaying = _mediaService.Current?.IsPlaying ?? false;
-        bool stopwatchActive = _stopwatch.IsRunning;
-        bool countdownRunning = _countdownService?.IsRunning ?? false;
-        bool callActive = !string.IsNullOrWhiteSpace(_privacyService.ActiveCallApp);
-        bool downloading = _downloadService.HasActiveDownloads;
-        bool recording = _voiceMemoService?.IsRecording ?? false;
-        bool liveActivity = _liveActivityHub?.HasActivities ?? false;
-
-        var (hasActivity, host, secondaryHost) = ActivityResolver.ResolveWithSecondary(
-            recording,
-            mediaPlaying,
-            callActive,
-            countdownRunning,
-            downloading,
-            stopwatchActive,
-            liveActivity);
-
-        bool enableSecondary = _settingsService?.Current.EnableSecondaryDroplet ?? true;
-        if (!enableSecondary)
-        {
-            secondaryHost = CompactActivityKind.None;
-        }
-
-        _activeCompactHost = host;
-        _secondaryCompactHost = secondaryHost;
-        _machine.SetActivity(hasActivity);
-
-        bool showTimerHost = host is CompactActivityKind.Countdown or CompactActivityKind.Stopwatch or CompactActivityKind.None;
-        CompactRecordHost.Visibility   = host == CompactActivityKind.Recording ? Visibility.Visible : Visibility.Collapsed;
-        CompactMediaHost.Visibility    = host == CompactActivityKind.Media ? Visibility.Visible : Visibility.Collapsed;
-        CompactCallHost.Visibility     = host == CompactActivityKind.Call ? Visibility.Visible : Visibility.Collapsed;
-        CompactDownloadHost.Visibility = host == CompactActivityKind.Download ? Visibility.Visible : Visibility.Collapsed;
-        CompactActivityHost.Visibility = host == CompactActivityKind.LiveActivity ? Visibility.Visible : Visibility.Collapsed;
-        CompactTimerHost.Visibility    = showTimerHost ? Visibility.Visible : Visibility.Collapsed;
-
-        if (host == CompactActivityKind.LiveActivity && _liveActivityHub?.Primary is { } primary)
-        {
-            CompactActivityTitle.Text = primary.Title;
-            if (!string.IsNullOrWhiteSpace(primary.Subtitle))
-            {
-                CompactActivitySubtitle.Text = primary.Subtitle;
-                CompactActivitySubtitle.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                CompactActivitySubtitle.Visibility = Visibility.Collapsed;
-            }
-
-            if (!string.IsNullOrWhiteSpace(primary.Glyph))
-            {
-                CompactActivityGlyph.Text = primary.Glyph;
-            }
-
-            if (primary.AccentColor != default)
-            {
-                var brush = new SolidColorBrush(primary.AccentColor);
-                brush.Freeze();
-                CompactActivityGlyph.Foreground = brush;
-                var badgeBg = new SolidColorBrush(Color.FromArgb(0x28, primary.AccentColor.R, primary.AccentColor.G, primary.AccentColor.B));
-                badgeBg.Freeze();
-                CompactActivityBadge.Background = badgeBg;
-            }
-
-            if (primary.Progress.HasValue)
-            {
-                CompactActivityTrailingBadge.Visibility = Visibility.Visible;
-                CompactActivityTrailingText.Text = primary.ProgressPercentText;
-            }
-            else
-            {
-                CompactActivityTrailingBadge.Visibility = Visibility.Collapsed;
-            }
-        }
+        if (_isClosing) return;
+        if (enabled)
+            _choreographer.Register("reassert_topmost", ReassertTopmost, 3, PowerSensitivity.Normal);
         else
-        {
-            CompactActivityTrailingBadge.Visibility = Visibility.Collapsed;
-        }
-
-        UpdateSecondaryDropletTarget();
-        UpdateSpectrumActivity();
-        UpdateClockTimerInterval();
-    }
-
-    private void UpdateClockTimerInterval()
-    {
-        string currentStyle = SettingsService.NormalizeClockStyle(_settingsService?.Current?.ClockStyle);
-        bool mediaPlaying = _mediaService.Current?.IsPlaying ?? false;
-        bool timerRunning = _stopwatch.IsRunning || (_countdownService?.IsRunning ?? false);
-        bool expandedMediaActive = _machine.State == IslandState.Expanded &&
-                                   _currentExpandedView == ExpandedView.Media &&
-                                   (mediaPlaying || timerRunning);
-        bool compactLyricsActive = _machine.State == IslandState.Compact &&
-                                   (_settingsService?.Current?.ShowLyricsInCompact ?? false) &&
-                                   mediaPlaying;
-        bool idleAnalogActive = _machine.State == IslandState.Idle &&
-                                (currentStyle == "Analog" || currentStyle == "JumpHour" || currentStyle == "Matrix");
-
-        bool needsSubSecond = expandedMediaActive || compactLyricsActive || idleAnalogActive;
-
-        // 50ms (20Hz) only when active media scrubber/lyrics or analog sweep hand is visible; 1s (1Hz) otherwise
-        var targetInterval = needsSubSecond ? TimeSpan.FromMilliseconds(50) : TimeSpan.FromSeconds(1);
-        if (_clockTimer != null && _clockTimer.Interval != targetInterval)
-        {
-            _clockTimer.Interval = targetInterval;
-        }
-    }
-
-    private void UpdateClockAndTimeline()
-    {
-        var now = DateTime.Now;
-        string time = now.ToString("t", CultureInfo.CurrentCulture);
-        if (time != _lastTimeText)
-        {
-            _lastTimeText = time;
-            if (IdleClock != null) IdleClock.Text = time;
-            if (IdleClockSecHMin != null) IdleClockSecHMin.Text = time;
-            if (IdleClockDateHMin != null) IdleClockDateHMin.Text = time;
-            if (IdleClockAnalogHMin != null) IdleClockAnalogHMin.Text = time;
-            if (IdleClockNeon != null) IdleClockNeon.Text = time;
-            if (IdleClockNeonGlow != null) IdleClockNeonGlow.Text = time;
-            if (IdleClockMatrixHMin != null) IdleClockMatrixHMin.Text = time;
-
-            string hourFormat = CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern.Contains("H") ? "HH" : "hh";
-            if (IdleFlipHourText != null) IdleFlipHourText.Text = now.ToString(hourFormat, CultureInfo.CurrentCulture);
-            if (IdleFlipMinText != null) IdleFlipMinText.Text = now.ToString("mm", CultureInfo.CurrentCulture);
-            if (IdleJumpHourText != null) IdleJumpHourText.Text = now.ToString(hourFormat, CultureInfo.CurrentCulture);
-            if (IdleJumpMinText != null) IdleJumpMinText.Text = now.ToString("mm", CultureInfo.CurrentCulture);
-            if (ExpandedBigClock != null) ExpandedBigClock.Text = time;
-            if (ExpandedMiniClock != null) ExpandedMiniClock.Text = time;
-
-            string dateShort = now.ToString("ddd, MMM d", CultureInfo.CurrentCulture);
-            if (dateShort != _lastDateShortText)
-            {
-                _lastDateShortText = dateShort;
-                if (IdleClockDateBadgeText != null) IdleClockDateBadgeText.Text = now.ToString("ddd d", CultureInfo.CurrentCulture);
-                if (ExpandedDate != null) ExpandedDate.Text = dateShort;
-                if (ExpandedBigDate != null) ExpandedBigDate.Text = now.ToString("dddd, MMMM d", CultureInfo.CurrentCulture);
-            }
-        }
-
-        if (_machine.State == IslandState.Idle)
-        {
-            string clockStyle = SettingsService.NormalizeClockStyle(_settingsService?.Current?.ClockStyle);
-            if (clockStyle == "Seconds")
-            {
-                if (IdleClockSecDigits != null) IdleClockSecDigits.Text = $":{now.Second:D2}";
-            }
-            else if (clockStyle == "Analog")
-            {
-                double secAngle = (now.Second + now.Millisecond / 1000.0) * 6.0;
-                double minAngle = (now.Minute + now.Second / 60.0) * 6.0;
-                double hourAngle = ((now.Hour % 12) + now.Minute / 60.0) * 30.0;
-                if (AnalogSecTransform != null) AnalogSecTransform.Angle = secAngle;
-                if (AnalogMinTransform != null) AnalogMinTransform.Angle = minAngle;
-                if (AnalogHourTransform != null) AnalogHourTransform.Angle = hourAngle;
-            }
-            else if (clockStyle == "Matrix")
-            {
-                if (IdleClockMatrixHMin != null) IdleClockMatrixHMin.Text = time;
-                if (IdleClockMatrixMeta != null) IdleClockMatrixMeta.Text = $"{now.Second:D2}s";
-                if (IdleClockMatrixPulseDot != null) IdleClockMatrixPulseDot.Opacity = (now.Millisecond < 500) ? 1.0 : 0.35;
-            }
-            else if (clockStyle == "JumpHour")
-            {
-                bool use24Hour = CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern.Contains("H");
-                if (IdleJumpHourText != null) IdleJumpHourText.Text = use24Hour ? now.ToString("HH", CultureInfo.CurrentCulture) : now.ToString("hh", CultureInfo.CurrentCulture);
-                if (IdleJumpMinText != null) IdleJumpMinText.Text = now.ToString("mm", CultureInfo.CurrentCulture);
-                if (IdleJumpSecDot != null) IdleJumpSecDot.Opacity = 0.55 + 0.45 * Math.Sin(now.TimeOfDay.TotalSeconds * Math.PI * 2.0);
-            }
-        }
-
-        _countdownService?.PollCompletion();
-
-        bool isCountdown = _countdownService is { IsActive: true } || (_countdownService?.TargetDuration > TimeSpan.Zero && !_stopwatch.IsRunning);
-        bool timerRunning = (_countdownService?.IsRunning ?? false) || _stopwatch.IsRunning;
-        if (MediaContainer?.MiniClockTimerActiveDot != null)
-        {
-            MediaContainer.MiniClockTimerActiveDot.Visibility = timerRunning ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        if (isCountdown && _countdownService != null)
-        {
-            string formatted = _countdownService.FormatRemaining();
-            if (formatted != _lastTimerText)
-            {
-                _lastTimerText = formatted;
-                CompactTimer.Text = formatted;
-                ExpandedTimer.Text = formatted;
-            }
-        }
-        else if (_stopwatch.IsRunning || _lastTimerText == null)
-        {
-            var elapsed = _stopwatch.Elapsed;
-            string formattedTimer = elapsed.TotalHours >= 1 ? elapsed.ToString(@"h\:mm\:ss") : elapsed.ToString(@"mm\:ss");
-            if (formattedTimer != _lastTimerText)
-            {
-                _lastTimerText = formattedTimer;
-                CompactTimer.Text = formattedTimer;
-                ExpandedTimer.Text = formattedTimer;
-            }
-        }
-
-        if (_privacyService.CallStartTime.HasValue)
-        {
-            var callSpan = DateTimeOffset.Now - _privacyService.CallStartTime.Value;
-            string callTimerText = callSpan.TotalHours >= 1 ? callSpan.ToString(@"h\:mm\:ss") : callSpan.ToString(@"mm\:ss");
-            ExpandedCallTimer.Text = callTimerText;
-            if (!string.IsNullOrWhiteSpace(_privacyService.ActiveCallApp) && CompactCallText != null)
-            {
-                CompactCallText.Text = PrivacyIndicatorService.FormatCompactCallText(_privacyService.ActiveCallApp, callSpan);
-            }
-        }
-
-        if (_machine.State == IslandState.Expanded || (_machine.State == IslandState.Compact && _settingsService?.Current?.ShowLyricsInCompact == true))
-        {
-            UpdateMediaTimelineUI();
-        }
-    }
-
-    private string? _lastPositionText;
-    private string? _lastDurationText;
-
-    private void UpdateMediaTimelineUI()
-    {
-        var media = _mediaService.Current;
-        if (media is not null && !string.IsNullOrWhiteSpace(media.Title))
-        {
-            var pos = media.GetPosition(DateTimeOffset.Now);
-            string posStr = FormatTime(pos);
-            if (posStr != _lastPositionText)
-            {
-                _lastPositionText = posStr;
-                PositionText.Text = posStr;
-            }
-
-            string durStr = media.Duration > TimeSpan.Zero ? FormatTime(media.Duration) : "0:00";
-            if (durStr != _lastDurationText)
-            {
-                _lastDurationText = durStr;
-                DurationText.Text = durStr;
-            }
-
-            if (!_isUserSeeking)
-            {
-                double pct = media.Duration > TimeSpan.Zero
-                    ? Math.Clamp((pos.TotalSeconds / media.Duration.TotalSeconds) * 100.0, 0, 100)
-                    : 0;
-                if (Math.Abs(TimelineSlider.Value - pct) > 0.05)
-                {
-                    TimelineSlider.Value = pct;
-                }
-            }
-
-            _lyricsService.UpdatePosition(pos);
-        }
-        else
-        {
-            if (_lastPositionText != "0:00")
-            {
-                _lastPositionText = "0:00";
-                PositionText.Text = "0:00";
-            }
-            if (_lastDurationText != "0:00")
-            {
-                _lastDurationText = "0:00";
-                DurationText.Text = "0:00";
-            }
-            if (!_isUserSeeking && TimelineSlider.Value != 0)
-            {
-                TimelineSlider.Value = 0;
-            }
-            _lyricsService.Reset();
-        }
-    }
-
-    private static string FormatTime(TimeSpan span)
-    {
-        return span.TotalHours >= 1
-            ? $"{(int)span.TotalHours}:{span.Minutes:D2}:{span.Seconds:D2}"
-            : $"{span.Minutes}:{span.Seconds:D2}";
-    }
-
-    internal static void SyncObservableCollection<T>(ObservableCollection<T> target, IReadOnlyList<T> source)
-    {
-        if (source.Count == 0)
-        {
-            if (target.Count > 0) target.Clear();
-            return;
-        }
-
-        if (source.Count == target.Count + 1 && target.Count > 0 && EqualityComparer<T>.Default.Equals(source[1], target[0]))
-        {
-            bool allMatch = true;
-            for (int i = 1; i < target.Count; i++)
-            {
-                if (!EqualityComparer<T>.Default.Equals(source[i + 1], target[i]))
-                {
-                    allMatch = false;
-                    break;
-                }
-            }
-            if (allMatch)
-            {
-                target.Insert(0, source[0]);
-                return;
-            }
-        }
-
-        for (int i = target.Count - 1; i >= 0; i--)
-        {
-            if (!source.Contains(target[i]))
-            {
-                target.RemoveAt(i);
-            }
-        }
-
-        for (int i = 0; i < source.Count; i++)
-        {
-            var desired = source[i];
-            if (i < target.Count)
-            {
-                if (!EqualityComparer<T>.Default.Equals(target[i], desired))
-                {
-                    int existingIdx = target.IndexOf(desired);
-                    if (existingIdx > i)
-                        target.Move(existingIdx, i);
-                    else
-                        target.Insert(i, desired);
-                }
-            }
-            else
-            {
-                target.Add(desired);
-            }
-        }
+            _choreographer.Unregister("reassert_topmost");
     }
 
     protected override void OnClosed(EventArgs e)
@@ -1306,7 +1064,7 @@ public partial class IslandWindow : Window
         _isClosing = true;
         App.Log("IslandWindow OnClosed called.");
         _clockTimer.Stop();
-        _topmostTimer.Stop();
+        _choreographer.Unregister("reassert_topmost");
         _natureThemeTimer?.Stop();
         _caffeineTimer?.Stop();
         _tuckRestoreTimer?.Stop();
@@ -1328,6 +1086,7 @@ public partial class IslandWindow : Window
         _settingsService.SaveNow();
         _trayIcon?.Dispose();
         _machine.Dispose();
+        DynamicIsland.LiquidGlass.GlassManager.Instance.FrameReady -= OnGlassManagerFrameReady;
         DynamicIsland.LiquidGlass.GlassManager.Instance.Dispose();
         _services.Dispose();
 

@@ -243,26 +243,28 @@ public partial class IslandWindow
         e.Handled = true;
         var menu = new ContextMenu();
 
-        void AddOption(string header, CaffeineMode mode)
+        void AddOption(string header, CaffeineMode mode, string glyph)
         {
             var mi = new MenuItem
             {
                 Header = header,
+                Icon = ThemeBrushes.CreateMenuIcon(glyph),
                 IsChecked = _caffeineMode == mode
             };
             mi.Click += (_, _) => SetCaffeineMode(mode);
             menu.Items.Add(mi);
         }
 
-        AddOption("Off (Normal Sleep)", CaffeineMode.Off);
-        AddOption("☕ 15 Minutes", CaffeineMode.Minutes15);
-        AddOption("☕ 1 Hour", CaffeineMode.Hour1);
-        AddOption("☕ Indefinite (∞)", CaffeineMode.Indefinite);
-        AddOption("⚡ While on AC Power", CaffeineMode.WhileOnAc);
+        AddOption("Off (Normal Sleep)", CaffeineMode.Off, "\uE708");
+        AddOption("15 Minutes", CaffeineMode.Minutes15, "\uEC32");
+        AddOption("1 Hour", CaffeineMode.Hour1, "\uEC32");
+        AddOption("Indefinite", CaffeineMode.Indefinite, "\uEC32");
+        AddOption("While on AC Power", CaffeineMode.WhileOnAc, "\uE945");
 
         var procItem = new MenuItem
         {
-            Header = "🪟 Until Foreground App Exits",
+            Header = "Until Foreground App Exits",
+            Icon = ThemeBrushes.CreateMenuIcon("\uE737"),
             IsChecked = _caffeineMode == CaffeineMode.UntilProcessExits
         };
         procItem.Click += (_, _) => SetCaffeineMode(CaffeineMode.UntilProcessExits);
@@ -463,7 +465,7 @@ public partial class IslandWindow
         {
             Id = "caffeine",
             Category = "caffeine",
-            Glyph = "☕",
+            Glyph = "\uEC32",
             Title = title,
             Subtitle = subtitle,
             AccentColor = ThemeBrushes.GreenColor,
@@ -499,6 +501,7 @@ public partial class IslandWindow
                 CaffeineQuickBtn.BorderBrush = ThemeBrushes.PlanSaverActiveBorder;
                 CaffeineQuickText.Text = badgeLabel;
                 CaffeineQuickText.Foreground = ThemeBrushes.Green;
+                if (CaffeineQuickIcon != null) CaffeineQuickIcon.Foreground = ThemeBrushes.Green;
             }
             else
             {
@@ -506,6 +509,7 @@ public partial class IslandWindow
                 CaffeineQuickBtn.BorderBrush = ThemeBrushes.BorderSubtle;
                 CaffeineQuickText.Text = "Awake";
                 CaffeineQuickText.Foreground = ThemeBrushes.SecondaryText;
+                if (CaffeineQuickIcon != null) CaffeineQuickIcon.Foreground = ThemeBrushes.SecondaryText;
             }
         }
     }
@@ -630,6 +634,78 @@ public partial class IslandWindow
             Category: "power"));
     }
 
+    internal void HighLoadAlertsToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_settingsService == null) return;
+        bool next = !_settingsService.Current.EnableHighLoadAlerts;
+        _settingsService.Update(s => s.EnableHighLoadAlerts = next, nameof(AppSettings.EnableHighLoadAlerts));
+        if (!next)
+        {
+            _isHighLoadAlertActive = false;
+            UpdateSecondaryDropletTarget();
+        }
+        UpdateDisplayAndBatterySettingsUI();
+        _machine.PushToast(new ToastContent(
+            "\uE9D9",
+            "High-Load Droplet Alerts",
+            next ? "Detached CPU & RAM overload droplet enabled" : "High-load overload droplet alerts muted",
+            next ? ThemeBrushes.AmberColor : ThemeBrushes.MutedGreyColor,
+            TimeSpan.FromSeconds(2.0),
+            TargetView: "settings",
+            Priority: ToastPriority.Feedback,
+            Category: "system"));
+    }
+
+    internal void HighCpuThresholdBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_settingsService == null) return;
+        int cur = _settingsService.Current.HighCpuAlertThreshold;
+        int next = cur switch
+        {
+            75 => 80,
+            80 => 85,
+            85 => 90,
+            90 => 95,
+            _ => 75
+        };
+        _settingsService.Update(s => s.HighCpuAlertThreshold = next, nameof(AppSettings.HighCpuAlertThreshold));
+        UpdateDisplayAndBatterySettingsUI();
+        _machine.PushToast(new ToastContent(
+            "\uE9D9",
+            "CPU Alert Threshold",
+            $"High CPU droplet triggers at {next}%+",
+            ThemeBrushes.AmberColor,
+            TimeSpan.FromSeconds(2.0),
+            TargetView: "settings",
+            Priority: ToastPriority.Feedback,
+            Category: "system"));
+    }
+
+    internal void HighRamThresholdBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_settingsService == null) return;
+        int cur = _settingsService.Current.HighRamAlertThreshold;
+        int next = cur switch
+        {
+            75 => 80,
+            80 => 85,
+            85 => 90,
+            90 => 95,
+            _ => 75
+        };
+        _settingsService.Update(s => s.HighRamAlertThreshold = next, nameof(AppSettings.HighRamAlertThreshold));
+        UpdateDisplayAndBatterySettingsUI();
+        _machine.PushToast(new ToastContent(
+            "\uE9D9",
+            "RAM Alert Threshold",
+            $"High RAM droplet triggers at {next}%+",
+            ThemeBrushes.RedColor,
+            TimeSpan.FromSeconds(2.0),
+            TargetView: "settings",
+            Priority: ToastPriority.Feedback,
+            Category: "system"));
+    }
+
     private void UpdateDisplayAndBatterySettingsUI()
     {
         if (_settingsService == null) return;
@@ -671,6 +747,21 @@ public partial class IslandWindow
 
             if (dp.AutoPowerAcToggleSwitch != null)
                 dp.AutoPowerAcToggleSwitch.IsChecked = s.AutoPowerPlanOnAc;
+
+            if (dp.HighLoadAlertsToggleSwitch != null)
+                dp.HighLoadAlertsToggleSwitch.IsChecked = s.EnableHighLoadAlerts;
+
+            if (dp.HighCpuThresholdText != null)
+            {
+                dp.HighCpuThresholdText.Text = $"{s.HighCpuAlertThreshold}%";
+                dp.HighCpuThresholdText.Foreground = s.EnableHighLoadAlerts ? ThemeBrushes.Amber : ThemeBrushes.SecondaryText;
+            }
+
+            if (dp.HighRamThresholdText != null)
+            {
+                dp.HighRamThresholdText.Text = $"{s.HighRamAlertThreshold}%";
+                dp.HighRamThresholdText.Foreground = s.EnableHighLoadAlerts ? ThemeBrushes.Red : ThemeBrushes.SecondaryText;
+            }
         }
 
         if (NightLightQuickBtn != null && NightLightQuickText != null)
@@ -681,6 +772,7 @@ public partial class IslandWindow
                 NightLightQuickBtn.BorderBrush = ThemeBrushes.AmberBorderActive;
                 NightLightQuickText.Text = "Night Light On";
                 NightLightQuickText.Foreground = ThemeBrushes.Amber;
+                if (NightLightQuickIcon != null) NightLightQuickIcon.Foreground = ThemeBrushes.Amber;
             }
             else
             {
@@ -688,6 +780,7 @@ public partial class IslandWindow
                 NightLightQuickBtn.BorderBrush = ThemeBrushes.BorderSubtle;
                 NightLightQuickText.Text = "Night Light";
                 NightLightQuickText.Foreground = ThemeBrushes.SecondaryText;
+                if (NightLightQuickIcon != null) NightLightQuickIcon.Foreground = ThemeBrushes.SecondaryText;
             }
         }
 

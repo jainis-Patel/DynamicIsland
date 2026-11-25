@@ -39,6 +39,8 @@ internal sealed class WeatherService : IDisposable
     private readonly Dispatcher _ui;
     private readonly Func<AppSettings>? _getSettings;
     private readonly DispatcherTimer _timer;
+    private Choreographer? _choreographer;
+    private bool _started;
     private bool _disposed;
     private bool _refreshing;
 
@@ -56,14 +58,34 @@ internal sealed class WeatherService : IDisposable
     {
         _ui = ui;
         _getSettings = getSettings;
-        _timer = new DispatcherTimer(RefreshInterval, DispatcherPriority.Background, (_, _) => _ = RefreshAsync(), _ui);
+        _timer = new DispatcherTimer(RefreshInterval, DispatcherPriority.Background, (_, _) => RefreshAsync().FireAndForget("Weather.Poll"), _ui);
+    }
+
+    public void AttachChoreographer(Choreographer choreographer)
+    {
+        if (_disposed || choreographer == null) return;
+        _choreographer = choreographer;
+        if (_started)
+        {
+            _timer.Stop();
+            _choreographer.Register("weather_refresh", () => RefreshAsync().FireAndForget("Weather.Chore"), (int)RefreshInterval.TotalSeconds, PowerSensitivity.Relaxed);
+        }
     }
 
     public void Start()
     {
         if (_disposed) return;
-        _timer.Start();
-        _ = RefreshAsync();
+        _started = true;
+        if (_choreographer != null)
+        {
+            _timer.Stop();
+            _choreographer.Register("weather_refresh", () => RefreshAsync().FireAndForget("Weather.Chore"), (int)RefreshInterval.TotalSeconds, PowerSensitivity.Relaxed);
+        }
+        else
+        {
+            _timer.Start();
+        }
+        RefreshAsync().FireAndForget("Weather.Start");
     }
 
     public async Task RefreshAsync()
@@ -231,5 +253,6 @@ internal sealed class WeatherService : IDisposable
     {
         _disposed = true;
         _timer.Stop();
+        _choreographer?.Unregister("weather_refresh");
     }
 }

@@ -39,14 +39,14 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <Border Grid.Row="0" Background="{DynamicResource CardSurfaceBrush}" CornerRadius="10" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="10,6">
+            <Border Grid.Row="0" Background="{DynamicResource CardSurfaceBrush}" CornerRadius="14" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="10,6">
                 <Grid>
                     <TextBox KeyDown="CalcInputBox_KeyDown" TextChanged="CalcInputBox_TextChanged" x:Name="CalcInputBox" Background="Transparent" Foreground="{DynamicResource PrimaryTextBrush}" BorderThickness="0" FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" CaretBrush="{DynamicResource AccentBrush}" />
                     <TextBlock x:Name="CalcPlaceholder" Text="e.g. 15 * 24, ans * 2, 255 in hex, 100 km in mi" FontSize="12" Foreground="{DynamicResource SecondaryBrush}" Opacity="0.65" VerticalAlignment="Center" IsHitTestVisible="False" Margin="2,0,0,0" />
                 </Grid>
             </Border>
             <Grid Grid.Row="1" Margin="0,6,0,0">
-                <Border MouseLeftButtonDown="CalcResult_Click" x:Name="CalcResultHost" Visibility="Collapsed" Background="{DynamicResource CardSurfaceBrush}" CornerRadius="10" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="12,6" Cursor="Hand" ToolTipService.ToolTip="Click to copy result">
+                <Border MouseLeftButtonDown="CalcResult_Click" x:Name="CalcResultHost" Visibility="Collapsed" Background="{DynamicResource CardSurfaceBrush}" CornerRadius="14" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" Padding="12,6" Cursor="Hand" ToolTipService.ToolTip="Click to copy result">
                     <DockPanel LastChildFill="False">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock x:Name="CalcExplanationText" FontSize="11.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />

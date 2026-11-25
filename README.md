@@ -46,6 +46,8 @@ An interactive, Apple-inspired **Dynamic Island** desktop overlay for Windows 10
   - Automated regex scanning and on-screen masking (`AKIA••••••••MPLE`) for sensitive credentials (OpenAI keys, GitHub tokens, AWS access keys, Private Keys, Slack tokens) in `Services/ClipboardHistoryService.cs`.
 - **Audio Output Switcher, Smart Power & Wireless Peripherals Hub**:
   - 1-click default audio output switching via `IPolicyConfig` (`Services/AudioEndpointService.cs`), Windows Power Scheme switching (`Services/PowerPlanService.cs`), and Bluetooth / XInput controller battery telemetry (`Services/PeripheralDeviceService.cs`).
+- **Widgets Gallery, Pet Sanctuary, Community Droplets & AI Agent HUD**:
+  - Customizable Bento **Widgets Gallery** with detachable desktop widgets (`Views/DesktopWidgetWindow.xaml`), an interactive **Pet Sanctuary** with desktop roam mode (`Views/PetFloatWindow.xaml`), JSON-defined **Community Droplets SDK** (`Services/CommunityDropletService.cs`), detachable **Floating PiP** mode, and 2-way **AI Agent Approval HUD** with Termi-Notch diff previews.
 
 ---
 
@@ -115,14 +117,14 @@ Double-click `installer\DynamicIsland-Setup.exe` (or `publish\DynamicIsland-Setu
 - Full Windows **Installed Apps** (Add/Remove Programs) registration.
 - Silent command-line install: `DynamicIsland-Setup.exe --install --silent`.
 
-### Option 2: 1-Click Batch / PowerShell Script
+### Option 3: 1-Click Batch / PowerShell Script
 - Double-click `installer\Install.bat` to launch the automated script installer.
 - Or run PowerShell directly:
   ```powershell
   powershell -ExecutionPolicy Bypass -File .\installer\Install.ps1
   ```
 
-### Option 3: Inno Setup
+### Option 4: Inno Setup
 - Compile `installer\DynamicIsland.iss` using Inno Setup 6 (`iscc.exe DynamicIsland.iss`).
 
 ### Uninstallation

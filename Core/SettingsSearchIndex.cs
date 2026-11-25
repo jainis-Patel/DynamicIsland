@@ -47,7 +47,9 @@ internal static class SettingsSearchIndex
         new("Hardware Notch Presets", "MacBook Pro 16, MBP 14, Air, Dell XPS, or Custom dimensions", "Screen", "Display", "\uE7F4", "notch preset macbook pro air dell xps bezel"),
         new("Night Light & Color Temperature", "Warm eye comfort filter and Kelvin warmth slider", "Screen", "Display", "\uE708", "night light warmth kelvin eye comfort"),
         new("Power Automation", "MagSafe charging pulse, low battery alert, auto saver & AC perf", "Screen", "Display", "\uE945", "battery power magsafe charging pulse alert threshold saver ac"),
+        new("High-Load Droplet Alerts", "CPU & RAM high-usage capsule badge toggle and percentage thresholds", "Screen", "Display", "\uE9D9", "high load cpu ram memory alert threshold droplet performance telemetry"),
         new("Browser & Tab Passthrough", "Click Only, Hover 150/260/380ms, Fast-Swipe Guard, Ghost key & Quick Tuck", "Screen", "Display", "\uE8B0", "hover dwell fast swipe guard click only ghost modifier ctrl alt quick tuck browser tabs"),
+        new("Auto-Hide & Always Visible", "Hide Dynamic Island like the Windows taskbar; hover top edge to pull back", "Screen", "Display", "\uE8B0", "auto hide autohide taskbar always visible top edge hover reveal"),
 
         // Alerts (Notifications)
         new("Notification Center", "Inspect notification history ring buffer", "Notifications", "Alerts", "\uEA8F", "notification center history"),

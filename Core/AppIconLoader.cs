@@ -19,7 +19,7 @@ internal static class AppIconLoader
 
     private static readonly Dictionary<string, ImageSource?> IconCache = new(StringComparer.OrdinalIgnoreCase);
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct SHFILEINFO
     {
         public IntPtr hIcon;
@@ -31,7 +31,7 @@ internal static class AppIconLoader
         public string szTypeName;
     }
 
-    [DllImport("shell32.dll", CharSet = CharSet.Auto)]
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr SHGetFileInfo(string pszPath, uint dwFileAttributes, ref SHFILEINFO psfi, uint cbFileInfo, uint uFlags);
 
     [DllImport("user32.dll", SetLastError = true)]

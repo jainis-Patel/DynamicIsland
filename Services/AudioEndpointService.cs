@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
+using DynamicIsland.Core;
 using NAudio.CoreAudioApi;
 using NAudio.CoreAudioApi.Interfaces;
 using Windows.Devices.Enumeration;
@@ -530,7 +531,7 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
         _pendingAppVolumes[processId] = clamped;
         if (!_disposed && Interlocked.CompareExchange(ref _appVolumeWorkerActive, 1, 0) == 0)
         {
-            _ = Task.Run(ProcessPendingAppVolumes);
+            Task.Run(ProcessPendingAppVolumes).FireAndForget("AudioEndpoint.AppVolumes");
         }
     }
 
@@ -592,7 +593,7 @@ internal sealed class AudioEndpointService : IMMNotificationClient, IDisposable
             if (!_disposed && !_pendingAppVolumes.IsEmpty &&
                 Interlocked.CompareExchange(ref _appVolumeWorkerActive, 1, 0) == 0)
             {
-                _ = Task.Run(ProcessPendingAppVolumes);
+                Task.Run(ProcessPendingAppVolumes).FireAndForget("AudioEndpoint.AppVolumes");
             }
         }
     }

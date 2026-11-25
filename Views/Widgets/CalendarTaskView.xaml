@@ -21,8 +21,16 @@
                 <TextBlock x:Name="HeaderWeekNumber" Text="W42" FontSize="10" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" Margin="6,0,0,0" VerticalAlignment="Center" />
             </StackPanel>
 
-            <!-- Right: Action Pills (+) (↗) [OCT/NOV] -->
+            <!-- Right: Action Pills (Camera) (+) (↗) [OCT/NOV] -->
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Pre-Call Webcam Mirror Button -->
+                <Button x:Name="OpenMirrorBtn" Click="OpenMirrorBtn_Click" Style="{StaticResource IslandButton}"
+                        Width="24" Height="24" Padding="0" Margin="0,0,4,0" ToolTipService.ToolTip="Pre-Call Webcam Mirror &amp; Mic Check">
+                    <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE714;" FontSize="9.5" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                </Button>
+
                 <!-- Add Task Button -->
                 <Button x:Name="QuickAddToggleBtn" Click="QuickAddToggleBtn_Click" Style="{StaticResource IslandButton}"
                         Width="24" Height="24" Padding="0" Margin="0,0,4,0" ToolTipService.ToolTip="Add a task or plan...">

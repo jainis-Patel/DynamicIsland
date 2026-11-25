@@ -43,10 +43,15 @@ Use this map to jump directly to the right file without broad directory scans or
 
 * **Core Shell, Routing & Animation**:
   * `IslandWindow.xaml` / `IslandWindow.xaml.cs` — Window shell, initialization, core state.
+  * `IslandWindow.Activity.cs` — Activity/clock coordination, timeline updates, and collection sync.
   * `IslandWindow.Navigation.cs` — Expanded view routing and morphing.
   * `IslandWindow.ViewForwarders.cs` — Event/command forwarding to widget UserControls.
-  * `IslandWindow.Animation.cs` — Spring-driven pill/window animation loop.
-  * `IslandWindow.Interop.cs` — Win32 hooks, DPI, click-through, window styles.
+  * `IslandWindow.Animation.cs` — Spring-driven pill/window animation loop and ambient halo.
+  * `IslandWindow.LivingThemes.cs` — Living botanical themes and virtual pet frame stepping.
+  * `IslandWindow.Visualizers.cs` — Audio spectrum visualizers and Liquid Glass surface updates.
+  * `IslandWindow.Interop.cs` — Win32 hooks, `WndProc`, touchpad gestures, system events.
+  * `IslandWindow.Hotkeys.cs` — Global hotkey bindings, registration, and keyboard hooks.
+  * `IslandWindow.Placement.cs` — Monitor/DPI placement, hit-testing, ghost passthrough, auto-hide, and quick tuck.
   * `IslandWindow.Floating.cs` — Secondary floating windows coordination.
 * **Feature Partials**:
   * `IslandWindow.AudioEndpoints.cs` — Audio output/input device switching.
@@ -64,7 +69,7 @@ Use this map to jump directly to the right file without broad directory scans or
   * `IslandWindow.VoiceMemo.cs` — Voice memo recording/playback UI.
   * `IslandWindow.WeatherCalendar.cs` — Weather, calendar & tasks UI.
 * **Settings Partials**:
-  * `IslandWindow.Settings.cs`, `IslandWindow.Settings.Droplets.cs`, `IslandWindow.Settings.Themes.cs`, `IslandWindow.Settings.Updates.cs`.
+  * `IslandWindow.Settings.cs`, `IslandWindow.Settings.Behavior.cs`, `IslandWindow.Settings.System.cs`, `IslandWindow.Settings.Droplets.cs`, `IslandWindow.Settings.Themes.cs`, `IslandWindow.Settings.Updates.cs`.
 
 ---
 
@@ -80,13 +85,13 @@ Use this map to jump directly to the right file without broad directory scans or
 
 ### `Services/` — Background & Platform Services (`IDisposable`)
 * **Media & Audio**: `AudioEndpointService.cs`, `AudioSpectrum.cs`, `ColorExtractor.cs`, `LyricsService.cs`, `MediaPlayerBrandService.cs`, `MediaSessionService.cs`, `MediaSongListService.cs`, `VolumeService.cs`, `KeyboardSoundService.cs`, `VoiceMemoService.cs`.
-* **System & Hardware**: `BluetoothMonitor.cs`, `BrightnessService.cs`, `DisplayTopologyService.cs`, `NetworkService.cs`, `NotificationListenerService.cs`, `PeripheralDeviceService.cs`, `PowerPlanService.cs`, `PrivacyIndicatorService.cs`, `SystemPerformanceService.cs`, `StartupService.cs`, `WindowSnapService.cs`.
-* **Productivity & Utilities**: `CalendarService.cs`, `ClipboardHistoryService.cs`, `CountdownTimerService.cs`, `MeetingModeService.cs`, `NotesService.cs`, `QuickCalcService.cs`, `QuickLauncherService.cs`, `ScreenToolsService.cs`, `TaskService.cs`, `TermiNotchService.cs`, `VirtualPetService.cs`, `WeatherService.cs`.
+* **System & Hardware**: `BluetoothMonitor.cs`, `BrightnessService.cs`, `DisplayTopologyService.cs`, `NetworkService.cs` (+ `NetworkService.Wifi.cs`), `NotificationListenerService.cs` (+ `NotificationListenerService.Activation.cs`), `PeripheralDeviceService.cs`, `PowerPlanService.cs`, `PrivacyIndicatorService.cs`, `SystemPerformanceService.cs`, `StartupService.cs`, `WindowSnapService.cs`.
+* **Productivity & Utilities**: `CalendarService.cs`, `ClipboardHistoryService.cs` (+ `ClipboardHistoryService.Persistence.cs`), `CountdownTimerService.cs`, `MeetingModeService.cs`, `NotesService.cs`, `QuickCalcService.cs`, `QuickLauncherService.cs`, `ScreenToolsService.cs`, `TaskService.cs`, `TermiNotchService.cs`, `VirtualPetService.cs`, `WeatherService.cs`.
 * **Files, Sharing & IPC**: `DownloadTrackerService.cs`, `DropShelfService.cs`, `FileActionPipeline.cs`, `JiggleBasketService.cs`, `LanQuickShareService.cs`, `LiveActivityIpcService.cs`, `WindowsShareService.cs`.
 * **App & Updates**: `CommunityDropletService.cs`, `GitHubReleaseClient.cs`, `SettingsService.cs`, `TrayIconService.cs`, `UpdateManagerService.cs`.
 
 ### `Views/` — Floating Windows & Modular Widgets
-* **Standalone Windows (`Views/*.xaml`)**: `BasketWindow`, `CaptureOverlayWindow`, `ClipboardPopupWindow`, `DesktopWidgetWindow`, `GlassPlayground`, `MiniPlayerWindow`, `NotesPopupWindow`, `PetFloatWindow`, `PinnedCaptureWindow`, `SetupWindow`, `UninstallWindow`.
+* **Standalone Windows (`Views/*.xaml`)**: `BasketWindow`, `CaptureOverlayWindow`, `ClipboardPopupWindow`, `DesktopWidgetWindow`, `GlassPlayground`, `MiniPlayerWindow` (+ `MiniPlayerWindow.Panels.cs`), `NotesPopupWindow`, `PetFloatWindow`, `PinnedCaptureWindow`, `SetupWindow`, `UninstallWindow`.
 * **Widget UserControls (`Views/Widgets/*.xaml`)**: `AudioView`, `BatteryView`, `CalcView`, `CalendarTaskView`, `CaptureStudioView`, `ClipboardView`, `ConverterView`, `LauncherView`, `MechSoundsView`, `MediaView`, `NetworkView`, `NotesView`, `NotificationsView`, `PeripheralsView`, `PetSanctuaryView`, `PhoneBridgeView`, `QuickReplyView`, `SettingsView` (+ `Views/Widgets/Settings/`), `ShelfView`, `SystemHudView`, `TermiNotchView`, `VoiceMemoView`, `WidgetsGalleryView`.
 
 ### `Interop/`, `src/`, `Resources/` & `Assets/`
@@ -107,4 +112,4 @@ When a task goes beyond locating files into subsystem implementation rules, load
 * `dynamic-island-win32-shell-interop` — Win32 styles, Per-Monitor V2 DPI, fullscreen detection, privacy hooks.
 * `dynamic-island-live-activities-ipc` — Named Pipe IPC (`\\.\pipe\DynamicIsland.Activities`) & priority queuing.
 * `dynamic-island-performance-profiler` — Zero-idle-CPU (< 0.1%), < 75MB RAM, frozen `ThemeBrushes`, diagnostic flags.
-* `dynamic-island-release-packaging` — 52-test verification suite, `win-x64` single-file publish, Inno Setup installer.
+* `dynamic-island-release-packaging` — 86-test verification suite, `win-x64` single-file publish, Inno Setup installer.

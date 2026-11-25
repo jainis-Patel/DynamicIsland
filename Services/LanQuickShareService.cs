@@ -194,7 +194,7 @@ internal sealed partial class LanQuickShareService : IDisposable
                         g.Address.AddressFamily == AddressFamily.InterNetwork &&
                         !IPAddress.Any.Equals(g.Address));
                 }
-                catch { }
+                catch (Exception ex) { App.LogDebug("LanQuickShare.GatewayCheck", ex); }
 
                 string adapterMeta = $"{ni.Name} {ni.Description}".ToLowerInvariant();
                 bool isVirtualAdapter = VirtualAdapterHints.Any(h => adapterMeta.Contains(h, StringComparison.Ordinal));
@@ -332,7 +332,7 @@ internal sealed partial class LanQuickShareService : IDisposable
             _cts = cts;
             _tcpListener = listener;
 
-            _ = Task.Run(() => AcceptConnectionsAsync(listener, cts));
+            Task.Run(() => AcceptConnectionsAsync(listener, cts)).FireAndForget("LanShare.Accept");
         }
 
         _ui.InvokeAsync(() =>
@@ -509,7 +509,7 @@ internal sealed partial class LanQuickShareService : IDisposable
                     throw;
                 }
 
-                _ = Task.Run(async () =>
+                Task.Run(async () =>
                 {
                     try
                     {
@@ -519,7 +519,7 @@ internal sealed partial class LanQuickShareService : IDisposable
                     {
                         try { _connectionGate.Release(); } catch (ObjectDisposedException) { }
                     }
-                }, CancellationToken.None);
+                }, CancellationToken.None).FireAndForget("LanShare.Client");
             }
         }
         catch (OperationCanceledException) { }

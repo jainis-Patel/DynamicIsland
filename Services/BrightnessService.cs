@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
+using DynamicIsland.Core;
 using static DynamicIsland.Interop.NativeMethods;
 
 namespace DynamicIsland.Services;
@@ -71,7 +72,7 @@ internal sealed class BrightnessService : IDisposable
 
         if (!_disposed && Interlocked.CompareExchange(ref _writerActive, 1, 0) == 0)
         {
-            _ = Task.Run(ProcessBrightnessWrites);
+            Task.Run(ProcessBrightnessWrites).FireAndForget("Brightness.Write");
         }
     }
 
@@ -100,7 +101,7 @@ internal sealed class BrightnessService : IDisposable
             if (!_disposed && Volatile.Read(ref _pendingBrightness) >= 0 &&
                 Interlocked.CompareExchange(ref _writerActive, 1, 0) == 0)
             {
-                _ = Task.Run(ProcessBrightnessWrites);
+                Task.Run(ProcessBrightnessWrites).FireAndForget("Brightness.Write");
             }
         }
     }

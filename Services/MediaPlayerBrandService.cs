@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Windows.Media;
+using DynamicIsland.Core;
 
 namespace DynamicIsland.Services;
 
@@ -274,7 +275,10 @@ public static class MediaPlayerBrandService
                         if (lower.Contains("soundcloud")) return SoundCloudInfo;
                         if (lower.Contains("youtube")) return YouTubeMusicInfo;
                     }
-                    catch { }
+                    catch (Exception ex)
+        {
+            App.LogDebug("MediaBrand.Detect", ex);
+        }
                 }
             }
             finally
@@ -285,7 +289,10 @@ public static class MediaPlayerBrandService
                 }
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            App.LogDebug("MediaBrand.Detect", ex);
+        }
 
         return null;
     }
@@ -305,55 +312,31 @@ public static class MediaPlayerBrandService
             // Desktop URI schemes where available
             if (brand.Brand == MediaPlayerBrand.Spotify)
             {
-                try
-                {
-                    // Prefer native desktop client URI
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = $"spotify:search:{query}",
-                        UseShellExecute = true
-                    });
+                if (SafeProcessLauncher.TryOpenShellUri($"spotify:search:{query}"))
                     return true;
-                }
-                catch { }
             }
             else if (brand.Brand == MediaPlayerBrand.AppleMusic)
             {
-                try
-                {
-                    // Open in Apple Music web / desktop bridge
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = $"https://music.apple.com/search?term={query}",
-                        UseShellExecute = true
-                    });
+                if (SafeProcessLauncher.TryOpenUrl($"https://music.apple.com/search?term={query}"))
                     return true;
-                }
-                catch { }
             }
             else if (brand.Brand == MediaPlayerBrand.YouTubeMusic)
             {
-                try
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = $"https://music.youtube.com/search?q={query}",
-                        UseShellExecute = true
-                    });
+                if (SafeProcessLauncher.TryOpenUrl($"https://music.youtube.com/search?q={query}"))
                     return true;
-                }
-                catch { }
             }
 
             // Fallback to configured SearchUrlTemplate
             if (!string.IsNullOrWhiteSpace(brand.SearchUrlTemplate))
             {
                 string url = brand.SearchUrlTemplate.Replace("{query}", query);
-                Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
-                return true;
+                return SafeProcessLauncher.TryOpenUrl(url);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            App.LogDebug("MediaBrand.Detect", ex);
+        }
 
         return false;
     }

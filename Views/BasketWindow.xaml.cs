@@ -14,6 +14,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using DynamicIsland.Core;
+using DynamicIsland.Interop;
 using DynamicIsland.Services;
 using static DynamicIsland.Interop.NativeMethods;
 
@@ -117,11 +118,7 @@ public partial class BasketWindow : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        IntPtr hwnd = new WindowInteropHelper(this).Handle;
-        long ex = GetExStyle(hwnd);
-        ex |= WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
-        ex &= ~WS_EX_APPWINDOW;
-        SetExStyle(hwnd, ex);
+        FloatingWindowHelper.ApplyToolWindowStyles(this, noActivate: true);
     }
 
     public void ShowAtPhysicalPoint(int physicalX, int physicalY)
@@ -415,7 +412,7 @@ public partial class BasketWindow : Window
                     {
                         if (!string.IsNullOrEmpty(res.CopiedClipboardText))
                         {
-                            try { Clipboard.SetText(res.CopiedClipboardText); } catch { }
+                            try { SafeClipboard.TrySetText(res.CopiedClipboardText); } catch { }
                         }
                         if (res.OutputPaths.Count > 0)
                         {

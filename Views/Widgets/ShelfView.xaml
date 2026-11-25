@@ -225,11 +225,12 @@
 
                                         <!-- Hero Preview Well (Full Image Crop OR Large Type Glyph + Floating Extension/Pin Bar) -->
                                         <Border Grid.Row="0"
-                                                CornerRadius="9"
+                                                CornerRadius="10"
                                                 Background="{DynamicResource ChipBgBrush}"
                                                 BorderBrush="{DynamicResource CardBorderBrush}"
                                                 BorderThickness="1"
-                                                ClipToBounds="True">
+                                                ClipToBounds="True"
+                                                core:RoundedClip.ClipChild="True">
                                             <Grid>
                                                 <!-- Centered File Type Icon (when no thumbnail image) -->
                                                 <Border Width="42" Height="42"

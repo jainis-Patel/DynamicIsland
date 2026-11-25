@@ -961,6 +961,30 @@ internal static partial class SelfTestRunner
                homeMediaView.PlayPauseButton!.RenderTransform is ScaleTransform &&
                !ReferenceEquals(homeMediaView.MediaArtworkSquircle.RenderTransform, homeMediaView.PlayPauseButton.RenderTransform),
             "Home Screen interactive controls must receive independent ScaleTransforms");
+
+        Assert(RoundedClip.GetClipChild(homeMediaView.MediaArtworkSquircle) &&
+               Math.Abs(homeMediaView.MediaArtworkSquircle.CornerRadius.TopLeft - 18.0) < 1e-6,
+            "MediaArtworkSquircle must use concentric 18px CornerRadius with RoundedClip.ClipChild enabled");
+
+        var clipHost = new System.Windows.Controls.Border
+        {
+            Width = 54,
+            Height = 54,
+            CornerRadius = new CornerRadius(18),
+            BorderThickness = new Thickness(1),
+            Child = new System.Windows.Controls.Grid()
+        };
+        RoundedClip.SetClipChild(clipHost, true);
+        clipHost.Measure(new Size(54, 54));
+        clipHost.Arrange(new Rect(0, 0, 54, 54));
+        RoundedClip.UpdateClip(clipHost);
+        var clipGeo = clipHost.Child.Clip as RectangleGeometry;
+        Assert(clipGeo != null &&
+               clipGeo.IsFrozen &&
+               Math.Abs(clipGeo.RadiusX - 17.0) < 1e-6 &&
+               Math.Abs(clipGeo.Rect.Width - 52.0) < 1e-6 &&
+               Math.Abs(clipGeo.Rect.Height - 52.0) < 1e-6,
+            "RoundedClip.UpdateClip must apply a frozen concentric RectangleGeometry matching inner Border bounds");
     }
 
     private static void TestSettingsOverhaulInvariants()

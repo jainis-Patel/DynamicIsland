@@ -122,6 +122,7 @@ public partial class UninstallWindow : Window
         }
         catch (Exception ex)
         {
+            App.LogDebug("UninstallWindow.Uninstall", ex);
             ProgressBarContainer.Visibility = Visibility.Collapsed;
             StatusText.Text = $"Uninstall error: {ex.Message}";
             UninstallBtn.IsEnabled = true;

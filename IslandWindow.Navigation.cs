@@ -45,14 +45,15 @@ public partial class IslandWindow
         }
         _lastViewSwitchTime = DateTime.UtcNow;
 
-        var (targetContainer, targetButton) = _viewRegistry.TryGetValue(view, out var entry)
+        var (resolveContainer, targetButton) = _viewRegistry.TryGetValue(view, out var entry)
             ? entry
             : _viewRegistry[ExpandedView.Media];
+        var targetContainer = resolveContainer();
 
         SetDockActive(targetButton);
         if (animateTransition && previousView != view)
         {
-            foreach (var c in _allContainers)
+            foreach (var c in _materializedContainers)
             {
                 if (c != targetContainer && c.Visibility == Visibility.Visible)
                 {
@@ -184,6 +185,15 @@ public partial class IslandWindow
             PetSanctuaryContainer?.RefreshUI();
             EnsureRendering();
         }
+        else if (view == ExpandedView.Mirror)
+        {
+            MirrorContainer?.SetActive(true);
+        }
+
+        if (previousView == ExpandedView.Mirror && view != ExpandedView.Mirror)
+        {
+            MirrorContainer?.SetActive(false);
+        }
 
         if (view == ExpandedView.Settings && previousView != ExpandedView.Settings)
         {
@@ -235,13 +245,13 @@ public partial class IslandWindow
         }
         else if (view == ExpandedView.Peripherals)
         {
-            _ = _peripheralService?.RefreshAsync();
+            _peripheralService?.RefreshAsync().FireAndForget("Navigation.Peripherals");
         }
         else if (view == ExpandedView.Network)
         {
             if (_networkService != null)
             {
-                _ = _networkService.RefreshRadioStatesAsync();
+                _networkService.RefreshRadioStatesAsync().FireAndForget("Navigation.NetworkRadios");
                 _networkService.Sample();
             }
         }
@@ -261,10 +271,33 @@ public partial class IslandWindow
 
     private void SecondaryDroplet_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
+        if (e.ChangedButton == MouseButton.Right && IsHighLoadDropletActive)
+        {
+            TriggerLiquidImpulse(-90, 25, -10);
+            SnoozeHighLoadAlerts(TimeSpan.FromMinutes(15));
+            e.Handled = true;
+            return;
+        }
+
         if (e.ChangedButton != MouseButton.Middle)
             return;
 
         TriggerLiquidImpulse(110, -40, 14);
+        if (IsHighLoadDropletActive)
+        {
+            if (_highLoadIsRamPriority)
+            {
+                PurgeIdleRamWithToast();
+            }
+            else
+            {
+                _machine.ExpandNow();
+                SwitchExpandedView(ExpandedView.SystemHud);
+            }
+            e.Handled = true;
+            return;
+        }
+
         switch (_secondaryCompactHost)
         {
             case CompactActivityKind.Media:
@@ -295,6 +328,14 @@ public partial class IslandWindow
 
     private void SecondaryDroplet_Click(object sender, MouseButtonEventArgs e)
     {
+        if (IsHighLoadDropletActive)
+        {
+            _machine.ExpandNow();
+            SwitchExpandedView(ExpandedView.SystemHud);
+            e.Handled = true;
+            return;
+        }
+
         var secondaryKind = _secondaryCompactHost;
         if (secondaryKind == CompactActivityKind.LiveActivity)
         {

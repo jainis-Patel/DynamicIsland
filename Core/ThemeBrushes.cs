@@ -1,3 +1,5 @@
+using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 
 namespace DynamicIsland.Core;
@@ -485,6 +487,20 @@ internal static class ThemeBrushes
         ClockDialBorder = isDark ? ClockDialBorderDark : ClockDialBorderLight;
         ClockHand = isDark ? ClockHandDark : ClockHandLight;
     }
+
+    public static readonly FontFamily IconFont = new("Segoe Fluent Icons, Segoe MDL2 Assets");
+
+    /// <summary>Creates a uniformly aligned Segoe Fluent Icons menu glyph.</summary>
+    public static TextBlock CreateMenuIcon(string glyph, Brush? foreground = null) => new()
+    {
+        FontFamily = IconFont,
+        Text = glyph,
+        FontSize = 11,
+        Width = 14,
+        TextAlignment = TextAlignment.Center,
+        VerticalAlignment = VerticalAlignment.Center,
+        Foreground = foreground ?? SecondaryText
+    };
 
     public static SolidColorBrush CreateFrozen(Color color)
     {

@@ -128,8 +128,8 @@ public partial class IslandWindow
     // -------------------------------------------------------------------------
     //  Notes View Forwarders (NotesContainer)
     // -------------------------------------------------------------------------
-    internal TextBox NoteEditorBox => NotesContainer.NoteEditorBox;
-    internal ItemsControl NotesListControl => NotesContainer.NotesListControl;
+    internal TextBox NoteEditorBox => EnsureNotesContainer().NoteEditorBox;
+    internal ItemsControl NotesListControl => EnsureNotesContainer().NotesListControl;
 
     // -------------------------------------------------------------------------
     //  Settings View Forwarders (Minimal cross-partial accessor)
@@ -178,6 +178,7 @@ public partial class IslandWindow
     internal Slider BrightnessSlider => BatteryContainer.BrightnessSlider;
     internal TextBlock BrightnessValueText => BatteryContainer.BrightnessValueText;
     internal Button CaffeineQuickBtn => BatteryContainer.CaffeineQuickBtn;
+    internal TextBlock CaffeineQuickIcon => BatteryContainer.CaffeineQuickIcon;
     internal TextBlock CaffeineQuickText => BatteryContainer.CaffeineQuickText;
     internal System.Windows.Controls.Border DisplayRefreshBadge => BatteryContainer.DisplayRefreshBadge;
     internal System.Windows.Controls.TextBlock DisplayRefreshText => BatteryContainer.DisplayRefreshText;
@@ -331,5 +332,7 @@ public partial class IslandWindow
     internal TextBlock HudRamHeroText => SystemHudContainer.HudRamHeroText;
     internal TextBlock HudRamStatusText => SystemHudContainer.HudRamStatusText;
     internal TextBlock HudSystemHealthChip => SystemHudContainer.HudSystemHealthChip;
+    internal Button HudSnoozeResetBtn => SystemHudContainer.HudSnoozeResetBtn;
+    internal TextBlock HudSnoozeResetText => SystemHudContainer.HudSnoozeResetText;
 
 }

@@ -514,7 +514,7 @@ internal sealed partial class LanQuickShareService
                                     {
                                         await _ui.InvokeAsync(() =>
                                         {
-                                            System.Windows.Clipboard.SetText(clipText);
+                                            SafeClipboard.TrySetText(clipText);
                                             TextReceivedFromPhone?.Invoke(clipText);
                                         }, DispatcherPriority.Normal, headerCts.Token);
                                     }

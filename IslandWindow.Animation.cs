@@ -28,50 +28,6 @@ public partial class IslandWindow
     private double _appliedDroplet = -1;
     private Point _lastMousePos;
     private DateTime _lastMouseMoveTime;
-    private static readonly Stopwatch NatureClock = Stopwatch.StartNew();
-    private DispatcherTimer? _natureThemeTimer;
-    private bool _isPetScampering;
-    private double _scamperStartTime = -1.0;
-    private double _nextScamperAllowedTime = 120.0;
-
-    public void TriggerPetScamper()
-    {
-        if (_isPetScampering || _petService == null || !(_settingsService?.Current.EnableVirtualPet ?? true)) return;
-        var state = _machine.State;
-        if (state != IslandState.Idle && state != IslandState.Compact) return;
-
-        _isPetScampering = true;
-        _scamperStartTime = -1.0;
-        EnsureRendering();
-    }
-
-    private static T CreateFrozenEase<T>(T ease) where T : Freezable
-    {
-        ease.Freeze();
-        return ease;
-    }
-
-    private bool IsReducedMotion =>
-        (_settingsService?.Current.ReduceMotion ?? false) || !SystemParameters.ClientAreaAnimation;
-
-    /// <summary>
-    /// Computes analytical spring stiffness and damping from user-configured gooey/liquid intensity (0..1)
-    /// and animation speed multiplier (0.5..1.6).
-    /// </summary>
-    internal static (double Stiffness, double Damping) ComputeSpringParameters(double liquidIntensity, double animationSpeed, bool reducedMotion)
-    {
-        double speed = Math.Clamp(animationSpeed, 0.5, 1.6);
-        double liquid = reducedMotion ? 0.0 : Math.Clamp(liquidIntensity, 0.0, 1.0);
-
-        // Apple Fluid Natural Frequency: smooth, silky, continuous (230 * speed^2)
-        double stiffness = 230.0 * speed * speed;
-
-        // Damping ratio zeta: 1.00 (critically damped) at 0% down to 0.68 (Apple canonical fluid cushion) at 100% liquid
-        double zeta = 1.00 - (0.32 * liquid);
-        double damping = 2.0 * zeta * Math.Sqrt(stiffness);
-        return (stiffness, damping);
-    }
-
     private void SyncSpringMotionPreferences()
     {
         var cur = _settingsService?.Current;
@@ -94,9 +50,16 @@ public partial class IslandWindow
         _dropletOffset.Damping = damping * 0.94;
     }
 
+    private bool IsHighLoadDropletActive =>
+        _isHighLoadAlertActive &&
+        DateTime.UtcNow >= _highLoadSnoozedUntilUtc &&
+        _machine.State is IslandState.Idle or IslandState.Compact;
+
     private void UpdateSecondaryDropletTarget()
     {
-        bool showDroplet = _machine.State == IslandState.Compact && _secondaryCompactHost != CompactActivityKind.None;
+        bool highLoadAlert = IsHighLoadDropletActive;
+        bool showSecondaryActivity = _machine.State == IslandState.Compact && _secondaryCompactHost != CompactActivityKind.None;
+        bool showDroplet = highLoadAlert || showSecondaryActivity;
         double newTarget = showDroplet ? 1.0 : 0.0;
         if (Math.Abs(_dropletOffset.Target - newTarget) > 0.01)
         {
@@ -104,8 +67,59 @@ public partial class IslandWindow
             TriggerLiquidImpulse(showDroplet ? 140 : -120, showDroplet ? -35 : 30, 12);
         }
 
-        if (showDroplet)
+        if (highLoadAlert)
         {
+            var accent = _highLoadIsCritical ? ThemeBrushes.Red : ThemeBrushes.Amber;
+            if (SecondaryDropletIconHost != null)
+            {
+                SecondaryDropletIconHost.Visibility = Visibility.Collapsed;
+            }
+            if (SecondaryDropletAlertStack != null)
+            {
+                SecondaryDropletAlertStack.Visibility = Visibility.Visible;
+            }
+            if (SecondaryDropletAlertIconBg != null)
+            {
+                SecondaryDropletAlertIconBg.Background = _highLoadIsCritical ? ThemeBrushes.AlertRedBg : ThemeBrushes.AlertAmberBg;
+            }
+            if (SecondaryDropletAlertGlyph != null)
+            {
+                SecondaryDropletAlertGlyph.Text = _highLoadIsRamPriority ? "\uE964" : "\uE950";
+                SecondaryDropletAlertGlyph.Foreground = accent;
+            }
+            if (SecondaryDropletAlertLabel != null)
+            {
+                SecondaryDropletAlertLabel.Text = _highLoadIsRamPriority ? "RAM" : "CPU";
+                SecondaryDropletAlertLabel.Foreground = accent;
+            }
+            if (SecondaryDropletAlertPercent != null)
+            {
+                SecondaryDropletAlertPercent.Text = $"{_highLoadPercent}%";
+            }
+            if (SecondaryDroplet != null)
+            {
+                SecondaryDroplet.Width = 78;
+                SecondaryDroplet.Height = 30;
+                SecondaryDroplet.CornerRadius = new CornerRadius(15);
+                SecondaryDroplet.BorderBrush = _highLoadIsCritical ? ThemeBrushes.AlertRedBorder : ThemeBrushes.AlertAmberBorder;
+                SecondaryDroplet.ToolTip = _highLoadTooltip;
+                System.Windows.Automation.AutomationProperties.SetName(
+                    SecondaryDroplet,
+                    $"High {(_highLoadIsRamPriority ? "RAM" : "CPU")} usage {_highLoadPercent} percent");
+            }
+            _appliedDroplet = -1;
+        }
+        else if (showSecondaryActivity)
+        {
+            if (SecondaryDropletAlertStack != null)
+            {
+                SecondaryDropletAlertStack.Visibility = Visibility.Collapsed;
+            }
+            if (SecondaryDropletIconHost != null)
+            {
+                SecondaryDropletIconHost.Visibility = Visibility.Visible;
+            }
+
             SolidColorBrush accent = ThemeBrushes.AmberDark;
             string glyph = ActivityResolver.GlyphForActivity(_secondaryCompactHost);
             string tip = ActivityResolver.DescribeSecondaryDroplet(_secondaryCompactHost);
@@ -152,10 +166,20 @@ public partial class IslandWindow
             {
                 SecondaryDropletRing.Stroke = accent;
             }
+            if (SecondaryDropletInnerTint != null)
+            {
+                SecondaryDropletInnerTint.Fill = accent;
+            }
             if (SecondaryDroplet != null)
             {
+                SecondaryDroplet.Width = 32;
+                SecondaryDroplet.Height = 32;
+                SecondaryDroplet.CornerRadius = new CornerRadius(16);
+                SecondaryDroplet.ClearValue(Border.BorderBrushProperty);
                 SecondaryDroplet.ToolTip = tip;
+                System.Windows.Automation.AutomationProperties.SetName(SecondaryDroplet, tip);
             }
+            _appliedDroplet = -1;
         }
         EnsureRendering();
     }
@@ -252,6 +276,8 @@ public partial class IslandWindow
         {
             RefreshTargetGeometry();
         }
+
+        EvaluateAutoHideState();
     }
 
     private void OnStateChanged(IslandState previous, IslandState next)
@@ -280,11 +306,15 @@ public partial class IslandWindow
             {
                 WidgetsGalleryContainer?.SetExpanded(false);
             }
+            else if (_currentExpandedView == ExpandedView.Mirror)
+            {
+                MirrorContainer?.SetActive(false);
+            }
             _currentExpandedView = ExpandedView.Media;
             SetKeyboardFocusable(false);
             UpdatePinExpandedUI();
             SetDockActive(MediaHomeButton);
-            foreach (var c in _allContainers)
+            foreach (var c in _materializedContainers)
             {
                 bool isMedia = c == MediaContainer;
                 c.BeginAnimation(OpacityProperty, null);
@@ -320,11 +350,11 @@ public partial class IslandWindow
         if (next == IslandState.Hidden)
         {
             Root.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(160)));
-            _topmostTimer.Stop(); // P1a perf: no need to reassert topmost while hidden
+            SetTopmostReassertEnabled(false); // P1a perf: no need to reassert topmost while hidden
         }
         else if (previous == IslandState.Hidden)
         {
-            _topmostTimer.Start(); // P1a perf: resume topmost reassertion when visible
+            SetTopmostReassertEnabled(true); // P1a perf: resume topmost reassertion when visible
             ReassertTopmost();
             Root.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(220)));
         }
@@ -340,6 +370,7 @@ public partial class IslandWindow
         UpdateNatureThemeTimerState();
         EnsureRendering();
         _memoryManager?.NotifyStateChanged(next);
+        EvaluateAutoHideState();
 
         if (next is IslandState.Expanded or IslandState.Idle)
         {
@@ -603,7 +634,7 @@ public partial class IslandWindow
     private void AnimateContainerSwitch(FrameworkElement newContainer)
     {
         bool reduced = IsReducedMotion;
-        foreach (var c in _allContainers)
+        foreach (var c in _materializedContainers)
         {
             if (c != newContainer && c.Visibility == Visibility.Visible)
             {
@@ -727,346 +758,6 @@ public partial class IslandWindow
         }
     }
 
-    private bool _isNatureThemeActive;
-
-    internal void UpdateNatureThemeTimerState()
-    {
-        bool shouldRun = _isNatureThemeActive
-                         && !_isClosing
-                         && !IsReducedMotion
-                         && !_isSessionLocked
-                         && _machine.State != IslandState.Hidden
-                         && !(_choreographer?.ShouldThrottleVisuals ?? false);
-
-        if (shouldRun)
-        {
-            if (_natureThemeTimer == null)
-            {
-                _natureThemeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(42), DispatcherPriority.Background, (_, _) =>
-                {
-                    if (_isClosing || _isSessionLocked || _machine.State == IslandState.Hidden || !_isNatureThemeActive)
-                    {
-                        _natureThemeTimer?.Stop();
-                        return;
-                    }
-                    UpdateIslandNatureTheme(NatureClock.Elapsed.TotalSeconds);
-                }, Dispatcher);
-            }
-
-            if (!_natureThemeTimer.IsEnabled)
-            {
-                UpdateIslandNatureTheme(NatureClock.Elapsed.TotalSeconds);
-                _natureThemeTimer.Start();
-            }
-        }
-        else
-        {
-            _natureThemeTimer?.Stop();
-            if (_isNatureThemeActive && !_isClosing && !_isSessionLocked && _machine.State != IslandState.Hidden)
-            {
-                UpdateIslandNatureTheme(NatureClock.Elapsed.TotalSeconds);
-            }
-        }
-    }
-
-    private void UpdateIslandNatureTheme(double t)
-    {
-        if (!_isNatureThemeActive) return;
-        if (_machine.State == IslandState.Hidden) return;
-
-        double pillW = _appliedWidth > 0 ? _appliedWidth : Pill.Width;
-        double pillH = _appliedHeight > 0 ? _appliedHeight : Pill.Height;
-        double rootW = Root.ActualWidth > 0 ? Root.ActualWidth : CanvasWidthDip;
-        double pillX = (rootW - pillW) / 2.0;
-        double pillY = 0.0;
-        var pillRect = new Rect(pillX, pillY, pillW, pillH);
-
-        var cur = _settingsService?.Current;
-        double density = cur?.NatureDensity ?? 0.70;
-        double scale = cur?.NatureScale ?? 0.85;
-        double dropLength = cur?.NatureDropLength ?? 60.0;
-        int butterflyCount = cur?.NatureButterflyCount ?? 2;
-        double bloomDensity = cur?.NatureBloomDensity ?? 0.75;
-        bool pollenEnabled = cur?.NaturePollenEnabled ?? true;
-        int pollenCount = cur?.NaturePollenCount ?? 14;
-
-        IslandThemeUnderlay?.Step(t, pillRect, IsReducedMotion, density, scale, dropLength, butterflyCount, bloomDensity, pollenEnabled, pollenCount);
-        IslandThemeOverlay?.Step(t, pillRect, IsReducedMotion, density, scale, dropLength, butterflyCount, bloomDensity, pollenEnabled, pollenCount);
-    }
-
-    private void UpdateVirtualPet(double t)
-    {
-        if (_petService == null) return;
-        bool petEnabled = _settingsService?.Current.EnableVirtualPet ?? true;
-        var state = _machine.State;
-
-        if (!petEnabled)
-        {
-            _isPetScampering = false;
-            if (IdlePetTranslate != null) { IdlePetTranslate.X = 0; IdlePetTranslate.Y = 0; }
-            if (IdlePetScale != null) IdlePetScale.ScaleX = 1;
-            if (CompactPetTranslate != null) { CompactPetTranslate.X = 0; CompactPetTranslate.Y = 0; }
-            if (CompactPetScale != null) CompactPetScale.ScaleX = 1;
-            if (IdlePetCompanion != null && IdlePetCompanion.Visibility != Visibility.Collapsed)
-                IdlePetCompanion.Visibility = Visibility.Collapsed;
-            if (CompactPetCompanion != null && CompactPetCompanion.Visibility != Visibility.Collapsed)
-                CompactPetCompanion.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        bool isMusicPlaying = (_mediaService.Current?.IsPlaying ?? false) && state != IslandState.Hidden;
-        float bass = _smoothBands[0];
-        float treble = _smoothBands[AudioSpectrum.BandCount - 1];
-
-        _petService.UpdateActivity(isMusicPlaying, bass, _pointerInside);
-
-        var mood = _petService.CurrentMood;
-        string species = _petService.PetSpecies;
-        string accessory = _petService.PetAccessory;
-        string petName = _petService.PetName;
-        int affection = _petService.AffectionScore;
-
-        // Check automatic scamper timer (every ~2.5 to 4.5 minutes when Idle / Compact)
-        if (!_isPetScampering && t >= _nextScamperAllowedTime && (state == IslandState.Idle || state == IslandState.Compact))
-        {
-            if (mood != PetMood.Sleeping && mood != PetMood.Thirsty)
-            {
-                TriggerPetScamper();
-            }
-            else
-            {
-                _nextScamperAllowedTime = t + 45.0;
-            }
-        }
-
-        // Scamper animation computation
-        double scamperX = 0.0;
-        double scamperY = 0.0;
-        double scamperScaleX = 1.0;
-        bool isScampering = false;
-        bool isPeeking = false;
-
-        if (_isPetScampering)
-        {
-            if (state != IslandState.Idle && state != IslandState.Compact)
-            {
-                _isPetScampering = false;
-                _scamperStartTime = -1.0;
-            }
-            else
-            {
-                if (_scamperStartTime < 0.0)
-                {
-                    _scamperStartTime = t;
-                }
-                double elapsed = t - _scamperStartTime;
-                const double TotalScamperDuration = 5.2;
-
-                if (elapsed >= TotalScamperDuration)
-                {
-                    _isPetScampering = false;
-                    _scamperStartTime = -1.0;
-                    _nextScamperAllowedTime = t + 150.0 + (Random.Shared.NextDouble() * 120.0); // P2d perf: avoid transient Random allocation
-                    if (state == IslandState.Idle) IdlePetCompanion?.PetClickImpulse();
-                    else CompactPetCompanion?.PetClickImpulse();
-                }
-                else
-                {
-                    double targetDistance = state == IslandState.Idle ? -88.0 : -168.0;
-
-                    if (elapsed < 0.4)
-                    {
-                        // Phase 1: Crouch & Spring Prep
-                        double p = elapsed / 0.4;
-                        scamperX = 0;
-                        scamperY = p * 1.5;
-                        scamperScaleX = -1.0;
-                        isScampering = true;
-                    }
-                    else if (elapsed < 1.8)
-                    {
-                        // Phase 2: Sprint Across to the Left Edge
-                        double p = (elapsed - 0.4) / 1.4;
-                        double ease = p < 0.5 ? 2 * p * p : 1.0 - Math.Pow(-2 * p + 2, 2) / 2.0;
-                        scamperX = targetDistance * ease;
-                        scamperY = 0.5;
-                        scamperScaleX = -1.0;
-                        isScampering = true;
-                    }
-                    else if (elapsed < 3.4)
-                    {
-                        // Phase 3: Peek Over the Edge into the desktop
-                        scamperX = targetDistance;
-                        scamperY = 3.5;
-                        scamperScaleX = -1.0;
-                        isPeeking = true;
-                    }
-                    else if (elapsed < 4.8)
-                    {
-                        // Phase 4: Turn Around & Sprint Back Home
-                        double p = (elapsed - 3.4) / 1.4;
-                        double ease = p < 0.5 ? 2 * p * p : 1.0 - Math.Pow(-2 * p + 2, 2) / 2.0;
-                        scamperX = targetDistance * (1.0 - ease);
-                        scamperY = 3.5 * (1.0 - Math.Min(1.0, p * 2.5));
-                        scamperScaleX = 1.0;
-                        isScampering = true;
-                    }
-                    else
-                    {
-                        // Phase 5: Settle Hop
-                        scamperX = 0;
-                        scamperY = 0;
-                        scamperScaleX = 1.0;
-                    }
-                }
-            }
-        }
-
-        double gazeX = 0, gazeY = 0;
-        if (_pointerInside)
-        {
-            try
-            {
-                var activePet = state == IslandState.Idle ? IdlePetCompanion : CompactPetCompanion;
-                if (activePet != null && activePet.IsVisible)
-                {
-                    Point mousePos = System.Windows.Input.Mouse.GetPosition(activePet);
-                    double pcX = activePet.ActualWidth > 0 ? activePet.ActualWidth / 2.0 : 14.0;
-                    double pcY = activePet.ActualHeight > 0 ? activePet.ActualHeight / 2.0 : 12.0;
-                    gazeX = Math.Clamp((mousePos.X - pcX) / 35.0, -1.0, 1.0);
-                    gazeY = Math.Clamp((mousePos.Y - pcY) / 25.0, -1.0, 1.0);
-                }
-            }
-            catch { }
-        }
-
-        if (state == IslandState.Idle)
-        {
-            if (IdlePetCompanion != null)
-            {
-                if (IdlePetCompanion.Visibility != Visibility.Visible)
-                    IdlePetCompanion.Visibility = Visibility.Visible;
-
-                IdlePetCompanion.Species = species;
-                IdlePetCompanion.Accessory = accessory;
-                IdlePetCompanion.Mood = mood;
-                IdlePetCompanion.PetName = petName;
-                IdlePetCompanion.Affection = affection;
-                IdlePetCompanion.IsScampering = isScampering;
-                IdlePetCompanion.IsPeeking = isPeeking;
-
-                if (IdlePetTranslate != null)
-                {
-                    IdlePetTranslate.X = scamperX;
-                    IdlePetTranslate.Y = scamperY;
-                }
-                if (IdlePetScale != null)
-                {
-                    IdlePetScale.ScaleX = scamperScaleX;
-                }
-
-                if (mood == PetMood.Dancing)
-                    IdlePetCompanion.Dance(bass, treble, t);
-                else
-                    IdlePetCompanion.UpdateTick(t, _pointerInside, gazeX, gazeY);
-            }
-            if (CompactPetCompanion != null && CompactPetCompanion.Visibility != Visibility.Collapsed)
-                CompactPetCompanion.Visibility = Visibility.Collapsed;
-        }
-        else if (state == IslandState.Compact)
-        {
-            if (CompactPetCompanion != null)
-            {
-                if (CompactPetCompanion.Visibility != Visibility.Visible)
-                    CompactPetCompanion.Visibility = Visibility.Visible;
-
-                CompactPetCompanion.Species = species;
-                CompactPetCompanion.Accessory = accessory;
-                CompactPetCompanion.Mood = mood;
-                CompactPetCompanion.PetName = petName;
-                CompactPetCompanion.Affection = affection;
-                CompactPetCompanion.IsScampering = isScampering;
-                CompactPetCompanion.IsPeeking = isPeeking;
-
-                if (CompactPetTranslate != null)
-                {
-                    CompactPetTranslate.X = scamperX;
-                    CompactPetTranslate.Y = scamperY;
-                }
-                if (CompactPetScale != null)
-                {
-                    CompactPetScale.ScaleX = scamperScaleX;
-                }
-
-                if (mood == PetMood.Dancing)
-                    CompactPetCompanion.Dance(bass, treble, t);
-                else
-                    CompactPetCompanion.UpdateTick(t, _pointerInside, gazeX, gazeY);
-            }
-            if (IdlePetCompanion != null && IdlePetCompanion.Visibility != Visibility.Collapsed)
-                IdlePetCompanion.Visibility = Visibility.Collapsed;
-        }
-        else
-        {
-            if (IdlePetCompanion != null && IdlePetCompanion.Visibility != Visibility.Collapsed)
-                IdlePetCompanion.Visibility = Visibility.Collapsed;
-            if (CompactPetCompanion != null && CompactPetCompanion.Visibility != Visibility.Collapsed)
-                CompactPetCompanion.Visibility = Visibility.Collapsed;
-        }
-
-
-        // Settings Hero Showcase Pet animation
-        if (SettingsHeroPet != null && SettingsHeroPet.IsVisible)
-        {
-            SettingsHeroPet.Species = species;
-            SettingsHeroPet.Accessory = accessory;
-            SettingsHeroPet.Mood = mood;
-            SettingsHeroPet.PetName = petName;
-            SettingsHeroPet.Affection = affection;
-
-            double heroGazeX = 0, heroGazeY = 0;
-            bool heroHover = false;
-            try
-            {
-                Point heroMouse = System.Windows.Input.Mouse.GetPosition(SettingsHeroPet);
-                heroHover = heroMouse.X >= 0 && heroMouse.X <= SettingsHeroPet.ActualWidth &&
-                            heroMouse.Y >= 0 && heroMouse.Y <= SettingsHeroPet.ActualHeight;
-                heroGazeX = Math.Clamp((heroMouse.X - (SettingsHeroPet.ActualWidth / 2.0)) / 35.0, -1.0, 1.0);
-                heroGazeY = Math.Clamp((heroMouse.Y - (SettingsHeroPet.ActualHeight / 2.0)) / 30.0, -1.0, 1.0);
-            }
-            catch { }
-
-            if (mood == PetMood.Dancing)
-                SettingsHeroPet.Dance(bass, treble, t);
-            else
-                SettingsHeroPet.UpdateTick(t, heroHover || _pointerInside, heroGazeX, heroGazeY);
-        }
-
-        // Pet Sanctuary Playground Stage Pet animation
-        if (PetSanctuaryContainer != null && PetSanctuaryContainer.IsVisible)
-        {
-            var stagePet = PetSanctuaryContainer.StagePet;
-            if (stagePet != null)
-            {
-                double stageGazeX = 0, stageGazeY = 0;
-                bool stageHover = false;
-                try
-                {
-                    Point stageMouse = System.Windows.Input.Mouse.GetPosition(stagePet);
-                    stageHover = stageMouse.X >= 0 && stageMouse.X <= stagePet.ActualWidth &&
-                                 stageMouse.Y >= 0 && stageMouse.Y <= stagePet.ActualHeight;
-                    stageGazeX = Math.Clamp((stageMouse.X - (stagePet.ActualWidth / 2.0)) / 45.0, -1.0, 1.0);
-                    stageGazeY = Math.Clamp((stageMouse.Y - (stagePet.ActualHeight / 2.0)) / 35.0, -1.0, 1.0);
-                }
-                catch { }
-
-                if (mood == PetMood.Dancing)
-                    stagePet.Dance(bass, treble, t);
-                else
-                    stagePet.UpdateTick(t, stageHover || _pointerInside, stageGazeX, stageGazeY);
-            }
-        }
-    }
 
     private bool UpdateAmbientHalo(double dt = 1.0 / 60.0)
     {
@@ -1177,9 +868,10 @@ public partial class IslandWindow
             {
                 SecondaryDroplet.Visibility = Visibility.Visible;
                 SecondaryDroplet.Opacity = Math.Clamp(dropT * 1.25, 0.0, 1.0);
-                double dropletDiameter = SecondaryDroplet.Width > 0 ? SecondaryDroplet.Width : 30.0;
-                SecondaryDropletTranslate.X = (w / 2.0 + 8.0 + (dropletDiameter / 2.0)) * dropT;
-                SecondaryDropletTranslate.Y = (h - dropletDiameter) / 2.0;
+                double dropletW = SecondaryDroplet.Width > 0 ? SecondaryDroplet.Width : 32.0;
+                double dropletH = SecondaryDroplet.Height > 0 ? SecondaryDroplet.Height : 32.0;
+                SecondaryDropletTranslate.X = (w / 2.0 + 8.0 + (dropletW / 2.0)) * dropT;
+                SecondaryDropletTranslate.Y = (h - dropletH) / 2.0;
                 double dropVel = Math.Clamp(_dropletOffset.Velocity / 8.0, -0.35, 0.35) * liquid;
                 SecondaryDropletScale.ScaleX = Math.Clamp(0.45 + 0.55 * dropT + dropVel, 0.3, 1.28);
                 SecondaryDropletScale.ScaleY = Math.Clamp(0.45 + 0.55 * dropT - dropVel * 0.65, 0.3, 1.22);
@@ -1295,280 +987,4 @@ public partial class IslandWindow
         }
     }
 
-    private void UpdateLiveBars(double t, double dt = 1.0 / 60.0)
-    {
-        if (_machine.State != IslandState.Compact) return;
-
-        _audioSpectrum.ReadBands(_bandLevels);
-        bool isMusicPlaying = _mediaService.Current?.IsPlaying ?? false;
-        bool isTimerRunning = _stopwatch.IsRunning || (_countdownService?.IsRunning ?? false);
-        bool isCallActive = !string.IsNullOrWhiteSpace(_privacyService.ActiveCallApp);
-        bool isRecording = _voiceMemoService?.IsRecording ?? false;
-        string style = _settingsService?.Current?.VisualizerStyle ?? "ClassicBars";
-        bool active = isMusicPlaying || isTimerRunning || isCallActive || isRecording;
-
-        double clampedDt = Math.Clamp(dt, 0.001, 0.1);
-        float attackAlpha = (float)(1.0 - Math.Exp(-0.65 * 60.0 * clampedDt));
-        float decayAlpha = (float)(1.0 - Math.Exp(-0.22 * 60.0 * clampedDt));
-
-        for (int i = 0; i < _bars.Length; i++)
-        {
-            float target = _bandLevels[i];
-
-            if (isRecording && _voiceMemoService != null)
-            {
-                float peak = _voiceMemoService.PeakLevel;
-                double wave = peak * (0.65 + 0.35 * Math.Sin(t * 7.5 + i * 1.5));
-                target = (float)wave;
-            }
-            else if (target < 0.08f && (isTimerRunning || isCallActive))
-            {
-                double wave = (0.5 + 0.5 * Math.Sin(t * (5.5 + i * 1.8) + i * 1.3)) * 0.72;
-                target = (float)wave;
-            }
-            else if (!isMusicPlaying && !isTimerRunning && !isCallActive)
-            {
-                target = 0f;
-            }
-
-            // Apple iOS Dynamic Island ballistics: fast explosive attack, smooth organic decay
-            float alpha = target > _smoothBands[i] ? attackAlpha : decayAlpha;
-            _smoothBands[i] += (target - _smoothBands[i]) * alpha;
-        }
-
-        switch (style)
-        {
-            case "Waveform":
-                UpdateCompactWaveVisualizer(t, active);
-                break;
-
-            case "LiquidBlob":
-                UpdateBlobVisualizer(t);
-                break;
-
-            case "NeonAurora":
-                UpdateAuroraVisualizer(t);
-                break;
-
-            case "SiriOrb":
-                UpdateSiriOrbVisualizer(t);
-                break;
-
-            default:
-                UpdateBarsVisualizer(t, active);
-                break;
-        }
-    }
-
-    private void UpdateBarsVisualizer(double t, bool active)
-    {
-        for (int i = 0; i < _bars.Length; i++)
-        {
-            if (!active)
-            {
-                _bars[i].ScaleY = 0.18;
-                continue;
-            }
-
-            // Dynamic harmonic wave modulation calibrated to Apple iOS Dynamic Island motion
-            double wavePhase = 0.88 + 0.12 * Math.Sin(t * 7.2 + i * 1.15);
-            double level = Math.Clamp(_smoothBands[i], 0f, 1f) * wavePhase;
-
-            // Bar-specific dynamic sensitivity:
-            // Bar 0: sub-bass pulse, Bar 1: kick/snare punch, Bar 2: vocal warmth, Bar 3: treble sparkle
-            double multiplier = i switch
-            {
-                0 => 1.05,
-                1 => 1.15,
-                2 => 1.00,
-                3 => 0.90,
-                _ => 1.00
-            };
-
-            double scale = 0.20 + 0.80 * Math.Clamp(level * multiplier, 0.0, 1.0);
-            _bars[i].ScaleY = scale;
-        }
-    }
-
-    private void UpdateCompactWaveVisualizer(double t, bool active)
-    {
-        if (_compactWaveFigure == null) return;
-        for (int i = 0; i < 9; i++)
-        {
-            double x = i * 2.5;
-            double y = 7.0;
-            if (active)
-            {
-                int band = Math.Clamp(i * 3 / 8, 0, 3);
-                double energy = _smoothBands[band];
-                y = 7.0 + Math.Sin(t * 8.0 + i * 0.8) * energy * 5.0;
-            }
-            if (i == 0)
-            {
-                _compactWaveFigure.StartPoint = new Point(x, y);
-            }
-            else if (i - 1 < _compactWaveFigure.Segments.Count && _compactWaveFigure.Segments[i - 1] is LineSegment seg)
-            {
-                seg.Point = new Point(x, y);
-            }
-        }
-    }
-
-    private void UpdateBlobVisualizer(double t)
-    {
-        if (BlobScale == null || BlobRotate == null || BlobOuterGlow == null) return;
-        double bass = Math.Clamp(_smoothBands[0], 0, 1);
-        double mid = Math.Clamp(_smoothBands[1], 0, 1);
-        double energy = (bass * 0.72 + mid * 0.28);
-
-        double squash = Math.Sin(t * 9.0) * 0.18 * energy;
-        BlobScale.ScaleX = 0.75 + (0.65 * energy) + squash;
-        BlobScale.ScaleY = 0.75 + (0.65 * energy) - squash;
-        BlobRotate.Angle = Math.Sin(t * 3.5) * 22.0 * (0.25 + energy);
-        BlobOuterGlow.Opacity = Math.Clamp(0.20 + 0.75 * energy, 0, 1);
-        double glowSize = 13 + (8 * energy);
-        BlobOuterGlow.Width = glowSize;
-        BlobOuterGlow.Height = glowSize;
-    }
-
-    private void UpdateAuroraVisualizer(double t)
-    {
-        if (AuroraScale0 == null || AuroraScale1 == null || AuroraScale2 == null || AuroraScale3 == null) return;
-        double w0 = 0.85 + 0.15 * Math.Sin(t * 6.5);
-        double w1 = 0.85 + 0.15 * Math.Sin(t * 6.5 + 1.2);
-        double w2 = 0.85 + 0.15 * Math.Sin(t * 6.5 + 2.4);
-        double w3 = 0.85 + 0.15 * Math.Sin(t * 6.5 + 3.6);
-
-        AuroraScale0.ScaleY = Math.Clamp((0.18 + 0.82 * Math.Clamp(_smoothBands[0], 0, 1)) * w0, 0.15, 1.25);
-        AuroraScale1.ScaleY = Math.Clamp((0.18 + 0.82 * Math.Clamp(_smoothBands[1], 0, 1)) * w1, 0.15, 1.25);
-        AuroraScale2.ScaleY = Math.Clamp((0.18 + 0.82 * Math.Clamp(_smoothBands[2], 0, 1)) * w2, 0.15, 1.25);
-        AuroraScale3.ScaleY = Math.Clamp((0.18 + 0.82 * Math.Clamp(_smoothBands[3], 0, 1)) * w3, 0.15, 1.25);
-    }
-
-    private void UpdateSiriOrbVisualizer(double t)
-    {
-        if (SiriRotate == null || SiriCoreScale == null || SiriAura == null) return;
-        double beat = Math.Clamp(_smoothBands[0] * 0.75 + _smoothBands[1] * 0.45, 0, 1);
-        double highs = Math.Clamp(_smoothBands[2] * 0.5 + _smoothBands[3] * 0.5, 0, 1);
-
-        SiriRotate.Angle = (t * 85.0) % 360.0;
-        double corePulse = 0.70 + 0.65 * beat;
-        SiriCoreScale.ScaleX = corePulse;
-        SiriCoreScale.ScaleY = corePulse;
-        SiriAura.Opacity = Math.Clamp(0.30 + 0.70 * (beat * 0.6 + highs * 0.4), 0.25, 1.0);
-    }
-
-    private void Pill_MouseMove(object sender, MouseEventArgs e)
-    {
-        _lastMousePos = e.GetPosition(Pill);
-        _lastMouseMoveTime = DateTime.UtcNow;
-
-        if (_isPillPressed && e.LeftButton == MouseButtonState.Pressed && _machine.State != IslandState.Expanded)
-        {
-            try
-            {
-                ProcessPillDrag(PointToScreen(e.GetPosition(this)));
-            }
-            catch { }
-        }
-    }
-
-    private void Pill_MouseLeave(object sender, MouseEventArgs e)
-    {
-        if (_isPillPressed && e.LeftButton != MouseButtonState.Pressed)
-        {
-            _isPillPressed = false;
-            EndPillDrag();
-        }
-    }
-
-    private ImageBrush? _pillGlassBrush;
-    private int _lastPillGlassW;
-    private int _lastPillGlassH;
-    private float _lastPillGlassR;
-    private bool _lastHasSecondary;
-    private float _lastDropletX;
-    private float _lastDropletY;
-
-    internal void UpdatePillLiquidGlass(double w, double h, float radius, double dropT)
-    {
-        if (!ThemeManager.IsLiquidGlass || !DynamicIsland.LiquidGlass.GlassManager.Instance.IsEnabled)
-        {
-            if (_pillGlassBrush != null && PillBackground.Background == _pillGlassBrush)
-            {
-                PillBackground.SetResourceReference(Border.BackgroundProperty, "PillBackgroundBrush");
-            }
-            return;
-        }
-
-        int targetW = (int)Math.Max(w, 20);
-        int targetH = (int)Math.Max(h, 20);
-
-        bool hasSecondary = dropT > 0.01 && SecondaryDroplet != null && SecondaryDroplet.Visibility == Visibility.Visible;
-        float dropX = (float)(SecondaryDropletTranslate?.X ?? 0);
-        float dropY = (float)(SecondaryDropletTranslate?.Y ?? 0);
-
-        if (targetW == _lastPillGlassW && targetH == _lastPillGlassH && Math.Abs(radius - _lastPillGlassR) < 0.5f &&
-            hasSecondary == _lastHasSecondary &&
-            (!hasSecondary || (Math.Abs(dropX - _lastDropletX) < 0.5f && Math.Abs(dropY - _lastDropletY) < 0.5f)))
-        {
-            return;
-        }
-
-        _lastPillGlassW = targetW;
-        _lastPillGlassH = targetH;
-        _lastPillGlassR = radius;
-        _lastHasSecondary = hasSecondary;
-        _lastDropletX = dropX;
-        _lastDropletY = dropY;
-
-        float screenX = 0;
-        float screenY = 0;
-        try
-        {
-            var screenPos = PillBackground.PointToScreen(new Point(0, 0));
-            screenX = (float)screenPos.X;
-            screenY = (float)screenPos.Y;
-        }
-        catch { }
-
-        // P2a perf: Use zero-allocation GlassSettings.Lerp between pre-computed presets
-        // instead of Builder pattern that allocates per-frame during morph transitions.
-        // Adaptive preset based on current morphing state:
-        // Compact idle/toast: Punchy Pill capsule profile
-        // Expanding/Expanded: Squircle Card profile with lower refraction thickness
-        // to prevent interior text warping, and higher diffusion blur
-        var settings = DynamicIsland.LiquidGlass.GlassPresets.Pill;
-        if (targetH > 38 || targetW > 200)
-        {
-            float t = Math.Clamp((float)(targetH - 30) / (176f - 30f), 0.0f, 1.0f);
-            settings = DynamicIsland.LiquidGlass.GlassSettings.Lerp(
-                DynamicIsland.LiquidGlass.GlassPresets.Pill,
-                DynamicIsland.LiquidGlass.GlassPresets.Card,
-                t) with { CornerRadius = radius, CornerSmoothing = 0.80f };
-        }
-
-        var bmp = DynamicIsland.LiquidGlass.GlassManager.Instance.RenderPillGlass(
-            targetW,
-            targetH,
-            (float)_dpiScale,
-            settings,
-            radius,
-            hasSecondary,
-            (float)(SecondaryDropletTranslate?.X ?? 0),
-            (float)(SecondaryDropletTranslate?.Y ?? 0),
-            18.0f,
-            screenX,
-            screenY);
-
-        if (bmp != null)
-        {
-            _pillGlassBrush ??= new ImageBrush { Stretch = Stretch.Fill };
-            _pillGlassBrush.ImageSource = bmp;
-            if (PillBackground.Background != _pillGlassBrush)
-            {
-                PillBackground.Background = _pillGlassBrush;
-            }
-        }
-    }
 }

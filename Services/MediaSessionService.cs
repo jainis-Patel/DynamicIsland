@@ -233,7 +233,7 @@ internal sealed class MediaSessionService : IDisposable
                         var pb = sess.GetPlaybackInfo();
                         isPlaying = pb?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
                     }
-                    catch { }
+                    catch (Exception ex) { App.LogDebug("MediaSession.GetPlaybackInfo", ex); }
 
                     string title = "";
                     string artist = "";
@@ -252,7 +252,7 @@ internal sealed class MediaSessionService : IDisposable
                             }
                         }
                     }
-                    catch { }
+                    catch (Exception ex) { App.LogDebug("MediaSession.GetProps", ex); }
 
                     var brand = MediaPlayerBrandService.Detect(aumid, title, artist);
                     list.Add(new ActiveMediaSessionItem
@@ -267,7 +267,7 @@ internal sealed class MediaSessionService : IDisposable
                         IsCurrent = string.Equals(aumid, currentAumid, StringComparison.OrdinalIgnoreCase)
                     });
                 }
-                catch { }
+                catch (Exception ex) { App.LogDebug("MediaSession.EnumerateSession", ex); }
             }
         }
         catch (Exception ex)
@@ -354,7 +354,7 @@ internal sealed class MediaSessionService : IDisposable
                             return true;
                         }
                     }
-                    catch { }
+                    catch (Exception ex) { App.LogDebug("MediaSession.FocusProcess", ex); }
                 }
             }
             finally
@@ -365,7 +365,7 @@ internal sealed class MediaSessionService : IDisposable
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { App.LogDebug("MediaSession.TryFocusPlayer", ex); }
         return false;
     }
 

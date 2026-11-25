@@ -37,7 +37,8 @@ internal sealed class WindowsShareService : IDisposable
         _hwndProvider = hwndProvider;
     }
 
-    [DllImport("combase.dll")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA2101:Specify marshaling for P/Invoke string arguments", Justification = "activatableClassId uses UnmanagedType.HString (UTF-16 WinRT HSTRING).")]
+    [DllImport("combase.dll", CharSet = CharSet.Unicode)]
     private static extern int RoGetActivationFactory(
         [MarshalAs(UnmanagedType.HString)] string activatableClassId,
         [In] ref Guid iid,

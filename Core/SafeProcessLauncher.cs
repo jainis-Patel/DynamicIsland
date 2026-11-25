@@ -15,7 +15,8 @@ internal static class SafeProcessLauncher
         "ms-settings",
         "ms-availablenetworks",
         "outlookcal",
-        "mailto"
+        "mailto",
+        "spotify"
     };
 
     public static bool TryOpenUrl(string? url)

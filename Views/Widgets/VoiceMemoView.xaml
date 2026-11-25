@@ -18,8 +18,8 @@
                 </Button>
                 <TextBlock Style="{StaticResource SectionTitle}" Text="Voice Memos" VerticalAlignment="Center" />
             </StackPanel>
-            <Button Click="OpenMemosFolder_Click" DockPanel.Dock="Right" BorderThickness="0" Cursor="Hand" Padding="2" ToolTipService.ToolTip="Open Recordings Folder">
-                <TextBlock Text="Open Folder" FontSize="10" Foreground="{DynamicResource SecondaryBrush}" />
+            <Button Click="OpenMemosFolder_Click" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" ToolTipService.ToolTip="Open Recordings Folder">
+                <TextBlock Text="Open Folder" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
             </Button>
         </DockPanel>
         <Grid Grid.Row="1" Height="82" VerticalAlignment="Top">
@@ -28,7 +28,7 @@
                 <ColumnDefinition Width="8" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10,6">
+            <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="14" Padding="10,6">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
@@ -63,7 +63,7 @@
                     <TextBlock x:Name="HeroRecordStatus" Grid.Row="2" Text="Ready" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" />
                 </Grid>
             </Border>
-            <Border Grid.Column="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="8,6">
+            <Border Grid.Column="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="14" Padding="8,6">
                 <Grid>
                     <StackPanel x:Name="LastMemoHost" Visibility="Collapsed">
                         <TextBlock x:Name="LastMemoFileName" />

@@ -89,16 +89,17 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- 54x54 Continuous Squircle Album Artwork -->
+                <!-- 54x54 Continuous Squircle Album Artwork (Concentric with R=34 outer pill minus 16px inset) -->
                 <Border x:Name="MediaArtworkSquircle"
                         MouseLeftButtonDown="FocusMediaPlayer_Click"
                         Cursor="Hand"
                         Width="54" Height="54"
-                        CornerRadius="13.5"
+                        CornerRadius="18"
                         Background="#14FFFFFF"
                         BorderThickness="1"
                         BorderBrush="#22FFFFFF"
                         ClipToBounds="True"
+                        core:RoundedClip.ClipChild="True"
                         VerticalAlignment="Center"
                         ToolTipService.ToolTip="Click to open active media player">
                     <Grid>
@@ -294,7 +295,7 @@
                         Background="#0FFFFFFF"
                         BorderBrush="#18FFFFFF"
                         BorderThickness="1"
-                        CornerRadius="14"
+                        CornerRadius="18"
                         Padding="11,7"
                         VerticalAlignment="Center">
                     <StackPanel HorizontalAlignment="Right">

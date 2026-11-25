@@ -128,7 +128,7 @@ public partial class IslandWindow
         {
             try
             {
-                Clipboard.SetText(ip);
+                SafeClipboard.TrySetText(ip);
                 _machine.PushToast(new ToastContent(
                     "\uE8C8",
                     "IPv4 Copied",
@@ -207,16 +207,16 @@ public partial class IslandWindow
 
     internal void WifiNetworksCard_Click(object sender, MouseButtonEventArgs e)
     {
-        SetWifiScannerMode(true);
+        SetWifiScannerModeAsync(true).FireAndForget("Network.SetWifiScannerMode");
         e.Handled = true;
     }
 
     internal void ScanWifiModeBtn_Click(object sender, RoutedEventArgs e)
     {
-        SetWifiScannerMode(!_isWifiScannerMode);
+        SetWifiScannerModeAsync(!_isWifiScannerMode).FireAndForget("Network.SetWifiScannerMode");
     }
 
-    private async void SetWifiScannerMode(bool scannerMode)
+    private async Task SetWifiScannerModeAsync(bool scannerMode)
     {
         try
         {

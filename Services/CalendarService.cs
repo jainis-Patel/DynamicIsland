@@ -57,6 +57,8 @@ internal sealed class CalendarService : IDisposable
     private readonly object _eventsLock = new();
     private readonly List<IslandCustomEvent> _customEvents = new();
     private readonly DebouncedJsonStore<List<IslandCustomEvent>> _eventsStore;
+    private Choreographer? _choreographer;
+    private bool _started;
     private bool _disposed;
 
     public CalendarEventInfo? NextEvent { get; private set; }
@@ -72,14 +74,34 @@ internal sealed class CalendarService : IDisposable
             lock (_eventsLock) return new List<IslandCustomEvent>(_customEvents);
         });
         LoadCustomEvents();
-        _timer = new DispatcherTimer(PollInterval, DispatcherPriority.Background, (_, _) => _ = RefreshAsync(), _ui);
+        _timer = new DispatcherTimer(PollInterval, DispatcherPriority.Background, (_, _) => RefreshAsync().FireAndForget("Calendar.Poll"), _ui);
+    }
+
+    public void AttachChoreographer(Choreographer choreographer)
+    {
+        if (_disposed || choreographer == null) return;
+        _choreographer = choreographer;
+        if (_started)
+        {
+            _timer.Stop();
+            _choreographer.Register("calendar_refresh", () => RefreshAsync().FireAndForget("Calendar.Chore"), (int)PollInterval.TotalSeconds, PowerSensitivity.Relaxed);
+        }
     }
 
     public void Start()
     {
         if (_disposed) return;
-        _timer.Start();
-        _ = RefreshAsync();
+        _started = true;
+        if (_choreographer != null)
+        {
+            _timer.Stop();
+            _choreographer.Register("calendar_refresh", () => RefreshAsync().FireAndForget("Calendar.Chore"), (int)PollInterval.TotalSeconds, PowerSensitivity.Relaxed);
+        }
+        else
+        {
+            _timer.Start();
+        }
+        RefreshAsync().FireAndForget("Calendar.Start");
     }
 
     public IReadOnlyList<IslandCustomEvent> GetEventsForDate(DateTime date)
@@ -270,40 +292,23 @@ internal sealed class CalendarService : IDisposable
             App.Log("[CalendarService] Rejected unsafe or invalid meeting URL.");
             return false;
         }
-        try
-        {
-            using var proc = Process.Start(new ProcessStartInfo(parsed.AbsoluteUri) { UseShellExecute = true });
-            return true;
-        }
-        catch (Exception ex)
-        {
-            App.Log($"[CalendarService] LaunchMeeting failed: {ex.Message}");
-            return false;
-        }
+        return SafeProcessLauncher.TryOpenUrl(parsed.AbsoluteUri);
     }
 
     public static bool LaunchEventOrCalendar(CalendarEventInfo? evt)
     {
-        try
+        if (evt != null && !string.IsNullOrWhiteSpace(evt.JoinUrl))
         {
-            if (evt != null && !string.IsNullOrWhiteSpace(evt.JoinUrl))
-            {
-                return LaunchMeeting(evt.JoinUrl);
-            }
+            return LaunchMeeting(evt.JoinUrl);
+        }
 
-            using var proc = Process.Start(new ProcessStartInfo("outlookcal:") { UseShellExecute = true });
-            return true;
-        }
-        catch (Exception ex)
-        {
-            App.Log($"[CalendarService] Launch failed: {ex.Message}");
-            return false;
-        }
+        return SafeProcessLauncher.TryOpenShellUri("outlookcal:");
     }
 
     public void Dispose()
     {
         _disposed = true;
+        _choreographer?.Unregister("calendar_refresh");
         _timer.Stop();
         _eventsStore.Dispose();
     }

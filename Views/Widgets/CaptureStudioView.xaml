@@ -52,7 +52,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- Left: Quick Tools & Eyedropper Card -->
-            <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="8,7">
+            <Border Grid.Column="0" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="14" Padding="8,7">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -94,7 +94,7 @@
             </Border>
 
             <!-- Right: Instant OCR Extractor -->
-            <Border Grid.Column="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="8,6"
+            <Border Grid.Column="2" Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="14" Padding="8,6"
                     AllowDrop="True" Drop="OcrDropZone_Drop" DragOver="OcrDropZone_DragOver">
                 <Grid>
                     <Grid.RowDefinitions>

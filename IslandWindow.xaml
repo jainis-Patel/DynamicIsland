@@ -99,7 +99,7 @@
                     <!-- Privacy Status LED (Green = Camera, Amber = Mic) -->
                     <Ellipse x:Name="NotchPrivacyLed" Width="3.5" Height="3.5" Margin="5,0,0,0" Fill="#30D158" Visibility="Collapsed">
                         <Ellipse.Effect>
-                            <DropShadowEffect BlurRadius="4" ShadowDepth="0" Color="#30D158" Opacity="0.9" />
+                            <DropShadowEffect BlurRadius="4" ShadowDepth="0" Color="#30D158" Opacity="0.9"  RenderingBias="Performance" />
                         </Ellipse.Effect>
                     </Ellipse>
                 </StackPanel>
@@ -210,7 +210,8 @@
                         <!-- 3. Date Badge Style (Patek / Apple Two-Tier Calendar Aperture Window) -->
                         <StackPanel x:Name="IdleClockDateHost" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
                             <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}"
-                                    BorderThickness="1" CornerRadius="5" Margin="0,0,5.5,0" VerticalAlignment="Center" ClipToBounds="True">
+                                    BorderThickness="1" CornerRadius="5" Margin="0,0,5.5,0" VerticalAlignment="Center"
+                                    ClipToBounds="True" core:RoundedClip.ClipChild="True">
                                 <Grid>
                                     <!-- Anodized Calendar Header Strip -->
                                     <Border Height="2.2" VerticalAlignment="Top" HorizontalAlignment="Stretch">
@@ -336,7 +337,7 @@
                                                Foreground="{DynamicResource AccentBrush}" Text="12:00"
                                                HorizontalAlignment="Center" VerticalAlignment="Center">
                                         <TextBlock.Effect>
-                                            <DropShadowEffect x:Name="NeonClockGlowEffect" BlurRadius="14" ShadowDepth="0" Color="#FF9F0A" Opacity="0.95" />
+                                            <DropShadowEffect x:Name="NeonClockGlowEffect" BlurRadius="14" ShadowDepth="0" Color="#FF9F0A" Opacity="0.95"  RenderingBias="Performance" />
                                         </TextBlock.Effect>
                                     </TextBlock>
                                     <!-- Crisp Filament Core Layer -->
@@ -519,14 +520,6 @@
                                 </TransformGroup>
                             </core:VirtualPetControl.RenderTransform>
                         </core:VirtualPetControl>
-                        <!-- Idle Ambient High-Load Alert Badge (Appears when CPU > 80% or RAM > 85%) -->
-                        <Border x:Name="SystemHudAlertPill" Visibility="Collapsed" Background="#28FF9F0A" BorderBrush="#60FF9F0A"
-                                BorderThickness="1" CornerRadius="8" Padding="6,2" Margin="6,0,0,0" Cursor="Hand"
-                                MouseLeftButtonDown="SystemHudAlertPill_Click" VerticalAlignment="Center" ToolTip="High Resource Usage Detected &#x2022; Click to open System HUD">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock x:Name="SystemHudAlertText" Text="&#x1F525; 91% CPU" FontSize="9" FontWeight="SemiBold" Foreground="#FF9F0A" TextTrimming="CharacterEllipsis" MaxWidth="110" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Border>
                     </StackPanel>
                 </Grid>
 
@@ -537,7 +530,7 @@
                     <Grid HorizontalAlignment="Left" VerticalAlignment="Center" Margin="11,0,0,0">
                         <Grid x:Name="CompactMediaHost" Visibility="Collapsed">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Border Width="20" Height="20" CornerRadius="6" Background="#1AFFFFFF" ClipToBounds="True">
+                                <Border Width="20" Height="20" CornerRadius="10" Background="#1AFFFFFF" ClipToBounds="True" core:RoundedClip.ClipChild="True">
                                     <Grid>
                                         <TextBlock x:Name="CompactArtFallback" Style="{StaticResource Glyph}"
                                                    Text="&#xE8D6;" FontSize="10.5" HorizontalAlignment="Center" Foreground="#86868B" />
@@ -702,7 +695,7 @@
                                             <ScaleTransform x:Name="AuroraScale0" ScaleY="0.25" />
                                         </Rectangle.RenderTransform>
                                         <Rectangle.Effect>
-                                            <DropShadowEffect BlurRadius="4" ShadowDepth="0" Color="#00F0FF" Opacity="0.8" />
+                                            <DropShadowEffect BlurRadius="4" ShadowDepth="0" Color="#00F0FF" Opacity="0.8"  RenderingBias="Performance" />
                                         </Rectangle.Effect>
                                     </Rectangle>
                                     <Rectangle x:Name="AuroraBar1" Width="2.5" Height="14" RadiusX="1.25" RadiusY="1.25" Margin="0.75,0" Fill="{DynamicResource AccentBrush}" RenderTransformOrigin="0.5,0.5">
@@ -710,7 +703,7 @@
                                             <ScaleTransform x:Name="AuroraScale1" ScaleY="0.25" />
                                         </Rectangle.RenderTransform>
                                         <Rectangle.Effect>
-                                            <DropShadowEffect BlurRadius="5" ShadowDepth="0" Color="#FF9F0A" Opacity="0.9" />
+                                            <DropShadowEffect BlurRadius="5" ShadowDepth="0" Color="#FF9F0A" Opacity="0.9"  RenderingBias="Performance" />
                                         </Rectangle.Effect>
                                     </Rectangle>
                                     <Rectangle x:Name="AuroraBar2" Width="2.5" Height="14" RadiusX="1.25" RadiusY="1.25" Margin="0.75,0" Fill="#BF5AF2" RenderTransformOrigin="0.5,0.5">
@@ -718,7 +711,7 @@
                                             <ScaleTransform x:Name="AuroraScale2" ScaleY="0.25" />
                                         </Rectangle.RenderTransform>
                                         <Rectangle.Effect>
-                                            <DropShadowEffect BlurRadius="4" ShadowDepth="0" Color="#BF5AF2" Opacity="0.8" />
+                                            <DropShadowEffect BlurRadius="4" ShadowDepth="0" Color="#BF5AF2" Opacity="0.8"  RenderingBias="Performance" />
                                         </Rectangle.Effect>
                                     </Rectangle>
                                     <Rectangle x:Name="AuroraBar3" Width="2.5" Height="14" RadiusX="1.25" RadiusY="1.25" Margin="0.75,0" Fill="#30D158" RenderTransformOrigin="0.5,0.5">
@@ -726,7 +719,7 @@
                                             <ScaleTransform x:Name="AuroraScale3" ScaleY="0.25" />
                                         </Rectangle.RenderTransform>
                                         <Rectangle.Effect>
-                                            <DropShadowEffect BlurRadius="4" ShadowDepth="0" Color="#30D158" Opacity="0.8" />
+                                            <DropShadowEffect BlurRadius="4" ShadowDepth="0" Color="#30D158" Opacity="0.8"  RenderingBias="Performance" />
                                         </Rectangle.Effect>
                                     </Rectangle>
                                 </StackPanel>
@@ -751,7 +744,7 @@
                                         <ScaleTransform x:Name="SiriCoreScale" ScaleX="1" ScaleY="1" />
                                     </Ellipse.RenderTransform>
                                     <Ellipse.Effect>
-                                        <DropShadowEffect BlurRadius="5" ShadowDepth="0" Color="White" Opacity="0.7" />
+                                        <DropShadowEffect BlurRadius="5" ShadowDepth="0" Color="White" Opacity="0.7"  RenderingBias="Performance" />
                                     </Ellipse.Effect>
                                 </Ellipse>
                             </Grid>
@@ -836,31 +829,22 @@
                 <!-- ── Expanded Interactive Surface (Clean Content Card) ───────── -->
                 <Grid x:Name="ExpandedPanel" Width="484" Height="176"
                       HorizontalAlignment="Center" VerticalAlignment="Top">
-                    <Grid Margin="14,10,14,10" ClipToBounds="True">
-                        <widgets:MediaView x:Name="MediaContainer" />
-                        <widgets:CalendarTaskView x:Name="CalendarContainer" Visibility="Collapsed" />
-                        <widgets:ShelfView x:Name="ShelfContainer" Visibility="Collapsed" />
-                        <widgets:ClipboardView x:Name="ClipboardContainer" Visibility="Collapsed" />
-                        <widgets:CalcView x:Name="CalcContainer" Visibility="Collapsed" />
-                        <widgets:NotesView x:Name="NotesContainer" Visibility="Collapsed" />
-                        <widgets:SettingsView x:Name="SettingsContainer" Visibility="Collapsed" />
-                        <widgets:AudioView x:Name="AudioContainer" Visibility="Collapsed" />
-                        <widgets:BatteryView x:Name="BatteryContainer" Visibility="Collapsed" />
-                        <widgets:VoiceMemoView x:Name="VoiceMemoContainer" Visibility="Collapsed" />
-                        <widgets:PeripheralsView x:Name="PeripheralsContainer" Visibility="Collapsed" />
-                        <widgets:NetworkView x:Name="NetworkContainer" Visibility="Collapsed" />
-                        <widgets:NotificationsView x:Name="NotificationsContainer" Visibility="Collapsed" />
-                        <widgets:SystemHudView x:Name="SystemHudContainer" Visibility="Collapsed" />
-                        <widgets:ConverterView x:Name="ConverterContainer" Visibility="Collapsed" />
-                        <widgets:WidgetsGalleryView x:Name="WidgetsGalleryContainer" Visibility="Collapsed" />
-                        <widgets:LauncherView x:Name="LauncherContainer" Visibility="Collapsed" />
-                        <widgets:TermiNotchView x:Name="TermiContainer" Visibility="Collapsed" />
-                        <widgets:PhoneBridgeView x:Name="PhoneBridgeContainer" Visibility="Collapsed" />
-                        <widgets:MechSoundsView x:Name="MechSoundsContainer" Visibility="Collapsed" />
-                        <widgets:CaptureStudioView x:Name="CaptureStudioContainer" Visibility="Collapsed" />
-                        <widgets:QuickReplyView x:Name="QuickReplyContainer" Visibility="Collapsed" />
-                        <widgets:PetSanctuaryView x:Name="PetSanctuaryContainer" Visibility="Collapsed" />
-                    </Grid>
+                    <Border Margin="16,14,16,14" CornerRadius="18" Background="Transparent" core:RoundedClip.ClipChild="True">
+                        <Grid x:Name="ExpandedViewsHost">
+                            <widgets:MediaView x:Name="MediaContainer" />
+                            <widgets:ShelfView x:Name="ShelfContainer" Visibility="Collapsed" />
+                            <widgets:ClipboardView x:Name="ClipboardContainer" Visibility="Collapsed" />
+                            <widgets:CalcView x:Name="CalcContainer" Visibility="Collapsed" />
+                            <widgets:SettingsView x:Name="SettingsContainer" Visibility="Collapsed" />
+                            <widgets:AudioView x:Name="AudioContainer" Visibility="Collapsed" />
+                            <widgets:BatteryView x:Name="BatteryContainer" Visibility="Collapsed" />
+                            <widgets:VoiceMemoView x:Name="VoiceMemoContainer" Visibility="Collapsed" />
+                            <widgets:PeripheralsView x:Name="PeripheralsContainer" Visibility="Collapsed" />
+                            <widgets:NetworkView x:Name="NetworkContainer" Visibility="Collapsed" />
+                            <widgets:NotificationsView x:Name="NotificationsContainer" Visibility="Collapsed" />
+                            <widgets:SystemHudView x:Name="SystemHudContainer" Visibility="Collapsed" />
+                        </Grid>
+                    </Border>
                 </Grid>
             </Grid>
 
@@ -1045,8 +1029,8 @@
             <TextBlock x:Name="LauncherButtonGlyph" />
         </Grid>
 
-        <!-- iOS-Style Split-Droplet Secondary Activity Bubble (Detaches when 2 live activities run simultaneously in Compact mode) -->
-        <Border x:Name="SecondaryDroplet" Width="30" Height="30" CornerRadius="15"
+        <!-- iOS-Style Split-Droplet Secondary Activity Bubble / High-Load Capsule -->
+        <Border x:Name="SecondaryDroplet" Width="32" Height="32" CornerRadius="16"
                 HorizontalAlignment="Center" VerticalAlignment="Top"
                 Visibility="Collapsed" Opacity="0" Cursor="Hand"
                 RenderTransformOrigin="0.5,0.5"
@@ -1063,17 +1047,43 @@
                 <Style TargetType="Border">
                     <Setter Property="Background" Value="{DynamicResource PillBackgroundBrush}" />
                     <Setter Property="BorderBrush" Value="{DynamicResource PillStrokeBrush}" />
+                    <Style.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="BorderBrush" Value="{DynamicResource DockActiveBorderBrush}" />
+                        </Trigger>
+                    </Style.Triggers>
                 </Style>
             </Border.Style>
-            <Border.BorderThickness>1,0,1,1</Border.BorderThickness>
+            <Border.BorderThickness>1</Border.BorderThickness>
             <Border.Effect>
                 <DropShadowEffect BlurRadius="14" ShadowDepth="3" Direction="270" Opacity="0.65" Color="Black" RenderingBias="Performance" />
             </Border.Effect>
             <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                <!-- Apple-Style Concentric Progress / Activity Ring -->
-                <Ellipse x:Name="SecondaryDropletRing" Width="23" Height="23" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.5" Opacity="0.9" />
-                <TextBlock x:Name="SecondaryDropletGlyph" Style="{StaticResource Glyph}" FontSize="10.5"
-                           Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Text="&#xE916;" />
+                <!-- Circular Activity Ring & Tinted Icon Host -->
+                <Grid x:Name="SecondaryDropletIconHost" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse x:Name="SecondaryDropletInnerTint" Width="24" Height="24" Fill="{DynamicResource AccentBrush}" Opacity="0.16" />
+                    <Ellipse Width="24" Height="24" Stroke="{DynamicResource CardBorderBrush}" StrokeThickness="1.5" Opacity="0.35" />
+                    <Ellipse x:Name="SecondaryDropletRing" Width="24" Height="24" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.75" Opacity="0.92" />
+                    <TextBlock x:Name="SecondaryDropletGlyph" Style="{StaticResource Glyph}" FontSize="11"
+                               Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Text="&#xE916;" />
+                </Grid>
+
+                <!-- High-Load RAM / CPU Alert Capsule Host -->
+                <StackPanel x:Name="SecondaryDropletAlertStack" Orientation="Horizontal" Visibility="Collapsed"
+                            HorizontalAlignment="Center" VerticalAlignment="Center" Margin="6,0,8,0"
+                            IsHitTestVisible="False">
+                    <Border x:Name="SecondaryDropletAlertIconBg" Width="18" Height="18" CornerRadius="9"
+                            Background="#28FF453A" Margin="0,0,5,0" VerticalAlignment="Center">
+                        <TextBlock x:Name="SecondaryDropletAlertGlyph" Style="{StaticResource Glyph}" FontSize="9.5"
+                                   Text="&#xE964;" Foreground="#FFFF453A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock x:Name="SecondaryDropletAlertPercent" Style="{StaticResource Digits}" Text="89%"
+                                   FontSize="10" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" LineHeight="10" />
+                        <TextBlock x:Name="SecondaryDropletAlertLabel" Text="RAM" FontSize="6.8" FontWeight="Bold"
+                                   Foreground="#FFFF453A" Opacity="0.95" Margin="0,-1,0,0" />
+                    </StackPanel>
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

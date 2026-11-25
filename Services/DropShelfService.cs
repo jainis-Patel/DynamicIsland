@@ -504,7 +504,7 @@ internal sealed class DropShelfService : IDisposable
     {
         try
         {
-            Clipboard.SetText(path);
+            SafeClipboard.TrySetText(path);
         }
         catch (Exception ex)
         {

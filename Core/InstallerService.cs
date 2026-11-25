@@ -13,7 +13,7 @@ internal static class InstallerService
 {
     public const string AppDisplayName = "Dynamic Island";
     public const string AppPublisher = "Jainis Patel";
-    public const string AppVersion = "0.8.0";
+    public const string AppVersion = "0.9.0";
 
     public static string GetDefaultInstallDir()
     {
@@ -59,7 +59,7 @@ internal static class InstallerService
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { App.LogDebug("Installer.ReadRegistry", ex); }
 
         // Fallback: check default install directory
         string defaultDir = GetDefaultInstallDir();
@@ -84,7 +84,7 @@ internal static class InstallerService
                 return $"{gb:0.0} GB free on {drive.Name.TrimEnd('\\')}";
             }
         }
-        catch { }
+        catch (Exception ex) { App.LogDebug("Installer.GetDriveFreeSpace", ex); }
         return "Sufficient space available";
     }
 
@@ -383,14 +383,14 @@ internal static class InstallerService
                 string startMenu = GetStartMenuShortcutPath();
                 if (File.Exists(startMenu)) File.Delete(startMenu);
             }
-            catch { }
+            catch (Exception ex) { App.LogDebug("Installer.RemoveStartMenuShortcut", ex); }
 
             try
             {
                 string desktop = GetDesktopShortcutPath();
                 if (File.Exists(desktop)) File.Delete(desktop);
             }
-            catch { }
+            catch (Exception ex) { App.LogDebug("Installer.RemoveDesktopShortcut", ex); }
 
             string installDir = GetExistingInstallation().Location ?? GetDefaultInstallDir();
 
@@ -413,7 +413,7 @@ internal static class InstallerService
                         Directory.Delete(dataDir, recursive: true);
                     }
                 }
-                catch { }
+                catch (Exception ex) { App.LogDebug("Installer.RemoveUserData", ex); }
             }
 
             // Schedule post-exit self deletion of installation directory
@@ -425,7 +425,7 @@ internal static class InstallerService
                     UseShellExecute = false
                 });
             }
-            catch { }
+            catch (Exception ex) { App.LogDebug("Installer.ScheduleSelfDelete", ex); }
 
             return true;
         }
@@ -492,7 +492,7 @@ internal static class InstallerService
             using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\DirectX\UserGpuPreferences", writable: true);
             key?.DeleteValue(exePath, throwOnMissingValue: false);
         }
-        catch { }
+        catch (Exception ex) { App.LogDebug("Installer.RemoveGpuPref", ex); }
     }
 
     public static bool GetAutoStart()
@@ -533,7 +533,7 @@ internal static class InstallerService
                         key.SetValue("EstimatedSize", (int)(fi.Length / 1024), RegistryValueKind.DWord);
                     }
                 }
-                catch { }
+                catch (Exception sizeEx) { App.LogDebug("Installer.EstimatedSize", sizeEx); }
             }
         }
         catch (Exception ex)

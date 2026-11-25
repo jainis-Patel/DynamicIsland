@@ -760,7 +760,7 @@ public partial class PhoneBridgeView : UserControl
                 _appliedSessionPassword = password;
                 _activeSessionTotalSeconds = _selectedDurationMinutes * 60;
 
-                try { Clipboard.SetText(session.Url); } catch { }
+                try { SafeClipboard.TrySetText(session.Url); } catch { }
                 _window?.TriggerLiquidImpulse(34, -12, 4);
                 string securityTag = session.RequiresPassword ? " · Password protected" : string.Empty;
                 _window?.ShowToast(
@@ -788,7 +788,7 @@ public partial class PhoneBridgeView : UserControl
         var session = _window?.LanQuickShare?.CurrentSession;
         if (session != null && !session.IsExpired)
         {
-            try { Clipboard.SetText(session.Url); } catch { }
+            try { SafeClipboard.TrySetText(session.Url); } catch { }
             ShowCopyConfirmation();
             _window?.ShowToast(
                 "\uE8C8",

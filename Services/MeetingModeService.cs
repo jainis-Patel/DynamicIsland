@@ -100,22 +100,7 @@ internal sealed class MeetingModeService : IDisposable
 
             if (ShouldShowMeetingJoin(mins, ev.JoinUrl, isCallActive))
             {
-                var action = new LiveActivityAction("Join", "\uE717", () =>
-                {
-                    CalendarService.LaunchMeeting(ev.JoinUrl);
-                    _hub.Complete(MeetingJoinActivityId);
-                });
-
-                _hub.Publish(new LiveActivityItem(
-                    Id: MeetingJoinActivityId,
-                    Source: "Meeting",
-                    Title: ev.Subject,
-                    Subtitle: FormatMeetingSubtitle(mins),
-                    Glyph: "\uE717",
-                    AccentColor: Color.FromRgb(0x30, 0xD1, 0x58), // Emerald green
-                    Priority: 90,
-                    TargetViewKey: "calendar",
-                    Actions: new[] { action }));
+                _hub.Publish(BuildUpcomingMeetingActivity(ev, mins, _hub, _ui));
                 return;
             }
         }
@@ -126,6 +111,35 @@ internal sealed class MeetingModeService : IDisposable
 
         // If not matching conditions, ensure join activity is cleaned up
         _hub.Complete(MeetingJoinActivityId);
+    }
+
+    internal static LiveActivityItem BuildUpcomingMeetingActivity(
+        CalendarEventInfo ev,
+        int mins,
+        LiveActivityHub? hub,
+        Dispatcher ui)
+    {
+        var joinAction = new LiveActivityAction("Join", "\uE717", () =>
+        {
+            CalendarService.LaunchMeeting(ev.JoinUrl);
+            hub?.Complete(MeetingJoinActivityId);
+        });
+
+        var mirrorAction = new LiveActivityAction("Mirror", "\uE714", () =>
+        {
+            _ = ui.InvokeAsync(() => IslandWindow.Instance?.ExpandAndSwitchView(ExpandedView.Mirror));
+        });
+
+        return new LiveActivityItem(
+            Id: MeetingJoinActivityId,
+            Source: "Meeting",
+            Title: ev.Subject,
+            Subtitle: FormatMeetingSubtitle(mins),
+            Glyph: "\uE717",
+            AccentColor: Color.FromRgb(0x30, 0xD1, 0x58), // Emerald green
+            Priority: 90,
+            TargetViewKey: "calendar",
+            Actions: new[] { joinAction, mirrorAction });
     }
 
     private void UpdateActiveCallActivity()
