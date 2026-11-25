@@ -962,16 +962,7 @@ public sealed class SystemPerformanceService : IDisposable
             string? rawName = key?.GetValue("ProcessorNameString") as string;
             if (!string.IsNullOrWhiteSpace(rawName))
             {
-                string clean = rawName
-                    .Replace("(R)", "", StringComparison.OrdinalIgnoreCase)
-                    .Replace("(TM)", "", StringComparison.OrdinalIgnoreCase)
-                    .Replace("CPU", "", StringComparison.OrdinalIgnoreCase)
-                    .Trim();
-
-                if (clean.Length > 22)
-                    clean = clean.Substring(0, 22).Trim();
-
-                return $"{clean} • {cores} Cores";
+                return FormatHardwareSummary(rawName, cores);
             }
         }
         catch
@@ -979,6 +970,36 @@ public sealed class SystemPerformanceService : IDisposable
             // Fallback to core count
         }
         return $"{cores} Logical Cores";
+    }
+
+    internal static string FormatHardwareSummary(string rawName, int cores)
+    {
+        string clean = rawName
+            .Replace("(R)", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("(TM)", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("Processor", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("CPU", "", StringComparison.OrdinalIgnoreCase)
+            .Trim();
+
+        // Strip trailing GPU/clock clauses like "w/ Radeon 780M Graphics", "with ...", or "@ 3.80GHz"
+        int cutIdx = clean.IndexOf(" w/", StringComparison.OrdinalIgnoreCase);
+        if (cutIdx > 4) clean = clean[..cutIdx];
+        cutIdx = clean.IndexOf(" with ", StringComparison.OrdinalIgnoreCase);
+        if (cutIdx > 4) clean = clean[..cutIdx];
+        cutIdx = clean.IndexOf('@');
+        if (cutIdx > 4) clean = clean[..cutIdx];
+
+        while (clean.Contains("  ", StringComparison.Ordinal))
+            clean = clean.Replace("  ", " ", StringComparison.Ordinal);
+
+        clean = clean.Trim();
+        if (clean.Length > 26)
+        {
+            int spaceIdx = clean.LastIndexOf(' ', 26);
+            clean = spaceIdx > 8 ? clean[..spaceIdx].Trim() : clean[..26].Trim();
+        }
+
+        return string.IsNullOrEmpty(clean) ? $"{cores} Logical Cores" : $"{clean} · {cores} Cores";
     }
 
     public void Dispose()

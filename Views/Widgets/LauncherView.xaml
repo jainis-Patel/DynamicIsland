@@ -8,49 +8,6 @@
              d:DesignHeight="360" d:DesignWidth="470"
              AllowDrop="True" Drop="LauncherView_Drop" DragOver="LauncherView_DragOver">
     <UserControl.Resources>
-        <!-- Sleek Glass Context Menu Style -->
-        <Style x:Key="IslandContextMenu" TargetType="ContextMenu">
-            <Setter Property="Background" Value="{DynamicResource MenuBackground}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource MenuBorder}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
-            <Setter Property="Padding" Value="4" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ContextMenu">
-                        <Border Background="{DynamicResource MenuBackground}" BorderBrush="{DynamicResource MenuBorder}" BorderThickness="1" CornerRadius="10" Padding="4">
-                            <StackPanel IsItemsHost="True" />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Context Menu Item Style -->
-        <Style x:Key="IslandMenuItem" TargetType="MenuItem">
-            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
-            <Setter Property="FontSize" Value="10.5" />
-            <Setter Property="FontWeight" Value="Medium" />
-            <Setter Property="Padding" Value="10,6" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="MenuItem">
-                        <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="7" Padding="{TemplateBinding Padding}" Margin="1">
-                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource DockActiveBgBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.4" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <!-- Filter Pill Button Style -->
         <Style x:Key="FilterPillButton" TargetType="Button">
             <Setter Property="Height" Value="20" />

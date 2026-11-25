@@ -437,8 +437,10 @@ internal static partial class SelfTestRunner
     {
         using var service = new SystemPerformanceService();
 
-        // 1. Verify Hardware Summary is populated
+        // 1. Verify Hardware Summary is populated and strips trailing GPU/clock suffixes cleanly
         Assert(!string.IsNullOrWhiteSpace(service.HardwareSummary), "SystemPerformanceService failed to read HardwareSummary.");
+        string formattedAmd = SystemPerformanceService.FormatHardwareSummary("AMD Ryzen 7 7840HS w/ Radeon 780M Graphics", 16);
+        Assert(formattedAmd == "AMD Ryzen 7 7840HS · 16 Cores", $"Expected clean CPU summary without chopped 'w/', got '{formattedAmd}'");
 
         // 2. Benchmark Tier 1 Idle Poll (Must execute in < 25.0 ms with 0 exceptions)
         var sw = Stopwatch.StartNew();

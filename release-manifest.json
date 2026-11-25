@@ -2,21 +2,21 @@
     "version": "0.9.0",
     "releaseTag": "v0.9.0",
     "channel": "stable",
-    "releaseDate": "2026-11-26T00:40:00Z",
+    "releaseDate": "2026-11-26T01:37:00Z",
     "minWindowsBuild": "10.0.19041.0",
     "changelogUrl": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.9.0",
-    "summary": "High-load CPU/RAM droplet & Settings controls, Pre-Call Webcam Mirror & Meeting Mode workflow, Smart Clipboard Transforms, global themed ContextMenus, Fluent glyphs across Battery/Notes/VoiceMemos/DropShelf, and 86-test verification suite.",
+    "summary": "Redesigned Widgets Gallery Bento cards fixing header badge collisions & CPU name truncation, expanded Notifications & Dock Bar clipping fix, unified frosted Tray/Launcher/DropShelf/Caffeine menus with Segoe Fluent icons, Pre-Call Webcam Mirror, Smart Clipboard Transforms, and 86-test suite.",
     "isCritical": false,
     "downloads": {
         "installer": {
             "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.0/DynamicIsland-Setup.exe",
-            "sha256": "43a3689ff63cf296086c0f0c3a4bec6a4dc203217f2cdf874fe0c5997be2d947",
-            "sizeBytes": 74358116
+            "sha256": "a5d9482265ee3460d66d9f924bcfc81b8c8c7c0ec8fc67e267d77e6aafe39691",
+            "sizeBytes": 74358512
         },
         "portable": {
             "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.0/DynamicIsland-Portable.zip",
-            "sha256": "0d170714c064f5d86bca44f16c9f53698593e8d885a01c157cf84c47b506072e",
-            "sizeBytes": 68483478
+            "sha256": "eaae6ed01ed1d49d7aaa84ab07b2bedab7be4df77e7d4ca6f90f4a43b831f898",
+            "sizeBytes": 68483630
         }
     }
 }

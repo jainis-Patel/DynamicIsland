@@ -23,7 +23,7 @@ public partial class IslandWindow : Window
     private readonly record struct PillShape(double Width, double Height, double Radius);
 
     public const double CanvasWidthDip = 760.0;
-    public const double CanvasHeightDip = 580.0;
+    public const double CanvasHeightDip = 660.0;
 
     /// <summary>
     /// Optical geometry targets tuned with golden-ratio aspect proportions and continuous squircle radii.
@@ -45,7 +45,7 @@ public partial class IslandWindow : Window
     private static readonly PillShape SystemHudExpandedShape  = new(484, 232, 34);
     private static readonly PillShape LyricsExpandedShape     = new(484, 216, 34);
     private static readonly PillShape ConverterExpandedShape  = new(484, 232, 36);
-    private static readonly PillShape WidgetsGalleryExpandedShape = new(484, 340, 36);
+    private static readonly PillShape WidgetsGalleryExpandedShape = new(520, 356, 36);
     private static readonly PillShape LauncherExpandedShape   = new(484, 320, 36);
     private static readonly PillShape TermiExpandedShape      = new(484, 232, 36);
     private static readonly PillShape PhoneBridgeExpandedShape = new(484, 288, 36);
@@ -75,8 +75,8 @@ public partial class IslandWindow : Window
         }
 
         int expandedExtraItems = _notificationAppGroups.Where(g => g.IsExpanded).Sum(g => Math.Min(g.Notifications.Count - 1, 3));
-        int visibleCount = Math.Clamp(count + expandedExtraItems, 1, 5);
-        double targetHeight = Math.Clamp(118 + (visibleCount * 76), 210, 448);
+        int visibleCount = Math.Clamp(count + expandedExtraItems, 1, 4);
+        double targetHeight = Math.Clamp(114 + (visibleCount * 70), 210, 396);
         return new PillShape(484, targetHeight, 38);
     }
 

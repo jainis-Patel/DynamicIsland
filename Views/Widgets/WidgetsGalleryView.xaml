@@ -5,44 +5,35 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:core="clr-namespace:DynamicIsland.Core"
              mc:Ignorable="d"
-             d:DesignHeight="360" d:DesignWidth="470"
+             d:DesignHeight="356" d:DesignWidth="520"
              UseLayoutRounding="True"
              SnapsToDevicePixels="True"
              TextOptions.TextFormattingMode="Ideal"
              TextOptions.TextRenderingMode="ClearType"
              PreviewMouseWheel="WidgetsGallery_PreviewMouseWheel">
     <UserControl.Resources>
-        <!-- Apple Bento Card Style with Glass Refraction & Spring Hover Feedback -->
+        <!-- Quiet Frosted Bento Card -->
         <Style x:Key="BentoCardBorder" TargetType="Border" BasedOn="{StaticResource BentoSpringMotionBorder}">
             <Setter Property="Background" Value="{DynamicResource CardBackground}" />
             <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="18" />
-            <Setter Property="Padding" Value="11,9" />
+            <Setter Property="CornerRadius" Value="15" />
+            <Setter Property="Padding" Value="12,10" />
             <Setter Property="Cursor" Value="Hand" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource DockActiveBgBrush}" />
-                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource DockActiveBorderBrush}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
 
-        <!-- Tinted Icon Squircle Backdrop -->
-        <Style x:Key="CardIconSquircle" TargetType="Border">
+        <!-- Micro Pin-to-Desktop Button -->
+        <Style x:Key="PinMiniBtn" TargetType="Button">
             <Setter Property="Width" Value="20" />
             <Setter Property="Height" Value="20" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Margin" Value="0,0,6,0" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-
-        <!-- Micro Pin-to-Desktop Action Button inside Bento Cards -->
-        <Style x:Key="PinMiniBtn" TargetType="Button">
-            <Setter Property="Width" Value="22" />
-            <Setter Property="Height" Value="22" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="4,0,0,0" />
+            <Setter Property="Margin" Value="6,0,0,0" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Foreground" Value="{DynamicResource SecondaryBrush}" />
             <Setter Property="BorderThickness" Value="0" />
@@ -53,7 +44,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="PinBg" Background="{TemplateBinding Background}" CornerRadius="6">
-                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE718;" FontSize="9.5" Foreground="{TemplateBinding Foreground}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE718;" FontSize="9" Foreground="{TemplateBinding Foreground}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -68,23 +59,12 @@
             </Setter>
         </Style>
 
-        <!-- Compact Micro Transport / Action Button -->
+        <!-- Compact Inline Action Button -->
         <Style x:Key="MicroActionBtn" TargetType="Button" BasedOn="{StaticResource IslandButton}">
             <Setter Property="Width" Value="22" />
             <Setter Property="Height" Value="22" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="Focusable" Value="False" />
-        </Style>
-
-        <!-- Category Tag Badge Style -->
-        <Style x:Key="CategoryTagBadge" TargetType="Border">
-            <Setter Property="Height" Value="17" />
-            <Setter Property="Padding" Value="6,0" />
-            <Setter Property="CornerRadius" Value="8.5" />
-            <Setter Property="Background" Value="{DynamicResource ChipBgBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource ChipBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
         <!-- Segmented Filter Pill Button -->
@@ -125,35 +105,30 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Top Header & Launchpad Link -->
+        <!-- Top Header -->
         <DockPanel Grid.Row="0" Margin="2,0,2,7" LastChildFill="False">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Left">
-                <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" Margin="0,0,8,0">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE74C;" FontSize="12" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Widgets Gallery" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
-                    <TextBlock Text="Live telemetry, media &amp; quick tools" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,1,0,0" />
-                </StackPanel>
+                <TextBlock Style="{StaticResource Glyph}" Text="&#xE74C;" FontSize="13" Foreground="{DynamicResource AccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                <TextBlock Text="Widgets" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
             </StackPanel>
 
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button x:Name="UnpinAllDesktopBtn" Click="UnpinAllDesktopBtn_Click" Style="{StaticResource IslandButton}" Height="24" Padding="8,0" Margin="0,0,5,0" Visibility="Collapsed" ToolTipService.ToolTip="Close all pinned desktop widgets">
+                <Button x:Name="UnpinAllDesktopBtn" Click="UnpinAllDesktopBtn_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0,0,5,0" Visibility="Collapsed" ToolTipService.ToolTip="Close all pinned desktop widgets">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Style="{StaticResource Glyph}" Text="&#xE77A;" FontSize="8.5" Foreground="{DynamicResource AmberBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
                         <TextBlock x:Name="UnpinAllDesktopText" Text="Unpin (1)" FontSize="8.5" FontWeight="Medium" />
                     </StackPanel>
                 </Button>
-                <Button Click="OpenLaunchpad_Click" Style="{StaticResource IslandButton}" Height="24" Padding="9,0" Margin="0,0,2,0" ToolTipService.ToolTip="Switch to Apps &amp; Launchpad (Ctrl+6)">
+                <Button Click="OpenLaunchpad_Click" Style="{StaticResource IslandButton}" Height="22" Padding="9,0" ToolTipService.ToolTip="Open Apps Launchpad (Ctrl+6)">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xF0E2;" FontSize="9" Foreground="{DynamicResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center" />
-                        <TextBlock Text="Apps Launchpad" FontSize="8.5" FontWeight="Medium" />
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xF0E2;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Launchpad" FontSize="8.5" FontWeight="Medium" />
                     </StackPanel>
                 </Button>
             </StackPanel>
         </DockPanel>
 
-        <!-- Segmented Category Filter Pill Strip -->
+        <!-- Category Filter Strip -->
         <Border Grid.Row="1"
                 Margin="2,0,2,8"
                 Background="{DynamicResource ChipBgBrush}"
@@ -172,7 +147,7 @@
             </StackPanel>
         </Border>
 
-        <!-- Center Content: Bento Box Grid of Live Widgets -->
+        <!-- Scrollable Bento Surface -->
         <ScrollViewer Grid.Row="2"
                       x:Name="WidgetsScrollViewer"
                       HorizontalScrollBarVisibility="Disabled"
@@ -182,20 +157,21 @@
                       PanningMode="VerticalOnly"
                       SizeChanged="WidgetsScrollViewer_SizeChanged"
                       PreviewMouseWheel="WidgetsGallery_PreviewMouseWheel">
-            <StackPanel Margin="2,2,4,14">
+            <StackPanel Margin="2,1,4,12">
 
-                <!-- Section Header: Live Telemetry & Glance -->
+                <!-- Section: Live Telemetry -->
                 <TextBlock x:Name="LiveSectionHeader"
-                           Text="LIVE TELEMETRY &amp; GLANCE"
-                           FontSize="7.5"
-                           FontWeight="Bold"
+                           Text="Live Telemetry"
+                           FontSize="9"
+                           FontWeight="SemiBold"
                            Foreground="{DynamicResource SecondaryBrush}"
                            Margin="2,0,0,6" />
 
-                <!-- Hero Featured Wide Card: Now Playing & Audio Glance -->
+                <!-- Hero Wide Card: Now Playing -->
                 <Border x:Name="MediaHeroCard"
                         Style="{StaticResource BentoCardBorder}"
-                        Margin="0,0,0,6"
+                        Padding="12,9"
+                        Margin="0,0,0,7"
                         MouseLeftButtonDown="MediaCard_Click">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -204,46 +180,46 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <!-- Album Art or Music Squircle -->
-                        <Border Grid.Column="0" Width="38" Height="38" CornerRadius="10" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" Margin="0,0,10,0" ClipToBounds="True" core:RoundedClip.ClipChild="True">
+                        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="9" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" Margin="0,0,10,0" ClipToBounds="True" core:RoundedClip.ClipChild="True">
                             <Grid>
-                                <Image x:Name="MediaThumbnailImage" Width="38" Height="38" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" Visibility="Collapsed" />
-                                <TextBlock x:Name="MediaFallbackGlyph" Style="{StaticResource Glyph}" Text="&#xE8D6;" FontSize="15" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Image x:Name="MediaThumbnailImage" Width="36" Height="36" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" Visibility="Collapsed" />
+                                <TextBlock x:Name="MediaFallbackGlyph" Style="{StaticResource Glyph}" Text="&#xE8D6;" FontSize="14" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Grid>
                         </Border>
 
-                        <!-- Track Info -->
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,6,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="NOW PLAYING" FontSize="7.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                <Border x:Name="PlayerBrandBadgeHost" Style="{StaticResource CategoryTagBadge}" Visibility="Collapsed">
-                                    <TextBlock x:Name="PlayerBrandBadgeText" Text="Spotify" FontSize="7" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
+                            <Grid Margin="0,0,0,1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="TrackTitleText" Grid.Column="0" Text="No media playing" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" MaxWidth="230" />
+                                <Border x:Name="PlayerBrandBadgeHost" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="6,0,0,0" Padding="5,1" CornerRadius="5" Background="{DynamicResource ChipBgBrush}" Visibility="Collapsed">
+                                    <TextBlock x:Name="PlayerBrandBadgeText" Text="Spotify" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" />
                                 </Border>
-                            </StackPanel>
-                            <TextBlock x:Name="TrackTitleText" Text="No media playing" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" Margin="0,1.5,0,0" />
-                            <TextBlock x:Name="TrackArtistText" Text="Open Spotify, Apple Music, or YouTube Music" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
+                            </Grid>
+                            <TextBlock x:Name="TrackArtistText" Text="Open a media player to control playback" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
 
-                        <!-- Transport Controls & Desktop Pin Icon -->
                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Button x:Name="PinMediaBtn" Tag="Media" Click="PinDesktopWidget_Click" Style="{StaticResource PinMiniBtn}" Margin="0,0,5,0" />
                             <Button x:Name="PrevMiniBtn" Click="PrevMiniBtn_Click" Style="{StaticResource MicroActionBtn}" Margin="0,0,3,0" ToolTipService.ToolTip="Previous track">
                                 <TextBlock Style="{StaticResource Glyph}" Text="&#xE892;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Button>
-                            <Button x:Name="PlayPauseMiniBtn" Click="PlayPauseMiniBtn_Click" Style="{StaticResource IslandButton}" Width="26" Height="26" Padding="0" Margin="0,0,3,0" ToolTipService.ToolTip="Play / Pause">
-                                <TextBlock x:Name="PlayPauseMiniGlyph" Style="{StaticResource Glyph}" Text="&#xE768;" FontSize="11" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Button x:Name="PlayPauseMiniBtn" Click="PlayPauseMiniBtn_Click" Style="{StaticResource IslandButton}" Width="24" Height="24" Padding="0" Margin="0,0,3,0" ToolTipService.ToolTip="Play / Pause">
+                                <TextBlock x:Name="PlayPauseMiniGlyph" Style="{StaticResource Glyph}" Text="&#xE768;" FontSize="10.5" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Button>
                             <Button x:Name="NextMiniBtn" Click="NextMiniBtn_Click" Style="{StaticResource MicroActionBtn}" ToolTipService.ToolTip="Next track">
                                 <TextBlock Style="{StaticResource Glyph}" Text="&#xE893;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Button>
+                            <Button x:Name="PinMediaBtn" Tag="Media" Click="PinDesktopWidget_Click" Style="{StaticResource PinMiniBtn}" />
                         </StackPanel>
                     </Grid>
                 </Border>
 
-                <!-- Responsive 2-Column Live Telemetry WrapPanel -->
-                <WrapPanel x:Name="LiveCardsWrapPanel" Margin="0,0,-6,4">
-                    <!-- 1. System Vitals Widget Card -->
-                    <Border x:Name="CardVitals" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="SystemVitalsCard_Click">
+                <!-- Responsive 2-Column Live Grid -->
+                <WrapPanel x:Name="LiveCardsWrapPanel" Margin="0,0,-7,4">
+                    <!-- 1. System Vitals -->
+                    <Border x:Name="CardVitals" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="SystemVitalsCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -251,94 +227,90 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1FFF9F0A">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE9D9;" FontSize="10.5" Foreground="#FF9F0A" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="SYSTEM VITALS" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CategoryTagBadge}">
-                                        <TextBlock x:Name="CpuPercentBadge" Style="{StaticResource Digits}" Text="CPU 0%" FontSize="7.5" FontWeight="SemiBold" Foreground="#FF9F0A" VerticalAlignment="Center" />
-                                    </Border>
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE9D9;" FontSize="11.5" Foreground="#FF9F0A" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="System Vitals" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock x:Name="CpuPercentBadge" Style="{StaticResource Digits}" Text="0%" FontSize="9" FontWeight="SemiBold" Foreground="#FF9F0A" VerticalAlignment="Center" />
                                     <Button x:Name="PinVitalsBtn" Tag="Vitals" Click="PinDesktopWidget_Click" Style="{StaticResource PinMiniBtn}" />
                                 </StackPanel>
-                            </DockPanel>
+                            </Grid>
 
-                            <!-- Proportional Mini Bars: CPU & RAM -->
-                            <StackPanel Grid.Row="1" Margin="0,1,0,5">
-                                <Grid Margin="0,0,0,4">
+                            <StackPanel Grid.Row="1" Margin="0,0,0,7">
+                                <Grid Margin="0,0,0,5">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="26" />
+                                        <ColumnDefinition Width="28" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="CPU" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                    <Border Grid.Column="1" Height="5" CornerRadius="2.5" Background="{DynamicResource ChipBgBrush}" VerticalAlignment="Center" ClipToBounds="True">
+                                    <Border Grid.Column="1" Height="4.5" CornerRadius="2.25" Background="{DynamicResource ChipBgBrush}" VerticalAlignment="Center" ClipToBounds="True">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition x:Name="CpuBarFillCol" Width="10*" />
                                                 <ColumnDefinition x:Name="CpuBarTrackCol" Width="90*" />
                                             </Grid.ColumnDefinitions>
-                                            <Border Grid.Column="0" CornerRadius="2.5" Background="#FF9F0A" />
+                                            <Border Grid.Column="0" CornerRadius="2.25" Background="#FF9F0A" />
                                         </Grid>
                                     </Border>
-                                    <TextBlock x:Name="CpuDetailText" Grid.Column="2" Style="{StaticResource Digits}" Text="0%" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="CpuDetailText" Grid.Column="2" Style="{StaticResource Digits}" Text="0%" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="7,0,0,0" VerticalAlignment="Center" />
                                 </Grid>
 
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="26" />
+                                        <ColumnDefinition Width="28" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="RAM" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                    <Border Grid.Column="1" Height="5" CornerRadius="2.5" Background="{DynamicResource ChipBgBrush}" VerticalAlignment="Center" ClipToBounds="True">
+                                    <Border Grid.Column="1" Height="4.5" CornerRadius="2.25" Background="{DynamicResource ChipBgBrush}" VerticalAlignment="Center" ClipToBounds="True">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition x:Name="RamBarFillCol" Width="25*" />
                                                 <ColumnDefinition x:Name="RamBarTrackCol" Width="75*" />
                                             </Grid.ColumnDefinitions>
-                                            <Border Grid.Column="0" CornerRadius="2.5" Background="#0A84FF" />
+                                            <Border Grid.Column="0" CornerRadius="2.25" Background="#0A84FF" />
                                         </Grid>
                                     </Border>
-                                    <TextBlock x:Name="RamDetailText" Grid.Column="2" Style="{StaticResource Digits}" Text="0 GB" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="RamDetailText" Grid.Column="2" Style="{StaticResource Digits}" Text="0 GB" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="7,0,0,0" VerticalAlignment="Center" />
                                 </Grid>
                             </StackPanel>
 
-                            <TextBlock x:Name="HardwareSummaryText" Grid.Row="2" Text="Hardware Monitor · Click for HUD" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="HardwareSummaryText" Grid.Row="2" Text="Hardware Monitor" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 2. Battery & Power Widget Card -->
-                    <Border x:Name="CardBattery" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="BatteryCard_Click">
+                    <!-- 2. Battery & Power -->
+                    <Border x:Name="CardBattery" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="BatteryCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
 
-                            <DockPanel Grid.Row="0" Margin="0,0,0,5">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1F30D158">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE945;" FontSize="10.5" Foreground="#30D158" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="BATTERY" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CategoryTagBadge}">
-                                        <TextBlock x:Name="PowerPlanBadge" Text="Balanced" FontSize="7.5" FontWeight="SemiBold" Foreground="#30D158" VerticalAlignment="Center" />
-                                    </Border>
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE945;" FontSize="11.5" Foreground="#30D158" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Battery" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock x:Name="PowerPlanBadge" Text="Balanced" FontSize="8.5" FontWeight="Medium" Foreground="#30D158" MaxWidth="82" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                                     <Button x:Name="PinBatteryBtn" Tag="Battery" Click="PinDesktopWidget_Click" Style="{StaticResource PinMiniBtn}" />
                                 </StackPanel>
-                            </DockPanel>
+                            </Grid>
 
-                            <StackPanel Grid.Row="1" Margin="0,0,0,5">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
-                                    <TextBlock x:Name="BatteryBigPercent" Style="{StaticResource Digits}" Text="100%" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                    <TextBlock x:Name="BatteryStatusText" Text=" · AC Online" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Margin="4,2,0,0" TextTrimming="CharacterEllipsis" />
+                            <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,0,0,7">
+                                    <TextBlock x:Name="BatteryBigPercent" Style="{StaticResource Digits}" Text="100%" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Bottom" />
+                                    <TextBlock x:Name="BatteryStatusText" Text="Charging" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Bottom" Margin="6,0,0,2.5" TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                                 <Border Height="5" CornerRadius="2.5" Background="{DynamicResource ChipBgBrush}" ClipToBounds="True">
                                     <Grid>
@@ -350,13 +322,11 @@
                                     </Grid>
                                 </Border>
                             </StackPanel>
-
-                            <TextBlock x:Name="BatteryActionHint" Grid.Row="2" Text="Click for battery health &amp; power plans" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 3. Wi-Fi & Network Speedometer Card -->
-                    <Border x:Name="CardNetwork" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="NetworkCard_Click">
+                    <!-- 3. Network & Speed -->
+                    <Border x:Name="CardNetwork" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="NetworkCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -364,159 +334,151 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1F0A84FF">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE701;" FontSize="10.5" Foreground="#0A84FF" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="NETWORK" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CategoryTagBadge}">
-                                        <TextBlock x:Name="NetworkPingBadge" Style="{StaticResource Digits}" Text="—" FontSize="7.5" FontWeight="SemiBold" Foreground="#0A84FF" VerticalAlignment="Center" />
-                                    </Border>
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE701;" FontSize="11.5" Foreground="#0A84FF" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Network" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock x:Name="NetworkPingBadge" Style="{StaticResource Digits}" Text="—" FontSize="8.5" FontWeight="Medium" Foreground="#0A84FF" VerticalAlignment="Center" />
                                     <Button x:Name="PinNetworkBtn" Tag="Network" Click="PinDesktopWidget_Click" Style="{StaticResource PinMiniBtn}" />
                                 </StackPanel>
-                            </DockPanel>
+                            </Grid>
 
-                            <Grid Grid.Row="1" Margin="0,1,0,5">
+                            <Grid Grid.Row="1" Margin="0,0,0,7">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="↓ DOWNLOAD" FontSize="7" FontWeight="SemiBold" Foreground="#0A84FF" />
-                                    <TextBlock x:Name="NetDownloadSpeed" Style="{StaticResource Digits}" Text="0 KB/s" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,1,0,0" />
+                                    <TextBlock Text="Download" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
+                                    <TextBlock x:Name="NetDownloadSpeed" Style="{StaticResource Digits}" Text="0 KB/s" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,1,0,0" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1">
-                                    <TextBlock Text="↑ UPLOAD" FontSize="7" FontWeight="SemiBold" Foreground="#BF5AF2" />
-                                    <TextBlock x:Name="NetUploadSpeed" Style="{StaticResource Digits}" Text="0 KB/s" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,1,0,0" />
+                                    <TextBlock Text="Upload" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
+                                    <TextBlock x:Name="NetUploadSpeed" Style="{StaticResource Digits}" Text="0 KB/s" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,1,0,0" />
                                 </StackPanel>
                             </Grid>
 
-                            <TextBlock x:Name="NetworkNameText" Grid.Row="2" Text="Checking network..." FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="NetworkNameText" Grid.Row="2" Text="Checking connection..." FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 4. Calendar & Agenda Card -->
-                    <Border x:Name="CardCalendar" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="CalendarCard_Click">
+                    <!-- 4. Calendar & Agenda -->
+                    <Border x:Name="CardCalendar" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="CalendarCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
 
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1FFFD60A">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE787;" FontSize="10.5" Foreground="#FFD60A" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="CALENDAR" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CategoryTagBadge}">
-                                        <TextBlock x:Name="TodayDateBadge" Text="TODAY" FontSize="7.5" FontWeight="SemiBold" Foreground="#FFD60A" VerticalAlignment="Center" />
-                                    </Border>
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE787;" FontSize="11.5" Foreground="#FFD60A" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Calendar" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TodayDateBadge" Text="Today" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
                                     <Button x:Name="PinCalendarBtn" Tag="Calendar" Click="PinDesktopWidget_Click" Style="{StaticResource PinMiniBtn}" />
                                 </StackPanel>
-                            </DockPanel>
+                            </Grid>
 
-                            <StackPanel Grid.Row="1" Margin="0,1,0,5">
-                                <TextBlock x:Name="NextEventTitleText" Text="All caught up" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
-                                <TextBlock x:Name="NextEventTimeText" Text="No upcoming meetings" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                            <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                                <TextBlock x:Name="NextEventTitleText" Text="All caught up" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock x:Name="NextEventTimeText" Text="No upcoming meetings today" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
-
-                            <TextBlock Grid.Row="2" Text="Click for calendar &amp; tasks" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 5. Live Weather & Forecast Card -->
-                    <Border x:Name="CardWeather" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="WeatherCard_Click">
+                    <!-- 5. Weather -->
+                    <Border x:Name="CardWeather" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="WeatherCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1FFFD60A">
-                                        <TextBlock x:Name="WeatherGlyphIcon" Style="{StaticResource Glyph}" Text="&#xE706;" FontSize="10.5" Foreground="#FFD60A" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="WEATHER" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CategoryTagBadge}">
-                                        <TextBlock x:Name="WeatherLocationBadge" Text="Local" FontSize="7.5" FontWeight="SemiBold" Foreground="#FFD60A" VerticalAlignment="Center" MaxWidth="62" TextTrimming="CharacterEllipsis" />
-                                    </Border>
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="WeatherGlyphIcon" Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE706;" FontSize="11.5" Foreground="#FFD60A" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Weather" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock x:Name="WeatherLocationBadge" Text="Local" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" MaxWidth="68" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                                     <Button x:Name="PinWeatherBtn" Tag="Weather" Click="PinDesktopWidget_Click" Style="{StaticResource PinMiniBtn}" />
                                 </StackPanel>
-                            </DockPanel>
-                            <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,5">
-                                <TextBlock x:Name="WeatherTempBigText" Style="{StaticResource Digits}" Text="—°C" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                                <TextBlock x:Name="WeatherConditionText" Text=" · Syncing..." FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Margin="4,2,0,0" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,0,0,5">
+                                <TextBlock x:Name="WeatherTempBigText" Style="{StaticResource Digits}" Text="—°C" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Bottom" />
+                                <TextBlock x:Name="WeatherConditionText" Text="Syncing" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Bottom" Margin="6,0,0,2.5" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
-                            <TextBlock x:Name="WeatherForecastText" Grid.Row="2" Text="Click to refresh Open-Meteo forecast" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="WeatherForecastText" Grid.Row="2" Text="Updating local forecast" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 6. Pomodoro & Focus Timer Card -->
-                    <Border x:Name="CardTimer" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="TimerCard_Click">
+                    <!-- 6. Focus Timer -->
+                    <Border x:Name="CardTimer" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="TimerCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1FFF9F0A">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE916;" FontSize="10.5" Foreground="#FF9F0A" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="FOCUS TIMER" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CategoryTagBadge}">
-                                        <TextBlock x:Name="TimerModeBadgeText" Text="Ready" FontSize="7.5" FontWeight="SemiBold" Foreground="#FF9F0A" VerticalAlignment="Center" />
-                                    </Border>
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE916;" FontSize="11.5" Foreground="#FF9F0A" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Focus Timer" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TimerModeBadgeText" Text="Ready" FontSize="8.5" FontWeight="Medium" Foreground="#FF9F0A" VerticalAlignment="Center" />
                                     <Button x:Name="PinTimerBtn" Tag="Timer" Click="PinDesktopWidget_Click" Style="{StaticResource PinMiniBtn}" />
                                 </StackPanel>
-                            </DockPanel>
+                            </Grid>
                             <DockPanel Grid.Row="1" Margin="0,0,0,5" LastChildFill="True">
                                 <Button x:Name="TimerQuickToggleBtn" DockPanel.Dock="Right" Click="TimerQuickToggleBtn_Click" Style="{StaticResource MicroActionBtn}" ToolTipService.ToolTip="Start / Pause Pomodoro Timer">
                                     <TextBlock x:Name="TimerQuickToggleGlyph" Style="{StaticResource Glyph}" Text="&#xE768;" FontSize="9" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Button>
-                                <TextBlock x:Name="TimerBigReadoutText" Style="{StaticResource Digits}" Text="25:00" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                                <TextBlock x:Name="TimerBigReadoutText" Style="{StaticResource Digits}" Text="25:00" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                             </DockPanel>
-                            <TextBlock x:Name="TimerStatusSubtitleText" Grid.Row="2" Text="Pomodoro 25m · Click play to start" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="TimerStatusSubtitleText" Grid.Row="2" Text="Pomodoro 25m" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 7. Disk & Storage Drive Meter Card -->
-                    <Border x:Name="CardStorage" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="StorageCard_Click">
+                    <!-- 7. Storage -->
+                    <Border x:Name="CardStorage" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="StorageCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1F32ADE6">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xEDA2;" FontSize="10.5" Foreground="#32ADE6" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="STORAGE" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CategoryTagBadge}">
-                                        <TextBlock x:Name="StorageFreeBadgeText" Style="{StaticResource Digits}" Text="0 GB free" FontSize="7.5" FontWeight="SemiBold" Foreground="#32ADE6" VerticalAlignment="Center" />
-                                    </Border>
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xEDA2;" FontSize="11.5" Foreground="#32ADE6" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Storage" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock x:Name="StorageFreeBadgeText" Style="{StaticResource Digits}" Text="0 GB free" FontSize="8.5" FontWeight="Medium" Foreground="#32ADE6" VerticalAlignment="Center" />
                                     <Button x:Name="PinStorageBtn" Tag="Storage" Click="PinDesktopWidget_Click" Style="{StaticResource PinMiniBtn}" />
                                 </StackPanel>
-                            </DockPanel>
-                            <StackPanel Grid.Row="1" Margin="0,0,0,5">
-                                <TextBlock x:Name="StorageUsedDetailText" Style="{StaticResource Digits}" Text="0 / 0 GB" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,0,0,5" />
+                            </Grid>
+                            <StackPanel Grid.Row="1" Margin="0,0,0,6">
+                                <TextBlock x:Name="StorageUsedDetailText" Style="{StaticResource Digits}" Text="0 / 0 GB" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,0,0,5" />
                                 <Border Height="5" CornerRadius="2.5" Background="{DynamicResource ChipBgBrush}" ClipToBounds="True">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -527,33 +489,32 @@
                                     </Grid>
                                 </Border>
                             </StackPanel>
-                            <TextBlock x:Name="StorageDriveSummaryText" Grid.Row="2" Text="System (C:) · Click to open in Explorer" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="StorageDriveSummaryText" Grid.Row="2" Text="System (C:)" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 8. Audio Output & Volume Card -->
-                    <Border x:Name="CardAudio" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="AudioCard_Click">
+                    <!-- 8. Audio Output -->
+                    <Border x:Name="CardAudio" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="AudioCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1F30D158">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE7F5;" FontSize="10.5" Foreground="#30D158" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="AUDIO" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CategoryTagBadge}">
-                                        <TextBlock x:Name="AudioVolumeBadgeText" Style="{StaticResource Digits}" Text="50%" FontSize="7.5" FontWeight="SemiBold" Foreground="#30D158" VerticalAlignment="Center" />
-                                    </Border>
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE7F5;" FontSize="11.5" Foreground="#30D158" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Audio" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock x:Name="AudioVolumeBadgeText" Style="{StaticResource Digits}" Text="50%" FontSize="8.5" FontWeight="Medium" Foreground="#30D158" VerticalAlignment="Center" />
                                     <Button x:Name="PinAudioBtn" Tag="Audio" Click="PinDesktopWidget_Click" Style="{StaticResource PinMiniBtn}" />
                                 </StackPanel>
-                            </DockPanel>
-                            <DockPanel Grid.Row="1" Margin="0,0,0,5" LastChildFill="True">
+                            </Grid>
+                            <DockPanel Grid.Row="1" Margin="0,0,0,6" LastChildFill="True">
                                 <Button x:Name="AudioQuickMuteBtn" DockPanel.Dock="Right" Click="AudioQuickMuteBtn_Click" Style="{StaticResource MicroActionBtn}" Margin="6,0,0,0" ToolTipService.ToolTip="Mute / Unmute Audio">
                                     <TextBlock x:Name="AudioQuickMuteGlyph" Style="{StaticResource Glyph}" Text="&#xE767;" FontSize="9" Foreground="#30D158" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Button>
@@ -570,308 +531,298 @@
                                     </Border>
                                 </StackPanel>
                             </DockPanel>
-                            <TextBlock x:Name="AudioEndpointSubtitleText" Grid.Row="2" Text="Click to switch outputs &amp; app mixer" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="AudioEndpointSubtitleText" Grid.Row="2" Text="Output &amp; app mixer" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 9. Virtual Pet Companion Card -->
-                    <Border x:Name="CardPet" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="PetCard_Click">
+                    <!-- 9. Companion -->
+                    <Border x:Name="CardPet" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="PetCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1FFF6B8B">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xEB52;" FontSize="10.5" Foreground="#FF6B8B" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="PET SANCTUARY" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <Border Style="{StaticResource CategoryTagBadge}" DockPanel.Dock="Right">
-                                    <TextBlock x:Name="PetMoodBadgeText" Text="Awake" FontSize="7.5" FontWeight="SemiBold" Foreground="#FF6B8B" VerticalAlignment="Center" />
-                                </Border>
-                            </DockPanel>
-                            <TextBlock x:Name="PetNameAndSpeciesText" Grid.Row="1" Text="Mochi · Cat" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,1,0,5" TextTrimming="CharacterEllipsis" />
-                            <TextBlock x:Name="PetAffectionDetailText" Grid.Row="2" Text="Affection 0 · Click for playground" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xEB52;" FontSize="11.5" Foreground="#FF6B8B" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Companion" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                                <TextBlock x:Name="PetMoodBadgeText" Grid.Column="2" Text="Awake" FontSize="8.5" FontWeight="Medium" Foreground="#FF6B8B" VerticalAlignment="Center" />
+                            </Grid>
+                            <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                                <TextBlock x:Name="PetNameAndSpeciesText" Text="Mochi · Cat" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock x:Name="PetAffectionDetailText" Text="Affection 0 · 0 treats" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
                         </Grid>
                     </Border>
                 </WrapPanel>
 
-                <!-- Empty State Card when Pinned filter is active with 0 pinned widgets -->
+                <!-- Empty State for Pinned Filter -->
                 <Border x:Name="PinnedEmptyStateCard"
                         Visibility="Collapsed"
                         Background="{DynamicResource CardBackground}"
                         BorderBrush="{DynamicResource CardBorder}"
                         BorderThickness="1"
-                        CornerRadius="14"
+                        CornerRadius="15"
                         Padding="16,20"
                         Margin="0,2,0,8">
                     <StackPanel HorizontalAlignment="Center">
                         <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,8">
                             <TextBlock Style="{StaticResource Glyph}" Text="&#xE718;" FontSize="14" Foreground="{DynamicResource AmberBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <TextBlock Text="No floating desktop widgets pinned" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
-                        <TextBlock Text="Click the pin icon on any live card to float it on your desktop" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,3,0,10" />
+                        <TextBlock Text="No floating widgets pinned" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
+                        <TextBlock Text="Pin any live telemetry card to float it on your desktop" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,3,0,10" />
                         <Button Click="BrowseLiveWidgets_Click" Style="{StaticResource IslandButton}" Height="24" Padding="12,0" HorizontalAlignment="Center">
                             <TextBlock Text="Browse Live Widgets" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
                         </Button>
                     </StackPanel>
                 </Border>
 
-                <!-- Section Divider: Workspace & Utility Tools -->
+                <!-- Section: Tools & Utilities -->
                 <TextBlock x:Name="ToolsSectionHeader"
-                           Text="PRODUCTIVITY &amp; UTILITY TOOLS"
-                           FontSize="7.5"
-                           FontWeight="Bold"
+                           Text="Tools &amp; Utilities"
+                           FontSize="9"
+                           FontWeight="SemiBold"
                            Foreground="{DynamicResource SecondaryBrush}"
-                           Margin="2,4,0,6" />
+                           Margin="2,6,0,6" />
 
-                <WrapPanel x:Name="ToolCardsWrapPanel" Margin="0,0,-6,0">
-                    <!-- 10. Connected Devices Card -->
-                    <Border x:Name="CardPeripherals" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="PeripheralsCard_Click">
+                <WrapPanel x:Name="ToolCardsWrapPanel" Margin="0,0,-7,0">
+                    <!-- 10. Webcam Mirror -->
+                    <Border x:Name="CardMirror" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="MirrorCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1F64D2FF">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE702;" FontSize="10.5" Foreground="#64D2FF" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="PERIPHERALS" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                            <StackPanel Grid.Row="1" Margin="0,1,0,5">
-                                <TextBlock x:Name="PeripheralsStatusText" Text="Bluetooth Devices" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
-                                <TextBlock x:Name="PeripheralsDetailText" Text="Battery levels &amp; accessories" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
-                            <TextBlock Grid.Row="2" Text="Click for peripherals HUD" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <Grid Grid.Row="0" Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE714;" FontSize="11.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Webcam Mirror" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="2" Text="Pre-Call" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                            </Grid>
+                            <TextBlock Grid.Row="1" Text="Camera preview, ring light &amp; mic level" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 11. Quick Scratchpad Card -->
-                    <Border x:Name="CardNotes" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="NotesCard_Click">
+                    <!-- 11. Connected Peripherals -->
+                    <Border x:Name="CardPeripherals" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="PeripheralsCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1FBF5AF2">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE70B;" FontSize="10.5" Foreground="#BF5AF2" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="QUICK NOTES" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <Border Style="{StaticResource CategoryTagBadge}" DockPanel.Dock="Right">
-                                    <TextBlock x:Name="NotesCountBadge" Style="{StaticResource Digits}" Text="0 notes" FontSize="7.5" FontWeight="SemiBold" Foreground="#BF5AF2" VerticalAlignment="Center" />
-                                </Border>
-                            </DockPanel>
-                            <StackPanel Grid.Row="1" Margin="0,1,0,5">
-                                <TextBlock x:Name="NotesSnippetText" Text="Scratchpad &amp; Checklist" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="Instant Markdown capture &amp; pins" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
-                            <TextBlock Grid.Row="2" Text="Click to write or view notes" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <Grid Grid.Row="0" Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE702;" FontSize="11.5" Foreground="#64D2FF" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="PeripheralsStatusText" Grid.Column="1" Text="Bluetooth &amp; Devices" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                            <TextBlock x:Name="PeripheralsDetailText" Grid.Row="1" Text="Connected battery levels &amp; pairing" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 12. Calculator & Math Widget Card -->
-                    <Border x:Name="CardCalc" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="CalcCard_Click">
+                    <!-- 12. Quick Notes -->
+                    <Border x:Name="CardNotes" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="NotesCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1F30D158">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8EF;" FontSize="10.5" Foreground="#30D158" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="CALCULATOR" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                            <TextBlock Grid.Row="1" Text="Math &amp; Units Converter" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,1,0,5" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Row="2" Text="Percentages, arithmetic &amp; conversions" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <Grid Grid.Row="0" Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE70B;" FontSize="11.5" Foreground="#BF5AF2" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Notes" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                                <TextBlock x:Name="NotesCountBadge" Grid.Column="2" Style="{StaticResource Digits}" Text="0 notes" FontSize="8.5" FontWeight="Medium" Foreground="#BF5AF2" VerticalAlignment="Center" />
+                            </Grid>
+                            <TextBlock x:Name="NotesSnippetText" Grid.Row="1" Text="Scratchpad &amp; Markdown pins" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 13. Drop Shelf Staged Files Card -->
-                    <Border x:Name="CardShelf" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="ShelfCard_Click">
+                    <!-- 13. Calculator -->
+                    <Border x:Name="CardCalc" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="CalcCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1F64D2FF">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="10.5" Foreground="#64D2FF" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="DROP SHELF" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <Border Style="{StaticResource CategoryTagBadge}" DockPanel.Dock="Right">
-                                    <TextBlock x:Name="ShelfCountBadge" Style="{StaticResource Digits}" Text="0 files" FontSize="7.5" FontWeight="SemiBold" Foreground="#64D2FF" VerticalAlignment="Center" />
-                                </Border>
-                            </DockPanel>
-                            <TextBlock x:Name="ShelfStatusText" Grid.Row="1" Text="Temporary Staged Tray" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,1,0,5" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Row="2" Text="Drag &amp; drop files to hold or ZIP bundle" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <Grid Grid.Row="0" Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE8EF;" FontSize="11.5" Foreground="#30D158" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Calculator" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                            <TextBlock Grid.Row="1" Text="Math, unit conversions &amp; hex/bin" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 14. Voice Memos Audio Recorder Card -->
-                    <Border x:Name="CardVoiceMemo" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="VoiceMemoCard_Click">
+                    <!-- 14. Drop Shelf -->
+                    <Border x:Name="CardShelf" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="ShelfCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1FFF453A">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE720;" FontSize="10.5" Foreground="#FF453A" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="VOICE MEMOS" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                            <TextBlock Grid.Row="1" Text="Audio WAV Recorder" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,1,0,5" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Row="2" Text="1-click mic recording &amp; quick memos" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <Grid Grid.Row="0" Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE8B7;" FontSize="11.5" Foreground="#64D2FF" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Drop Shelf" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                                <TextBlock x:Name="ShelfCountBadge" Grid.Column="2" Style="{StaticResource Digits}" Text="0 files" FontSize="8.5" FontWeight="Medium" Foreground="#64D2FF" VerticalAlignment="Center" />
+                            </Grid>
+                            <TextBlock x:Name="ShelfStatusText" Grid.Row="1" Text="Stage files to drag, ZIP, or share" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 15. Screen Capture & OCR Card -->
-                    <Border x:Name="CardCapture" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="CaptureStudioCard_Click">
+                    <!-- 15. Voice Memos -->
+                    <Border x:Name="CardVoiceMemo" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="VoiceMemoCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1F64D2FF">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE924;" FontSize="10.5" Foreground="#64D2FF" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="CAPTURE &amp; OCR" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                            <TextBlock Grid.Row="1" Text="Screen Snip &amp; Pin" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,1,0,5" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Row="2" Text="Instant OCR text extraction &amp; overlay" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <Grid Grid.Row="0" Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE720;" FontSize="11.5" Foreground="#FF453A" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Voice Memos" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                            <TextBlock Grid.Row="1" Text="One-click WAV audio recording" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 16. File Converter & PDF Card -->
-                    <Border x:Name="CardConverter" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="ConverterCard_Click">
+                    <!-- 16. Capture & OCR -->
+                    <Border x:Name="CardCapture" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="CaptureStudioCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1F0A84FF">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xEA90;" FontSize="10.5" Foreground="#0A84FF" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="FILE CONVERTER" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                            <TextBlock Grid.Row="1" Text="Batch Convert &amp; Merge" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,1,0,5" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Row="2" Text="PNG, JPG, WebP &amp; PDF document tools" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <Grid Grid.Row="0" Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE924;" FontSize="11.5" Foreground="#64D2FF" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Capture &amp; OCR" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                            <TextBlock Grid.Row="1" Text="Screen snip, offline OCR &amp; eyedropper" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 17. Termi-Notch Snippets Card -->
-                    <Border x:Name="CardTermi" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="TermiCard_Click">
+                    <!-- 17. File Converter -->
+                    <Border x:Name="CardConverter" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="ConverterCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1FBF5AF2">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE756;" FontSize="10.5" Foreground="#BF5AF2" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="TERMI-NOTCH" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                            <TextBlock Grid.Row="1" Text="Terminal Console" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,1,0,5" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Row="2" Text="Saved PowerShell &amp; CMD snippet runner" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <Grid Grid.Row="0" Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xEA90;" FontSize="11.5" Foreground="#0A84FF" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="File Converter" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                            <TextBlock Grid.Row="1" Text="Batch image conversion &amp; PDF merge" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 18. Phone Bridge Card -->
-                    <Border x:Name="CardPhoneBridge" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="PhoneBridgeCard_Click">
+                    <!-- 18. Termi-Notch -->
+                    <Border x:Name="CardTermi" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="TermiCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1F30D158">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8EA;" FontSize="10.5" Foreground="#30D158" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="PHONE BRIDGE" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                            <TextBlock Grid.Row="1" Text="LAN QuickShare" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,1,0,5" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Row="2" Text="Zero-config Wi-Fi transfer &amp; clipboard" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <Grid Grid.Row="0" Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE756;" FontSize="11.5" Foreground="#BF5AF2" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Termi-Notch" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                            <TextBlock Grid.Row="1" Text="PowerShell &amp; CMD command console" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 19. Mech Sounds Studio Card -->
-                    <Border x:Name="CardMechSounds" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="MechSoundsCard_Click">
+                    <!-- 19. Phone Bridge -->
+                    <Border x:Name="CardPhoneBridge" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="PhoneBridgeCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1FFF375F">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE765;" FontSize="10.5" Foreground="#FF375F" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="MECH SOUNDS" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                                <Border Style="{StaticResource CategoryTagBadge}" DockPanel.Dock="Right">
-                                    <TextBlock x:Name="MechSoundsStateBadge" Text="Off" FontSize="7.5" FontWeight="SemiBold" Foreground="#FF375F" VerticalAlignment="Center" />
-                                </Border>
-                            </DockPanel>
-                            <TextBlock Grid.Row="1" Text="Tactile Keyboard Studio" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,1,0,5" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Row="2" Text="Cherry Blue, Brown, Holy Panda &amp; Thock" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <Grid Grid.Row="0" Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE8EA;" FontSize="11.5" Foreground="#30D158" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Phone Bridge" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                            <TextBlock Grid.Row="1" Text="Local Wi-Fi transfer &amp; QR pairing" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
 
-                    <!-- 20. Clipboard History Queue Card -->
-                    <Border x:Name="CardClipboard" Style="{StaticResource BentoCardBorder}" Margin="0,0,6,6" MouseLeftButtonDown="ClipboardCard_Click">
+                    <!-- 20. Mech Sounds -->
+                    <Border x:Name="CardMechSounds" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="MechSoundsCard_Click">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid Grid.Row="0" Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE765;" FontSize="11.5" Foreground="#FF375F" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Mech Sounds" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0" />
+                                <TextBlock x:Name="MechSoundsStateBadge" Grid.Column="2" Text="Off" FontSize="8.5" FontWeight="Medium" Foreground="#FF375F" VerticalAlignment="Center" />
+                            </Grid>
+                            <TextBlock Grid.Row="1" Text="Cherry Blue, Tactile Brown &amp; Thock" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                    </Border>
+
+                    <!-- 21. Clipboard Queue -->
+                    <Border x:Name="CardClipboard" Style="{StaticResource BentoCardBorder}" Margin="0,0,7,7" MouseLeftButtonDown="ClipboardCard_Click">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <DockPanel Grid.Row="0" Margin="0,0,0,6">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                                    <Border Style="{StaticResource CardIconSquircle}" Background="#1FFF9F0A">
-                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE77F;" FontSize="10.5" Foreground="#FF9F0A" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="CLIPBOARD QUEUE" FontSize="8.5" FontWeight="Bold" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </DockPanel>
-                            <TextBlock Grid.Row="1" Text="Clipboard History" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,1,0,5" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Row="2" Text="DPAPI encrypted history &amp; pinned clips" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <Grid Grid.Row="0" Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Style="{StaticResource Glyph}" Text="&#xE77F;" FontSize="11.5" Foreground="#FF9F0A" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Clipboard" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                            <TextBlock Grid.Row="1" Text="Encrypted history, pins &amp; transforms" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                     </Border>
                 </WrapPanel>

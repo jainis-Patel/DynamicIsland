@@ -255,8 +255,8 @@ public partial class WidgetsGalleryView : UserControl
     private void UpdateCardWidths()
     {
         if (WidgetsScrollViewer == null) return;
-        double avail = WidgetsScrollViewer.ViewportWidth > 40 ? WidgetsScrollViewer.ViewportWidth : 448.0;
-        double cardWidth = Math.Max(180.0, Math.Floor((avail - 12.0) / 2.0));
+        double avail = WidgetsScrollViewer.ViewportWidth > 40 ? WidgetsScrollViewer.ViewportWidth : 484.0;
+        double cardWidth = Math.Max(200.0, Math.Floor((avail - 13.0) / 2.0));
 
         ApplyPanelCardWidth(LiveCardsWrapPanel, cardWidth);
         ApplyPanelCardWidth(ToolCardsWrapPanel, cardWidth);
@@ -454,7 +454,7 @@ public partial class WidgetsGalleryView : UserControl
     private void UpdateVitalsUI(SystemVitalsSnapshot snap)
     {
         if (CpuPercentBadge != null)
-            CpuPercentBadge.Text = $"CPU {snap.CpuPercent}%";
+            CpuPercentBadge.Text = $"{snap.CpuPercent}%";
 
         if (CpuDetailText != null)
             CpuDetailText.Text = $"{snap.CpuPercent}%";
@@ -476,11 +476,11 @@ public partial class WidgetsGalleryView : UserControl
         if (BatteryStatusText != null)
         {
             if (status.IsCharging)
-                BatteryStatusText.Text = " · Charging";
+                BatteryStatusText.Text = "Charging";
             else if (status.IsAcOnline)
-                BatteryStatusText.Text = " · Plugged in";
+                BatteryStatusText.Text = "Plugged in";
             else
-                BatteryStatusText.Text = " · On Battery";
+                BatteryStatusText.Text = "On battery";
         }
 
         if (PowerPlanBadge != null)
@@ -519,7 +519,7 @@ public partial class WidgetsGalleryView : UserControl
 
         if (NetworkPingBadge != null)
         {
-            NetworkPingBadge.Text = snap.PingMs > 0 ? $"{snap.PingMs}ms" : (snap.IsConnected ? "Active" : "Offline");
+            NetworkPingBadge.Text = snap.PingMs > 0 ? $"{snap.PingMs} ms" : (snap.IsConnected ? "Active" : "Offline");
         }
     }
 
@@ -570,7 +570,7 @@ public partial class WidgetsGalleryView : UserControl
     {
         if (TodayDateBadge != null)
         {
-            TodayDateBadge.Text = DateTime.Now.ToString("ddd · MMM d").ToUpperInvariant();
+            TodayDateBadge.Text = DateTime.Now.ToString("ddd, MMM d");
         }
 
         var island = Island;
@@ -624,7 +624,7 @@ public partial class WidgetsGalleryView : UserControl
         {
             ShelfCountBadge.Text = shelf.Count == 1 ? "1 file" : $"{shelf.Count} files";
             if (ShelfStatusText != null)
-                ShelfStatusText.Text = shelf.Count > 0 ? $"{shelf.Count} items staged" : "Temporary Staged Tray";
+                ShelfStatusText.Text = shelf.Count > 0 ? $"{shelf.Count} items staged" : "Stage files to drag, ZIP, or share";
         }
     }
 
@@ -635,14 +635,14 @@ public partial class WidgetsGalleryView : UserControl
             if (WeatherGlyphIcon != null) WeatherGlyphIcon.Text = weather.Glyph;
             if (WeatherLocationBadge != null) WeatherLocationBadge.Text = string.IsNullOrWhiteSpace(weather.LocationName) ? "Local" : weather.LocationName;
             if (WeatherTempBigText != null) WeatherTempBigText.Text = weather.BadgeText;
-            if (WeatherConditionText != null) WeatherConditionText.Text = $" · {weather.Condition}";
+            if (WeatherConditionText != null) WeatherConditionText.Text = weather.Condition;
             if (WeatherForecastText != null) WeatherForecastText.Text = weather.SummaryLine;
         }
         else
         {
             if (WeatherTempBigText != null) WeatherTempBigText.Text = "—°C";
-            if (WeatherConditionText != null) WeatherConditionText.Text = " · Local";
-            if (WeatherForecastText != null) WeatherForecastText.Text = "Click to fetch Open-Meteo forecast";
+            if (WeatherConditionText != null) WeatherConditionText.Text = "Local";
+            if (WeatherForecastText != null) WeatherForecastText.Text = "Updating local forecast";
         }
     }
 
@@ -658,7 +658,7 @@ public partial class WidgetsGalleryView : UserControl
             {
                 TimerStatusSubtitleText.Text = timer.IsRunning
                     ? $"{timer.Label} active"
-                    : (timer.IsActive ? $"{timer.Label} paused" : "Pomodoro 25m · Click play to start");
+                    : (timer.IsActive ? $"{timer.Label} paused" : "Pomodoro 25m");
             }
         }
         else
@@ -706,8 +706,8 @@ public partial class WidgetsGalleryView : UserControl
         {
             int count = epSvc?.Endpoints.Count ?? 0;
             AudioEndpointSubtitleText.Text = count > 1
-                ? $"{count} outputs available · Click to switch"
-                : "Click to switch outputs & app mixer";
+                ? $"{count} outputs available"
+                : "Output & app mixer";
         }
     }
 
@@ -718,7 +718,7 @@ public partial class WidgetsGalleryView : UserControl
         {
             if (PetMoodBadgeText != null) PetMoodBadgeText.Text = pet.CurrentMood.ToString();
             if (PetNameAndSpeciesText != null) PetNameAndSpeciesText.Text = $"{pet.PetName} · {pet.PetSpecies}";
-            if (PetAffectionDetailText != null) PetAffectionDetailText.Text = $"Affection {pet.AffectionScore} · {pet.TreatCount} treats · Click for sanctuary";
+            if (PetAffectionDetailText != null) PetAffectionDetailText.Text = $"Affection {pet.AffectionScore} · {pet.TreatCount} treats";
         }
     }
 
@@ -816,6 +816,9 @@ public partial class WidgetsGalleryView : UserControl
 
     private void ClipboardCard_Click(object sender, MouseButtonEventArgs e) =>
         Island?.NavigateToView(ExpandedView.Clipboard);
+
+    private void MirrorCard_Click(object sender, MouseButtonEventArgs e) =>
+        Island?.NavigateToView(ExpandedView.Mirror);
 
     private void MediaCard_Click(object sender, MouseButtonEventArgs e) =>
         Island?.NavigateToView(ExpandedView.Media);

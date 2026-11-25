@@ -278,9 +278,13 @@ public partial class LauncherView : UserControl
     {
         if (sender is FrameworkElement fe && fe.DataContext is LauncherDisplayItem item)
         {
-            var cm = new ContextMenu { Style = (Style)FindResource("IslandContextMenu") };
+            var cm = new ContextMenu();
 
-            var openItem = new MenuItem { Header = $"Launch {item.Name}", Style = (Style)FindResource("IslandMenuItem") };
+            var openItem = new MenuItem
+            {
+                Header = $"Launch {item.Name}",
+                Icon = ThemeBrushes.CreateMenuIcon("\uE7AC", ThemeBrushes.Accent)
+            };
             openItem.Click += (_, _) => LaunchItem(item);
             cm.Items.Add(openItem);
 
@@ -288,18 +292,31 @@ public partial class LauncherView : UserControl
             {
                 if (item.TargetPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                 {
-                    var adminItem = new MenuItem { Header = "Run as Administrator", Style = (Style)FindResource("IslandMenuItem") };
+                    var adminItem = new MenuItem
+                    {
+                        Header = "Run as Administrator",
+                        Icon = ThemeBrushes.CreateMenuIcon("\uEA18")
+                    };
                     adminItem.Click += (_, _) => LaunchAsAdmin(item);
                     cm.Items.Add(adminItem);
                 }
 
-                var locItem = new MenuItem { Header = "Open File Location", Style = (Style)FindResource("IslandMenuItem") };
+                var locItem = new MenuItem
+                {
+                    Header = "Open File Location",
+                    Icon = ThemeBrushes.CreateMenuIcon("\uED25")
+                };
                 locItem.Click += (_, _) => OpenLocation(item);
                 cm.Items.Add(locItem);
 
-                cm.Items.Add(new Separator { Background = ThemeBrushes.MenuSeparator, Margin = new Thickness(2, 3, 2, 3) });
+                cm.Items.Add(new Separator());
 
-                var unpinItem = new MenuItem { Header = "Unpin from Launcher", Style = (Style)FindResource("IslandMenuItem"), Foreground = UnpinRedBrush };
+                var unpinItem = new MenuItem
+                {
+                    Header = "Unpin from Launcher",
+                    Icon = ThemeBrushes.CreateMenuIcon("\uE77A", UnpinRedBrush),
+                    Foreground = UnpinRedBrush
+                };
                 unpinItem.Click += (_, _) => UnpinItem(item);
                 cm.Items.Add(unpinItem);
             }

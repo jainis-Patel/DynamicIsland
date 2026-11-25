@@ -1157,6 +1157,11 @@ SSID 3 : Home_Router
         Assert(rect.Width == 1020 && rect.Height == 870, $"Expected 1020x870 physical px at 1.5x, got {rect.Width}x{rect.Height}");
         Assert(rect.Left == (2560 - 1020) / 2, $"Expected centered X=770, got {rect.Left}");
         Assert(rect.Top == 6, $"Expected Top=6px at 1.5x, got {rect.Top}");
+
+        // Ensure CanvasHeightDip never clips FloatingDockHost even at max Notifications height + spring overshoot + 125% IslandScale
+        const double maxNotifPlusDockAndOvershoot = 396.0 + 20.0 + 4.0 + 40.0 + 16.0;
+        Assert(maxNotifPlusDockAndOvershoot * 1.25 <= IslandWindow.CanvasHeightDip,
+            $"CanvasHeightDip ({IslandWindow.CanvasHeightDip}) must exceed scaled max pill + dock footprint ({maxNotifPlusDockAndOvershoot * 1.25})");
     }
 
     private static void TestAutoHideSettingRoundTrip()

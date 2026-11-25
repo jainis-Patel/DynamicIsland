@@ -481,7 +481,11 @@ public partial class IslandWindow
 
         foreach (var act in actions)
         {
-            var mi = new MenuItem { Header = $"{act.Label} — {act.Subtitle}" };
+            var mi = new MenuItem
+            {
+                Header = $"{act.Label} — {act.Subtitle}",
+                Icon = ThemeBrushes.CreateMenuIcon("\uE8E5", ThemeBrushes.Accent)
+            };
             var capturedKind = act.Kind;
             mi.Click += async (_, _) =>
             {
@@ -499,21 +503,34 @@ public partial class IslandWindow
 
         if (menu.Items.Count > 0) menu.Items.Add(new Separator());
 
-        var zipItem = new MenuItem { Header = "📦 Bundle into ZIP Archive" };
+        var zipItem = new MenuItem
+        {
+            Header = "Bundle into ZIP Archive",
+            Icon = ThemeBrushes.CreateMenuIcon("\uF012")
+        };
         zipItem.Click += (_, _) => ZipShelfButton_Click(zipItem, new RoutedEventArgs());
         menu.Items.Add(zipItem);
 
-        var shareWinItem = new MenuItem { Header = "🔗 Share via Windows Sheet..." };
+        var shareWinItem = new MenuItem
+        {
+            Header = "Share via Windows Sheet...",
+            Icon = ThemeBrushes.CreateMenuIcon("\uE72D")
+        };
         shareWinItem.Click += (_, _) => _windowsShareService.ShareFiles(paths);
         menu.Items.Add(shareWinItem);
 
-        var phoneShareItem = new MenuItem { Header = "📱 Phone Drop / LAN Quickshare..." };
+        var phoneShareItem = new MenuItem
+        {
+            Header = "Phone Drop / LAN Quickshare...",
+            Icon = ThemeBrushes.CreateMenuIcon("\uE8EA")
+        };
         phoneShareItem.Click += (_, _) => PhoneShareButton_Click(phoneShareItem, new RoutedEventArgs());
         menu.Items.Add(phoneShareItem);
 
         var copyPathsItem = new MenuItem
         {
-            Header = paths.Count > 1 ? $"📋 Copy All File Paths ({paths.Count})" : "📋 Copy File Path"
+            Header = paths.Count > 1 ? $"Copy All File Paths ({paths.Count})" : "Copy File Path",
+            Icon = ThemeBrushes.CreateMenuIcon("\uE8C8")
         };
         copyPathsItem.Click += (_, _) =>
         {
@@ -526,7 +543,11 @@ public partial class IslandWindow
 
         if (singleItem == null && paths.Count > 0)
         {
-            var revealFirstItem = new MenuItem { Header = "📂 Show First in Explorer" };
+            var revealFirstItem = new MenuItem
+            {
+                Header = "Show First in Explorer",
+                Icon = ThemeBrushes.CreateMenuIcon("\uED25")
+            };
             revealFirstItem.Click += (_, _) => DropShelfService.Reveal(paths[0]);
             menu.Items.Add(revealFirstItem);
         }
@@ -535,7 +556,11 @@ public partial class IslandWindow
         {
             if (singleItem.IsImage)
             {
-                var ocrItem = new MenuItem { Header = "🔍 Extract Text (Offline OCR)" };
+                var ocrItem = new MenuItem
+                {
+                    Header = "Extract Text (Offline OCR)",
+                    Icon = ThemeBrushes.CreateMenuIcon("\uE8C1")
+                };
                 ocrItem.Click += async (_, _) =>
                 {
                     try
@@ -562,11 +587,19 @@ public partial class IslandWindow
                 menu.Items.Add(ocrItem);
             }
 
-            var pinItem = new MenuItem { Header = singleItem.IsPinned ? "📌 Unpin from Shelf" : "📌 Pin to Shelf" };
+            var pinItem = new MenuItem
+            {
+                Header = singleItem.IsPinned ? "Unpin from Shelf" : "Pin to Shelf",
+                Icon = ThemeBrushes.CreateMenuIcon("\uE718", singleItem.IsPinned ? ThemeBrushes.Amber : null)
+            };
             pinItem.Click += (_, _) => _shelfService.TogglePin(singleItem.FullPath);
             menu.Items.Add(pinItem);
 
-            var revealItem = new MenuItem { Header = "📂 Show in Explorer" };
+            var revealItem = new MenuItem
+            {
+                Header = "Show in Explorer",
+                Icon = ThemeBrushes.CreateMenuIcon("\uED25")
+            };
             revealItem.Click += (_, _) => DropShelfService.Reveal(singleItem.FullPath);
             menu.Items.Add(revealItem);
         }

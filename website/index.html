@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#030306">
+  <title>Dynamic Island for Windows — Fluid Desktop Hub &amp; Liquid Glass Overlay</title>
+  <meta name="description" content="An interactive, Apple-inspired Dynamic Island desktop overlay for Windows 10 &amp; 11 built with WPF (.NET 8), closed-form analytical spring physics (60–240 Hz+), Direct3D 11 Liquid Glass refraction, and WASAPI audio spectrum analysis.">
+  <link rel="icon" type="image/svg+xml" href="./assets/dynamic-island.svg">
+  <link rel="apple-touch-icon" href="./assets/app_256.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <div class="backdrop-mesh" aria-hidden="true"></div>
+
+  <!-- Sticky Navigation -->
+  <header class="site-header">
+    <div class="container nav-inner">
+      <a class="brand-link" href="#top">
+        <img class="brand-icon" src="./assets/dynamic-island.svg" alt="" width="34" height="34">
+        <span>Dynamic Island</span>
+      </a>
+
+      <nav aria-label="Primary navigation">
+        <ul id="primary-nav" class="nav-links">
+          <li><a href="#features">Labs</a></li>
+          <li><a href="#droplets">Droplets</a></li>
+          <li><a href="#liquid-glass">Liquid Glass</a></li>
+          <li><a href="#developers">IPC &amp; Hotkeys</a></li>
+          <li><a href="#download">Download</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <button id="haptics-toggle" class="icon-btn" type="button" aria-pressed="false" title="Synthesize 11ms–22ms RIFF micro-haptics in browser">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+          <span class="haptic-label">Haptics</span>
+        </button>
+
+        <button id="theme-toggle" class="icon-btn" type="button" aria-label="Switch to light mode" aria-pressed="false" title="Toggle Dark / Light theme">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+          </svg>
+        </button>
+
+        <a class="btn btn-primary btn-sm" href="#download">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span class="nav-cta-text">Get v0.9.0</span>
+        </a>
+
+        <button id="mobile-menu-btn" class="icon-btn mobile-menu-btn" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="primary-nav">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <!-- Hero + Simulated Windows Desktop Stage -->
+    <section id="top" class="hero">
+      <div class="container">
+        <div class="hero-top">
+          <div class="hero-badges">
+            <span class="meta-pill"><span class="eyebrow-dot" aria-hidden="true"></span><strong>v0.9.0</strong> Stable</span>
+            <span class="meta-pill">Windows 10 (19041+) &amp; Windows 11</span>
+            <span class="meta-pill">MIT Open Source</span>
+          </div>
+
+          <h1 class="hero-title">
+            A fluid, responsive <span class="accent-gradient">island</span> on your desktop.
+          </h1>
+          <p class="hero-subtitle">
+            Built with <strong>.NET 8 WPF</strong>, closed-form analytical spring physics (<strong>60–240 Hz+</strong>), Direct3D 11 Liquid Glass refraction, and WASAPI spectrum analysis—engineered for under <strong>0.1% idle CPU</strong>.
+          </p>
+
+          <div class="hero-cta-group">
+            <a class="btn btn-primary" href="https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.0/DynamicIsland-Setup.exe">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Download Installer (70.9 MB)
+            </a>
+            <a class="btn btn-secondary" href="https://github.com/jainis-Patel/DynamicIsland" target="_blank" rel="noopener noreferrer">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path>
+                <path d="M9 18c-4.51 2-5-2-7-2"></path>
+              </svg>
+              View on GitHub
+            </a>
+          </div>
+
+          <div class="winget-bar" role="region" aria-label="Install via Windows Package Manager">
+            <code>winget install JainisPatel.DynamicIsland</code>
+            <button class="copy-btn" type="button" data-copy="winget install JainisPatel.DynamicIsland" aria-label="Copy winget install command">
+              Copy
+            </button>
+          </div>
+        </div>
+
+        <!-- Interactive Windows 11 Desktop Stage -->
+        <div class="desktop-stage" aria-label="Interactive Dynamic Island Windows desktop simulator">
+          <div class="stage-hud-bar">
+            <span class="stage-status">
+              <span class="eyebrow-dot" aria-hidden="true"></span>
+              <span id="spring-readout" aria-live="polite">W: 184px · H: 36px · ζ = 0.73</span>
+            </span>
+
+            <div class="stage-toggles">
+              <button id="notch-mode-btn" class="stage-chip-btn" type="button" aria-pressed="false">Hardware Notch Ears</button>
+              <button id="satellite-btn" class="stage-chip-btn" type="button" aria-pressed="false">Split-Pill Droplet</button>
+              <button id="surface-style-btn" class="stage-chip-btn" type="button" aria-pressed="true">Liquid Glass</button>
+            </div>
+          </div>
+
+          <div class="desktop-canvas">
+            <div id="island-bezel-row" class="island-bezel-row">
+              <div id="island-halo" class="island-halo" aria-hidden="true"></div>
+
+              <div class="island-assembly">
+                <div id="island-pill" class="island-pill" role="region" aria-live="polite" aria-label="Simulated Dynamic Island pill">
+                  <!-- MacBook-style Concave Hardware Notch Ears (exact paths from IslandWindow.xaml) -->
+                  <svg class="notch-ear notch-ear-left" viewBox="0 0 10 10" aria-hidden="true">
+                    <path d="M 0,0 L 10,0 L 10,10 A 10,10 0 0 0 0,0 Z" fill="#040406"></path>
+                  </svg>
+                  <svg class="notch-ear notch-ear-right" viewBox="0 0 10 10" aria-hidden="true">
+                    <path d="M 0,10 L 0,0 L 10,0 A 10,10 0 0 0 0,10 Z" fill="#040406"></path>
+                  </svg>
+
+                  <div class="island-inner-clip">
+                    <div id="island-content" class="island-content"></div>
+                  </div>
+                </div>
+
+                <!-- Split-Pill Satellite Droplet -->
+                <div id="satellite-droplet" class="satellite-droplet" aria-hidden="true">
+                  <span style="width:7px;height:7px;border-radius:50%;background:#ff9f0a;box-shadow:0 0 8px #ff9f0a;"></span>
+                  <span>RAM 84%</span>
+                </div>
+              </div>
+
+              <!-- Floating Glass Quick Dock -->
+              <div class="floating-dock" role="group" aria-label="Dynamic Island view switcher">
+                <button class="dock-btn" type="button" data-mode="idle" aria-pressed="true">Idle</button>
+                <button class="dock-btn" type="button" data-mode="media" aria-pressed="false">Now Playing</button>
+                <button class="dock-btn" type="button" data-mode="agent" aria-pressed="false">AI Agent HUD</button>
+                <button class="dock-btn" type="button" data-mode="timer" aria-pressed="false">25m Pomodoro</button>
+                <button class="dock-btn" type="button" data-mode="shelf" aria-pressed="false">Drop Shelf</button>
+                <button class="dock-btn" type="button" data-mode="vitals" aria-pressed="false">Vitals &amp; Weather</button>
+              </div>
+            </div>
+
+            <!-- Drag-and-Drop Shelf & Priority Toast Queue Simulator -->
+            <div class="desktop-tray-bar">
+              <div class="draggable-files">
+                <span class="tray-caption">Drag onto Island (or click):</span>
+                <button class="file-chip" type="button" draggable="true" data-drop-file="spec_v0.9.pdf">spec_v0.9.pdf</button>
+                <button class="file-chip" type="button" draggable="true" data-drop-file="release.zip">release.zip</button>
+              </div>
+              <div class="toast-triggers">
+                <span class="tray-caption">Priority Queue:</span>
+                <button class="stage-chip-btn" type="button" data-toast="volume">Vol 68%</button>
+                <button class="stage-chip-btn" type="button" data-toast="message">WhatsApp Msg</button>
+                <button class="stage-chip-btn" type="button" data-toast="critical">Battery 12%</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Engineering Metrics -->
+        <div class="metrics-strip">
+          <div class="metric-tile reveal">
+            <div class="metric-value">&lt; 0.1%</div>
+            <div class="metric-label">Idle CPU overhead (CompositionTarget unhooked at rest)</div>
+          </div>
+          <div class="metric-tile reveal">
+            <div class="metric-value">60–240 Hz+</div>
+            <div class="metric-label">Frame-rate invariant analytical spring physics</div>
+          </div>
+          <div class="metric-tile reveal">
+            <div class="metric-value">20 Droplets</div>
+            <div class="metric-label">Zero-allocation modules (0 KB RAM when disabled)</div>
+          </div>
+          <div class="metric-tile reveal">
+            <div class="metric-value">86 Checks</div>
+            <div class="metric-label">Deterministic self-test suite (--self-test)</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive Living Bento Grid -->
+    <section id="features" class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Interactive Engineering Labs</span>
+          <h2 class="section-title">Feel every subsystem right in your browser.</h2>
+          <p class="section-subtitle">
+            Each card runs a live interactive model of the actual C# subsystem—tune spring stiffness, watch 4-band FFT bars react, test regex secret redaction, or trigger the exact 11ms–22ms synthesized RIFF micro-haptics.
+          </p>
+        </div>
+
+        <div class="bento-grid">
+          <!-- Lab 1: Live Analytical Spring Curve Plotter -->
+          <article class="glass-card bento-card span-7 reveal">
+            <div>
+              <div class="bento-header-row">
+                <div class="bento-icon tone-amber" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12c2-6 5-6 7 0s5 6 7 0 4-6 6 0"></path></svg>
+                </div>
+                <span id="zeta-badge" class="bento-badge">ζ = 0.73 · Underdamped</span>
+              </div>
+              <h3 class="bento-title">Closed-Form Analytical Spring Physics</h3>
+              <p class="bento-desc">
+                Solves the damped harmonic oscillator in O(1) per frame via <code>Math.Exp</code> &amp; <code>Math.SinCos</code>—matching identically across 60 Hz, 144 Hz, and 240 Hz displays. Adjusting sliders below updates both the curve and the Hero Island above.
+              </p>
+            </div>
+            <div class="mini-lab">
+              <canvas id="spring-canvas" class="lab-canvas" width="560" height="112" aria-label="Analytical spring step response curve"></canvas>
+              <div class="slider-row">
+                <label class="slider-control">
+                  <span>Stiffness: <strong id="stiffness-val">320</strong></span>
+                  <input id="stiffness-slider" type="range" min="140" max="520" step="10" value="320">
+                </label>
+                <label class="slider-control">
+                  <span>Damping: <strong id="damping-val">26</strong></span>
+                  <input id="damping-slider" type="range" min="12" max="46" step="1" value="26">
+                </label>
+              </div>
+            </div>
+          </article>
+
+          <!-- Lab 2: WASAPI Loopback FFT & Album Halo -->
+          <article class="glass-card bento-card span-5 reveal" id="wasapi-card">
+            <div>
+              <div class="bento-header-row">
+                <div class="bento-icon tone-blue" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                </div>
+                <span class="bento-badge">GSMTC + WASAPI</span>
+              </div>
+              <h3 class="bento-title">4-Band FFT &amp; HDR Album Glow</h3>
+              <p class="bento-desc">
+                Extracts dominant vibrant hues with Extended Reinhard HDR tone mapping and drives a lock-free 4-band spectrum ring buffer.
+              </p>
+            </div>
+            <div class="mini-lab">
+              <canvas id="fft-canvas" class="lab-canvas" width="380" height="112" aria-label="Simulated 4-band audio spectrum visualizer"></canvas>
+              <div class="swatch-row">
+                <span style="font-size:0.78rem; color:var(--text-secondary);">Artwork Accent:</span>
+                <div class="swatches" role="group" aria-label="Select album artwork accent color">
+                  <button class="swatch-btn" type="button" data-accent="#ff9f0a" style="background:#ff9f0a;" aria-pressed="true" aria-label="Amber Glow"></button>
+                  <button class="swatch-btn" type="button" data-accent="#ff3366" style="background:#ff3366;" aria-pressed="false" aria-label="Crimson Rose"></button>
+                  <button class="swatch-btn" type="button" data-accent="#32ade6" style="background:#32ade6;" aria-pressed="false" aria-label="Electric Cyan"></button>
+                  <button class="swatch-btn" type="button" data-accent="#30d158" style="background:#30d158;" aria-pressed="false" aria-label="Emerald"></button>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Lab 3: Clipboard Secret Redaction & Transforms -->
+          <article class="glass-card bento-card span-4 reveal">
+            <div>
+              <div class="bento-header-row">
+                <div class="bento-icon tone-purple" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                </div>
+                <span class="bento-badge">DPAPI Encrypted</span>
+              </div>
+              <h3 class="bento-title">Clipboard Redaction &amp; Transforms</h3>
+              <p class="bento-desc">
+                Auto-excludes password managers, masks leaked API tokens on screen, and runs 1-click JSON, Base64 &amp; URL transforms.
+              </p>
+            </div>
+            <div class="mini-lab">
+              <div class="seg-group" role="group" aria-label="Clipboard transform demo">
+                <button class="seg-btn" type="button" data-clip="aws" aria-pressed="true">AWS Redact</button>
+                <button class="seg-btn" type="button" data-clip="json" aria-pressed="false">JSON Format</button>
+                <button class="seg-btn" type="button" data-clip="b64" aria-pressed="false">Base64</button>
+              </div>
+              <div id="clip-demo-output" class="code-preview-box">AKIA••••••••MPLE (Auto-masked on UI)</div>
+            </div>
+          </article>
+
+          <!-- Lab 4: Kernel Privacy Dots & 1-Click Mic Mute -->
+          <article class="glass-card bento-card span-4 reveal">
+            <div>
+              <div class="bento-header-row">
+                <div class="bento-icon tone-green" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                </div>
+                <span class="bento-badge">RegNotifyChangeKeyValue</span>
+              </div>
+              <h3 class="bento-title">Kernel Privacy &amp; Mic Mute</h3>
+              <p class="bento-desc">
+                Zero-CPU registry hook detects webcam &amp; microphone usage immediately with call timer tracking and 1-click hardware mic mute.
+              </p>
+            </div>
+            <div class="mini-lab">
+              <div class="privacy-sim-row">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span id="lab-cam-dot" class="dot-cam"></span>
+                  <span id="lab-mic-dot" class="dot-mic"></span>
+                  <span id="lab-call-status" style="font-size:0.8rem; font-weight:600;">Teams Call · 04:18</span>
+                </div>
+                <button id="lab-mic-btn" class="seg-btn" type="button" aria-pressed="false">Mute Mic</button>
+              </div>
+              <div style="font-size:0.75rem; color:var(--text-secondary);">Detects Teams, Discord, WhatsApp &amp; Phone Link</div>
+            </div>
+          </article>
+
+          <!-- Lab 5: Power Choreographer & Tactile Haptics -->
+          <article class="glass-card bento-card span-4 reveal">
+            <div>
+              <div class="bento-header-row">
+                <div class="bento-icon tone-cyan" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                </div>
+                <span class="bento-badge">GpuPreference=1</span>
+              </div>
+              <h3 class="bento-title">Power Governor &amp; Micro-Haptics</h3>
+              <p class="bento-desc">
+                Pins rendering to iGPU (saving 10W–25W), scales polling under Battery Saver, and plays 11ms–22ms in-memory RIFF audio ticks.
+              </p>
+            </div>
+            <div class="mini-lab">
+              <div class="seg-group" role="group" aria-label="Power governor simulation">
+                <button class="seg-btn" type="button" data-power="ac" aria-pressed="true">AC Power</button>
+                <button class="seg-btn" type="button" data-power="saver" aria-pressed="false">Battery Saver</button>
+              </div>
+              <div id="power-demo-output" class="code-preview-box">240Hz Springs · WASAPI Active · iGPU Pinned</div>
+              <div class="seg-group" role="group" aria-label="Play synthesized RIFF micro-haptic sounds">
+                <button class="seg-btn" type="button" data-synth="tick">11ms Tick</button>
+                <button class="seg-btn" type="button" data-synth="snap">16ms Snap</button>
+                <button class="seg-btn" type="button" data-synth="dismiss">22ms Dismiss</button>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Modular Droplets Explorer with Interactive Zero-RAM Toggles -->
+    <section id="droplets" class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Zero-Allocation Droplets</span>
+          <h2 class="section-title">20 modular droplets. Toggle any off for 0 RAM.</h2>
+          <p class="section-subtitle">
+            Try toggling droplets below: disabled droplets tear down their background hooks and dock icons completely, reclaiming every kilobyte of active memory.
+          </p>
+        </div>
+
+        <div class="filter-bar">
+          <div class="filter-controls-left">
+            <div class="filter-tabs" role="tablist" aria-label="Filter droplets by category">
+              <button class="filter-tab" type="button" role="tab" aria-selected="true" data-category="All">All (20)</button>
+              <button class="filter-tab" type="button" role="tab" aria-selected="false" data-category="Productivity">Productivity (11)</button>
+              <button class="filter-tab" type="button" role="tab" aria-selected="false" data-category="System">System (5)</button>
+              <button class="filter-tab" type="button" role="tab" aria-selected="false" data-category="Media">Media (2)</button>
+              <button class="filter-tab" type="button" role="tab" aria-selected="false" data-category="Capture">Capture (2)</button>
+            </div>
+            <label for="droplet-search" class="sr-only">Search droplets</label>
+            <input id="droplet-search" class="search-input" type="search" placeholder="Search droplets (e.g. PDF, RAM, LAN)..." autocomplete="off">
+          </div>
+
+          <div class="ram-meter-bar" aria-live="polite">
+            <span id="droplet-ram-summary">20 shown · Active Footprint: <strong>~656 KB</strong></span>
+            <button id="droplet-reset-btn" class="copy-btn" type="button" style="min-height:28px;">Reset Defaults</button>
+          </div>
+        </div>
+
+        <div id="droplets-grid" class="droplets-grid"></div>
+      </div>
+    </section>
+
+    <!-- Direct3D 11 Liquid Glass Optical Playground & Golden Render -->
+    <section id="liquid-glass" class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Direct3D 11 Optical Shader</span>
+          <h2 class="section-title">Real Snell’s Law Liquid Glass, verified by headless GPU tests.</h2>
+          <p class="section-subtitle">
+            <code>GlassShaderCore.hlsl</code> evaluates analytical Signed Distance Fields, polynomial smooth-union (<code>smin</code>) bridges, and 3-tap RGB spectral dispersion—falling back cleanly to Windows 11 Mica/Acrylic when preferred.
+          </p>
+        </div>
+
+        <div class="split-grid">
+          <!-- Interactive Optical Lens Playground -->
+          <div class="optical-playground" id="optical-playground">
+            <div style="display:flex; justify-content:space-between; align-items:center; color:#cbd5e1; font-size:0.78rem; font-family:var(--font-mono);">
+              <span>Move pointer over lens · Snell Refraction Demo</span>
+              <span id="ior-readout">IOR: 1.45 · Dispersion: 0.35</span>
+            </div>
+
+            <div class="optical-lens-stage">
+              <div id="optical-lens" class="optical-lens-capsule">
+                <div style="font-size:0.95rem; font-weight:700;">GlassShaderCore.hlsl</div>
+                <div style="font-size:0.74rem; color:#cbd5e1;">Convex Bevel · 3-Tap Dispersion</div>
+              </div>
+            </div>
+
+            <div class="slider-row">
+              <label class="slider-control" style="color:#cbd5e1;">
+                <span>Index of Refraction: <strong id="ior-val">1.45</strong></span>
+                <input id="ior-slider" type="range" min="1.05" max="1.85" step="0.05" value="1.45">
+              </label>
+              <label class="slider-control" style="color:#cbd5e1;">
+                <span>Chromatic Dispersion: <strong id="disp-val">0.35</strong></span>
+                <input id="disp-slider" type="range" min="0" max="1" step="0.05" value="0.35">
+              </label>
+            </div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:14px;">
+            <div class="golden-frame">
+              <img src="./assets/golden-glass.png" alt="Headless Direct3D 11 golden render showing polynomial smooth-union smin liquid bridge between the main pill and satellite droplet" width="140" height="79">
+              <div>
+                <div style="font-size:0.92rem; font-weight:700; color:#1c1c1e; margin-bottom:4px;">Actual D3D11 Golden Render Output</div>
+                <div style="font-size:0.82rem; color:#52525b; line-height:1.45;">
+                  Captured directly from <code>SelfTestRunner</code>'s headless Direct3D 11 verification test (<code>golden_output.png</code>), proving the smooth-union meniscus bridge and perimeter refraction bevel.
+                </div>
+              </div>
+            </div>
+
+            <ol class="pipeline-list">
+              <li class="pipeline-step">
+                <span class="step-num">01</span>
+                <div>
+                  <div class="step-title">Multi-Shape SDF &amp; G2 Squircle Curvature</div>
+                  <div class="step-desc">Evaluates <code>sdRoundRect</code>, <code>sdSquircle</code>, <code>sdCapsule</code>, and <code>sdCircle</code> analytically with zero polygon seams.</div>
+                </div>
+              </li>
+              <li class="pipeline-step">
+                <span class="step-num">02</span>
+                <div>
+                  <div class="step-title">Polynomial Smooth-Union (<code>smin</code>) &amp; 3-Tap Dispersion</div>
+                  <div class="step-desc">Merges satellite droplets with an organic meniscus and refracts Red, Green, and Blue rays at distinct wavelengths.</div>
+                </div>
+              </li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Live Activity IPC 2.0 & Global Hotkeys -->
+    <section id="developers" class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Automation &amp; Keyboard Control</span>
+          <h2 class="section-title">Live Activity IPC 2.0 &amp; instant global hotkeys.</h2>
+          <p class="section-subtitle">
+            Stream build phases, AI agent thought chunks, and 2-way approval prompts over <code>\\.\pipe\DynamicIsland.Activities</code>—or summon any widget with a single chord.
+          </p>
+        </div>
+
+        <div class="split-grid" style="margin-bottom: 42px;">
+          <div class="code-panel">
+            <div class="code-header">
+              <span>\\.\pipe\DynamicIsland.Activities (CurrentUserOnly ACL)</span>
+              <button class="copy-btn" type="button" data-copy='{"action":"prompt","id":"agent-patch","source":"Antigravity","title":"Apply Auth Middleware Refactor","phases":["Analyze","Patch","Verify"],"phaseIndex":1,"buttons":["Approve","Reject"],"diff":"+ ValidateJwtIssuer(token, strict: true)","timeoutSec":60}'>Copy JSON</button>
+            </div>
+            <pre class="code-body"><code>{
+  <span class="tok-key">"action"</span>: <span class="tok-str">"prompt"</span>,
+  <span class="tok-key">"id"</span>: <span class="tok-str">"agent-patch"</span>,
+  <span class="tok-key">"source"</span>: <span class="tok-str">"Antigravity"</span>,
+  <span class="tok-key">"title"</span>: <span class="tok-str">"Apply Auth Middleware Refactor"</span>,
+  <span class="tok-key">"phases"</span>: [<span class="tok-str">"Analyze"</span>, <span class="tok-str">"Patch"</span>, <span class="tok-str">"Verify"</span>],
+  <span class="tok-key">"phaseIndex"</span>: <span class="tok-num">1</span>,
+  <span class="tok-key">"buttons"</span>: [<span class="tok-str">"Approve"</span>, <span class="tok-str">"Reject"</span>],
+  <span class="tok-key">"diff"</span>: <span class="tok-str">"+ ValidateJwtIssuer(token, strict: true)"</span>,
+  <span class="tok-key">"timeoutSec"</span>: <span class="tok-num">60</span>
+}</code></pre>
+          </div>
+
+          <div class="glass-card bento-card">
+            <div>
+              <h3 class="bento-title">Community Droplets SDK &amp; Two-Way Agent RPC</h3>
+              <p class="bento-desc">
+                Any CLI utility, PowerShell script, or AI coding agent (Antigravity, Claude Code, GitHub Copilot) can push multi-phase pipelines, streaming thoughts, and blocking approval prompts with sub-millisecond Named Pipe latency—or register custom JSON-driven Community Droplets with hot-reload.
+              </p>
+            </div>
+            <div class="mini-lab">
+              <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                <span class="bento-badge">256 KB Max Payload</span>
+                <span class="bento-badge">16 Concurrent Clients</span>
+                <span class="bento-badge">JSON Hot-Reload SDK</span>
+                <span class="bento-badge">86-Test Self-Check</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px;">
+          <h3 style="margin:0; font-size:1.2rem; font-weight:700;">Default Global Hotkeys <span id="hotkey-feedback" style="color:var(--accent); font-weight:500; font-size:0.88rem; margin-left:8px;" aria-live="polite">Click any shortcut to test</span></h3>
+        </div>
+        <div id="hotkeys-grid" class="hotkeys-grid"></div>
+      </div>
+    </section>
+
+    <!-- Download & Installation -->
+    <section id="download" class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Install v0.9.0</span>
+          <h2 class="section-title">Zero UAC elevation. Ready in seconds.</h2>
+          <p class="section-subtitle">
+            Requires Windows 10 (build 19041+) or Windows 11 (x64). User data is stored atomically in <code>%LocalAppData%\DynamicIsland\</code>.
+          </p>
+        </div>
+
+        <div class="install-grid">
+          <article class="glass-card install-card featured reveal">
+            <div>
+              <div class="eyebrow" style="margin-bottom: 12px;">Recommended · 70.9 MB</div>
+              <h3 class="bento-title">Native Setup Wizard</h3>
+              <p class="bento-desc">
+                Custom dark-mode wizard with squircle controls, autostart setup, Start Menu shortcuts, and silent CLI flag (<code>--install --silent</code>).
+              </p>
+            </div>
+            <div>
+              <div class="install-meta" style="margin-bottom: 14px;">
+                SHA-256: 1988f0c1a8c6dda5406be4b957b7bfe13335177b671a0cabaa34df09ca029cc0
+              </div>
+              <a class="btn btn-primary" style="width: 100%;" href="https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.0/DynamicIsland-Setup.exe">
+                Download DynamicIsland-Setup.exe
+              </a>
+            </div>
+          </article>
+
+          <article class="glass-card install-card reveal">
+            <div>
+              <div class="eyebrow" style="margin-bottom: 12px;">Package Manager</div>
+              <h3 class="bento-title">Windows Package Manager</h3>
+              <p class="bento-desc">
+                Install and update cleanly from PowerShell or Windows Terminal via the official WinGet manifest.
+              </p>
+            </div>
+            <div>
+              <div class="code-preview-box" style="margin-bottom: 14px;">winget install JainisPatel.DynamicIsland</div>
+              <button class="btn btn-secondary" style="width: 100%;" type="button" data-copy="winget install JainisPatel.DynamicIsland">
+                Copy WinGet Command
+              </button>
+            </div>
+          </article>
+
+          <article class="glass-card install-card reveal">
+            <div>
+              <div class="eyebrow" style="margin-bottom: 12px;">Portable · 65.3 MB</div>
+              <h3 class="bento-title">Portable ZIP &amp; Source</h3>
+              <p class="bento-desc">
+                Self-contained <code>win-x64</code> archive with zero registry writes, or compile with .NET 8 SDK and run <code>--self-test</code>.
+              </p>
+            </div>
+            <div>
+              <div class="install-meta" style="margin-bottom: 14px;">
+                SHA-256: e365657db7a9baba63a7ad2ed203e04e6452b6b80d9ea9c9bd71d4c89770abaf
+              </div>
+              <a class="btn btn-secondary" style="width: 100%;" href="https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.0/DynamicIsland-Portable.zip">
+                Download Portable ZIP
+              </a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <img src="./assets/app_256.png" alt="Dynamic Island app icon" width="28" height="28" style="border-radius: 7px;">
+        <span>Dynamic Island for Windows v0.9.0 · Created by <strong>Jainis Patel</strong> · MIT License</span>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/jainis-Patel/DynamicIsland" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.9.0" target="_blank" rel="noopener noreferrer">Release Notes</a>
+        <a href="https://github.com/jainis-Patel/DynamicIsland/issues" target="_blank" rel="noopener noreferrer">Issues</a>
+        <a href="#top">Back to top</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>
