@@ -329,6 +329,10 @@ public partial class IslandWindow
             ExpandedPanel.Width = shape.Width;
             ExpandedPanel.Height = shape.Height;
         }
+        else if (next == IslandState.Toast)
+        {
+            ToastPanel.Width = shape.Width;
+        }
 
         _width.Target = shape.Width;
         _height.Target = shape.Height;
@@ -430,6 +434,16 @@ public partial class IslandWindow
             {
                 ToastActionsHost.Visibility = Visibility.Collapsed;
             }
+        }
+
+        var toastShape = GetToastShape(toast);
+        ToastPanel.Width = toastShape.Width;
+        if (_machine.State == IslandState.Toast)
+        {
+            _width.Target = toastShape.Width;
+            _height.Target = toastShape.Height;
+            _radius.Target = toastShape.Radius;
+            RepositionIfEdgeDocked();
         }
 
         if (replacing && !IsReducedMotion)
@@ -740,6 +754,7 @@ public partial class IslandWindow
 
         ApplyGeometry(dt);
         UpdateLiveBars(now.TotalSeconds, dt);
+        bool discsSettled = UpdatePlayerDiscs(dt);
         UpdateVirtualPet(now.TotalSeconds);
         bool glowSettled = UpdateAmbientHalo(dt);
 
@@ -752,10 +767,44 @@ public partial class IslandWindow
              (_pointerInside && (_machine.State == IslandState.Idle || _machine.State == IslandState.Compact || (SettingsHeroPet?.IsVisible ?? false) || (PetSanctuaryContainer?.IsVisible ?? false))));
 
         if (_width.IsAtRest && _height.IsAtRest && _radius.IsAtRest && _dropletOffset.IsAtRest &&
-            !BarsAnimating && glowSettled && !petActive)
+            !BarsAnimating && discsSettled && glowSettled && !petActive)
         {
             StopRendering();
         }
+    }
+
+    private bool UpdatePlayerDiscs(double dt)
+    {
+        if (_isSessionLocked || _machine.State == IslandState.Hidden)
+        {
+            return true;
+        }
+
+        string style = SettingsService.NormalizeAlbumArtStyle(_settingsService?.Current.AlbumArtStyle);
+        if (style == "StaticSquircle")
+        {
+            return true;
+        }
+
+        bool reduced = IsReducedMotion || (_settingsService?.Current.LowMemoryMode ?? false);
+        bool isPlaying = _mediaService.Current?.IsPlaying ?? false;
+        float bass = isPlaying ? _smoothBands[0] : 0f;
+        bool settled = true;
+
+        if (_machine.State == IslandState.Compact && CompactArtDisc != null)
+        {
+            settled &= CompactArtDisc.StepPhysics(dt, isPlaying, bass, reduced);
+        }
+        else if (_machine.State == IslandState.Expanded && _currentExpandedView == ExpandedView.Media && ExpandedArtDisc != null)
+        {
+            settled &= ExpandedArtDisc.StepPhysics(dt, isPlaying, bass, reduced);
+        }
+        else if (_machine.State == IslandState.Expanded && _currentExpandedView == ExpandedView.WidgetsGallery && _widgetsGalleryContainer != null)
+        {
+            settled &= _widgetsGalleryContainer.StepMediaDisc(dt, isPlaying, bass, reduced);
+        }
+
+        return settled;
     }
 
 

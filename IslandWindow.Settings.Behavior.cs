@@ -346,6 +346,97 @@ public partial class IslandWindow
         }
     }
 
+    internal void AlbumArtStyleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string style })
+        {
+            string normalized = SettingsService.NormalizeAlbumArtStyle(style);
+            _settingsService.Update(s => s.AlbumArtStyle = normalized, nameof(AppSettings.AlbumArtStyle));
+
+            string friendlyName = normalized switch
+            {
+                "OpticalDisc" => "Full-Art Disc",
+                "StaticSquircle" => "Classic Static Squircle",
+                _ => "Studio Vinyl LP"
+            };
+            var accent = _mediaService.Current?.Accent ?? ThemeBrushes.AmberColor;
+            _machine.PushToast(new ToastContent(
+                "\uE958",
+                "Player Disc",
+                friendlyName,
+                accent,
+                TimeSpan.FromSeconds(2.0),
+                TargetView: "settings",
+                Priority: ToastPriority.Feedback,
+                Category: "albumart"));
+        }
+    }
+
+    private void UpdateAlbumArtStyleUI()
+    {
+        var cp = SettingsContainer?.ClockAudioPanel;
+        if (cp?.ActiveAlbumArtStyleLabel == null || cp.AlbumArtVinylBtn == null) return;
+
+        string style = SettingsService.NormalizeAlbumArtStyle(_settingsService.Current.AlbumArtStyle);
+        var accentBrush = (Brush)Resources["AccentBrush"];
+        var defaultBorder = (Brush)FindResource("CardBorderBrush");
+        var activeBg = ThemeBrushes.PillToggleActiveBg;
+        var defaultBg = (Brush)FindResource("CardSurfaceBrush");
+
+        StyleCardOptionButton(cp.AlbumArtVinylBtn, style == "VinylDisc", accentBrush, activeBg, defaultBg, defaultBorder);
+        StyleCardOptionButton(cp.AlbumArtOpticalBtn, style == "OpticalDisc", accentBrush, activeBg, defaultBg, defaultBorder);
+        StyleCardOptionButton(cp.AlbumArtStaticBtn, style == "StaticSquircle", accentBrush, activeBg, defaultBg, defaultBorder);
+
+        cp.ActiveAlbumArtStyleLabel.Text = style switch
+        {
+            "OpticalDisc" => "Full-Art Disc (Spinning)",
+            "StaticSquircle" => "Classic Squircle (Static)",
+            _ => "Studio Vinyl LP (Turntable)"
+        };
+    }
+
+    private void ApplyAlbumArtStyle(string? style)
+    {
+        string normalized = SettingsService.NormalizeAlbumArtStyle(style);
+        CompactArtDisc?.SetStyle(normalized);
+        ExpandedArtDisc?.SetStyle(normalized);
+        _widgetsGalleryContainer?.ApplyAlbumArtStyle(normalized);
+        _miniPlayerWindow?.ApplyAlbumArtStyle(normalized);
+
+        UpdateAlbumArtStyleUI();
+        EnsureRendering();
+    }
+
+    internal void CycleAlbumArtStyle()
+    {
+        string cur = SettingsService.NormalizeAlbumArtStyle(_settingsService.Current.AlbumArtStyle);
+        string next = cur switch
+        {
+            "VinylDisc" => "OpticalDisc",
+            "OpticalDisc" => "StaticSquircle",
+            _ => "VinylDisc"
+        };
+
+        _settingsService.Update(s => s.AlbumArtStyle = next, nameof(AppSettings.AlbumArtStyle));
+
+        string friendlyName = next switch
+        {
+            "OpticalDisc" => "Full-Art Disc",
+            "StaticSquircle" => "Classic Static",
+            _ => "Studio Vinyl LP"
+        };
+        var accent = _mediaService.Current?.Accent ?? ThemeBrushes.AmberColor;
+        _machine.PushToast(new ToastContent(
+            "\uE958",
+            "Player Disc",
+            friendlyName,
+            accent,
+            TimeSpan.FromSeconds(1.8),
+            TargetView: "media",
+            Priority: ToastPriority.Feedback,
+            Category: "albumart"));
+    }
+
     private void UpdateVisualizerStyleUI()
     {
         var cp = SettingsContainer?.ClockAudioPanel;

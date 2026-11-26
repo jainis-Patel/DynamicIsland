@@ -59,6 +59,12 @@ public partial class SystemUpdatesSettingsPanel : UserControl
     private void ViewChangelogBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.ViewChangelogBtn_Click(sender, e);
 
+    private void SkipUpdateBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.SkipUpdateBtn_Click(sender, e);
+
+    private void CancelDownloadBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.CancelDownloadBtn_Click(sender, e);
+
     private void InstallUpdateBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.InstallUpdateBtn_Click(sender, e);
 
@@ -76,4 +82,10 @@ public partial class SystemUpdatesSettingsPanel : UserControl
 
     private void ToggleVersionHistoryBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.ToggleVersionHistoryBtn_Click(sender, e);
+
+    private void RefreshVersionHistoryBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.RefreshVersionHistoryBtn_Click(sender, e);
+
+    private void OpenReleasesPageBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.OpenReleasesPageBtn_Click(sender, e);
 }

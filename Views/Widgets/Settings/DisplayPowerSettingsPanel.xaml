@@ -136,10 +136,6 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="6" />
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="6" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="6" />
-                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
                         <DockPanel Grid.Row="0" Grid.Column="0" LastChildFill="False">
@@ -148,41 +144,45 @@
                         </DockPanel>
 
                         <DockPanel Grid.Row="0" Grid.Column="2" LastChildFill="False">
-                            <TextBlock Text="Low Battery Alert" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                            <Button Click="LowBattThresholdBtn_Click" x:Name="LowBattThresholdBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="7,0" Margin="0">
-                                <TextBlock x:Name="LowBattThresholdText" Text="20%" Style="{StaticResource Digits}" FontSize="8" FontWeight="SemiBold" />
-                            </Button>
+                            <TextBlock Text="Auto Power Saver" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            <CheckBox x:Name="AutoPowerSaverToggleSwitch" Click="AutoPowerSaverToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
                         </DockPanel>
 
                         <DockPanel Grid.Row="2" Grid.Column="0" LastChildFill="False">
-                            <TextBlock Text="Auto Power Saver" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                            <CheckBox x:Name="AutoPowerSaverToggleSwitch" Click="AutoPowerSaverToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                            <TextBlock Text="High-Load Droplet" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            <CheckBox x:Name="HighLoadAlertsToggleSwitch" Click="HighLoadAlertsToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
                         </DockPanel>
 
                         <DockPanel Grid.Row="2" Grid.Column="2" LastChildFill="False">
                             <TextBlock Text="Auto AC Perf" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                             <CheckBox x:Name="AutoPowerAcToggleSwitch" Click="AutoPowerAcToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
                         </DockPanel>
+                    </Grid>
 
-                        <DockPanel Grid.Row="4" Grid.Column="0" LastChildFill="False">
-                            <TextBlock Text="High-Load Droplet" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                            <CheckBox x:Name="HighLoadAlertsToggleSwitch" Click="HighLoadAlertsToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <UniformGrid Columns="3">
+                        <DockPanel LastChildFill="False" Margin="0,0,6,0">
+                            <TextBlock Text="Low Battery" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                            <Button Click="LowBattThresholdBtn_Click" x:Name="LowBattThresholdBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0">
+                                <TextBlock x:Name="LowBattThresholdText" Text="20%" Style="{StaticResource Digits}" FontSize="8" FontWeight="SemiBold" />
+                            </Button>
                         </DockPanel>
 
-                        <DockPanel Grid.Row="4" Grid.Column="2" LastChildFill="False">
-                            <TextBlock Text="CPU Alert Threshold" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                            <Button Click="HighCpuThresholdBtn_Click" x:Name="HighCpuThresholdBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="7,0" Margin="0">
+                        <DockPanel LastChildFill="False" Margin="3,0">
+                            <TextBlock Text="CPU Alert" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                            <Button Click="HighCpuThresholdBtn_Click" x:Name="HighCpuThresholdBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0">
                                 <TextBlock x:Name="HighCpuThresholdText" Text="80%" Style="{StaticResource Digits}" FontSize="8" FontWeight="SemiBold" />
                             </Button>
                         </DockPanel>
 
-                        <DockPanel Grid.Row="6" Grid.Column="0" LastChildFill="False">
-                            <TextBlock Text="RAM Alert Threshold" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                            <Button Click="HighRamThresholdBtn_Click" x:Name="HighRamThresholdBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="7,0" Margin="0">
+                        <DockPanel LastChildFill="False" Margin="6,0,0,0">
+                            <TextBlock Text="RAM Alert" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                            <Button Click="HighRamThresholdBtn_Click" x:Name="HighRamThresholdBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="19" Padding="6,0" Margin="0">
                                 <TextBlock x:Name="HighRamThresholdText" Text="85%" Style="{StaticResource Digits}" FontSize="8" FontWeight="SemiBold" />
                             </Button>
                         </DockPanel>
-                    </Grid>
+                    </UniformGrid>
                 </StackPanel>
             </Border>
 

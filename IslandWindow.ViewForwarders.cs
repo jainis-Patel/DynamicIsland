@@ -25,8 +25,7 @@ public partial class IslandWindow
     internal TextBlock ClockWifiText => MediaContainer.ClockWifiText;
     internal TextBlock CpuText => MediaContainer.CpuText;
     internal TextBlock DurationText => MediaContainer.DurationText;
-    internal TextBlock ExpandedArtFallback => MediaContainer.ExpandedArtFallback;
-    internal Image ExpandedArtImage => MediaContainer.ExpandedArtImage;
+    internal PlayerDiscControl ExpandedArtDisc => MediaContainer.ExpandedArtDisc;
     internal TextBlock ExpandedArtist => MediaContainer.ExpandedArtist;
     internal TextBlock ExpandedBigClock => MediaContainer.ExpandedBigClock;
     internal TextBlock ExpandedBigDate => MediaContainer.ExpandedBigDate;

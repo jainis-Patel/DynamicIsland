@@ -93,6 +93,7 @@ public partial class IslandWindow
             UpdateNetSpeedIdleUI();
             UpdateCapsuleElementsUI();
             UpdateVisualizerStyleUI();
+            UpdateAlbumArtStyleUI();
             UpdatePetSettingsUI();
             UpdateDisplayAndBatterySettingsUI();
             UpdateNotifSettingsUI();
@@ -101,6 +102,7 @@ public partial class IslandWindow
             SwitchSettingsTab(_currentSettingsTab, false);
             ApplyClockStyle(cur.ClockStyle);
             ApplyVisualizerStyle(cur.VisualizerStyle);
+            ApplyAlbumArtStyle(cur.AlbumArtStyle);
             ApplyIslandTheme(cur.IslandTheme);
             UpdateThemeModeUI();
             UpdateThemeStyleUI();
@@ -205,6 +207,10 @@ public partial class IslandWindow
 
             case nameof(AppSettings.VisualizerStyle):
                 ApplyVisualizerStyle(cur.VisualizerStyle);
+                break;
+
+            case nameof(AppSettings.AlbumArtStyle):
+                ApplyAlbumArtStyle(cur.AlbumArtStyle);
                 break;
 
             case nameof(AppSettings.ShowNetworkSpeedInIdle):

@@ -2,13 +2,12 @@ using System;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using DynamicIsland.Core;
 using DynamicIsland.Interop;
 using DynamicIsland.Services;
-using static DynamicIsland.Interop.NativeMethods;
 
 namespace DynamicIsland.Views;
 
@@ -18,10 +17,24 @@ public partial class PetFloatWindow : Window
 
     private readonly VirtualPetService _petService;
     private readonly IslandWindow _island;
+    private readonly DispatcherTimer _roamHeartbeatTimer;
+
     private bool _isMouseOverWindow;
     private bool _isRenderingHooked;
     private bool _isClosed;
     private double _lastRenderTime;
+    private double _lastFrameTime;
+
+    // Autonomous roaming & drag state
+    private bool _isWalking;
+    private double _walkDirection = -1.0; // -1 left, +1 right
+    private double _walkSpeedDipPerSec = 34.0;
+    private double _nextRoamToggleTime;
+    private bool _isPointerDownOnPet;
+    private bool _isDraggingPet;
+    private Point _dragStartScreen;
+    private double _dragStartLeft;
+    private double _dragStartTop;
 
     internal PetFloatWindow(VirtualPetService petService, IslandWindow island)
     {
@@ -33,16 +46,36 @@ public partial class PetFloatWindow : Window
         _petService.MoodChanged += OnMoodChanged;
         _petService.SpecialActionTriggered += OnSpecialActionTriggered;
 
+        _roamHeartbeatTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
+        {
+            Interval = TimeSpan.FromMilliseconds(1500)
+        };
+        _roamHeartbeatTimer.Tick += OnRoamHeartbeatTick;
+
         IsVisibleChanged += (_, _) => UpdateRenderingSubscription();
         Loaded += PetFloatWindow_Loaded;
     }
 
+    private bool ShouldRunRenderLoop()
+    {
+        if (!IsVisible || _isClosed) return false;
+        if (_island.IsFullscreenSuppressed || !SystemParameters.ClientAreaAnimation) return false;
+
+        return _isMouseOverWindow ||
+               _isWalking ||
+               _isDraggingPet ||
+               FloatPet.IsAnimatingTrick ||
+               FloatPet.IsAnimatingSpecialAction ||
+               _petService.CurrentMood is PetMood.Dancing or PetMood.Happy or PetMood.Eating or PetMood.Playing;
+    }
+
     private void UpdateRenderingSubscription()
     {
-        bool shouldRender = IsVisible && !_isClosed;
+        bool shouldRender = ShouldRunRenderLoop();
         if (shouldRender && !_isRenderingHooked)
         {
             _isRenderingHooked = true;
+            _lastFrameTime = MonotonicClock.Elapsed.TotalSeconds;
             CompositionTarget.Rendering += OnRenderingFrame;
         }
         else if (!shouldRender && _isRenderingHooked)
@@ -60,15 +93,25 @@ public partial class PetFloatWindow : Window
 
     private void PetFloatWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        // Position gracefully near top-right of the current monitor
-        try
-        {
-            var screenW = SystemParameters.PrimaryScreenWidth;
-            Left = Math.Max(40, screenW - Width - 60);
-            Top = 60;
-        }
-        catch { }
+        var work = SystemParameters.WorkArea;
+        var (savedX, savedY) = _petService.GetFloatPosition();
 
+        if (savedX.HasValue && savedY.HasValue &&
+            savedX.Value >= work.Left - 20 && savedX.Value <= work.Right - 40 &&
+            savedY.Value >= work.Top - 20 && savedY.Value <= work.Bottom - 20)
+        {
+            Left = savedX.Value;
+            Top = savedY.Value;
+        }
+        else
+        {
+            // Perch directly on top of the Windows taskbar on the right side
+            Left = Math.Max(work.Left + 24, work.Right - Width - 80);
+            Top = work.Bottom - Height + 8;
+        }
+
+        _nextRoamToggleTime = MonotonicClock.Elapsed.TotalSeconds + 5.0;
+        _roamHeartbeatTimer.Start();
         RefreshUI();
         UpdateRenderingSubscription();
     }
@@ -76,6 +119,7 @@ public partial class PetFloatWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _isClosed = true;
+        _roamHeartbeatTimer.Stop();
         UpdateRenderingSubscription();
         TopToolbar.BeginAnimation(OpacityProperty, null);
         _petService.AffectionChanged -= OnAffectionChanged;
@@ -84,17 +128,110 @@ public partial class PetFloatWindow : Window
         base.OnClosed(e);
     }
 
+    private void OnRoamHeartbeatTick(object? sender, EventArgs e)
+    {
+        if (_isClosed || !IsVisible) return;
+
+        double now = MonotonicClock.Elapsed.TotalSeconds;
+
+        // Manage autonomous roaming transitions
+        if (!_petService.AutoRoamEnabled || _isMouseOverWindow || _isDraggingPet ||
+            _petService.CurrentMood == PetMood.Sleeping)
+        {
+            if (_isWalking)
+            {
+                StopWalking();
+            }
+        }
+        else if (now >= _nextRoamToggleTime)
+        {
+            if (_isWalking)
+            {
+                StopWalking();
+                _nextRoamToggleTime = now + 10.0 + Random.Shared.NextDouble() * 12.0;
+            }
+            else
+            {
+                StartWalking();
+                _nextRoamToggleTime = now + 4.0 + Random.Shared.NextDouble() * 4.5;
+            }
+        }
+
+        // When render loop is detached (resting/napping), step gentle ambient breath/blink at 0% GPU cost
+        if (!_isRenderingHooked && !_island.IsFullscreenSuppressed && SystemParameters.ClientAreaAnimation)
+        {
+            FloatPet.UpdateTick(now, false, 0, 0);
+        }
+
+        UpdateRenderingSubscription();
+    }
+
+    private void StartWalking()
+    {
+        _isWalking = true;
+        FloatPet.IsScampering = true;
+        if (Random.Shared.NextDouble() < 0.35)
+        {
+            _walkDirection *= -1.0;
+        }
+        FloatPetFlipScale.ScaleX = _walkDirection < 0 ? -1.0 : 1.0;
+        UpdateRenderingSubscription();
+    }
+
+    private void StopWalking()
+    {
+        _isWalking = false;
+        FloatPet.IsScampering = false;
+        FloatPetFlipScale.ScaleX = 1.0;
+        PersistFloatPosition();
+        UpdateRenderingSubscription();
+    }
+
+    private void PersistFloatPosition()
+    {
+        _petService.SaveFloatPosition(Left, Top);
+    }
+
     private void OnRenderingFrame(object? sender, EventArgs e)
     {
         if (!IsVisible || _isClosed) return;
-        if (_island.IsFullscreenSuppressed || !SystemParameters.ClientAreaAnimation) return;
+        if (!ShouldRunRenderLoop())
+        {
+            UpdateRenderingSubscription();
+            return;
+        }
 
         double t = MonotonicClock.Elapsed.TotalSeconds;
         double minInterval = _island.ShouldThrottleVisuals
             ? (1.0 / 10.0)
-            : (_isMouseOverWindow ? (1.0 / 60.0) : (1.0 / 30.0));
+            : ((_isMouseOverWindow || _isWalking || _isDraggingPet) ? (1.0 / 60.0) : (1.0 / 30.0));
         if ((t - _lastRenderTime) < minInterval) return;
+
+        double dt = Math.Clamp(t - _lastFrameTime, 0.001, 0.08);
+        _lastFrameTime = t;
         _lastRenderTime = t;
+
+        // Autonomous horizontal walking along current rail
+        if (_isWalking && !_isDraggingPet && !_isMouseOverWindow && _petService.AutoRoamEnabled)
+        {
+            var work = SystemParameters.WorkArea;
+            double minLeft = work.Left + 12.0;
+            double maxLeft = Math.Max(minLeft, work.Right - Width - 12.0);
+            double nextLeft = Left + (_walkDirection * _walkSpeedDipPerSec * dt);
+            if (nextLeft <= minLeft)
+            {
+                nextLeft = minLeft;
+                _walkDirection = 1.0;
+                FloatPetFlipScale.ScaleX = 1.0;
+            }
+            else if (nextLeft >= maxLeft)
+            {
+                nextLeft = maxLeft;
+                _walkDirection = -1.0;
+                FloatPetFlipScale.ScaleX = -1.0;
+            }
+            Left = nextLeft;
+        }
 
         double gazeX = 0, gazeY = 0;
         if (_isMouseOverWindow)
@@ -102,7 +239,7 @@ public partial class PetFloatWindow : Window
             try
             {
                 var pos = Mouse.GetPosition(FloatPet);
-                double pcX = FloatPet.ActualWidth > 0 ? FloatPet.ActualWidth / 2.0 : 49.0;
+                double pcX = FloatPet.ActualWidth > 0 ? FloatPet.ActualWidth / 2.0 : 48.0;
                 double pcY = FloatPet.ActualHeight > 0 ? FloatPet.ActualHeight / 2.0 : 40.0;
                 gazeX = Math.Clamp((pos.X - pcX) / 35.0, -1.0, 1.0);
                 gazeY = Math.Clamp((pos.Y - pcY) / 25.0, -1.0, 1.0);
@@ -119,12 +256,14 @@ public partial class PetFloatWindow : Window
     {
         FloatPet.Mood = mood;
         RefreshUI();
+        UpdateRenderingSubscription();
     });
 
     private void OnSpecialActionTriggered(PetSpecialActionKind kind) => Dispatcher.InvokeAsync(() =>
     {
         FloatPet.TriggerSpecialAction(kind);
         RefreshUI();
+        UpdateRenderingSubscription();
     });
 
     public void RefreshUI()
@@ -142,86 +281,113 @@ public partial class PetFloatWindow : Window
         FloatPet.Affection = affection;
 
         FloatPetNameText.Text = name;
-        FloatPetSpeciesGlyph.Text = species switch
+        if (AutoRoamGlyph != null)
         {
-            "Dog" => "🐶",
-            "Bunny" => "🐰",
-            "Fox" => "🦊",
-            "Panda" => "🐼",
-            "Dragon" => "🐲",
-            _ => "🐱"
-        };
-
-        FloatStatusText.Text = $"❤️ {affection} · {mood}";
-    }
-
-    private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (e.LeftButton == MouseButtonState.Pressed)
-        {
-            try { DragMove(); } catch (InvalidOperationException) { }
+            AutoRoamGlyph.Foreground = _petService.AutoRoamEnabled
+                ? (Brush)FindResource("AccentBrush")
+                : (Brush)FindResource("SecondaryBrush");
         }
+        FloatPet.ToolTip = $"{name} (❤️ {affection} · {_petService.CurrentContextCaption})\nClick to pet · Right-click for flip · Drag to move";
     }
 
     private void Window_MouseEnter(object sender, MouseEventArgs e)
     {
         _isMouseOverWindow = true;
-        TopToolbar.BeginAnimation(OpacityProperty, new DoubleAnimation(TopToolbar.Opacity, 1.0, TimeSpan.FromMilliseconds(120)));
+        if (_isWalking) StopWalking();
+        TopToolbar.IsHitTestVisible = true;
+        TopToolbar.BeginAnimation(OpacityProperty, new DoubleAnimation(TopToolbar.Opacity, 1.0, TimeSpan.FromMilliseconds(140)));
+        UpdateRenderingSubscription();
     }
 
     private void Window_MouseLeave(object sender, MouseEventArgs e)
     {
         _isMouseOverWindow = false;
-        TopToolbar.BeginAnimation(OpacityProperty, new DoubleAnimation(TopToolbar.Opacity, 0.3, TimeSpan.FromMilliseconds(200)));
+        TopToolbar.IsHitTestVisible = false;
+        TopToolbar.BeginAnimation(OpacityProperty, new DoubleAnimation(TopToolbar.Opacity, 0.0, TimeSpan.FromMilliseconds(200)));
+        UpdateRenderingSubscription();
     }
 
-    private void Pet_Click(object sender, MouseButtonEventArgs e)
+    private void Pet_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        string msg = _petService.Pet();
-        FloatPet.PetClickImpulse();
-        RefreshUI();
-        _island.PushToast(new ToastContent(
-            "\uE76E",
-            _petService.PetName,
-            msg,
-            ThemeBrushes.PinkColor,
-            TimeSpan.FromSeconds(2.5),
-            TargetView: null,
-            Priority: ToastPriority.Feedback));
+        _isPointerDownOnPet = true;
+        _isDraggingPet = false;
+        _dragStartScreen = PointToScreen(e.GetPosition(this));
+        _dragStartLeft = Left;
+        _dragStartTop = Top;
+        FloatPet.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void Pet_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_isPointerDownOnPet || e.LeftButton != MouseButtonState.Pressed) return;
+        Point curScreen = PointToScreen(e.GetPosition(this));
+        double dx = curScreen.X - _dragStartScreen.X;
+        double dy = curScreen.Y - _dragStartScreen.Y;
+
+        if (!_isDraggingPet && (Math.Abs(dx) > 5.0 || Math.Abs(dy) > 5.0))
+        {
+            _isDraggingPet = true;
+            if (_isWalking) StopWalking();
+            UpdateRenderingSubscription();
+        }
+
+        if (_isDraggingPet)
+        {
+            double dpiScale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+            Left = _dragStartLeft + (dx / Math.Max(1.0, dpiScale));
+            Top = _dragStartTop + (dy / Math.Max(1.0, dpiScale));
+        }
+    }
+
+    private void Pet_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_isPointerDownOnPet) return;
+        _isPointerDownOnPet = false;
+        if (FloatPet.IsMouseCaptured) FloatPet.ReleaseMouseCapture();
+
+        if (_isDraggingPet)
+        {
+            _isDraggingPet = false;
+            PersistFloatPosition();
+            FloatPet.PetClickImpulse();
+            UpdateRenderingSubscription();
+        }
+        else
+        {
+            _petService.Pet();
+            FloatPet.PetClickImpulse();
+            RefreshUI();
+            UpdateRenderingSubscription();
+        }
         e.Handled = true;
     }
 
     private void Pet_RightClick(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
-        string msg = _petService.PerformTrick();
+        _petService.PerformTrick();
         FloatPet.TriggerTrick();
         RefreshUI();
-        _island.PushToast(new ToastContent(
-            "\uE734",
-            $"{_petService.PetName} Flip!",
-            msg,
-            ThemeBrushes.AmberColor,
-            TimeSpan.FromSeconds(2.5),
-            TargetView: null,
-            Priority: ToastPriority.Feedback,
-            Category: "pet"));
+        UpdateRenderingSubscription();
     }
 
     private void SpecialAction_Click(object sender, RoutedEventArgs e)
     {
-        string msg = _petService.PlaySpecialAction();
+        _petService.PlaySpecialAction();
         FloatPet.TriggerSpecialAction();
         RefreshUI();
-        _island.PushToast(new ToastContent(
-            "\uE734",
-            $"{_petService.PetName} Playtime!",
-            msg,
-            ThemeBrushes.BlueColor,
-            TimeSpan.FromSeconds(3.0),
-            TargetView: null,
-            Priority: ToastPriority.Feedback,
-            Category: "pet"));
+        UpdateRenderingSubscription();
+    }
+
+    private void AutoRoamToggle_Click(object sender, RoutedEventArgs e)
+    {
+        _petService.ToggleAutoRoam();
+        if (!_petService.AutoRoamEnabled && _isWalking)
+        {
+            StopWalking();
+        }
+        RefreshUI();
     }
 
     private void ReturnToIsland_Click(object sender, RoutedEventArgs e)

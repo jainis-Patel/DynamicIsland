@@ -138,10 +138,11 @@ public sealed partial class VirtualPetControl : FrameworkElement
         return g;
     }
 
-    private const int TransformPoolSize = 64;
+    private const int TransformPoolSize = 128;
     private readonly MatrixTransform[][] _transformPools = new[] { CreateTransformPool(), CreateTransformPool() };
     private int _activePoolIndex;
     private int _transformPoolIndex;
+    private bool _isHeroLod;
 
     private static MatrixTransform[] CreateTransformPool()
     {
@@ -173,12 +174,38 @@ public sealed partial class VirtualPetControl : FrameworkElement
     private static readonly RadialGradientBrush HappyGlowBrush =
         Radial(0.5, 0.5, 0.5, 0.5, 0.5, (C(0xFFD60A, 120), 0.0), (C(0xFF9F0A, 40), 0.6), (C(0xFF9F0A, 0), 1.0));
 
-    // Top-light + bottom ambient occlusion for head & torso
+    // Top-light + bottom ambient occlusion + cool rim light + cast neck shadow
     private static readonly LinearGradientBrush HeadShadeBrush =
-        Linear(0, 0, 0, 1, (C(0xFFFFFF, 48), 0.0), (C(0xFFFFFF, 0), 0.38), (C(0x000000, 0), 0.58), (C(0x3A1400, 68), 1.0));
+        Linear(0, 0, 0, 1, (C(0xFFFFFF, 54), 0.0), (C(0xFFFFFF, 0), 0.36), (C(0x000000, 0), 0.56), (C(0x2E1000, 82), 1.0));
+
+    private static readonly LinearGradientBrush HeadRimLightBrush =
+        Linear(0, 0, 1, 1, (C(0xFFF6E8, 0), 0.0), (C(0xFFF6E8, 0), 0.68), (C(0xE8F4FF, 68), 0.92), (C(0xFFFFFF, 90), 1.0));
 
     private static readonly LinearGradientBrush BodyShadeBrush =
-        Linear(0, 0, 0, 1, (C(0x3A1400, 55), 0.0), (C(0x000000, 0), 0.28), (C(0x000000, 0), 0.68), (C(0x2A0E00, 75), 1.0));
+        Linear(0, 0, 0, 1, (C(0x280D00, 68), 0.0), (C(0x000000, 0), 0.28), (C(0x000000, 0), 0.66), (C(0x240C00, 84), 1.0));
+
+    private static readonly RadialGradientBrush CastNeckShadowBrush =
+        Radial(0.5, 0.5, 0.5, 0.5, 0.5, (C(0x180904, 115), 0.0), (C(0x180904, 55), 0.55), (C(0x180904, 0), 1.0));
+
+    private static readonly RadialGradientBrush EarSubsurfaceBrush =
+        Radial(0.5, 0.55, 0.5, 0.5, 0.5, (C(0xFF96AE, 110), 0.0), (C(0xFF7090, 45), 0.55), (C(0xFF7090, 0), 1.0));
+
+    // Realistic Corneal Eye & 3D Muzzle Brushes
+    private static readonly LinearGradientBrush UpperLidShadowBrush =
+        Linear(0, 0, 0, 1, (C(0x0A0810, 145), 0.0), (C(0x0A0810, 55), 0.32), (C(0x0A0810, 0), 0.58));
+
+    private static readonly RadialGradientBrush LowerIrisCausticBrush =
+        Radial(0.5, 0.78, 0.5, 0.78, 0.45, (C(0xFFFFFF, 105), 0.0), (C(0xFFFFFF, 0), 1.0));
+
+    private static readonly Pen IrisLimbalPen = MakePen(Solid(0x0D0A12, 185), 0.36);
+    private static readonly Pen EyelidCreasePen = MakePen(Solid(0x3A2418, 95), 0.34);
+    private static readonly RadialGradientBrush MuzzleCushionShadowBrush =
+        Radial(0.5, 0.65, 0.5, 0.6, 0.55, (C(0x4A2A18, 52), 0.0), (C(0x4A2A18, 0), 1.0));
+    private static readonly RadialGradientBrush WetNoseHighlightBrush =
+        Radial(0.35, 0.3, 0.32, 0.28, 0.55, (C(0xFFFFFF, 215), 0.0), (C(0xFFFFFF, 60), 0.45), (C(0xFFFFFF, 0), 1.0));
+    private static readonly SolidColorBrush NostrilBrush = Solid(0x120A0D, 185);
+    private static readonly Pen DragonWingRibPen = MakePen(Solid(0xB89EFF, 115), 0.42);
+    private static readonly SolidColorBrush DragonScaleBrush = Solid(0xA6E4FF, 85);
 
     // Neckwear (Collar / Bell / Bandana / Bow)
     private static readonly LinearGradientBrush CollarRedBrush =
@@ -203,7 +230,7 @@ public sealed partial class VirtualPetControl : FrameworkElement
         Radial(0.5, 0.6, 0.5, 0.5, 0.6, (C(0xFFE4EC), 0.0), (C(0xFFA8BE), 0.65), (C(0xDE6682), 1.0));
     private static readonly Pen CatTabbyPen = MakePen(Solid(0x9E430B), 0.85);
     private static readonly Pen CatBodyTabbyPen = MakePen(Solid(0x9E430B, 175), 0.72);
-    private static readonly Pen CatOutlinePen = MakePen(Solid(0x9E430B, 170), 0.48);
+    private static readonly Pen CatOutlinePen = MakePen(Solid(0x9E430B, 110), 0.34);
 
     private static readonly SolidColorBrush CatTailDarkBrush = Solid(0x9A4A12);
     private static readonly SolidColorBrush CatTailMidBrush = Solid(0xE68836);
@@ -226,7 +253,7 @@ public sealed partial class VirtualPetControl : FrameworkElement
         Radial(0.4, 0.35, 0.35, 0.3, 0.65, (C(0xB0723A), 0.0), (C(0x5E3412), 0.65), (C(0x281405), 1.0));
     private static readonly RadialGradientBrush DogTongueBrush =
         Radial(0.5, 0.25, 0.5, 0.2, 0.6, (C(0xFF8EA6), 0.0), (C(0xFF5077), 0.7), (C(0xD4244B), 1.0));
-    private static readonly Pen DogOutlinePen = MakePen(Solid(0x8F4C10, 165), 0.48);
+    private static readonly Pen DogOutlinePen = MakePen(Solid(0x8F4C10, 108), 0.34);
     private static readonly Pen DogTailPen = MakePen(DogCoatBrush, 2.4);
     private static readonly Pen DogTailInnerPen = MakePen(DogUrajiroBrush, 1.1);
     private static readonly Pen DogTailOutlinePen = MakePen(Solid(0x8F4C10, 200), 3.1);
@@ -242,7 +269,7 @@ public sealed partial class VirtualPetControl : FrameworkElement
         Radial(0.5, 0.5, 0.5, 0.5, 0.5, (C(0xFF5F87, 145), 0.0), (C(0xFF5F87, 0), 1.0));
     private static readonly RadialGradientBrush BunnyIrisBrush =
         Radial(0.4, 0.35, 0.35, 0.3, 0.65, (C(0xC64672), 0.0), (C(0x721937), 0.6), (C(0x280512), 1.0));
-    private static readonly Pen BunnyOutlinePen = MakePen(Solid(0xA6A6C8, 165), 0.48);
+    private static readonly Pen BunnyOutlinePen = MakePen(Solid(0x9494BA, 110), 0.34);
 
     // \U0001F98A Fox (Kitsune)
     private static readonly RadialGradientBrush FoxCoatBrush =
@@ -255,7 +282,7 @@ public sealed partial class VirtualPetControl : FrameworkElement
         Radial(0.4, 0.35, 0.35, 0.3, 0.65, (C(0xFFD644), 0.0), (C(0xD9820B), 0.6), (C(0x5E3000), 1.0));
     private static readonly LinearGradientBrush FoxScarfBrush =
         Linear(0, 0, 0, 1, (C(0x34D97B), 0.0), (C(0x169E52), 0.65), (C(0x0B6330), 1.0));
-    private static readonly Pen FoxOutlinePen = MakePen(Solid(0x7D2400, 180), 0.48);
+    private static readonly Pen FoxOutlinePen = MakePen(Solid(0x7D2400, 115), 0.34);
 
     // \U0001F43C Panda (Bamboo Giant Panda)
     private static readonly RadialGradientBrush PandaWhiteBrush =
@@ -264,8 +291,8 @@ public sealed partial class VirtualPetControl : FrameworkElement
         Radial(0.38, 0.32, 0.35, 0.30, 0.65, (C(0x3D3E48), 0.0), (C(0x22232B), 0.6), (C(0x101116), 1.0));
     private static readonly RadialGradientBrush PandaIrisBrush =
         Radial(0.4, 0.35, 0.35, 0.3, 0.65, (C(0x78E08F), 0.0), (C(0x28965A), 0.65), (C(0x0D4024), 1.0));
-    private static readonly Pen PandaOutlinePen = MakePen(Solid(0x5C5C6E, 175), 0.48);
-    private static readonly Pen PandaDarkOutlinePen = MakePen(Solid(0x0E0E14, 210), 0.48);
+    private static readonly Pen PandaOutlinePen = MakePen(Solid(0x5C5C6E, 112), 0.34);
+    private static readonly Pen PandaDarkOutlinePen = MakePen(Solid(0x0E0E14, 135), 0.34);
 
     // \U0001F432 Dragon (Celestial Baby Dragon)
     private static readonly RadialGradientBrush DragonCoatBrush =
@@ -278,7 +305,7 @@ public sealed partial class VirtualPetControl : FrameworkElement
         Linear(0, 0, 0, 1, (C(0xFFFDF5), 0.0), (C(0xF5D38C), 0.65), (C(0xB88228), 1.0));
     private static readonly RadialGradientBrush DragonIrisBrush =
         Radial(0.4, 0.35, 0.35, 0.3, 0.65, (C(0x00F5D4), 0.0), (C(0x00A8E8), 0.6), (C(0x003459), 1.0));
-    private static readonly Pen DragonOutlinePen = MakePen(Solid(0x1E1B5E, 185), 0.48);
+    private static readonly Pen DragonOutlinePen = MakePen(Solid(0x1E1B5E, 120), 0.34);
     private static readonly Pen DragonBellyLinePen = MakePen(Solid(0xC97A10, 145), 0.42);
 
     // Accessories & Treats Palette
@@ -679,6 +706,100 @@ public sealed partial class VirtualPetControl : FrameworkElement
         c.QuadraticBezierTo(new Point(11.2, -4.5), new Point(10.6, -0.5), true, false);
         c.QuadraticBezierTo(new Point(10.2, 1.8), new Point(7.6, 1.4), true, false);
     });
+
+    // Realistic Fur Tufts, Wing Ribs, Almond Pupil, Eyelid Arcs & Curved Whiskers
+    private static readonly StreamGeometry CheekTuftLGeo = Geo(c =>
+    {
+        c.BeginFigure(new Point(-6.8, 0.2), true, true);
+        c.QuadraticBezierTo(new Point(-9.4, 1.2), new Point(-8.2, 2.3), true, false);
+        c.QuadraticBezierTo(new Point(-9.0, 3.0), new Point(-6.9, 3.6), true, false);
+        c.QuadraticBezierTo(new Point(-5.8, 2.0), new Point(-6.8, 0.2), true, false);
+    });
+    private static readonly StreamGeometry CheekTuftRGeo = Geo(c =>
+    {
+        c.BeginFigure(new Point(6.8, 0.2), true, true);
+        c.QuadraticBezierTo(new Point(9.4, 1.2), new Point(8.2, 2.3), true, false);
+        c.QuadraticBezierTo(new Point(9.0, 3.0), new Point(6.9, 3.6), true, false);
+        c.QuadraticBezierTo(new Point(5.8, 2.0), new Point(6.8, 0.2), true, false);
+    });
+    private static readonly StreamGeometry ChestFluffGeo = Geo(c =>
+    {
+        c.BeginFigure(new Point(-2.4, 1.8), true, true);
+        c.QuadraticBezierTo(new Point(-1.2, 3.8), new Point(0.0, 4.6), true, false);
+        c.QuadraticBezierTo(new Point(1.2, 3.8), new Point(2.4, 1.8), true, false);
+        c.QuadraticBezierTo(new Point(0.0, 2.5), new Point(-2.4, 1.8), true, false);
+    });
+    private static readonly StreamGeometry EarTuftLGeo = Geo(c =>
+    {
+        c.BeginFigure(new Point(-4.8, -4.6), false, false);
+        c.QuadraticBezierTo(new Point(-5.6, -6.2), new Point(-4.4, -7.2), true, false);
+        c.BeginFigure(new Point(-3.9, -4.7), false, false);
+        c.QuadraticBezierTo(new Point(-4.3, -6.0), new Point(-3.5, -6.7), true, false);
+    });
+    private static readonly StreamGeometry EarTuftRGeo = Geo(c =>
+    {
+        c.BeginFigure(new Point(4.8, -4.6), false, false);
+        c.QuadraticBezierTo(new Point(5.6, -6.2), new Point(4.4, -7.2), true, false);
+        c.BeginFigure(new Point(3.9, -4.7), false, false);
+        c.QuadraticBezierTo(new Point(4.3, -6.0), new Point(3.5, -6.7), true, false);
+    });
+    private static readonly StreamGeometry AlmondSlitPupilGeo = Geo(c =>
+    {
+        c.BeginFigure(new Point(0.0, -1.0), true, true);
+        c.QuadraticBezierTo(new Point(0.72, 0.0), new Point(0.0, 1.0), true, false);
+        c.QuadraticBezierTo(new Point(-0.72, 0.0), new Point(0.0, -1.0), true, false);
+    });
+    private static readonly StreamGeometry UpperLidArcL = Geo(c =>
+    {
+        c.BeginFigure(new Point(-5.6, -1.6), false, false);
+        c.QuadraticBezierTo(new Point(-3.6, -3.5), new Point(-1.6, -1.5), true, false);
+    });
+    private static readonly StreamGeometry UpperLidArcR = Geo(c =>
+    {
+        c.BeginFigure(new Point(1.6, -1.5), false, false);
+        c.QuadraticBezierTo(new Point(3.6, -3.5), new Point(5.6, -1.6), true, false);
+    });
+    private static readonly StreamGeometry CurvedWhiskerL1 = Geo(c =>
+    {
+        c.BeginFigure(new Point(-5.8, 1.5), false, false);
+        c.QuadraticBezierTo(new Point(-8.8, 0.5), new Point(-11.8, 1.1), true, false);
+    });
+    private static readonly StreamGeometry CurvedWhiskerL2 = Geo(c =>
+    {
+        c.BeginFigure(new Point(-5.8, 2.5), false, false);
+        c.QuadraticBezierTo(new Point(-8.6, 2.7), new Point(-11.4, 3.8), true, false);
+    });
+    private static readonly StreamGeometry CurvedWhiskerR1 = Geo(c =>
+    {
+        c.BeginFigure(new Point(5.8, 1.5), false, false);
+        c.QuadraticBezierTo(new Point(8.8, 0.5), new Point(11.8, 1.1), true, false);
+    });
+    private static readonly StreamGeometry CurvedWhiskerR2 = Geo(c =>
+    {
+        c.BeginFigure(new Point(5.8, 2.5), false, false);
+        c.QuadraticBezierTo(new Point(8.6, 2.7), new Point(11.4, 3.8), true, false);
+    });
+    private static readonly StreamGeometry DragonWingRibsLGeo = Geo(c =>
+    {
+        c.BeginFigure(new Point(-4.0, 2.8), false, false);
+        c.QuadraticBezierTo(new Point(-7.5, 0.5), new Point(-10.8, 1.0), true, false);
+        c.BeginFigure(new Point(-4.1, 3.4), false, false);
+        c.QuadraticBezierTo(new Point(-7.2, 2.8), new Point(-9.6, 4.7), true, false);
+    });
+    private static readonly StreamGeometry DragonWingRibsRGeo = Geo(c =>
+    {
+        c.BeginFigure(new Point(4.0, 2.8), false, false);
+        c.QuadraticBezierTo(new Point(7.5, 0.5), new Point(10.8, 1.0), true, false);
+        c.BeginFigure(new Point(4.1, 3.4), false, false);
+        c.QuadraticBezierTo(new Point(7.2, 2.8), new Point(9.6, 4.7), true, false);
+    });
+    private static readonly StreamGeometry DragonScaleMarksGeo = Geo(c =>
+    {
+        c.BeginFigure(new Point(-4.4, -3.2), false, false);
+        c.QuadraticBezierTo(new Point(-3.6, -3.8), new Point(-2.8, -3.3), true, false);
+        c.BeginFigure(new Point(2.8, -3.3), false, false);
+        c.QuadraticBezierTo(new Point(3.6, -3.8), new Point(4.4, -3.2), true, false);
+    });
     private static readonly StreamGeometry DragonTailSpadeGeo = Geo(c =>
     {
         c.BeginFigure(new Point(0, -1.8), true, true);
@@ -797,8 +918,20 @@ public sealed partial class VirtualPetControl : FrameworkElement
     private bool _isDoingSpecialAction;
     private double _specialActionStartTime;
     private PetSpecialActionKind _specialActionKind = PetSpecialActionKind.None;
+    private bool _hasInteractiveToyTarget;
+    private double _interactiveToyNormX;
+    private double _interactiveToyNormY;
 
     public bool IsAnimatingSpecialAction => _isDoingSpecialAction;
+
+    public void SetInteractiveToyTarget(double normX, double normY)
+    {
+        _hasInteractiveToyTarget = true;
+        _interactiveToyNormX = Math.Clamp(normX, -1.0, 1.0);
+        _interactiveToyNormY = Math.Clamp(normY, -1.0, 1.0);
+    }
+
+    public void ClearInteractiveToyTarget() => _hasInteractiveToyTarget = false;
 
     // Ear & secondary head motion state
     private double _earAng, _earVel, _earTwitch, _earFlick;
@@ -948,6 +1081,7 @@ public sealed partial class VirtualPetControl : FrameworkElement
         // Virtual 32 x 28 canvas -> control size
         double actualW = ActualWidth > 0 ? ActualWidth : (Width > 0 ? Width : 32.0);
         double actualH = ActualHeight > 0 ? ActualHeight : (Height > 0 ? Height : 28.0);
+        _isHeroLod = Math.Max(actualW, actualH) >= 44.0;
         double scale = Math.Min(actualW / 32.0, actualH / 28.0);
         double offsetX = (actualW - 32.0 * scale) / 2.0;
         double offsetY = (actualH - 28.0 * scale) / 2.0;
@@ -1083,24 +1217,24 @@ public sealed partial class VirtualPetControl : FrameworkElement
                             petOffsetY += 0.8;
                             scaleX += 0.06;
                             scaleY -= 0.05;
-                            _targetGazeX = Math.Sin(p * 14.0) * 0.9;
-                            _targetGazeY = 0.65;
+                            _targetGazeX = _hasInteractiveToyTarget ? _interactiveToyNormX : Math.Sin(p * 14.0) * 0.9;
+                            _targetGazeY = _hasInteractiveToyTarget ? Math.Clamp(_interactiveToyNormY, -0.4, 0.8) : 0.65;
                         }
                         else
                         {
                             double leap = Math.Sin((p - 0.45) / 0.55 * Math.PI);
                             petOffsetY -= Math.Max(0, leap) * 4.2;
                             rotateAngle = Math.Sin(p * 18.0) * 8.0;
-                            _targetGazeX = 0.4;
-                            _targetGazeY = 0.2;
+                            _targetGazeX = _hasInteractiveToyTarget ? _interactiveToyNormX : 0.4;
+                            _targetGazeY = _hasInteractiveToyTarget ? _interactiveToyNormY : 0.2;
                         }
                         break;
                     case PetSpecialActionKind.BallFetch:
                         double ballArc = Math.Sin(p * Math.PI);
                         petOffsetY -= ballArc * 5.8;
                         rotateAngle = Math.Sin(p * Math.PI * 2.0) * 12.0;
-                        _targetGazeX = Math.Sin(p * Math.PI) * 0.8;
-                        _targetGazeY = -0.4;
+                        _targetGazeX = _hasInteractiveToyTarget ? _interactiveToyNormX : Math.Sin(p * Math.PI) * 0.8;
+                        _targetGazeY = _hasInteractiveToyTarget ? _interactiveToyNormY : -0.4;
                         break;
                     case PetSpecialActionKind.BinkyFlip:
                         double binkyArc = Math.Sin(p * Math.PI);
@@ -1271,6 +1405,12 @@ public sealed partial class VirtualPetControl : FrameworkElement
         }
         dc.DrawGeometry(outerBrush, outerPen, outer);
         dc.DrawGeometry(innerBrush, null, inner);
+        if (_isHeroLod)
+        {
+            dc.PushClip(inner);
+            dc.DrawRectangle(EarSubsurfaceBrush, null, inner.Bounds);
+            dc.Pop();
+        }
         if (rot) dc.Pop();
     }
 
@@ -1280,17 +1420,25 @@ public sealed partial class VirtualPetControl : FrameworkElement
         dc.DrawEllipse(BlushBrush, null, new Point(5.3, 2.4), 2.2 * s, 1.5 * s);
     }
 
-    private static void ShadeHead(DrawingContext dc, Geometry clip, Rect rect)
+    private void ShadeHead(DrawingContext dc, Geometry clip, Rect rect)
     {
         dc.PushClip(clip);
         dc.DrawRectangle(HeadShadeBrush, null, rect);
+        if (_isHeroLod)
+        {
+            dc.DrawRectangle(HeadRimLightBrush, null, rect);
+        }
         dc.Pop();
     }
 
-    private static void ShadeTorso(DrawingContext dc, Geometry clip)
+    private void ShadeTorso(DrawingContext dc, Geometry clip)
     {
         dc.PushClip(clip);
         dc.DrawRectangle(BodyShadeBrush, null, TorsoRect);
+        if (_isHeroLod)
+        {
+            dc.DrawEllipse(CastNeckShadowBrush, null, new Point(0.0, 1.4), 5.6, 2.4);
+        }
         dc.Pop();
     }
 

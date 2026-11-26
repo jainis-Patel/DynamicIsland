@@ -32,6 +32,7 @@ internal static class SettingsSearchIndex
         // Clock & Audio
         new("Idle Clock Face", "8 horology & digital clock styles for the idle capsule", "Clock", "Clock & Audio", "\uE823", "clock face minimal seconds date badge analog neon flip matrix jump hour"),
         new("Audio Waveform Visualizer", "Bars, Waveform, Liquid Blob, Neon Aurora, or Siri Orb", "Clock", "Clock & Audio", "\uE9D9", "visualizer audio waveform oscilloscope bars blob aurora siri orb"),
+        new("Now Playing Player Disc", "Rotating Studio Vinyl LP, Full-Art Disc, or Static Squircle cover", "Clock", "Clock & Audio", "\uE958", "album art cover vinyl disc record cd circle rotating spin turntable static squircle player"),
         new("Capsule Elements", "Camera lens dot, synced LRCLIB lyrics, pill lyrics & net speed", "Clock", "Clock & Audio", "\uE8D6", "camera lens lyrics compact pill network speed idle"),
         new("Split Secondary Droplet", "Detached bubble when two live activities run at once", "Clock", "Clock & Audio", "\uF158", "secondary droplet split bubble concurrent"),
 
@@ -62,6 +63,7 @@ internal static class SettingsSearchIndex
         new("Virtual Companion Profile", "Enable pet, switch species, equip gear, or rename", "Pet", "Companion", "\uEB51", "virtual pet companion cat dog bunny fox panda dragon species gear rename"),
         new("Pet Playground & Desktop Roam", "Open interactive Pet Playground or float on desktop", "Pet", "Companion", "\uE7FC", "playground roam desktop pet float"),
         new("Pet Care & Wellness Reminders", "Pet, feed treat, flip trick, hydrate, stretch & reminder interval", "Pet", "Companion", "\uEB52", "treat water stretch flip trick wellness reminder"),
+        new("Pet Auto-Roam & Context Reactions", "Autonomous taskbar roaming, custom name, daily streak & smart mood reactions", "Pet", "Companion", "\uE7C4", "pet auto roam desktop frameless custom name streak context reactions focus battery"),
 
         // Shortcuts
         new("Global Hotkeys", "Customize Ctrl+Alt shortcuts, Backspace to clear", "Shortcuts", "Shortcuts", "\uE765", "hotkeys shortcuts keybind ctrl alt record"),

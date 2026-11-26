@@ -28,7 +28,11 @@ internal sealed class GitHubReleaseClient : IDisposable
     private readonly HttpClient _http;
     private readonly HttpClient _downloadHttp;
     private readonly bool _ownsHttpClient;
-    private string? _lastETag;
+    private string? _lastRawETag;
+    private UpdateManifest? _cachedRawManifest;
+    private string? _lastApiETag;
+    private string? _lastApiEndpoint;
+    private UpdateManifest? _cachedApiManifest;
     private volatile string? _token;
     private bool _disposed;
 
@@ -54,7 +58,7 @@ internal sealed class GitHubReleaseClient : IDisposable
         _ownsHttpClient = client == null;
         string userAgent = productHeader.ToString();
         _http = client ?? SharedHttpClient.CreateClient(TimeSpan.FromSeconds(15), userAgent);
-        _downloadHttp = SharedHttpClient.CreateClient(TimeSpan.FromMinutes(10), userAgent);
+        _downloadHttp = client ?? SharedHttpClient.CreateClient(TimeSpan.FromMinutes(10), userAgent);
 
         if (!string.IsNullOrWhiteSpace(gitHubToken))
         {
@@ -70,9 +74,9 @@ internal sealed class GitHubReleaseClient : IDisposable
         _token = string.IsNullOrWhiteSpace(token) ? null : token.Trim();
     }
 
-    private HttpRequestMessage CreateGetRequest(string url, string? accept = null)
+    private HttpRequestMessage CreateRequest(HttpMethod method, string url, string? accept = null)
     {
-        var req = new HttpRequestMessage(HttpMethod.Get, url);
+        var req = new HttpRequestMessage(method, url);
         if (!string.IsNullOrEmpty(accept))
         {
             req.Headers.Accept.ParseAdd(accept);
@@ -89,31 +93,115 @@ internal sealed class GitHubReleaseClient : IDisposable
         return req;
     }
 
+    private HttpRequestMessage CreateGetRequest(string url, string? accept = null) =>
+        CreateRequest(HttpMethod.Get, url, accept);
+
     /// <summary>
-    /// Clears the cached ETag so the next update check forces a fresh query.
+    /// Clears all cached ETags and manifests so the next update check forces a fresh query.
     /// </summary>
     public void ClearETagCache()
     {
-        _lastETag = null;
+        _lastRawETag = null;
+        _cachedRawManifest = null;
+        _lastApiETag = null;
+        _lastApiEndpoint = null;
+        _cachedApiManifest = null;
     }
 
+    private static DateTime? ParseRateLimitResetUtc(HttpResponseMessage response)
+    {
+        if (response.Headers.TryGetValues("X-RateLimit-Reset", out var values))
+        {
+            foreach (string raw in values)
+            {
+                if (long.TryParse(raw.Trim(), out long epoch) && epoch > 0)
+                {
+                    return DateTimeOffset.FromUnixTimeSeconds(epoch).UtcDateTime;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static string FormatRateLimitMessage(DateTime? resetUtc) =>
+        resetUtc.HasValue
+            ? $"GitHub API rate limit reached (resets at {resetUtc.Value.ToLocalTime():t}). Add a GitHub token in Settings for 5,000 req/hr."
+            : "GitHub API rate limit reached. Add a GitHub token in Settings for 5,000 req/hr.";
+
     /// <summary>
-    /// Fetches the latest release manifest. Attempts the static raw CDN manifest first to avoid API rate limits.
-    /// Returns null if not modified (304) or on network failure.
+    /// Fetches the latest release manifest. Attempts the channel-aware GitHub Releases API (with ETag conditional caching)
+    /// and falls back to the raw CDN release-manifest.json if the API is rate-limited or unreachable.
     /// </summary>
     public async Task<UpdateManifest?> FetchManifestAsync(
         string owner = DefaultOwner,
         string repo = DefaultRepo,
         CancellationToken ct = default)
     {
-        // 1. Primary: Fetch raw release-manifest.json from GitHub CDN (Unmetered, no 60 req/hr API rate limit)
-        string rawManifestUrl = $"https://raw.githubusercontent.com/{owner}/{repo}/main/release-manifest.json";
-        UpdateManifest? rawManifest = null;
+        var result = await FetchLatestManifestDetailedAsync(
+            includePrereleases: false,
+            force: false,
+            owner: owner,
+            repo: repo,
+            ct: ct).ConfigureAwait(false);
+        return result.Manifest;
+    }
 
+    /// <summary>
+    /// Channel-aware, ETag-cached manifest query returning detailed status, rate-limit diagnostics, and source metadata.
+    /// </summary>
+    public async Task<ManifestFetchResult> FetchLatestManifestDetailedAsync(
+        bool includePrereleases = false,
+        bool force = false,
+        string owner = DefaultOwner,
+        string repo = DefaultRepo,
+        CancellationToken ct = default)
+    {
+        if (force)
+        {
+            ClearETagCache();
+        }
+
+        // 1. Primary: Channel-aware GitHub Releases API (conditional ETag 304 responses do not count against rate limit)
+        var apiOutcome = await FetchFromReleasesApiDetailedAsync(includePrereleases, owner, repo, ct).ConfigureAwait(false);
+        if (apiOutcome.Manifest != null)
+        {
+            return apiOutcome;
+        }
+
+        // 2. Fallback: Raw CDN release-manifest.json (unmetered, bypasses API rate limits)
+        var rawOutcome = await FetchRawManifestDetailedAsync(includePrereleases, owner, repo, ct).ConfigureAwait(false);
+        if (rawOutcome.Manifest != null)
+        {
+            return rawOutcome;
+        }
+
+        if (apiOutcome.Status == ManifestFetchStatus.RateLimited)
+        {
+            return apiOutcome;
+        }
+
+        if (apiOutcome.Status == ManifestFetchStatus.NoReleases && rawOutcome.Status == ManifestFetchStatus.NoReleases)
+        {
+            return new ManifestFetchResult(ManifestFetchStatus.NoReleases, null, "No published releases found on GitHub.");
+        }
+
+        return new ManifestFetchResult(
+            ManifestFetchStatus.NetworkError,
+            null,
+            apiOutcome.ErrorMessage ?? rawOutcome.ErrorMessage ?? "Unable to reach GitHub.");
+    }
+
+    private async Task<ManifestFetchResult> FetchRawManifestDetailedAsync(
+        bool includePrereleases,
+        string owner,
+        string repo,
+        CancellationToken ct)
+    {
+        string rawManifestUrl = $"https://raw.githubusercontent.com/{owner}/{repo}/main/release-manifest.json";
         try
         {
             using var request = CreateGetRequest(rawManifestUrl, "application/json, text/plain, */*");
-            if (!string.IsNullOrEmpty(_lastETag) && EntityTagHeaderValue.TryParse(_lastETag, out var parsedEtag))
+            if (!string.IsNullOrEmpty(_lastRawETag) && EntityTagHeaderValue.TryParse(_lastRawETag, out var parsedEtag))
             {
                 request.Headers.IfNoneMatch.Add(parsedEtag);
             }
@@ -122,60 +210,72 @@ internal sealed class GitHubReleaseClient : IDisposable
 
             if (response.StatusCode == HttpStatusCode.NotModified)
             {
-                App.Log("[GitHubClient] Manifest not modified (HTTP 304).");
-                return null;
+                App.Log("[GitHubClient] Raw manifest not modified (HTTP 304).");
+                if (_cachedRawManifest != null && MatchesChannel(_cachedRawManifest, includePrereleases))
+                {
+                    return new ManifestFetchResult(ManifestFetchStatus.NotModified, _cachedRawManifest, Source: "RawManifest");
+                }
+                return new ManifestFetchResult(ManifestFetchStatus.NotModified, null, Source: "RawManifest");
             }
 
-            if (response.IsSuccessStatusCode)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
-                string? candidateEtag = response.Headers.ETag?.Tag;
+                return new ManifestFetchResult(ManifestFetchStatus.NoReleases, null, "No release-manifest.json found on GitHub.");
+            }
 
-                string json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-                var manifest = JsonSerializer.Deserialize<UpdateManifest>(json, JsonOptions);
+            if (!response.IsSuccessStatusCode)
+            {
+                return new ManifestFetchResult(ManifestFetchStatus.NetworkError, null, $"Raw manifest returned HTTP {(int)response.StatusCode}.");
+            }
 
-                if (manifest != null && !string.IsNullOrWhiteSpace(manifest.Version))
+            string? candidateEtag = response.Headers.ETag?.Tag;
+            string json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            var manifest = JsonSerializer.Deserialize<UpdateManifest>(json, JsonOptions);
+
+            if (manifest == null || string.IsNullOrWhiteSpace(manifest.Version))
+            {
+                return new ManifestFetchResult(ManifestFetchStatus.NoReleases, null, "Raw manifest is empty or invalid.");
+            }
+
+            if (!MatchesChannel(manifest, includePrereleases))
+            {
+                return new ManifestFetchResult(ManifestFetchStatus.NoReleases, null, "Raw manifest belongs to a different release channel.");
+            }
+
+            string? assetUrl = manifest.Downloads?.Installer?.Url ?? manifest.Downloads?.Portable?.Url;
+            if (!string.IsNullOrWhiteSpace(assetUrl))
+            {
+                if (!IsTrustedGitHubUrl(assetUrl))
                 {
-                    // Pre-flight check: verify that the advertised download asset is reachable and not a 404
-                    string? assetUrl = manifest.Downloads?.Installer?.Url ?? manifest.Downloads?.Portable?.Url;
-                    if (!string.IsNullOrWhiteSpace(assetUrl))
-                    {
-                        if (!IsTrustedGitHubUrl(assetUrl))
-                        {
-                            App.Log($"[GitHubClient] Untrusted manifest asset URL rejected: {assetUrl}");
-                        }
-                        else if (await CheckAssetExistsAsync(assetUrl, ct).ConfigureAwait(false))
-                        {
-                            if (!string.IsNullOrEmpty(candidateEtag))
-                                _lastETag = candidateEtag;
-                            rawManifest = manifest;
-                        }
-                        else
-                        {
-                            App.Log($"[GitHubClient] Manifest version {manifest.Version} asset is not yet published on GitHub ({assetUrl}). Falling back to GitHub Releases API.");
-                        }
-                    }
-                    else
-                    {
-                        if (!string.IsNullOrEmpty(candidateEtag))
-                            _lastETag = candidateEtag;
-                        rawManifest = manifest;
-                    }
+                    App.Log($"[GitHubClient] Untrusted manifest asset URL rejected: {assetUrl}");
+                    return new ManifestFetchResult(ManifestFetchStatus.NetworkError, null, "Untrusted manifest asset URL rejected.");
+                }
+
+                if (!await CheckAssetExistsAsync(assetUrl, ct).ConfigureAwait(false))
+                {
+                    App.Log($"[GitHubClient] Manifest version {manifest.Version} asset is not yet published on GitHub ({assetUrl}).");
+                    return new ManifestFetchResult(ManifestFetchStatus.NoReleases, null, "Manifest asset is not published yet.");
                 }
             }
+
+            if (!string.IsNullOrEmpty(candidateEtag))
+            {
+                _lastRawETag = candidateEtag;
+            }
+            _cachedRawManifest = manifest;
+            return new ManifestFetchResult(ManifestFetchStatus.Success, manifest, Source: "RawManifest");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            App.Log($"[GitHubClient] Raw manifest check failed ({ex.Message}), falling back to GitHub API.");
+            App.Log($"[GitHubClient] Raw manifest check failed: {ex.Message}");
+            return new ManifestFetchResult(ManifestFetchStatus.NetworkError, null, ex.Message);
         }
+    }
 
-        // 2. Secondary Check: Query GitHub Releases API so newly tagged GitHub Releases are picked up
-        // even if the raw CDN cache is temporarily stale or rate-limited fallback is needed.
-        var apiManifest = await FetchManifestFromReleasesApiAsync(owner, repo, ct).ConfigureAwait(false);
-        if (rawManifest != null && apiManifest != null)
-        {
-            return apiManifest.ParsedVersion > rawManifest.ParsedVersion ? apiManifest : rawManifest;
-        }
-        return apiManifest ?? rawManifest;
+    private static bool MatchesChannel(UpdateManifest manifest, bool includePrereleases)
+    {
+        if (includePrereleases) return true;
+        return !manifest.ParsedVersion.IsPreRelease && manifest.ParsedChannel != UpdateChannel.Beta;
     }
 
     /// <summary>
@@ -188,13 +288,41 @@ internal sealed class GitHubReleaseClient : IDisposable
 
         try
         {
-            using var req = CreateGetRequest(url);
-            using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-            if (resp.StatusCode == HttpStatusCode.NotFound)
+            using var headReq = CreateRequest(HttpMethod.Head, url);
+            using var headResp = await _http.SendAsync(headReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+
+            if (headResp.RequestMessage?.RequestUri != null &&
+                !IsTrustedGitHubUrl(headResp.RequestMessage.RequestUri.ToString()))
             {
                 return false;
             }
-            return resp.IsSuccessStatusCode;
+
+            if (headResp.StatusCode == HttpStatusCode.NotFound)
+            {
+                return false;
+            }
+
+            if (headResp.StatusCode is HttpStatusCode.MethodNotAllowed or HttpStatusCode.Forbidden)
+            {
+                using var rangeReq = CreateRequest(HttpMethod.Get, url);
+                rangeReq.Headers.Range = new RangeHeaderValue(0, 0);
+                using var rangeResp = await _http.SendAsync(rangeReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+
+                if (rangeResp.RequestMessage?.RequestUri != null &&
+                    !IsTrustedGitHubUrl(rangeResp.RequestMessage.RequestUri.ToString()))
+                {
+                    return false;
+                }
+
+                if (rangeResp.StatusCode == HttpStatusCode.NotFound)
+                {
+                    return false;
+                }
+
+                return rangeResp.IsSuccessStatusCode || rangeResp.StatusCode == HttpStatusCode.PartialContent;
+            }
+
+            return headResp.IsSuccessStatusCode;
         }
         catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
@@ -208,56 +336,106 @@ internal sealed class GitHubReleaseClient : IDisposable
     }
 
     /// <summary>
-    /// Queries the GitHub Releases REST API for the latest release.
-    /// Falls back to the latest release in /releases if /releases/latest returns 404 (e.g. pre-releases).
+    /// Queries the GitHub Releases REST API for the latest release on the requested channel.
+    /// Uses /releases/latest for Stable and /releases?per_page=10 for Beta (including prereleases).
     /// </summary>
-    private async Task<UpdateManifest?> FetchManifestFromReleasesApiAsync(string owner, string repo, CancellationToken ct)
+    private async Task<ManifestFetchResult> FetchFromReleasesApiDetailedAsync(
+        bool includePrereleases,
+        string owner,
+        string repo,
+        CancellationToken ct)
     {
-        string apiUrl = $"https://api.github.com/repos/{owner}/{repo}/releases/latest";
+        string apiUrl = includePrereleases
+            ? $"https://api.github.com/repos/{owner}/{repo}/releases?per_page=10"
+            : $"https://api.github.com/repos/{owner}/{repo}/releases/latest";
 
         try
         {
             using var request = CreateGetRequest(apiUrl, "application/vnd.github.v3+json");
+            if (string.Equals(_lastApiEndpoint, apiUrl, StringComparison.Ordinal) &&
+                !string.IsNullOrEmpty(_lastApiETag) &&
+                EntityTagHeaderValue.TryParse(_lastApiETag, out var parsedEtag))
+            {
+                request.Headers.IfNoneMatch.Add(parsedEtag);
+            }
 
             using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
 
+            if (response.StatusCode == HttpStatusCode.NotModified)
+            {
+                App.Log("[GitHubClient] GitHub API release not modified (HTTP 304).");
+                return new ManifestFetchResult(ManifestFetchStatus.NotModified, _cachedApiManifest, Source: "GitHubApi");
+            }
+
             if (response.StatusCode == HttpStatusCode.Forbidden || response.StatusCode == HttpStatusCode.TooManyRequests)
             {
-                App.Log("[GitHubClient] GitHub API rate limit reached (60 req/hr).");
-                return null;
+                DateTime? resetUtc = ParseRateLimitResetUtc(response);
+                string msg = FormatRateLimitMessage(resetUtc);
+                App.Log($"[GitHubClient] {msg}");
+                return new ManifestFetchResult(ManifestFetchStatus.RateLimited, null, msg, resetUtc);
             }
 
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
-                // Fallback to /releases?per_page=1 in case all releases are pre-releases
-                using var fallbackReq = CreateGetRequest($"https://api.github.com/repos/{owner}/{repo}/releases?per_page=1", "application/vnd.github.v3+json");
-                using var fallbackResp = await _http.SendAsync(fallbackReq, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-                if (fallbackResp.IsSuccessStatusCode)
-                {
-                    using var fStream = await fallbackResp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-                    using var fDoc = await JsonDocument.ParseAsync(fStream, cancellationToken: ct).ConfigureAwait(false);
-                    if (fDoc.RootElement.ValueKind == JsonValueKind.Array && fDoc.RootElement.GetArrayLength() > 0)
-                    {
-                        return await TryParseOrFetchReleaseAsync(fDoc.RootElement[0], ct).ConfigureAwait(false);
-                    }
-                }
-                return null;
+                return new ManifestFetchResult(ManifestFetchStatus.NoReleases, null, "No published releases found on GitHub.");
             }
 
             if (!response.IsSuccessStatusCode)
             {
-                App.Log($"[GitHubClient] API check returned HTTP {(int)response.StatusCode}");
-                return null;
+                string msg = $"GitHub API returned HTTP {(int)response.StatusCode}.";
+                App.Log($"[GitHubClient] {msg}");
+                return new ManifestFetchResult(ManifestFetchStatus.NetworkError, null, msg);
             }
 
+            string? candidateEtag = response.Headers.ETag?.Tag;
             using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);
-            return await TryParseOrFetchReleaseAsync(doc.RootElement, ct).ConfigureAwait(false);
+
+            UpdateManifest? resolved = null;
+            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var releaseEl in doc.RootElement.EnumerateArray())
+                {
+                    if (releaseEl.TryGetProperty("draft", out var draftProp) && draftProp.ValueKind == JsonValueKind.True)
+                        continue;
+
+                    var candidate = await TryParseOrFetchReleaseAsync(releaseEl, ct).ConfigureAwait(false);
+                    if (candidate == null) continue;
+                    if (!MatchesChannel(candidate, includePrereleases)) continue;
+
+                    if (resolved == null || candidate.ParsedVersion > resolved.ParsedVersion)
+                    {
+                        resolved = candidate;
+                    }
+                }
+            }
+            else if (doc.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                if (!(doc.RootElement.TryGetProperty("draft", out var draftProp) && draftProp.ValueKind == JsonValueKind.True))
+                {
+                    var candidate = await TryParseOrFetchReleaseAsync(doc.RootElement, ct).ConfigureAwait(false);
+                    if (candidate != null && MatchesChannel(candidate, includePrereleases))
+                    {
+                        resolved = candidate;
+                    }
+                }
+            }
+
+            if (resolved == null)
+            {
+                return new ManifestFetchResult(ManifestFetchStatus.NoReleases, null, "No matching releases found on GitHub.");
+            }
+
+            _lastApiEndpoint = apiUrl;
+            _lastApiETag = candidateEtag;
+            _cachedApiManifest = resolved;
+
+            return new ManifestFetchResult(ManifestFetchStatus.Success, resolved, Source: "GitHubApi");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             App.Log($"[GitHubClient] GitHub Releases API query failed: {ex.Message}");
-            return null;
+            return new ManifestFetchResult(ManifestFetchStatus.NetworkError, null, ex.Message);
         }
     }
 
@@ -295,7 +473,23 @@ internal sealed class GitHubReleaseClient : IDisposable
                     var manifest = JsonSerializer.Deserialize<UpdateManifest>(json, JsonOptions);
                     if (manifest != null && !string.IsNullOrWhiteSpace(manifest.Version))
                     {
-                        return manifest;
+                        bool installerUrlValid = string.IsNullOrWhiteSpace(manifest.Downloads?.Installer?.Url) ||
+                                                 IsTrustedGitHubUrl(manifest.Downloads.Installer.Url);
+                        bool portableUrlValid = string.IsNullOrWhiteSpace(manifest.Downloads?.Portable?.Url) ||
+                                                IsTrustedGitHubUrl(manifest.Downloads.Portable.Url);
+                        if (installerUrlValid && portableUrlValid)
+                        {
+                            if (string.IsNullOrWhiteSpace(manifest.ReleaseTag) && root.TryGetProperty("tag_name", out var tagProp))
+                            {
+                                manifest.ReleaseTag = tagProp.GetString() ?? "";
+                            }
+                            if (string.IsNullOrWhiteSpace(manifest.ChangelogUrl) && root.TryGetProperty("html_url", out var urlProp))
+                            {
+                                manifest.ChangelogUrl = urlProp.GetString();
+                            }
+                            return manifest;
+                        }
+                        App.Log("[GitHubClient] Rejected release-manifest.json asset with untrusted download URL.");
                     }
                 }
             }
@@ -428,13 +622,20 @@ internal sealed class GitHubReleaseClient : IDisposable
         string body = root.TryGetProperty("body", out var bodyProp) ? bodyProp.GetString() ?? "" : "";
         string htmlUrl = root.TryGetProperty("html_url", out var urlProp) ? urlProp.GetString() ?? "" : "";
         DateTime publishedAt = root.TryGetProperty("published_at", out var pubProp) && pubProp.TryGetDateTime(out var dt) ? dt : DateTime.UtcNow;
+        bool isPreReleaseFlag = root.TryGetProperty("prerelease", out var preProp) && preProp.ValueKind == JsonValueKind.True;
 
         string cleanVersion = tagName.TrimStart('v', 'V');
+        bool isPreRelease = isPreReleaseFlag ||
+                            tagName.Contains("-beta", StringComparison.OrdinalIgnoreCase) ||
+                            tagName.Contains("-rc", StringComparison.OrdinalIgnoreCase) ||
+                            tagName.Contains("-alpha", StringComparison.OrdinalIgnoreCase) ||
+                            tagName.Contains("-preview", StringComparison.OrdinalIgnoreCase) ||
+                            tagName.Contains("beta", StringComparison.OrdinalIgnoreCase);
         var manifest = new UpdateManifest
         {
             Version = cleanVersion,
             ReleaseTag = tagName,
-            Channel = tagName.Contains("beta", StringComparison.OrdinalIgnoreCase) ? "beta" : "stable",
+            Channel = isPreRelease ? "beta" : "stable",
             ReleaseDate = publishedAt,
             Summary = string.IsNullOrWhiteSpace(body) ? $"Dynamic Island {tagName}" : body,
             ChangelogUrl = htmlUrl,
@@ -481,35 +682,70 @@ internal sealed class GitHubReleaseClient : IDisposable
     public async Task<IReadOnlyList<ReleaseHistoryItem>> FetchReleaseHistoryAsync(
         string owner = DefaultOwner,
         string repo = DefaultRepo,
-        int maxCount = 5,
+        int maxCount = 15,
         CancellationToken ct = default)
     {
-        string apiUrl = $"https://api.github.com/repos/{owner}/{repo}/releases?per_page={maxCount}";
+        var result = await FetchReleaseHistoryDetailedAsync(owner, repo, maxCount, ct).ConfigureAwait(false);
+        return result.Items;
+    }
+
+    /// <summary>
+    /// Fetches recent release history with structured rate-limit and error diagnostics.
+    /// </summary>
+    public async Task<ReleaseHistoryResult> FetchReleaseHistoryDetailedAsync(
+        string owner = DefaultOwner,
+        string repo = DefaultRepo,
+        int maxCount = 15,
+        CancellationToken ct = default)
+    {
+        string apiUrl = $"https://api.github.com/repos/{owner}/{repo}/releases?per_page={Math.Clamp(maxCount, 1, 30)}";
         var items = new List<ReleaseHistoryItem>();
 
         try
         {
             using var req = CreateGetRequest(apiUrl, "application/vnd.github.v3+json");
             using var response = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode) return items;
+
+            if (response.StatusCode == HttpStatusCode.Forbidden || response.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                DateTime? resetUtc = ParseRateLimitResetUtc(response);
+                string msg = FormatRateLimitMessage(resetUtc);
+                App.Log($"[GitHubClient] Release history rate-limited: {msg}");
+                return new ReleaseHistoryResult(items, IsSuccess: false, IsRateLimited: true, RateLimitResetUtc: resetUtc, ErrorMessage: msg);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string msg = $"GitHub API returned HTTP {(int)response.StatusCode}.";
+                return new ReleaseHistoryResult(items, IsSuccess: false, ErrorMessage: msg);
+            }
 
             using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);
 
             foreach (var release in doc.RootElement.EnumerateArray())
             {
+                if (release.TryGetProperty("draft", out var draftProp) && draftProp.ValueKind == JsonValueKind.True)
+                    continue;
+
                 string tag = release.TryGetProperty("tag_name", out var t) ? t.GetString() ?? "" : "";
                 string version = tag.TrimStart('v', 'V');
                 DateTime publishedAt = release.TryGetProperty("published_at", out var pub) && pub.TryGetDateTime(out var dt) ? dt : DateTime.UtcNow;
                 string body = release.TryGetProperty("body", out var b) ? b.GetString() ?? "" : "";
                 string htmlUrl = release.TryGetProperty("html_url", out var h) ? h.GetString() ?? "" : "";
-                bool isPreRelease = release.TryGetProperty("prerelease", out var pre) && pre.GetBoolean();
+                bool isPreRelease = (release.TryGetProperty("prerelease", out var pre) && pre.ValueKind == JsonValueKind.True) ||
+                                    tag.Contains("-beta", StringComparison.OrdinalIgnoreCase) ||
+                                    tag.Contains("-rc", StringComparison.OrdinalIgnoreCase) ||
+                                    tag.Contains("-alpha", StringComparison.OrdinalIgnoreCase);
 
                 string? installerUrl = null;
                 string? installerSha = null;
+                string? portableUrl = null;
+                string? portableSha = null;
                 string? checksumsUrl = null;
                 string? manifestUrl = null;
                 long size = 0;
+                long portableSize = 0;
 
                 if (release.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
                 {
@@ -522,6 +758,12 @@ internal sealed class GitHubReleaseClient : IDisposable
                             installerUrl = asset.TryGetProperty("browser_download_url", out var dl) ? dl.GetString() : null;
                             size = asset.TryGetProperty("size", out var s) ? s.GetInt64() : 0;
                             installerSha = TryExtractAssetDigestSha256(asset);
+                        }
+                        else if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) && portableUrl == null)
+                        {
+                            portableUrl = asset.TryGetProperty("browser_download_url", out var dl) ? dl.GetString() : null;
+                            portableSize = asset.TryGetProperty("size", out var s) ? s.GetInt64() : 0;
+                            portableSha = TryExtractAssetDigestSha256(asset);
                         }
                         else if (name.Equals("checksums.sha256", StringComparison.OrdinalIgnoreCase))
                         {
@@ -545,29 +787,37 @@ internal sealed class GitHubReleaseClient : IDisposable
                     InstallerSha256: installerSha,
                     SizeBytes: size,
                     ChecksumsUrl: checksumsUrl,
-                    ManifestUrl: manifestUrl));
+                    ManifestUrl: manifestUrl,
+                    PortableUrl: portableUrl,
+                    PortableSha256: portableSha,
+                    PortableSizeBytes: portableSize));
             }
+
+            return new ReleaseHistoryResult(items, IsSuccess: true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             App.Log($"[GitHubClient] Failed to fetch release history: {ex.Message}");
+            return new ReleaseHistoryResult(items, IsSuccess: false, ErrorMessage: ex.Message);
         }
-
-        return items;
     }
 
     /// <summary>
     /// Resolves the expected cryptographic SHA-256 for a historical release asset by querying
-    /// its release-manifest.json, checksums.sha256, or release body.
+    /// its release-manifest.json or checksums.sha256.
     /// </summary>
     public async Task<string?> FetchExpectedSha256Async(
         ReleaseHistoryItem item,
         string targetFileName,
         CancellationToken ct = default)
     {
-        if (!string.IsNullOrWhiteSpace(item.InstallerSha256) && IsValidHex64(item.InstallerSha256.Trim()))
+        bool isPortable = targetFileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ||
+                          targetFileName.Contains("Portable", StringComparison.OrdinalIgnoreCase);
+
+        string? directSha = isPortable ? item.PortableSha256 : item.InstallerSha256;
+        if (!string.IsNullOrWhiteSpace(directSha) && IsValidHex64(directSha.Trim()))
         {
-            return item.InstallerSha256.Trim();
+            return directSha.Trim();
         }
 
         // 1. Try manifestUrl asset
@@ -581,7 +831,9 @@ internal sealed class GitHubReleaseClient : IDisposable
                 {
                     string json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
                     var manifest = JsonSerializer.Deserialize<UpdateManifest>(json, JsonOptions);
-                    string? hash = manifest?.Downloads?.Installer?.Sha256;
+                    string? hash = isPortable
+                        ? manifest?.Downloads?.Portable?.Sha256
+                        : manifest?.Downloads?.Installer?.Sha256;
                     if (!string.IsNullOrWhiteSpace(hash) && IsValidHex64(hash.Trim())) return hash.Trim();
                 }
             }
@@ -602,11 +854,12 @@ internal sealed class GitHubReleaseClient : IDisposable
                 {
                     string text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
                     string? hash = ExtractHashFromChecksumsText(text, targetFileName);
-                    if (string.IsNullOrWhiteSpace(hash) && targetFileName.Contains("Setup", StringComparison.OrdinalIgnoreCase))
-                        hash = ExtractHashFromChecksumsText(text, "DynamicIsland-Setup.exe");
-                    if (string.IsNullOrWhiteSpace(hash) && targetFileName.Contains("Portable", StringComparison.OrdinalIgnoreCase))
-                        hash = ExtractHashFromChecksumsText(text, "DynamicIsland-Portable.zip");
-                    hash ??= ExtractHashFromChecksumsText(text, ".exe");
+                    if (string.IsNullOrWhiteSpace(hash) && isPortable)
+                        hash = ExtractHashFromChecksumsText(text, "DynamicIsland-Portable.zip") ??
+                               ExtractHashFromChecksumsText(text, ".zip");
+                    if (string.IsNullOrWhiteSpace(hash) && !isPortable)
+                        hash = ExtractHashFromChecksumsText(text, "DynamicIsland-Setup.exe") ??
+                               ExtractHashFromChecksumsText(text, ".exe");
                     if (!string.IsNullOrWhiteSpace(hash)) return hash;
                 }
             }
@@ -659,30 +912,55 @@ internal sealed class GitHubReleaseClient : IDisposable
             byte[] buffer = new byte[64 * 1024];
             long totalRead = 0;
             int read;
+            long startTick = Environment.TickCount64;
+            long lastReportTick = startTick - 150;
+
+            void ReportProgress(bool forceReport)
+            {
+                if (progress == null) return;
+                long now = Environment.TickCount64;
+                if (!forceReport && (now - lastReportTick) < 100) return;
+                lastReportTick = now;
+
+                double elapsedSec = Math.Max((now - startTick) / 1000.0, 0.001);
+                string speedSuffix = "";
+                if (elapsedSec > 0.25 && totalRead > 0)
+                {
+                    double bytesPerSec = totalRead / elapsedSec;
+                    speedSuffix = bytesPerSec >= 1024 * 1024
+                        ? $" · {bytesPerSec / (1024 * 1024):0.0} MB/s"
+                        : $" · {bytesPerSec / 1024:0} KB/s";
+                }
+
+                double readMb = totalRead / (1024.0 * 1024.0);
+                if (totalBytes > 0)
+                {
+                    double totalMb = totalBytes / (1024.0 * 1024.0);
+                    double percent = Math.Clamp((totalRead * 100.0) / totalBytes, 0.0, 100.0);
+                    progress.Report(new UpdateProgressInfo(
+                        Percent: percent,
+                        DownloadedBytes: totalRead,
+                        TotalBytes: totalBytes,
+                        StatusMessage: $"Downloading: {percent:0}% ({readMb:0.0} / {totalMb:0.0} MB{speedSuffix})"));
+                }
+                else
+                {
+                    progress.Report(new UpdateProgressInfo(
+                        Percent: 0,
+                        DownloadedBytes: totalRead,
+                        TotalBytes: -1,
+                        StatusMessage: $"Downloading: {readMb:0.0} MB{speedSuffix}"));
+                }
+            }
 
             while ((read = await sourceStream.ReadAsync(buffer, 0, buffer.Length, ct).ConfigureAwait(false)) > 0)
             {
                 await destinationStream.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
                 totalRead += read;
-
-                if (totalBytes > 0)
-                {
-                    double percent = Math.Clamp((totalRead * 100.0) / totalBytes, 0.0, 100.0);
-                    progress?.Report(new UpdateProgressInfo(
-                        Percent: percent,
-                        DownloadedBytes: totalRead,
-                        TotalBytes: totalBytes,
-                        StatusMessage: $"Downloading: {percent:0}% ({totalRead / 1024 / 1024} MB / {totalBytes / 1024 / 1024} MB)"));
-                }
-                else
-                {
-                    progress?.Report(new UpdateProgressInfo(
-                        Percent: 0,
-                        DownloadedBytes: totalRead,
-                        TotalBytes: -1,
-                        StatusMessage: $"Downloading: {totalRead / 1024 / 1024} MB"));
-                }
+                ReportProgress(forceReport: false);
             }
+
+            ReportProgress(forceReport: true);
         }
         catch
         {
@@ -695,7 +973,10 @@ internal sealed class GitHubReleaseClient : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        if (_ownsHttpClient) _http.Dispose();
-        _downloadHttp.Dispose();
+        if (_ownsHttpClient)
+        {
+            _http.Dispose();
+            _downloadHttp.Dispose();
+        }
     }
 }

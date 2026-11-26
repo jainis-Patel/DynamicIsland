@@ -199,6 +199,68 @@
                 </StackPanel>
             </Border>
 
+            <!-- Now Playing Player Disc Style -->
+            <Border Style="{StaticResource SettingsGroupCard}">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,6">
+                        <TextBlock Text="Now Playing Player Disc" FontSize="9.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        <TextBlock x:Name="ActiveAlbumArtStyleLabel" DockPanel.Dock="Right" Text="Studio Vinyl LP" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
+
+                    <UniformGrid Columns="3">
+                        <!-- 1. Studio Vinyl LP -->
+                        <Button Click="AlbumArtStyleBtn_Click" x:Name="AlbumArtVinylBtn" Tag="VinylDisc" Style="{StaticResource ClockPreviewCardStyle}" Width="Auto" Height="64" Margin="0,0,5,0">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <Grid Width="34" Height="28" ClipToBounds="False">
+                                    <Grid Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Ellipse Fill="#0B0B0F" Stroke="#38FFFFFF" StrokeThickness="0.8" />
+                                        <Ellipse Width="21" Height="21" Stroke="#20FFFFFF" StrokeThickness="0.6" />
+                                        <Ellipse Width="16" Height="16" Fill="{DynamicResource AccentBrush}" Opacity="0.9" />
+                                        <Ellipse Width="5" Height="5" Fill="#07070A" Stroke="#55FFFFFF" StrokeThickness="0.6" />
+                                    </Grid>
+                                    <!-- Micro-tonearm preview -->
+                                    <Grid HorizontalAlignment="Right" VerticalAlignment="Top" Width="9" Height="18" Margin="0,1,1,0">
+                                        <Ellipse Width="4.5" Height="4.5" Fill="#282A34" Stroke="#60FFFFFF" StrokeThickness="0.6" HorizontalAlignment="Right" VerticalAlignment="Top" />
+                                        <Path Data="M 6.5,2.5 L 5.5,12 L 2.5,15.5" Stroke="#C8CBD4" StrokeThickness="1.1" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+                                    </Grid>
+                                </Grid>
+                                <TextBlock Text="Vinyl LP" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- 2. Full-Art Optical Disc -->
+                        <Button Click="AlbumArtStyleBtn_Click" x:Name="AlbumArtOpticalBtn" Tag="OpticalDisc" Style="{StaticResource ClockPreviewCardStyle}" Width="Auto" Height="64" Margin="2.5,0">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <Grid Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Ellipse Width="26" Height="26" Stroke="#66FFFFFF" StrokeThickness="1.2">
+                                        <Ellipse.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                <GradientStop Color="#FF64D2FF" Offset="0" />
+                                                <GradientStop Color="#FFBF5AF2" Offset="0.55" />
+                                                <GradientStop Color="#FFFF9F0A" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Ellipse.Fill>
+                                    </Ellipse>
+                                    <Ellipse Width="8" Height="8" Fill="#440A0A0E" Stroke="#44FFFFFF" StrokeThickness="0.6" />
+                                    <Ellipse Width="4" Height="4" Fill="#07070A" Stroke="#55FFFFFF" StrokeThickness="0.6" />
+                                </Grid>
+                                <TextBlock Text="Full Disc" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,5,0,0" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- 3. Classic Static Squircle -->
+                        <Button Click="AlbumArtStyleBtn_Click" x:Name="AlbumArtStaticBtn" Tag="StaticSquircle" Style="{StaticResource ClockPreviewCardStyle}" Width="Auto" Height="64" Margin="5,0,0,0">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <Border Width="26" Height="26" CornerRadius="8" Background="#1E2028" BorderBrush="#38FFFFFF" BorderThickness="1">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8D6;" FontSize="11" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock Text="Static" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" Margin="0,5,0,0" />
+                            </StackPanel>
+                        </Button>
+                    </UniformGrid>
+                </StackPanel>
+            </Border>
+
             <!-- Audio Visualizer & Capsule Elements -->
             <Border Style="{StaticResource SettingsGroupCard}" Margin="0">
                 <StackPanel>

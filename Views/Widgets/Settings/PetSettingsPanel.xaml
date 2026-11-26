@@ -31,7 +31,12 @@
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <DockPanel LastChildFill="False" Margin="0,0,0,2">
                                 <TextBlock x:Name="SettingsHeroPetName" Text="Mochi" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" Cursor="Hand" MouseLeftButtonDown="PetNameBtn_Click" />
-                                <TextBlock x:Name="SettingsHeroPetRank" DockPanel.Dock="Right" Text="Level 1 · Companion" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border x:Name="PetSettingsStreakBadge" Visibility="Collapsed" Background="#22FF9F0A" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                                        <TextBlock x:Name="PetSettingsStreakText" Text="🔥 1d" Style="{StaticResource Digits}" FontSize="7.5" FontWeight="Bold" Foreground="#FF9F0A" />
+                                    </Border>
+                                    <TextBlock x:Name="SettingsHeroPetRank" Text="Level 1 · Companion" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
                             </DockPanel>
                             <TextBlock x:Name="SettingsHeroPetSub" Text="Interactive Capsule Companion" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,0,5" />
                             <Grid Height="4" Background="{DynamicResource IslandSliderTrackBrush}" Margin="0,0,0,4">
@@ -46,25 +51,90 @@
 
                     <Border Style="{StaticResource SettingsHairline}" />
 
-                    <!-- Profile Row -->
-                    <DockPanel LastChildFill="False">
+                    <!-- Profile & Custom Name Row -->
+                    <DockPanel LastChildFill="False" Margin="0,0,0,6">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <CheckBox x:Name="PetToggleSwitch" Click="PetToggleBtn_Click" Style="{StaticResource IslandToggleSwitch}" Margin="0,0,6,0" />
                             <TextBlock Text="Active" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                             <TextBlock x:Name="PetStatusSummaryText" Text="Mochi · 25 XP" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="6,0,0,0" VerticalAlignment="Center" />
                         </StackPanel>
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                            <Button Click="PetSpeciesBtn_Click" x:Name="PetSpeciesBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                <TextBlock x:Name="PetSpeciesText" Text="Cat" FontSize="8" FontWeight="Medium" />
-                            </Button>
-                            <Button Click="PetAccessoryBtn_Click" x:Name="PetAccessoryBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0">
-                                <TextBlock x:Name="PetAccessoryText" Text="None" FontSize="8" FontWeight="Medium" />
-                            </Button>
-                            <Button Click="PetNameBtn_Click" x:Name="PetNameBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0">
-                                <TextBlock x:Name="PetNameBtnText" Text="Rename" FontSize="8" FontWeight="Medium" />
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Height="20" Width="104" Padding="6,0" Margin="0,0,3,0">
+                                <TextBox x:Name="PetCustomNameBox" MaxLength="18" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource PrimaryTextBrush}" CaretBrush="{DynamicResource AccentBrush}" FontSize="8" VerticalAlignment="Center" KeyDown="PetCustomNameBox_KeyDown" LostFocus="PetCustomNameBox_LostFocus" ToolTipService.ToolTip="Type custom pet name and press Enter" />
+                            </Border>
+                            <Button Click="PetNameBtn_Click" x:Name="PetNameBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0" ToolTipService.ToolTip="Cycle preset pet names">
+                                <TextBlock x:Name="PetNameBtnText" Text="🎲" FontSize="8.5" FontWeight="Medium" />
                             </Button>
                         </StackPanel>
                     </DockPanel>
+
+                    <!-- 6-Species Visual Picker -->
+                    <TextBlock Text="SPECIES" Style="{StaticResource SettingsOverlineHeader}" Margin="0,0,0,4" />
+                    <UniformGrid Columns="6" Margin="0,0,0,6">
+                        <Button Click="PetSpeciesPickBtn_Click" x:Name="PetSpeciesCatBtn" Tag="Cat" Style="{StaticResource IslandButton}" Height="22" Padding="2,0" Margin="0,0,2,0">
+                            <TextBlock Text="🐱 Cat" FontSize="7.5" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="PetSpeciesPickBtn_Click" x:Name="PetSpeciesDogBtn" Tag="Dog" Style="{StaticResource IslandButton}" Height="22" Padding="2,0" Margin="1,0">
+                            <TextBlock Text="🐶 Dog" FontSize="7.5" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="PetSpeciesPickBtn_Click" x:Name="PetSpeciesBunnyBtn" Tag="Bunny" Style="{StaticResource IslandButton}" Height="22" Padding="2,0" Margin="1,0">
+                            <TextBlock Text="🐰 Bunny" FontSize="7.5" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="PetSpeciesPickBtn_Click" x:Name="PetSpeciesFoxBtn" Tag="Fox" Style="{StaticResource IslandButton}" Height="22" Padding="2,0" Margin="1,0">
+                            <TextBlock Text="🦊 Fox" FontSize="7.5" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="PetSpeciesPickBtn_Click" x:Name="PetSpeciesPandaBtn" Tag="Panda" Style="{StaticResource IslandButton}" Height="22" Padding="2,0" Margin="1,0">
+                            <TextBlock Text="🐼 Panda" FontSize="7.5" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="PetSpeciesPickBtn_Click" x:Name="PetSpeciesDragonBtn" Tag="Dragon" Style="{StaticResource IslandButton}" Height="22" Padding="2,0" Margin="2,0,0,0">
+                            <TextBlock Text="🐲 Dragon" FontSize="7.5" FontWeight="Medium" />
+                        </Button>
+                    </UniformGrid>
+
+                    <!-- 7-Accessory Wardrobe Picker -->
+                    <TextBlock Text="WARDROBE" Style="{StaticResource SettingsOverlineHeader}" Margin="0,0,0,4" />
+                    <WrapPanel Orientation="Horizontal" Margin="0,0,0,2">
+                        <Button Click="PetAccessoryPickBtn_Click" x:Name="PetAccNoneBtn" Tag="None" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,3">
+                            <TextBlock Text="None" FontSize="7.5" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="PetAccessoryPickBtn_Click" x:Name="PetAccCrownBtn" Tag="Crown" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,3">
+                            <TextBlock Text="👑 Crown" FontSize="7.5" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="PetAccessoryPickBtn_Click" x:Name="PetAccWizardBtn" Tag="WizardHat" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,3">
+                            <TextBlock Text="🧙 Wizard" FontSize="7.5" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="PetAccessoryPickBtn_Click" x:Name="PetAccHeadphonesBtn" Tag="Headphones" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,3">
+                            <TextBlock Text="🎧 DJ" FontSize="7.5" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="PetAccessoryPickBtn_Click" x:Name="PetAccSunglassesBtn" Tag="Sunglasses" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,3">
+                            <TextBlock Text="🕶️ Shades" FontSize="7.5" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="PetAccessoryPickBtn_Click" x:Name="PetAccHaloBtn" Tag="Halo" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,3,3">
+                            <TextBlock Text="😇 Halo" FontSize="7.5" FontWeight="Medium" />
+                        </Button>
+                        <Button Click="PetAccessoryPickBtn_Click" x:Name="PetAccSproutBtn" Tag="Sprout" Style="{StaticResource IslandButton}" Height="20" Padding="6,0" Margin="0,0,0,3">
+                            <TextBlock Text="🌱 Sprout" FontSize="7.5" FontWeight="Medium" />
+                        </Button>
+                    </WrapPanel>
+
+                    <Border Style="{StaticResource SettingsHairline}" />
+
+                    <!-- Behavior Toggles -->
+                    <Grid Margin="0,0,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <DockPanel Grid.Column="0" LastChildFill="False">
+                            <TextBlock Text="Auto-Roam Desktop" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" ToolTipService.ToolTip="Autonomously stroll along the taskbar when Roam Desktop is open" />
+                            <CheckBox x:Name="PetAutoRoamToggleSwitch" Click="PetAutoRoamToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                        </DockPanel>
+                        <DockPanel Grid.Column="2" LastChildFill="False">
+                            <TextBlock Text="Smart Reactions" FontSize="8.5" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" ToolTipService.ToolTip="React to Pomodoro focus, low battery, high load &amp; late-night hours" />
+                            <CheckBox x:Name="PetContextToggleSwitch" Click="PetContextToggleBtn_Click" DockPanel.Dock="Right" Style="{StaticResource IslandToggleSwitch}" />
+                        </DockPanel>
+                    </Grid>
 
                     <Border Style="{StaticResource SettingsHairline}" />
 

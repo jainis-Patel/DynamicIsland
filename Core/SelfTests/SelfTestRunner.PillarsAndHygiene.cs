@@ -949,22 +949,22 @@ internal static partial class SelfTestRunner
             "DesktopWidgetWindow.CloseAll must leave zero active widgets");
 
         var homeMediaView = new MediaView();
-        Assert(homeMediaView.MediaArtworkSquircle != null &&
+        Assert(homeMediaView.ExpandedArtDisc != null &&
                homeMediaView.MediaMiniClockCard != null &&
                homeMediaView.FocusStopwatchCard != null &&
                homeMediaView.AudioOutputQuickBtn != null &&
                homeMediaView.PrevButton != null &&
                homeMediaView.PlayPauseButton != null &&
                homeMediaView.NextButton != null,
-            "Home Screen MediaView must initialize Apple Dynamic Island artwork squircle, transport triad, and StandBy clock pod cleanly");
-        Assert(homeMediaView.MediaArtworkSquircle!.RenderTransform is ScaleTransform &&
+            "Home Screen MediaView must initialize Apple Dynamic Island artwork disc, transport triad, and StandBy clock pod cleanly");
+        Assert(homeMediaView.ExpandedArtDisc!.RenderTransform is ScaleTransform &&
                homeMediaView.PlayPauseButton!.RenderTransform is ScaleTransform &&
-               !ReferenceEquals(homeMediaView.MediaArtworkSquircle.RenderTransform, homeMediaView.PlayPauseButton.RenderTransform),
+               !ReferenceEquals(homeMediaView.ExpandedArtDisc.RenderTransform, homeMediaView.PlayPauseButton.RenderTransform),
             "Home Screen interactive controls must receive independent ScaleTransforms");
 
-        Assert(RoundedClip.GetClipChild(homeMediaView.MediaArtworkSquircle) &&
-               Math.Abs(homeMediaView.MediaArtworkSquircle.CornerRadius.TopLeft - 18.0) < 1e-6,
-            "MediaArtworkSquircle must use concentric 18px CornerRadius with RoundedClip.ClipChild enabled");
+        Assert(RoundedClip.GetClipChild(homeMediaView.ExpandedArtDisc.SquircleHost) &&
+               Math.Abs(homeMediaView.ExpandedArtDisc.SquircleHost.CornerRadius.TopLeft - 18.0) < 1e-6,
+            "ExpandedArtDisc.SquircleHost must use concentric 18px CornerRadius with RoundedClip.ClipChild enabled");
 
         var clipHost = new System.Windows.Controls.Border
         {

@@ -20,6 +20,8 @@ internal sealed class UpdateManagerService : IDisposable
     private readonly GitHubReleaseClient _client;
     private readonly Dispatcher? _dispatcher;
     private readonly SemaphoreSlim _opLock = new(1, 1);
+    private readonly object _ctsLock = new();
+    private CancellationTokenSource? _downloadCts;
     private Timer? _dailyTimer;
     private volatile bool _disposed;
 
@@ -45,18 +47,92 @@ internal sealed class UpdateManagerService : IDisposable
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _dispatcher = dispatcher;
 
-        // Extract version from executing assembly, fallback to InstallerService.AppVersion
-        var asm = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
-        var ver = asm.GetName().Version;
-        CurrentVersionString = ver != null ? $"{ver.Major}.{ver.Minor}.{ver.Build}" : InstallerService.AppVersion;
-
-        if (!SemVersion.TryParse(CurrentVersionString, out var parsed))
-        {
-            parsed = new SemVersion(0, 4, 0);
-        }
+        // Extract semantic version from executing assembly (preferring InformationalVersion for prerelease tags), fallback to InstallerService.AppVersion
+        var (verStr, parsed) = ResolveAssemblyVersion(Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly());
+        CurrentVersionString = verStr;
         CurrentVersion = parsed;
 
         _client = client ?? new GitHubReleaseClient(appVersion: CurrentVersionString, gitHubToken: _settingsService.Current.GitHubToken);
+    }
+
+    internal static (string VersionString, SemVersion Parsed) ResolveAssemblyVersion(Assembly? asm = null)
+    {
+        if (asm != null)
+        {
+            string? infoVer = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            if (!string.IsNullOrWhiteSpace(infoVer))
+            {
+                int plusIdx = infoVer.IndexOf('+');
+                string cleanInfo = plusIdx >= 0 ? infoVer[..plusIdx] : infoVer;
+                if (SemVersion.TryParse(cleanInfo, out var infoSem))
+                {
+                    return (infoSem.ToString(), infoSem);
+                }
+            }
+
+            var ver = asm.GetName().Version;
+            if (ver != null)
+            {
+                string verStr = $"{ver.Major}.{ver.Minor}.{Math.Max(0, ver.Build)}";
+                if (SemVersion.TryParse(verStr, out var asmSem))
+                {
+                    return (verStr, asmSem);
+                }
+            }
+        }
+
+        if (SemVersion.TryParse(InstallerService.AppVersion, out var fallbackSem))
+        {
+            return (InstallerService.AppVersion, fallbackSem);
+        }
+
+        var def = new SemVersion(0, 9, 0);
+        return (def.ToString(), def);
+    }
+
+    internal static (UpdateDownloadAsset? Asset, bool IsInstaller) SelectBestAsset(UpdateDownloads downloads, bool isInstalledCopy)
+    {
+        bool hasInstaller = downloads.Installer != null && !string.IsNullOrWhiteSpace(downloads.Installer.Url);
+        bool hasPortable = downloads.Portable != null && !string.IsNullOrWhiteSpace(downloads.Portable.Url);
+
+        if (isInstalledCopy)
+        {
+            if (hasInstaller) return (downloads.Installer, true);
+            if (hasPortable) return (downloads.Portable, false);
+        }
+        else
+        {
+            if (hasPortable) return (downloads.Portable, false);
+            if (hasInstaller) return (downloads.Installer, true);
+        }
+
+        return (null, isInstalledCopy);
+    }
+
+    /// <summary>
+    /// Resets cached update state and ETag cache when the user switches release channels.
+    /// </summary>
+    public void OnChannelChanged()
+    {
+        _client.ClearETagCache();
+        if (Status is not (UpdateStatus.Downloading or UpdateStatus.Verifying or UpdateStatus.Installing))
+        {
+            LatestManifest = null;
+            DownloadedPackagePath = null;
+            LastErrorMessage = null;
+            SetStatus(UpdateStatus.Idle, "Update channel changed.");
+        }
+    }
+
+    /// <summary>
+    /// Cancels an active update download if one is in progress.
+    /// </summary>
+    public void CancelDownload()
+    {
+        lock (_ctsLock)
+        {
+            try { _downloadCts?.Cancel(); } catch { }
+        }
     }
 
     /// <summary>
@@ -133,21 +209,54 @@ internal sealed class UpdateManagerService : IDisposable
             SetStatus(UpdateStatus.Checking, "Checking GitHub for updates...");
             LastErrorMessage = null;
 
-            if (force)
-            {
-                _client.ClearETagCache();
-            }
+            bool userWantsBeta = string.Equals(_settingsService.Current.UpdateChannel, "Beta", StringComparison.OrdinalIgnoreCase);
 
-            var manifest = await _client.FetchManifestAsync(ct: ct).ConfigureAwait(false);
+            var fetchResult = await _client.FetchLatestManifestDetailedAsync(
+                includePrereleases: userWantsBeta,
+                force: force,
+                ct: ct).ConfigureAwait(false);
+
+            if (fetchResult.Status is ManifestFetchStatus.RateLimited or ManifestFetchStatus.NetworkError)
+            {
+                string err = fetchResult.ErrorMessage ?? "Could not connect to GitHub.";
+                LastErrorMessage = err;
+                if (!silent)
+                {
+                    SetStatus(UpdateStatus.Failed, err);
+                }
+                else
+                {
+                    App.Log($"[UpdateManager] Silent check skipped due to {fetchResult.Status}: {err}");
+                    if (alreadyDownloaded)
+                    {
+                        SetStatus(UpdateStatus.ReadyToInstall, $"Dynamic Island {downloadedVersion} is ready to install.");
+                    }
+                    else if (LatestManifest != null && LatestManifest.ParsedVersion > CurrentVersion)
+                    {
+                        SetStatus(UpdateStatus.UpdateAvailable, $"Update {LatestManifest.Version} is available.");
+                    }
+                    else
+                    {
+                        SetStatus(UpdateStatus.Idle, "Check releases, switch channels, or rollback");
+                    }
+                }
+                return null;
+            }
 
             Dispatch(() =>
             {
                 _settingsService.Update(s => s.LastUpdateCheckTime = DateTime.UtcNow, nameof(AppSettings.LastUpdateCheckTime));
             });
 
+            if (fetchResult.Status == ManifestFetchStatus.NoReleases)
+            {
+                SetStatus(UpdateStatus.UpToDate, "No published releases found on GitHub yet.");
+                return null;
+            }
+
+            var manifest = fetchResult.Manifest;
             if (manifest == null)
             {
-                // Manifest unchanged (304 Not Modified) or up to date
                 if (LatestManifest != null && LatestManifest.ParsedVersion > CurrentVersion)
                 {
                     manifest = LatestManifest;
@@ -162,7 +271,6 @@ internal sealed class UpdateManagerService : IDisposable
             LatestManifest = manifest;
 
             // Channel filtering: Stable channel ignores pre-release builds
-            bool userWantsBeta = string.Equals(_settingsService.Current.UpdateChannel, "Beta", StringComparison.OrdinalIgnoreCase);
             bool isReleaseBeta = manifest.ParsedVersion.IsPreRelease || manifest.ParsedChannel == UpdateChannel.Beta;
 
             if (!userWantsBeta && isReleaseBeta)
@@ -272,20 +380,9 @@ internal sealed class UpdateManagerService : IDisposable
                 return false;
             }
 
-            // Determine best download asset
-            UpdateDownloadAsset? asset = null;
-            bool isInstaller = true;
-
-            if (LatestManifest.Downloads.Installer != null && !string.IsNullOrWhiteSpace(LatestManifest.Downloads.Installer.Url))
-            {
-                asset = LatestManifest.Downloads.Installer;
-                isInstaller = true;
-            }
-            else if (LatestManifest.Downloads.Portable != null && !string.IsNullOrWhiteSpace(LatestManifest.Downloads.Portable.Url))
-            {
-                asset = LatestManifest.Downloads.Portable;
-                isInstaller = false;
-            }
+            // Determine best download asset based on whether app is installed or running portable
+            bool isInstalledCopy = InstallerService.IsInstalledAtCurrentLocation();
+            var (asset, isInstaller) = SelectBestAsset(LatestManifest.Downloads, isInstalledCopy);
 
             if (asset == null || string.IsNullOrWhiteSpace(asset.Url))
             {
@@ -336,12 +433,18 @@ internal sealed class UpdateManagerService : IDisposable
                 Dispatch(() => DownloadProgressChanged?.Invoke(info));
             });
 
-            await _client.DownloadFileWithProgressAsync(asset.Url, targetFile, progress, ct).ConfigureAwait(false);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            lock (_ctsLock)
+            {
+                _downloadCts = linkedCts;
+            }
+
+            await _client.DownloadFileWithProgressAsync(asset.Url, targetFile, progress, linkedCts.Token).ConfigureAwait(false);
 
             // Step 2: Cryptographic SHA-256 integrity verification (fail closed)
             SetStatus(UpdateStatus.Verifying, "Verifying package integrity (SHA-256)...");
 
-            bool matches = await UpdateIntegrityVerifier.VerifyFileAsync(targetFile, asset.Sha256, ct).ConfigureAwait(false);
+            bool matches = await UpdateIntegrityVerifier.VerifyFileAsync(targetFile, asset.Sha256, linkedCts.Token).ConfigureAwait(false);
             if (!matches)
             {
                 UpdateIntegrityVerifier.TryCleanFile(targetFile);
@@ -357,6 +460,13 @@ internal sealed class UpdateManagerService : IDisposable
             SetStatus(UpdateStatus.ReadyToInstall, $"Dynamic Island {LatestManifest.Version} is ready to install.");
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            if (targetFile != null) UpdateIntegrityVerifier.TryCleanFile(targetFile);
+            LastErrorMessage = null;
+            SetStatus(LatestManifest != null ? UpdateStatus.UpdateAvailable : UpdateStatus.Idle, "Download canceled.");
+            return false;
+        }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             if (targetFile != null) UpdateIntegrityVerifier.TryCleanFile(targetFile);
@@ -366,7 +476,7 @@ internal sealed class UpdateManagerService : IDisposable
             LatestManifest = null;
             return false;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
             if (targetFile != null) UpdateIntegrityVerifier.TryCleanFile(targetFile);
             LastErrorMessage = ex.Message;
@@ -376,6 +486,10 @@ internal sealed class UpdateManagerService : IDisposable
         }
         finally
         {
+            lock (_ctsLock)
+            {
+                _downloadCts = null;
+            }
             _opLock.Release();
         }
     }
@@ -490,16 +604,28 @@ internal sealed class UpdateManagerService : IDisposable
     /// </summary>
     public async Task<IReadOnlyList<ReleaseHistoryItem>> FetchVersionHistoryAsync(CancellationToken ct = default)
     {
+        var result = await FetchVersionHistoryDetailedAsync(ct).ConfigureAwait(false);
+        return result.Items;
+    }
+
+    /// <summary>
+    /// Fetches the recent release history with detailed rate-limit and error diagnostics.
+    /// </summary>
+    public async Task<ReleaseHistoryResult> FetchVersionHistoryDetailedAsync(CancellationToken ct = default)
+    {
         try
         {
-            var history = await _client.FetchReleaseHistoryAsync(ct: ct).ConfigureAwait(false);
-            ReleaseHistory = history;
-            return history;
+            var result = await _client.FetchReleaseHistoryDetailedAsync(ct: ct).ConfigureAwait(false);
+            if (result.IsSuccess)
+            {
+                ReleaseHistory = result.Items;
+            }
+            return result;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             App.Log($"[UpdateManager] Failed to fetch version history: {ex.Message}");
-            return Array.Empty<ReleaseHistoryItem>();
+            return new ReleaseHistoryResult(Array.Empty<ReleaseHistoryItem>(), IsSuccess: false, ErrorMessage: ex.Message);
         }
     }
 
@@ -509,6 +635,152 @@ internal sealed class UpdateManagerService : IDisposable
     public Task<string?> FetchSha256ForReleaseAsync(ReleaseHistoryItem item, string targetFileName, CancellationToken ct = default)
     {
         return _client.FetchExpectedSha256Async(item, targetFileName, ct);
+    }
+
+    /// <summary>
+    /// Downloads, verifies SHA-256, and hands off a specific historical release (upgrade or rollback).
+    /// </summary>
+    public async Task<(bool Success, string? ErrorMessage)> DownloadAndApplyReleaseAsync(
+        ReleaseHistoryItem item,
+        IProgress<UpdateProgressInfo>? progress = null,
+        CancellationToken ct = default)
+    {
+        if (_disposed) return (false, "Update service is disposed.");
+
+        bool isInstalledCopy = InstallerService.IsInstalledAtCurrentLocation();
+        string? downloadUrl;
+        bool isInstaller;
+        long expectedSize;
+        string targetAssetName;
+
+        if (isInstalledCopy)
+        {
+            if (!string.IsNullOrWhiteSpace(item.InstallerUrl))
+            {
+                downloadUrl = item.InstallerUrl;
+                isInstaller = true;
+                expectedSize = item.SizeBytes;
+                targetAssetName = "DynamicIsland-Setup.exe";
+            }
+            else
+            {
+                downloadUrl = item.PortableUrl;
+                isInstaller = false;
+                expectedSize = item.PortableSizeBytes;
+                targetAssetName = "DynamicIsland-Portable.zip";
+            }
+        }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(item.PortableUrl))
+            {
+                downloadUrl = item.PortableUrl;
+                isInstaller = false;
+                expectedSize = item.PortableSizeBytes;
+                targetAssetName = "DynamicIsland-Portable.zip";
+            }
+            else
+            {
+                downloadUrl = item.InstallerUrl;
+                isInstaller = true;
+                expectedSize = item.SizeBytes;
+                targetAssetName = "DynamicIsland-Setup.exe";
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(downloadUrl) || !GitHubReleaseClient.IsTrustedGitHubUrl(downloadUrl))
+        {
+            return (false, "No trusted release package URL is available for this version.");
+        }
+
+        await _opLock.WaitAsync(ct).ConfigureAwait(false);
+        string? targetFile = null;
+        try
+        {
+            if (_disposed) return (false, "Update service is disposed.");
+
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            lock (_ctsLock)
+            {
+                _downloadCts = linkedCts;
+            }
+
+            // 1. Resolve SHA-256 before downloading (fail closed)
+            string? expectedHash = await _client.FetchExpectedSha256Async(item, targetAssetName, linkedCts.Token).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(expectedHash))
+            {
+                return (false, $"No SHA-256 checksum published for {item.ReleaseTag}. Aborted for security.");
+            }
+
+            // 2. Stage target path on a drive with sufficient space
+            string tempDir = Path.GetFullPath(ResolveDownloadDirectory(expectedSize));
+            Directory.CreateDirectory(tempDir);
+
+            string safeVer = Regex.Replace(item.Version ?? "unknown", @"[^0-9A-Za-z._-]", "_");
+            if (string.IsNullOrWhiteSpace(safeVer)) safeVer = "unknown";
+
+            string urlPath = new Uri(downloadUrl).AbsolutePath;
+            string ext = Path.GetExtension(urlPath);
+            if (string.IsNullOrEmpty(ext)) ext = isInstaller ? ".exe" : ".zip";
+
+            string prefix = isInstaller ? "DynamicIsland-Setup" : "DynamicIsland-Portable";
+            targetFile = Path.GetFullPath(Path.Combine(tempDir, $"{prefix}-{safeVer}{ext}"));
+            UpdateIntegrityVerifier.TryCleanFile(targetFile);
+
+            // 3. Download with progress
+            var wrappedProgress = new Progress<UpdateProgressInfo>(info =>
+            {
+                progress?.Report(info);
+                Dispatch(() => DownloadProgressChanged?.Invoke(info));
+            });
+
+            await _client.DownloadFileWithProgressAsync(downloadUrl, targetFile, wrappedProgress, linkedCts.Token).ConfigureAwait(false);
+
+            // 4. Verify SHA-256
+            bool verified = await UpdateIntegrityVerifier.VerifyFileAsync(targetFile, expectedHash, linkedCts.Token).ConfigureAwait(false);
+            if (!verified)
+            {
+                UpdateIntegrityVerifier.TryCleanFile(targetFile);
+                return (false, $"SHA-256 checksum mismatch for {item.ReleaseTag}. Package was discarded for security.");
+            }
+
+            // 5. Extract if portable ZIP, then execute handoff
+            string handoffPath = targetFile;
+            if (!isInstaller && targetFile.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                string? extractedExe = ExtractPortableBinarySafe(targetFile);
+                if (string.IsNullOrEmpty(extractedExe))
+                {
+                    return (false, "Failed to extract DynamicIsland.exe from portable release archive.");
+                }
+                handoffPath = extractedExe;
+            }
+
+            SetStatus(UpdateStatus.Installing, $"Launching {item.ReleaseTag}...");
+            bool handedOff = UpdateHandoffEngine.ExecuteHandoff(handoffPath, isInstaller);
+            return handedOff
+                ? (true, null)
+                : (false, $"Failed to launch updater handoff for {item.ReleaseTag}.");
+        }
+        catch (OperationCanceledException)
+        {
+            if (targetFile != null) UpdateIntegrityVerifier.TryCleanFile(targetFile);
+            return (false, "Download canceled.");
+        }
+        catch (Exception ex)
+        {
+            if (targetFile != null) UpdateIntegrityVerifier.TryCleanFile(targetFile);
+            App.Log($"[UpdateManager] DownloadAndApplyReleaseAsync failed for {item.ReleaseTag}: {ex}");
+            return (false, ex.Message);
+        }
+        finally
+        {
+            lock (_ctsLock)
+            {
+                _downloadCts = null;
+            }
+            _opLock.Release();
+        }
     }
 
     /// <summary>
@@ -596,6 +868,7 @@ internal sealed class UpdateManagerService : IDisposable
         if (_disposed) return;
         _disposed = true;
 
+        CancelDownload();
         _dailyTimer?.Dispose();
         _dailyTimer = null;
         _opLock.Dispose();

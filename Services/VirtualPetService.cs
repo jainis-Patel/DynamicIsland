@@ -86,6 +86,10 @@ internal sealed class VirtualPetService : IDisposable
     public int TreatCount => _settings.Current.PetTreatCount;
     public int ReminderIntervalMinutes => _settings.Current.WellnessReminderMinutes;
     public bool IsEnabled => _settings.Current.EnableVirtualPet;
+    public bool AutoRoamEnabled => _settings.Current.EnablePetAutoRoam;
+    public bool ContextReactionsEnabled => _settings.Current.EnablePetContextReactions;
+    public int CareStreakDays => _settings.Current.PetCareStreakDays;
+    public string CurrentContextCaption { get; private set; } = "Cozy & Content";
 
     public event Action<PetMood>? MoodChanged;
     public event Action<WellnessAlert>? WellnessAlertTriggered;
@@ -198,6 +202,7 @@ internal sealed class VirtualPetService : IDisposable
 
     public string Pet()
     {
+        RecordDailyCare();
         int newScore = AffectionScore + 3;
         _settings.Update(s => s.PetAffectionScore = newScore, nameof(AppSettings.PetAffectionScore));
         SetHappyMood();
@@ -216,6 +221,7 @@ internal sealed class VirtualPetService : IDisposable
 
     public string FeedTreat()
     {
+        RecordDailyCare();
         int count = TreatCount + 1;
         int newScore = AffectionScore + 8;
         _settings.Update(s =>
@@ -243,6 +249,7 @@ internal sealed class VirtualPetService : IDisposable
 
     public string PerformTrick()
     {
+        RecordDailyCare();
         int newScore = AffectionScore + 5;
         _settings.Update(s => s.PetAffectionScore = newScore, nameof(AppSettings.PetAffectionScore));
         SetHappyMood();
@@ -291,6 +298,7 @@ internal sealed class VirtualPetService : IDisposable
 
     public string PlaySpecialAction()
     {
+        RecordDailyCare();
         var kind = GetSpeciesSpecialActionKind();
         int newScore = AffectionScore + 6;
         _settings.Update(s => s.PetAffectionScore = newScore, nameof(AppSettings.PetAffectionScore));
@@ -314,6 +322,7 @@ internal sealed class VirtualPetService : IDisposable
 
     public string LogWater()
     {
+        RecordDailyCare();
         int count = WaterCount + 1;
         int newScore = AffectionScore + 10;
         _settings.Update(s =>
@@ -332,6 +341,7 @@ internal sealed class VirtualPetService : IDisposable
 
     public string LogStretch()
     {
+        RecordDailyCare();
         int count = StretchCount + 1;
         int newScore = AffectionScore + 10;
         _settings.Update(s =>
@@ -403,6 +413,77 @@ internal sealed class VirtualPetService : IDisposable
         return next;
     }
 
+    public string SetPetName(string? name)
+    {
+        string clean = SettingsService.SanitizePetName(name);
+        _settings.Update(s => s.PetName = clean, nameof(AppSettings.PetName));
+        SetHappyMood();
+        return clean;
+    }
+
+    public void ToggleAutoRoam()
+    {
+        bool next = !AutoRoamEnabled;
+        _settings.Update(s => s.EnablePetAutoRoam = next, nameof(AppSettings.EnablePetAutoRoam));
+    }
+
+    public void ToggleContextReactions()
+    {
+        bool next = !ContextReactionsEnabled;
+        _settings.Update(s => s.EnablePetContextReactions = next, nameof(AppSettings.EnablePetContextReactions));
+    }
+
+    public (double? X, double? Y) GetFloatPosition() =>
+        (_settings.Current.PetFloatX, _settings.Current.PetFloatY);
+
+    public void SaveFloatPosition(double x, double y)
+    {
+        _settings.Update(s =>
+        {
+            s.PetFloatX = x;
+            s.PetFloatY = y;
+        }, nameof(AppSettings.PetFloatX));
+    }
+
+    /// <summary>
+    /// Cozy, non-punishing daily care streak tracker (UTC calendar days).
+    /// </summary>
+    public int RecordDailyCare(DateTime? nowUtc = null)
+    {
+        var today = (nowUtc ?? DateTime.UtcNow).Date;
+        string todayStr = today.ToString("yyyy-MM-dd");
+        string? lastStr = _settings.Current.PetLastCareDate;
+        int streak = _settings.Current.PetCareStreakDays;
+
+        if (string.Equals(lastStr, todayStr, StringComparison.Ordinal))
+        {
+            if (streak < 1)
+            {
+                streak = 1;
+                _settings.Update(s => s.PetCareStreakDays = 1, nameof(AppSettings.PetCareStreakDays));
+            }
+            return streak;
+        }
+
+        if (DateTime.TryParseExact(lastStr, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var lastDate) &&
+            (today - lastDate.Date).TotalDays == 1)
+        {
+            streak = Math.Max(1, streak) + 1;
+        }
+        else
+        {
+            streak = 1;
+        }
+
+        _settings.Update(s =>
+        {
+            s.PetCareStreakDays = streak;
+            s.PetLastCareDate = todayStr;
+        }, nameof(AppSettings.PetCareStreakDays));
+        return streak;
+    }
+
     public void CycleReminderInterval()
     {
         int next = ReminderIntervalMinutes switch
@@ -423,12 +504,23 @@ internal sealed class VirtualPetService : IDisposable
         _settings.Update(s => s.EnableVirtualPet = next, nameof(AppSettings.EnableVirtualPet));
     }
 
-    public void UpdateActivity(bool isMediaPlaying, float audioEnergy, bool isUserNear)
+    public void UpdateActivity(bool isMediaPlaying, float audioEnergy, bool isUserNear) =>
+        UpdateActivity(isMediaPlaying, audioEnergy, isUserNear, isFocusTimerActive: false, isLowBattery: false, isHighLoad: false, localHour: -1);
+
+    public void UpdateActivity(
+        bool isMediaPlaying,
+        float audioEnergy,
+        bool isUserNear,
+        bool isFocusTimerActive,
+        bool isLowBattery,
+        bool isHighLoad,
+        int localHour)
     {
         var now = DateTime.UtcNow;
         if (now - _lastEatingTime < TimeSpan.FromSeconds(3.5))
         {
             CurrentMood = PetMood.Eating;
+            CurrentContextCaption = "🍣 Delicious treat!";
             return;
         }
 
@@ -437,6 +529,11 @@ internal sealed class VirtualPetService : IDisposable
             if (CurrentMood != PetMood.Playing)
             {
                 CurrentMood = PetMood.Happy;
+                CurrentContextCaption = "✨ Overjoyed & purring";
+            }
+            else
+            {
+                CurrentContextCaption = "🎾 Playtime!";
             }
             return;
         }
@@ -444,14 +541,50 @@ internal sealed class VirtualPetService : IDisposable
         if (isMediaPlaying && audioEnergy > 0.05f)
         {
             CurrentMood = PetMood.Dancing;
+            CurrentContextCaption = "🎵 Vibing to beats";
+            return;
         }
-        else if (isUserNear)
+
+        if (ContextReactionsEnabled)
+        {
+            if (isFocusTimerActive)
+            {
+                CurrentMood = PetMood.Awake;
+                CurrentContextCaption = "📚 Focus Buddy";
+                return;
+            }
+
+            if (isLowBattery)
+            {
+                CurrentMood = PetMood.Sleeping;
+                CurrentContextCaption = "🔋 Low battery yawn";
+                return;
+            }
+
+            if (isHighLoad)
+            {
+                CurrentMood = PetMood.Awake;
+                CurrentContextCaption = "⚡ Working hard!";
+                return;
+            }
+
+            if (localHour >= 0 && (localHour >= 23 || localHour < 6))
+            {
+                CurrentMood = isUserNear ? PetMood.Awake : PetMood.Sleeping;
+                CurrentContextCaption = isUserNear ? "🌙 Night-owl buddy" : "🌙 Late-night loaf";
+                return;
+            }
+        }
+
+        if (isUserNear)
         {
             CurrentMood = PetMood.Awake;
+            CurrentContextCaption = "👀 Ready to play";
         }
         else
         {
             CurrentMood = PetMood.Sleeping;
+            CurrentContextCaption = "💤 Cozy snoozing";
         }
     }
 

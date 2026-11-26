@@ -1018,6 +1018,163 @@ SSID 3 : Home_Router
         }
     }
 
+    private static void TestAlbumArtStylesAndPlayerDisc()
+    {
+        // 1. Normalization & alias resolution
+        Assert(SettingsService.AvailableAlbumArtStyles.Count == 3, "Must define 3 album art styles");
+        Assert(SettingsService.NormalizeAlbumArtStyle("vinyl") == "VinylDisc", "Must normalize 'vinyl' to VinylDisc");
+        Assert(SettingsService.NormalizeAlbumArtStyle("optical") == "OpticalDisc", "Must normalize 'optical' to OpticalDisc");
+        Assert(SettingsService.NormalizeAlbumArtStyle("cd") == "OpticalDisc", "Must normalize 'cd' to OpticalDisc");
+        Assert(SettingsService.NormalizeAlbumArtStyle("static") == "StaticSquircle", "Must normalize 'static' to StaticSquircle");
+        Assert(SettingsService.NormalizeAlbumArtStyle("unknown") == "VinylDisc", "Must fallback unknown to VinylDisc");
+        Assert(SettingsService.NormalizeAlbumArtStyle(null) == "VinylDisc", "Must fallback null to VinylDisc");
+
+        // 2. Settings round-trip persistence
+        string tempPath = Path.Combine(Path.GetTempPath(), $"di_disc_style_test_{Guid.NewGuid():N}.json");
+        try
+        {
+            var settings = new SettingsService(tempPath);
+            Assert(settings.Current.AlbumArtStyle == "VinylDisc", "Default AlbumArtStyle must be VinylDisc");
+            settings.Update(s => s.AlbumArtStyle = "OpticalDisc", nameof(AppSettings.AlbumArtStyle));
+            settings.SaveNow();
+
+            var reloaded = new SettingsService(tempPath);
+            Assert(reloaded.Current.AlbumArtStyle == "OpticalDisc", "AlbumArtStyle must persist across instances");
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
+
+        // 3. PlayerDiscControl inertial spin-up, coast-to-stop phase preservation, StaticSquircle & ReducedMotion
+        var disc = new PlayerDiscControl { DiscSize = 52, ShowTonearm = true };
+        disc.SetStyle("VinylDisc");
+        bool settled = disc.StepPhysics(1.0 / 60.0, isPlaying: true, bassLevel: 0.4f, reducedMotion: false);
+        Assert(!settled, "Playing VinylDisc must not report settled");
+        for (int i = 0; i < 60; i++)
+        {
+            disc.StepPhysics(1.0 / 60.0, isPlaying: true, bassLevel: 0.3f, reducedMotion: false);
+        }
+        Assert(disc.AngularVelocity > 25.0, "VinylDisc must spin up smoothly toward target RPM");
+        Assert(disc.Angle > 0.0, "VinylDisc angle must advance while playing");
+
+        // Coast to stop while preserving angle
+        double pausedAtAngle = disc.Angle;
+        bool coastedToRest = false;
+        for (int i = 0; i < 240; i++)
+        {
+            if (disc.StepPhysics(1.0 / 60.0, isPlaying: false, bassLevel: 0f, reducedMotion: false))
+            {
+                coastedToRest = true;
+                break;
+            }
+        }
+        Assert(coastedToRest, "Paused VinylDisc must coast to rest and allow render-loop detach");
+        Assert(disc.AngularVelocity == 0.0, "Settled VinylDisc must have 0 angular velocity");
+        Assert(disc.Angle != 0.0 && disc.Angle != pausedAtAngle, "Coast-to-stop must preserve rotational phase rather than snapping to 0");
+
+        // Reduced motion & StaticSquircle must settle immediately without rotation
+        double angleBeforeReduced = disc.Angle;
+        bool reducedSettled = disc.StepPhysics(1.0 / 60.0, isPlaying: true, bassLevel: 0.8f, reducedMotion: true);
+        Assert(reducedSettled, "ReducedMotion must settle immediately");
+        Assert(disc.Angle == angleBeforeReduced, "ReducedMotion must not rotate disc");
+
+        disc.SetStyle("StaticSquircle");
+        Assert(disc.StepPhysics(1.0 / 60.0, isPlaying: true, bassLevel: 0.8f, reducedMotion: false), "StaticSquircle must settle immediately");
+    }
+
+    private static void TestPetUpgradesAndRoaming()
+    {
+        // 1. Custom Pet Name Sanitization
+        Assert(SettingsService.SanitizePetName(null) == "Mochi", "Blank pet name must fallback to Mochi");
+        Assert(SettingsService.SanitizePetName("   ") == "Mochi", "Whitespace pet name must fallback to Mochi");
+        Assert(SettingsService.SanitizePetName("  Pixel  ") == "Pixel", "Pet name must trim whitespace");
+        Assert(SettingsService.SanitizePetName("SuperLongCompanionName123").Length <= 18, "Pet name must clamp to 18 chars");
+
+        // 2. VirtualPetService custom name, toggles, daily streak & context priority
+        string tempPath = Path.Combine(Path.GetTempPath(), $"di_pet_upgrade_test_{Guid.NewGuid():N}.json");
+        try
+        {
+            var settings = new SettingsService(tempPath);
+            using var pet = new VirtualPetService(Application.Current.Dispatcher, settings);
+
+            Assert(pet.AutoRoamEnabled, "AutoRoam must default to true");
+            Assert(pet.ContextReactionsEnabled, "ContextReactions must default to true");
+
+            string savedName = pet.SetPetName("  KitsuneFox  ");
+            Assert(savedName == "KitsuneFox" && pet.PetName == "KitsuneFox", "SetPetName must sanitize and persist custom name");
+
+            pet.ToggleAutoRoam();
+            Assert(!pet.AutoRoamEnabled, "ToggleAutoRoam must flip AutoRoamEnabled");
+            pet.ToggleContextReactions();
+            Assert(!pet.ContextReactionsEnabled, "ToggleContextReactions must flip ContextReactionsEnabled");
+            pet.ToggleContextReactions(); // re-enable for context test
+
+            // Daily care streak progression
+            var day1 = new DateTime(2026, 11, 20, 10, 0, 0, DateTimeKind.Utc);
+            Assert(pet.RecordDailyCare(day1) == 1, "First care day must set streak to 1");
+            Assert(pet.RecordDailyCare(day1.AddHours(4)) == 1, "Same-day care must keep streak at 1");
+            Assert(pet.RecordDailyCare(day1.AddDays(1)) == 2, "Consecutive-day care must increment streak to 2");
+            Assert(pet.RecordDailyCare(day1.AddDays(4)) == 1, "Missed-day gap must reset streak to 1");
+
+            // Context reaction priority (Dancing > Focus > LowBattery > LateNight)
+            // Reset happy timer influence by testing via UpdateActivity after clearing happy mood via reflection-free fresh instance
+            using var ctxPet = new VirtualPetService(Application.Current.Dispatcher, settings);
+            ctxPet.UpdateActivity(isMediaPlaying: true, audioEnergy: 0.25f, isUserNear: false,
+                isFocusTimerActive: true, isLowBattery: true, isHighLoad: true, localHour: 2);
+            Assert(ctxPet.CurrentMood == PetMood.Dancing, "Dancing must outrank focus/battery/late-night");
+
+            ctxPet.UpdateActivity(isMediaPlaying: false, audioEnergy: 0f, isUserNear: false,
+                isFocusTimerActive: true, isLowBattery: true, isHighLoad: false, localHour: 2);
+            Assert(ctxPet.CurrentMood == PetMood.Awake && ctxPet.CurrentContextCaption.Contains("Focus"),
+                "Focus timer must trigger Focus Buddy Awake pose");
+
+            ctxPet.UpdateActivity(isMediaPlaying: false, audioEnergy: 0f, isUserNear: true,
+                isFocusTimerActive: false, isLowBattery: true, isHighLoad: false, localHour: 14);
+            Assert(ctxPet.CurrentMood == PetMood.Sleeping && ctxPet.CurrentContextCaption.Contains("battery", StringComparison.OrdinalIgnoreCase),
+                "Low battery must trigger sleepy low-battery reaction");
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
+
+        // 3. PetFloatWindow frameless background-free check
+        string floatXamlPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Views", "PetFloatWindow.xaml");
+        if (File.Exists(floatXamlPath))
+        {
+            string xaml = File.ReadAllText(floatXamlPath);
+            Assert(xaml.Contains("Background=\"Transparent\"", StringComparison.Ordinal) &&
+                   !xaml.Contains("RootCard", StringComparison.Ordinal),
+                "PetFloatWindow must be background-free without RootCard");
+        }
+
+        // 4. Realistic Pet Model Micro LOD & Hero LOD render smoke test across all 6 species
+        foreach (string sp in SettingsService.AvailablePetSpecies)
+        {
+            var microPet = new VirtualPetControl { Width = 26, Height = 24, Species = sp, Mood = PetMood.Awake };
+            microPet.Measure(new Size(26, 24));
+            microPet.Arrange(new Rect(0, 0, 26, 24));
+            microPet.UpdateTick(1.2, isNearCursor: false, gazeX: 0.2, gazeY: -0.1);
+
+            var heroPet = new VirtualPetControl { Width = 135, Height = 105, Species = sp, Mood = PetMood.Happy };
+            heroPet.Measure(new Size(135, 105));
+            heroPet.Arrange(new Rect(0, 0, 135, 105));
+            heroPet.UpdateTick(2.4, isNearCursor: true, gazeX: -0.3, gazeY: 0.2);
+
+            var dg = new DrawingGroup();
+            using (var dc = dg.Open())
+            {
+                // Verify DrawingContext render path for both Hero and Micro sizes without exceptions
+                var mi = typeof(VirtualPetControl).GetMethod("OnRender",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert(mi != null, "VirtualPetControl.OnRender must exist");
+                mi!.Invoke(microPet, new object[] { dc });
+                mi.Invoke(heroPet, new object[] { dc });
+            }
+        }
+    }
+
     private static void TestIslandNatureThemes()
     {
         // 1. Verify available nature themes exist (None, Ivy & Blooms, Meadow)

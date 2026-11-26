@@ -89,32 +89,16 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- 54x54 Continuous Squircle Album Artwork (Concentric with R=34 outer pill minus 16px inset) -->
-                <Border x:Name="MediaArtworkSquircle"
-                        MouseLeftButtonDown="FocusMediaPlayer_Click"
-                        Cursor="Hand"
-                        Width="54" Height="54"
-                        CornerRadius="18"
-                        Background="#14FFFFFF"
-                        BorderThickness="1"
-                        BorderBrush="#22FFFFFF"
-                        ClipToBounds="True"
-                        core:RoundedClip.ClipChild="True"
-                        VerticalAlignment="Center"
-                        ToolTipService.ToolTip="Click to open active media player">
-                    <Grid>
-                        <TextBlock x:Name="ExpandedArtFallback"
-                                   Style="{StaticResource Glyph}"
-                                   Text="&#xE8D6;"
-                                   FontSize="20"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource SecondaryBrush}" />
-                        <Image x:Name="ExpandedArtImage"
-                               Stretch="UniformToFill"
-                               RenderOptions.BitmapScalingMode="HighQuality" />
-                    </Grid>
-                </Border>
+                <!-- 52x52 Platter / Squircle Artwork (58x54 non-clipping stage for micro-tonearm) -->
+                <core:PlayerDiscControl x:Name="ExpandedArtDisc"
+                                        DiscSize="52"
+                                        ShowTonearm="True"
+                                        SquircleRadius="18"
+                                        VerticalAlignment="Center"
+                                        Cursor="Hand"
+                                        MouseLeftButtonDown="FocusMediaPlayer_Click"
+                                        MouseRightButtonUp="CycleAlbumArtStyle_Click"
+                                        ToolTipService.ToolTip="Click to open active media player · Right-click to switch disc style" />
 
                 <!-- Editorial Track Title, Artist & Subtle Player Attribution -->
                 <StackPanel Grid.Column="1" Margin="13,0,12,0" VerticalAlignment="Center">

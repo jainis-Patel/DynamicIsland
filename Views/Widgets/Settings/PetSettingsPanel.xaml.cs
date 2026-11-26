@@ -25,11 +25,23 @@ public partial class PetSettingsPanel : UserControl
     private void PetToggleBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.PetToggleBtn_Click(sender, e);
 
-    private void PetSpeciesBtn_Click(object sender, RoutedEventArgs e) =>
-        Island?.PetSpeciesBtn_Click(sender, e);
+    private void PetSpeciesPickBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.PetSpeciesPickBtn_Click(sender, e);
 
-    private void PetAccessoryBtn_Click(object sender, RoutedEventArgs e) =>
-        Island?.PetAccessoryBtn_Click(sender, e);
+    private void PetAccessoryPickBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.PetAccessoryPickBtn_Click(sender, e);
+
+    private void PetCustomNameBox_KeyDown(object sender, KeyEventArgs e) =>
+        Island?.PetCustomNameBox_KeyDown(sender, e);
+
+    private void PetCustomNameBox_LostFocus(object sender, RoutedEventArgs e) =>
+        Island?.PetCustomNameBox_LostFocus(sender, e);
+
+    private void PetAutoRoamToggleBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.PetAutoRoamToggleBtn_Click(sender, e);
+
+    private void PetContextToggleBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.PetContextToggleBtn_Click(sender, e);
 
     private void OpenPetPlaygroundBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.OpenPetPlaygroundBtn_Click(sender, e);

@@ -81,8 +81,13 @@
         </Grid.RowDefinitions>
 
         <!-- ROW 0: Header Bar -->
-        <DockPanel Grid.Row="0" Margin="0,0,0,7" LastChildFill="False">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <Grid Grid.Row="0" Margin="0,0,0,7">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <DockPanel Grid.Column="0" VerticalAlignment="Center" LastChildFill="False" Margin="0,0,6,0">
                 <TextBlock Style="{StaticResource SectionTitle}" Text="Notifications" VerticalAlignment="Center" />
                 <Border x:Name="NotificationsCountBadge"
                         Background="{DynamicResource ChipBgBrush}"
@@ -90,7 +95,7 @@
                         BorderThickness="1"
                         CornerRadius="7"
                         Padding="6,1.5"
-                        Margin="8,0,0,0"
+                        Margin="7,0,0,0"
                         VerticalAlignment="Center">
                     <TextBlock x:Name="NotificationsCountText"
                                Style="{StaticResource Digits}"
@@ -104,18 +109,18 @@
                         Visibility="Collapsed"
                         Style="{StaticResource IslandButton}"
                         Height="20"
-                        Padding="7,0"
+                        Padding="6,0"
                         Margin="6,0,0,0"
                         VerticalAlignment="Center"
                         ToolTipService.ToolTip="Click to unmute all muted notification apps">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Style="{StaticResource Glyph}" Text="&#xE767;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
-                        <TextBlock x:Name="UnmuteAllAppsText" Text="1 Muted · Unmute" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock x:Name="UnmuteAllAppsText" Text="1 Muted · Unmute" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" MaxWidth="96" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </Button>
-            </StackPanel>
+            </DockPanel>
 
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="NotificationsDndButton"
                         Click="NotificationsDndButton_Click"
                         Style="{StaticResource IslandButton}"
@@ -155,7 +160,7 @@
                     </StackPanel>
                 </Button>
             </StackPanel>
-        </DockPanel>
+        </Grid>
 
         <!-- ROW 1: Compact Filter & Search Bar -->
         <DockPanel x:Name="NotificationsFilterBar" Grid.Row="1" Margin="0,0,0,8" LastChildFill="True" Visibility="Collapsed">
@@ -259,9 +264,10 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Grid Margin="0,0,0,7">
+                            <Grid Margin="0,0,0,5">
                                 <!-- Behind-card Swipe Dismiss Backdrop -->
                                 <Border x:Name="SwipeBackdrop"
+                                        Margin="0,0,0,3"
                                         CornerRadius="10"
                                         Opacity="0"
                                         Background="#33FF453A"
@@ -283,22 +289,23 @@
 
                                 <!-- Collapsed Stack Deck Lip -->
                                 <Border Visibility="{Binding CollapsedStackDeckVisibility}"
-                                        Height="6"
-                                        Margin="10,0,10,-3"
+                                        Height="5"
+                                        Margin="12,0,12,0"
                                         VerticalAlignment="Bottom"
-                                        CornerRadius="0,0,8,8"
+                                        CornerRadius="0,0,12,12"
                                         Background="{DynamicResource ElevatedSurfaceBrush}"
                                         BorderBrush="{DynamicResource CardBorderBrush}"
                                         BorderThickness="1,0,1,1"
-                                        Opacity="0.7"
+                                        Opacity="0.55"
                                         IsHitTestVisible="False" />
 
-                                <!-- Main Notification Card -->
+                                <!-- Main Notification Card (Apple 2-Column Editorial Layout, zero side stripe) -->
                                 <Border x:Name="NotificationCardRoot"
-                                        MinHeight="62"
-                                        CornerRadius="10"
+                                        Margin="0,0,0,3"
+                                        MinHeight="60"
+                                        CornerRadius="14"
                                         BorderThickness="1"
-                                        Padding="0"
+                                        Padding="11,9"
                                         ClipToBounds="True"
                                         Cursor="Hand"
                                         ToolTip="Click to open or copy · Swipe horizontally to dismiss"
@@ -316,7 +323,7 @@
                                             <Style.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter Property="Background" Value="{DynamicResource ElevatedSurfaceBrush}" />
-                                                    <Setter Property="BorderBrush" Value="#38FFFFFF" />
+                                                    <Setter Property="BorderBrush" Value="#34FFFFFF" />
                                                 </Trigger>
                                             </Style.Triggers>
                                         </Style>
@@ -324,120 +331,144 @@
 
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="3" />
+                                            <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
 
-                                        <!-- Subtle Vertical Accent Bar -->
-                                        <Border Grid.Column="0" Background="{Binding AccentBrush}" Opacity="0.85" />
+                                        <!-- Left: 34x34 App Icon Squircle + Optional Stack Count Pip -->
+                                        <Grid Grid.Column="0" Width="34" Height="34" Margin="0,1,11,0" VerticalAlignment="Top" ClipToBounds="False">
+                                            <Border Width="34" Height="34" CornerRadius="9.5"
+                                                    Background="{Binding IconBgBrush}"
+                                                    BorderBrush="#1AFFFFFF" BorderThickness="1">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="15"
+                                                           Foreground="{Binding AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <Border Visibility="{Binding MultipleBadgeVisibility}"
+                                                    Background="{DynamicResource ElevatedSurfaceBrush}"
+                                                    BorderBrush="{DynamicResource CardBorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="6"
+                                                    MinWidth="14" Height="14" Padding="3.5,0"
+                                                    Margin="0,-4,-4,0"
+                                                    HorizontalAlignment="Right" VerticalAlignment="Top">
+                                                <TextBlock Text="{Binding CountBadgeText}" Style="{StaticResource Digits}"
+                                                           FontSize="7.5" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                        </Grid>
 
-                                        <Grid Grid.Column="1" Margin="9,7,9,7">
+                                        <!-- Right: Title, Timestamp + Hover Actions, Body & Contextual Strip -->
+                                        <Grid Grid.Column="1">
                                             <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto" />
                                                 <RowDefinition Height="Auto" />
                                                 <RowDefinition Height="Auto" />
                                                 <RowDefinition Height="Auto" />
                                             </Grid.RowDefinitions>
 
-                                            <!-- Header: App Badge, Name, Stack Pill, Time & Micro Actions -->
-                                            <DockPanel Grid.Row="0" LastChildFill="False">
-                                                <Border Width="22" Height="22" CornerRadius="6" Background="{Binding IconBgBrush}" VerticalAlignment="Center">
-                                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="10" Foreground="{Binding AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                </Border>
-                                                <TextBlock Text="{Binding AppName}" FontSize="9.5" FontWeight="SemiBold" Foreground="{Binding AccentBrush}" Margin="7,0,0,0" VerticalAlignment="Center" MaxWidth="165" TextTrimming="CharacterEllipsis" />
+                                            <!-- Header: Title Left | Timestamp & Hover-Only Micro Actions Right -->
+                                            <DockPanel Grid.Row="0" LastChildFill="True">
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                                                    <TextBlock Text="{Binding LatestTimeText}" Style="{StaticResource Digits}" FontSize="8.5"
+                                                               Foreground="{DynamicResource SecondaryBrush}" Opacity="0.85" VerticalAlignment="Center" />
 
-                                                <Border Visibility="{Binding MultipleBadgeVisibility}"
-                                                        Background="{DynamicResource ChipBgBrush}"
-                                                        BorderBrush="{DynamicResource CardBorderBrush}"
-                                                        BorderThickness="1"
-                                                        CornerRadius="7"
-                                                        Padding="5,1"
-                                                        Margin="6,0,0,0"
-                                                        VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding CountBadgeText}" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
-                                                </Border>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="5,0,0,0">
+                                                        <StackPanel.Style>
+                                                            <Style TargetType="StackPanel">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsMouseOver, ElementName=NotificationCardRoot}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </StackPanel.Style>
+                                                        <Button Tag="{Binding LatestItem}" Click="CopyNotificationItem_Click" Style="{StaticResource CardMicroActionBtn}" ToolTip="Copy Notification Text">
+                                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
+                                                        </Button>
+                                                        <Button Tag="{Binding AppName}" Click="MuteAppNotification_Click" Style="{StaticResource CardMicroActionBtn}" ToolTip="Mute Notifications from this App">
+                                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE74F;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
+                                                        </Button>
+                                                        <Button Tag="{Binding}" Click="RemoveNotificationItem_Click" Style="{StaticResource CardMicroActionBtn}" ToolTip="Dismiss Notification">
+                                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                </StackPanel>
 
-                                                <Button Tag="{Binding}" Click="RemoveNotificationItem_Click" DockPanel.Dock="Right" Style="{StaticResource CardMicroActionBtn}" ToolTip="Dismiss Notification">
-                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                                </Button>
-
-                                                <Button Tag="{Binding AppName}" Click="MuteAppNotification_Click" DockPanel.Dock="Right" Style="{StaticResource CardMicroActionBtn}" ToolTip="Mute Notifications from this App">
-                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE74F;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                                </Button>
-
-                                                <Button Tag="{Binding LatestItem}" Click="CopyNotificationItem_Click" DockPanel.Dock="Right" Style="{StaticResource CardMicroActionBtn}" ToolTip="Copy Notification Text">
-                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
-                                                </Button>
-
-                                                <TextBlock DockPanel.Dock="Right" Text="{Binding LatestTimeText}" Style="{StaticResource Digits}" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,5,0" />
+                                                <TextBlock Text="{Binding LatestTitle}"
+                                                           FontSize="11.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           VerticalAlignment="Center" />
                                             </DockPanel>
 
-                                            <!-- Title -->
-                                            <TextBlock Grid.Row="1"
-                                                       Text="{Binding LatestTitle}"
-                                                       FontSize="11"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{DynamicResource PrimaryTextBrush}"
-                                                       Margin="0,4,0,1"
-                                                       TextTrimming="CharacterEllipsis" />
-
                                             <!-- Body (collapsed when empty or identical to Title) -->
-                                            <TextBlock Grid.Row="2"
+                                            <TextBlock Grid.Row="1"
                                                        Visibility="{Binding LatestBodyVisibility}"
                                                        Text="{Binding LatestBody}"
-                                                       FontSize="9.5"
+                                                       FontSize="10"
+                                                       LineHeight="13.5"
                                                        Foreground="{DynamicResource SecondaryBrush}"
-                                                       MaxHeight="30"
+                                                       Margin="0,2,0,0"
+                                                       MaxHeight="28"
                                                        TextWrapping="Wrap"
                                                        TextTrimming="CharacterEllipsis" />
 
-                                            <!-- Contextual Action Strip & Expanded Sub-Notifications -->
-                                            <StackPanel Grid.Row="3" Orientation="Vertical">
-                                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding BottomActionsVisibility}">
-                                                    <Button Tag="{Binding LatestItem}"
-                                                            Visibility="{Binding ReplyVisibility}"
-                                                            Click="ReplyNotificationItem_Click"
-                                                            Style="{StaticResource CardPillActionBtn}"
-                                                            ToolTip="Quick Reply to this message">
-                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE725;" FontSize="8.5" Foreground="{Binding AccentBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
-                                                            <TextBlock Text="Reply" FontSize="8.5" FontWeight="SemiBold" Foreground="{Binding AccentBrush}" VerticalAlignment="Center" />
-                                                        </StackPanel>
-                                                    </Button>
+                                            <!-- Footer: Quiet App Attribution + Contextual Action Pills -->
+                                            <StackPanel Grid.Row="2" Orientation="Vertical" Margin="0,5,0,0">
+                                                <DockPanel LastChildFill="False">
+                                                    <TextBlock Text="{Binding AppName}" FontSize="8.5" FontWeight="Medium"
+                                                               Foreground="{DynamicResource SecondaryBrush}" Opacity="0.72"
+                                                               VerticalAlignment="Center" MaxWidth="140" TextTrimming="CharacterEllipsis"
+                                                               Margin="0,0,8,0" />
 
-                                                    <Button Tag="{Binding LatestOtpCode}"
-                                                            Visibility="{Binding OtpVisibility}"
-                                                            Click="CopyOtpCode_Click"
-                                                            Style="{StaticResource CardPillActionBtn}"
-                                                            ToolTip="Copy detected verification code">
-                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="8.5" Foreground="{Binding AccentBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
-                                                            <TextBlock Text="{Binding OtpButtonText}" Style="{StaticResource Digits}" FontSize="8.5" FontWeight="SemiBold" Foreground="{Binding AccentBrush}" VerticalAlignment="Center" />
-                                                        </StackPanel>
-                                                    </Button>
+                                                    <StackPanel Orientation="Horizontal" Visibility="{Binding BottomActionsVisibility}" VerticalAlignment="Center">
+                                                        <Button Tag="{Binding LatestItem}"
+                                                                Visibility="{Binding ReplyVisibility}"
+                                                                Click="ReplyNotificationItem_Click"
+                                                                Style="{StaticResource CardPillActionBtn}"
+                                                                ToolTip="Quick Reply to this message">
+                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE725;" FontSize="8.5" Foreground="{Binding AccentBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                                                                <TextBlock Text="Reply" FontSize="8.5" FontWeight="SemiBold" Foreground="{Binding AccentBrush}" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </Button>
 
-                                                    <Button Tag="{Binding}"
-                                                            Visibility="{Binding MultipleBadgeVisibility}"
-                                                            Click="ToggleGroupExpand_Click"
-                                                            Style="{StaticResource CardPillActionBtn}"
-                                                            ToolTip="Expand or collapse stacked notifications">
-                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                            <TextBlock Style="{StaticResource Glyph}" Text="{Binding ExpandGlyph}" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
-                                                            <TextBlock Text="{Binding ExpandLabel}" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
-                                                        </StackPanel>
-                                                    </Button>
-                                                </StackPanel>
+                                                        <Button Tag="{Binding LatestOtpCode}"
+                                                                Visibility="{Binding OtpVisibility}"
+                                                                Click="CopyOtpCode_Click"
+                                                                Style="{StaticResource CardPillActionBtn}"
+                                                                ToolTip="Copy detected verification code">
+                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="8.5" Foreground="{Binding AccentBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                                                                <TextBlock Text="{Binding OtpButtonText}" Style="{StaticResource Digits}" FontSize="8.5" FontWeight="SemiBold" Foreground="{Binding AccentBrush}" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </Button>
+
+                                                        <Button Tag="{Binding}"
+                                                                Visibility="{Binding MultipleBadgeVisibility}"
+                                                                Click="ToggleGroupExpand_Click"
+                                                                Style="{StaticResource CardPillActionBtn}"
+                                                                ToolTip="Expand or collapse stacked notifications">
+                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <TextBlock Style="{StaticResource Glyph}" Text="{Binding ExpandGlyph}" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                                                                <TextBlock Text="{Binding ExpandLabel}" FontSize="8.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </StackPanel>
+                                                </DockPanel>
 
                                                 <ItemsControl Visibility="{Binding DetailsVisibility}"
                                                               ItemsSource="{Binding SecondaryNotifications}"
                                                               Margin="0,7,0,0">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <Border Background="{DynamicResource ElevatedSurfaceBrush}"
+                                                            <Border x:Name="SubCardRoot"
+                                                                    Background="{DynamicResource ElevatedSurfaceBrush}"
                                                                     BorderBrush="{DynamicResource CardBorderBrush}"
                                                                     BorderThickness="1"
-                                                                    CornerRadius="8"
-                                                                    Padding="8,5"
+                                                                    CornerRadius="10"
+                                                                    Padding="9,6"
                                                                     Margin="0,0,0,4"
                                                                     Cursor="Hand"
                                                                     MouseLeftButtonDown="SubNotificationCard_Click"
@@ -448,16 +479,30 @@
                                                                         <RowDefinition Height="Auto" />
                                                                         <RowDefinition Height="Auto" />
                                                                     </Grid.RowDefinitions>
-                                                                    <DockPanel Grid.Row="0" LastChildFill="False">
-                                                                        <TextBlock Text="{Binding Title}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" MaxWidth="220" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                                    <DockPanel Grid.Row="0" LastChildFill="True">
+                                                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                                                                            <TextBlock Text="{Binding TimeText}" Style="{StaticResource Digits}" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" Opacity="0.85" VerticalAlignment="Center" />
+                                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,0,0">
+                                                                                <StackPanel.Style>
+                                                                                    <Style TargetType="StackPanel">
+                                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                                        <Style.Triggers>
+                                                                                            <DataTrigger Binding="{Binding IsMouseOver, ElementName=SubCardRoot}" Value="True">
+                                                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                                            </DataTrigger>
+                                                                                        </Style.Triggers>
+                                                                                    </Style>
+                                                                                </StackPanel.Style>
+                                                                                <Button Tag="{Binding}" Click="CopyNotificationItem_Click" Style="{StaticResource CardMicroActionBtn}" Width="18" Height="18" ToolTip="Copy Notification">
+                                                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
+                                                                                </Button>
+                                                                                <Button Tag="{Binding Id}" Click="RemoveNotificationItem_Click" Style="{StaticResource CardMicroActionBtn}" Width="18" Height="18" ToolTip="Dismiss this alert">
+                                                                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
+                                                                                </Button>
+                                                                            </StackPanel>
+                                                                        </StackPanel>
 
-                                                                        <Button Tag="{Binding Id}" Click="RemoveNotificationItem_Click" DockPanel.Dock="Right" Style="{StaticResource CardMicroActionBtn}" Width="18" Height="18" ToolTip="Dismiss this alert">
-                                                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
-                                                                        </Button>
-                                                                        <Button Tag="{Binding}" Click="CopyNotificationItem_Click" DockPanel.Dock="Right" Style="{StaticResource CardMicroActionBtn}" Width="18" Height="18" ToolTip="Copy Notification">
-                                                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
-                                                                        </Button>
-                                                                        <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" Style="{StaticResource Digits}" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                                                        <TextBlock Text="{Binding Title}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                                                                     </DockPanel>
                                                                     <TextBlock Grid.Row="1" Visibility="{Binding BodyVisibility}" Text="{Binding Body}" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" Margin="0,2,0,0" MaxHeight="24" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
                                                                     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,4,0,0">

@@ -147,7 +147,20 @@ public partial class IslandWindow
         float bass = _smoothBands[0];
         float treble = _smoothBands[AudioSpectrum.BandCount - 1];
 
-        _petService.UpdateActivity(isMusicPlaying, bass, _pointerInside);
+        bool isFocusTimerActive = (_countdownService?.IsRunning ?? false) || _stopwatch.IsRunning;
+        var power = _powerPlanService?.Current;
+        bool isLowBattery = power is { HasBattery: true, IsCharging: false } &&
+                            power.BatteryPercent <= (_settingsService?.Current.LowBatteryAlertThreshold ?? 20);
+        bool isHighLoad = _systemPerfService?.LatestSnapshot.IsHighCpu ?? false;
+
+        _petService.UpdateActivity(
+            isMusicPlaying,
+            bass,
+            _pointerInside,
+            isFocusTimerActive,
+            isLowBattery,
+            isHighLoad,
+            DateTime.Now.Hour);
 
         var mood = _petService.CurrentMood;
         string species = _petService.PetSpecies;

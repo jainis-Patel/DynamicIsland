@@ -81,6 +81,16 @@ public partial class PetSanctuaryView : UserControl
         StagePetName.Text = name;
         PetSpeciesBadgeText.Text = FormatSpeciesBadge(species);
         StageAccessoryTag.Text = FormatAccessoryGlyph(accessory);
+        if (SanctuaryStreakBadge != null && SanctuaryStreakText != null)
+        {
+            int streak = service.CareStreakDays;
+            SanctuaryStreakBadge.Visibility = streak >= 1 ? Visibility.Visible : Visibility.Collapsed;
+            SanctuaryStreakText.Text = $"🔥 {streak}d";
+        }
+        if (StageThoughtText != null)
+        {
+            StageThoughtText.Text = service.CurrentContextCaption;
+        }
         UpdateMoodText(mood);
 
         // Rank and progress
@@ -145,6 +155,10 @@ public partial class PetSanctuaryView : UserControl
 
     private void UpdateMoodText(PetMood mood)
     {
+        if (StageThoughtText != null && (_petService ?? _window?.PetService) is { } svc)
+        {
+            StageThoughtText.Text = svc.CurrentContextCaption;
+        }
         StagePetMoodText.Text = mood switch
         {
             PetMood.Sleeping => "💤 Snoozing cozy (Loaf)",
@@ -211,21 +225,24 @@ public partial class PetSanctuaryView : UserControl
         _ => "Salmon Sushi"
     };
 
+    private void StagePet_MouseMove(object sender, MouseEventArgs e)
+    {
+        var pos = e.GetPosition(StagePet);
+        double cx = StagePet.ActualWidth > 0 ? StagePet.ActualWidth / 2.0 : 67.5;
+        double cy = StagePet.ActualHeight > 0 ? StagePet.ActualHeight / 2.0 : 52.5;
+        StagePet.SetInteractiveToyTarget((pos.X - cx) / Math.Max(1.0, cx), (pos.Y - cy) / Math.Max(1.0, cy));
+    }
+
+    private void StagePet_MouseLeave(object sender, MouseEventArgs e) =>
+        StagePet.ClearInteractiveToyTarget();
+
     private void StagePet_Click(object sender, MouseButtonEventArgs e)
     {
         if (_petService == null) return;
-        string msg = _petService.Pet();
+        _petService.Pet();
         _window?.TriggerLiquidImpulse(180, 80, 12);
         StagePet.PetClickImpulse();
         RefreshUI();
-        _window?.PushToast(new ToastContent(
-            "\uE76E",
-            _petService.PetName,
-            msg,
-            ThemeBrushes.PinkColor,
-            TimeSpan.FromSeconds(2.5),
-            TargetView: null,
-            Priority: ToastPriority.Feedback));
         e.Handled = true;
     }
 
@@ -233,19 +250,10 @@ public partial class PetSanctuaryView : UserControl
     {
         if (_petService == null) return;
         e.Handled = true;
-        string msg = _petService.PerformTrick();
+        _petService.PerformTrick();
         _window?.TriggerLiquidImpulse(220, -90, 16);
         StagePet.TriggerTrick();
         RefreshUI();
-        _window?.PushToast(new ToastContent(
-            "\uE734",
-            $"{_petService.PetName} Flip!",
-            msg,
-            ThemeBrushes.AmberColor,
-            TimeSpan.FromSeconds(2.5),
-            TargetView: null,
-            Priority: ToastPriority.Feedback,
-            Category: "pet"));
     }
 
     private void PetCuddle_Click(object sender, MouseButtonEventArgs e)
@@ -256,19 +264,10 @@ public partial class PetSanctuaryView : UserControl
     private void SpecialAction_Click(object sender, MouseButtonEventArgs e)
     {
         if (_petService == null) return;
-        string msg = _petService.PlaySpecialAction();
+        _petService.PlaySpecialAction();
         _window?.TriggerLiquidImpulse(240, 60, 15);
         StagePet.TriggerSpecialAction();
         RefreshUI();
-        _window?.PushToast(new ToastContent(
-            "\uE734",
-            $"{_petService.PetName} Playtime!",
-            msg,
-            ThemeBrushes.BlueColor,
-            TimeSpan.FromSeconds(3.0),
-            TargetView: null,
-            Priority: ToastPriority.Feedback,
-            Category: "pet"));
         e.Handled = true;
     }
 

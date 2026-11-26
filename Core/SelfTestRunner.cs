@@ -87,6 +87,8 @@ internal static partial class SelfTestRunner
         Run("IslandMemoryManager: Conservative working-set trim & LOH compaction", TestIslandMemoryManagerTrim);
         Run("ClockStyles: Multiple styles, normalization & shape geometry mapping", TestClockStyles);
         Run("VisualizerStyles: Themes enumeration, normalization & settings persistence", TestVisualizerStyles);
+        Run("AlbumArtStyles: PlayerDiscControl inertial physics, normalization & persistence", TestAlbumArtStylesAndPlayerDisc);
+        Run("VirtualPetUpgrades: Custom naming, daily streak, context reactions & frameless roam", TestPetUpgradesAndRoaming);
         Run("IslandNatureThemes: Living themes enumeration, normalization & settings persistence", TestIslandNatureThemes);
         Run("LyricsService: LRCLIB LRC timestamp parsing, title cleaning & playback position sync", TestLyricsService);
         Run("NetworkHUD: Real-time bandwidth abbreviation, ping latency & snapshot metrics", TestNetworkHudAndBandwidth);
@@ -114,6 +116,7 @@ internal static partial class SelfTestRunner
         Run("LiquidGlass: GPU headless golden-image refraction rendering & multi-body liquid bridge", TestLiquidGlassGoldenImage);
         Run("UpdateManager: SemVersion 2.0.0 parsing, sorting & pre-release precedence", TestSemVersionComparison);
         Run("UpdateManager: Manifest JSON serialization, channel resolution & hash verification", TestUpdateManifestAndIntegrity);
+        Run("UpdateManager: Channel-aware GitHub API, ETag 304, rate-limit fallback & rollback handoff", TestAutoUpdateAndGitHubVersionControl);
         Run("Option2And3: Live download speeds, rotating ring & notification app grouping / stacking", TestLiveDownloadsAndNotificationAppGrouping);
         Run("Choreographer: Power governor modes, task scheduling, interval scaling & iGPU preference", TestChoreographerAndPowerGovernor);
         Run("SpringAndHaptics: Impulse, Retarget, SnapTo & zero-allocation synthesized RIFF WAVE haptics", TestSpringDynamicsAndTactileHaptics);

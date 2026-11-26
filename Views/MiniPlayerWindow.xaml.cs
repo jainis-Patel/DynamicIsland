@@ -37,7 +37,10 @@ public partial class MiniPlayerWindow : Window
     private readonly VolumeService _volumeService;
     private readonly MediaSongListService _songListService;
     private readonly AudioSpectrum? _spectrum;
+    private readonly SettingsService? _settingsService;
     private readonly float[] _spectrumBands = new float[AudioSpectrum.BandCount];
+    private bool _discRendering;
+    private TimeSpan _lastDiscFrame = TimeSpan.Zero;
 
     private readonly DispatcherTimer _posTimer;
     private readonly DispatcherTimer _eqTimer;
@@ -68,13 +71,15 @@ public partial class MiniPlayerWindow : Window
         LyricsService lyricsService,
         VolumeService volumeService,
         MediaSongListService songListService,
-        AudioSpectrum? spectrum = null)
+        AudioSpectrum? spectrum = null,
+        SettingsService? settingsService = null)
     {
         _mediaService = mediaService;
         _lyricsService = lyricsService;
         _volumeService = volumeService;
         _songListService = songListService;
         _spectrum = spectrum;
+        _settingsService = settingsService;
 
         InitializeComponent();
 
@@ -138,6 +143,10 @@ public partial class MiniPlayerWindow : Window
         _volumeService.VolumeChanged += OnVolumeChanged;
         _songListService.HistoryChanged += OnHistoryChanged;
         ThemeManager.ThemeChanged += OnThemeChanged;
+        if (_settingsService != null)
+        {
+            _settingsService.Changed += OnSettingsChanged;
+        }
 
         // Scrubber thumb drag handling
         MiniTimelineSlider.AddHandler(Thumb.DragStartedEvent, new DragStartedEventHandler((_, _) => _isUserSeeking = true));
@@ -170,6 +179,7 @@ public partial class MiniPlayerWindow : Window
 
         Loaded += (_, _) =>
         {
+            ApplyAlbumArtStyle(_settingsService?.Current.AlbumArtStyle);
             RefreshAll();
             UpdateVolumeDisplay(_volumeService.CurrentVolume, _volumeService.IsMuted);
             if (_mediaService.Current?.IsPlaying ?? false)
@@ -177,10 +187,12 @@ public partial class MiniPlayerWindow : Window
                 _posTimer.Start();
                 _eqTimer.Start();
             }
+            EnsureDiscRendering();
         };
 
         Closed += (_, _) =>
         {
+            StopDiscRendering();
             PersistPlacementState();
             _posTimer.Stop();
             _eqTimer.Stop();
@@ -192,6 +204,10 @@ public partial class MiniPlayerWindow : Window
             _volumeService.VolumeChanged -= OnVolumeChanged;
             _songListService.HistoryChanged -= OnHistoryChanged;
             ThemeManager.ThemeChanged -= OnThemeChanged;
+            if (_settingsService != null)
+            {
+                _settingsService.Changed -= OnSettingsChanged;
+            }
         };
     }
 
@@ -318,9 +334,8 @@ public partial class MiniPlayerWindow : Window
             CompactTitleText.Text = "Not Playing";
             CompactArtistText.Text = "System Audio";
 
-            MiniArtFallback.Visibility = Visibility.Visible;
-            MiniArtImage.Source = null;
-            CompactArtImage.Source = null;
+            MiniArtDisc?.SetArtwork(null);
+            CompactArtDisc?.SetArtwork(null);
 
             MiniPlayPauseGlyph.Text = "\uE768";
             CompactPlayPauseGlyph.Text = "\uE768";
@@ -349,18 +364,8 @@ public partial class MiniPlayerWindow : Window
         CompactPlayPauseGlyph.Text = s.IsPlaying ? "\uE769" : "\uE768";
 
         // Artwork & Ambient Reactive Halo
-        if (s.Artwork != null)
-        {
-            MiniArtImage.Source = s.Artwork;
-            CompactArtImage.Source = s.Artwork;
-            MiniArtFallback.Visibility = Visibility.Collapsed;
-        }
-        else
-        {
-            MiniArtImage.Source = null;
-            CompactArtImage.Source = null;
-            MiniArtFallback.Visibility = Visibility.Visible;
-        }
+        MiniArtDisc?.SetArtwork(s.Artwork);
+        CompactArtDisc?.SetArtwork(s.Artwork);
 
         var accentColor = s.Accent ?? ThemeBrushes.AmberColor;
         MiniAmbientStop.Color = accentColor;
@@ -604,6 +609,73 @@ public partial class MiniPlayerWindow : Window
         EqBar3.Height = 3;
     }
 
+    private void OnSettingsChanged()
+    {
+        string? style = _settingsService?.Current.AlbumArtStyle;
+        Dispatcher.InvokeAsync(() =>
+        {
+            ApplyAlbumArtStyle(style);
+            EnsureDiscRendering();
+        });
+    }
+
+    internal void ApplyAlbumArtStyle(string? style)
+    {
+        string normalized = SettingsService.NormalizeAlbumArtStyle(style);
+        MiniArtDisc?.SetStyle(normalized);
+        CompactArtDisc?.SetStyle(normalized);
+        EnsureDiscRendering();
+    }
+
+    private void EnsureDiscRendering()
+    {
+        if (_discRendering) return;
+        string style = SettingsService.NormalizeAlbumArtStyle(_settingsService?.Current.AlbumArtStyle);
+        if (style == "StaticSquircle") return;
+
+        bool isPlaying = _mediaService.Current?.IsPlaying ?? false;
+        bool settled = (MiniArtDisc?.IsSettled ?? true) && (CompactArtDisc?.IsSettled ?? true);
+        if (!isPlaying && settled) return;
+
+        _discRendering = true;
+        _lastDiscFrame = TimeSpan.Zero;
+        CompositionTarget.Rendering += OnDiscRendering;
+    }
+
+    private void StopDiscRendering()
+    {
+        if (!_discRendering) return;
+        CompositionTarget.Rendering -= OnDiscRendering;
+        _discRendering = false;
+    }
+
+    private void OnDiscRendering(object? sender, EventArgs e)
+    {
+        var now = ((RenderingEventArgs)e).RenderingTime;
+        if (now == _lastDiscFrame) return;
+        double dt = _lastDiscFrame == TimeSpan.Zero ? 1.0 / 60.0 : (now - _lastDiscFrame).TotalSeconds;
+        _lastDiscFrame = now;
+
+        bool isPlaying = _mediaService.Current?.IsPlaying ?? false;
+        bool reduced = !SystemParameters.ClientAreaAnimation ||
+                       (_settingsService?.Current.ReduceMotion ?? false) ||
+                       (_settingsService?.Current.LowMemoryMode ?? false);
+
+        float bass = 0f;
+        if (isPlaying && _spectrum != null)
+        {
+            _spectrum.ReadBands(_spectrumBands);
+            bass = _spectrumBands[0];
+        }
+
+        bool miniSettled = MiniArtDisc?.StepPhysics(dt, isPlaying, bass, reduced) ?? true;
+        bool compactSettled = CompactArtDisc?.StepPhysics(dt, isPlaying, bass, reduced) ?? true;
+        if (miniSettled && compactSettled)
+        {
+            StopDiscRendering();
+        }
+    }
+
     // ── Event Handlers ───────────────────────────────────────────────
 
     private void OnMediaChanged() =>
@@ -621,12 +693,15 @@ public partial class MiniPlayerWindow : Window
                 _eqTimer.Stop();
                 ResetEqualizerBars();
             }
+            EnsureDiscRendering();
         });
 
     private void OnTrackChanged() =>
         Dispatcher.InvokeAsync(() =>
         {
             RefreshAll();
+            MiniArtDisc?.PulseTrackChange();
+            EnsureDiscRendering();
             // If the song list drawer is currently showing album tracks, auto-fetch for the new song
             if (_activeDrawer == DrawerState.Songs && _activeSongsTab == SongsTab.AlbumTracks)
             {

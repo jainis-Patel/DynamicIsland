@@ -76,8 +76,22 @@ public partial class IslandWindow : Window
 
         int expandedExtraItems = _notificationAppGroups.Where(g => g.IsExpanded).Sum(g => Math.Min(g.Notifications.Count - 1, 3));
         int visibleCount = Math.Clamp(count + expandedExtraItems, 1, 4);
-        double targetHeight = Math.Clamp(114 + (visibleCount * 70), 210, 396);
+        double targetHeight = Math.Clamp(126 + (visibleCount * 82), 224, 412);
         return new PillShape(484, targetHeight, 38);
+    }
+
+    private static PillShape GetToastShape(ToastContent? toast)
+    {
+        if (toast != null && (toast.OnPromptDecision != null || !string.IsNullOrWhiteSpace(toast.PromptActivityId)))
+        {
+            double w = !string.IsNullOrWhiteSpace(toast.DiffText) ? 416 : 384;
+            return new PillShape(w, 58, 29);
+        }
+        if (toast?.CanReply == true)
+        {
+            return new PillShape(368, 58, 29);
+        }
+        return Shapes[IslandState.Toast];
     }
 
     /// <summary>
@@ -170,6 +184,10 @@ public partial class IslandWindow : Window
         else if (state == IslandState.Idle)
         {
             baseShape = GetIdleShape();
+        }
+        else if (state == IslandState.Toast)
+        {
+            baseShape = GetToastShape(_machine.ActiveToast);
         }
         else
         {
@@ -990,7 +1008,7 @@ public partial class IslandWindow : Window
             return;
         }
 
-        _miniPlayerWindow = new Views.MiniPlayerWindow(_mediaService, _lyricsService, _volumeService, _mediaSongListService, _audioSpectrum);
+        _miniPlayerWindow = new Views.MiniPlayerWindow(_mediaService, _lyricsService, _volumeService, _mediaSongListService, _audioSpectrum, _settingsService);
         _miniPlayerWindow.Closed += (_, _) => _miniPlayerWindow = null;
 
         double scale = DpiScaleValue;

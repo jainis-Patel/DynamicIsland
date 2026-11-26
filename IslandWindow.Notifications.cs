@@ -29,7 +29,7 @@ public partial class IslandWindow
     {
         if (NotificationsBadgeText == null) return;
         var items = _notificationListener.History;
-        NotificationsBadgeText.Text = items.Count.ToString();
+        NotificationsBadgeText.Text = items.Count > 99 ? "99+" : items.Count.ToString();
         NotificationsBadgeText.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         if (NotificationsBadgeHost != null)
         {

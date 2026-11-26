@@ -120,19 +120,27 @@
                                 <StackPanel VerticalAlignment="Center">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" FontSize="8.5" Foreground="#0A84FF" Margin="0,0,4,0" VerticalAlignment="Center" />
-                                        <TextBlock x:Name="UpdateVersionTitleText" Text="v0.8.1 Available" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                                        <TextBlock x:Name="UpdateVersionTitleText" Text="Update Available" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
                                     </StackPanel>
-                                    <TextBlock x:Name="UpdateSummaryText" Text="New liquid physics and performance improvements." FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" TextWrapping="Wrap" MaxWidth="250" Margin="0,2,0,0" />
-                                    <Button Click="ViewChangelogBtn_Click" x:Name="ViewChangelogBtn" Style="{StaticResource IslandButton}" Height="18" Padding="6,0" Margin="0,4,0,0" HorizontalAlignment="Left" Visibility="Collapsed">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE8A7;" FontSize="7" Margin="0,0,3,0" VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}" />
-                                            <TextBlock Text="View Changelog on GitHub" FontSize="7" Foreground="{DynamicResource AccentBrush}" />
-                                        </StackPanel>
-                                    </Button>
+                                    <TextBlock x:Name="UpdateSummaryText" Text="New release published on GitHub." FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" TextWrapping="Wrap" MaxWidth="240" Margin="0,2,0,0" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                        <Button Click="ViewChangelogBtn_Click" x:Name="ViewChangelogBtn" Style="{StaticResource IslandButton}" Height="18" Padding="6,0" Margin="0,0,4,0" Visibility="Collapsed">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8A7;" FontSize="7" Margin="0,0,3,0" VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}" />
+                                                <TextBlock Text="View Changelog" FontSize="7" Foreground="{DynamicResource AccentBrush}" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Click="SkipUpdateBtn_Click" x:Name="SkipUpdateBtn" Style="{StaticResource IslandButton}" Height="18" Padding="6,0" Visibility="Collapsed" ToolTipService.ToolTip="Remind me in 7 days">
+                                            <TextBlock Text="Skip" FontSize="7" Foreground="{DynamicResource SecondaryBrush}" />
+                                        </Button>
+                                    </StackPanel>
                                 </StackPanel>
                                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Click="CancelDownloadBtn_Click" x:Name="CancelDownloadBtn" Style="{StaticResource IslandButton}" Height="22" Padding="7,0" Margin="0,0,4,0" Visibility="Collapsed">
+                                        <TextBlock Text="Cancel" FontSize="8" FontWeight="Medium" Foreground="#FF453A" />
+                                    </Button>
                                     <Button Click="InstallUpdateBtn_Click" x:Name="InstallUpdateBtn" Style="{StaticResource IslandButton}" Height="22" Padding="9,0" Background="#1F0A84FF" BorderBrush="#4D0A84FF">
-                                        <TextBlock x:Name="InstallUpdateBtnText" Text="Install &amp; Restart" FontSize="8.5" FontWeight="SemiBold" Foreground="#0A84FF" />
+                                        <TextBlock x:Name="InstallUpdateBtnText" Text="Download &amp; Install" FontSize="8.5" FontWeight="SemiBold" Foreground="#0A84FF" />
                                     </Button>
                                 </StackPanel>
                             </DockPanel>
@@ -189,9 +197,17 @@
                             <TextBlock Text="Version History &amp; Rollback" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" />
                             <TextBlock Text="Switch to previous GitHub releases if experiencing conflicts" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
                         </StackPanel>
-                        <Button Click="ToggleVersionHistoryBtn_Click" x:Name="ToggleVersionHistoryBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" VerticalAlignment="Center">
-                            <TextBlock x:Name="ToggleVersionHistoryText" Text="View Releases" FontSize="8.5" FontWeight="Medium" />
-                        </Button>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Click="RefreshVersionHistoryBtn_Click" x:Name="RefreshVersionHistoryBtn" Style="{StaticResource IslandButton}" Height="20" Width="22" Padding="0" Margin="0,0,3,0" ToolTipService.ToolTip="Refresh release list from GitHub">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE72C;" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
+                            </Button>
+                            <Button Click="OpenReleasesPageBtn_Click" x:Name="OpenReleasesPageBtn" Style="{StaticResource IslandButton}" Height="20" Width="22" Padding="0" Margin="0,0,4,0" ToolTipService.ToolTip="Open GitHub Releases in browser">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8A7;" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
+                            </Button>
+                            <Button Click="ToggleVersionHistoryBtn_Click" x:Name="ToggleVersionHistoryBtn" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="ToggleVersionHistoryText" Text="View Releases" FontSize="8.5" FontWeight="Medium" />
+                            </Button>
+                        </StackPanel>
                     </DockPanel>
 
                     <StackPanel x:Name="VersionHistoryContainer" Visibility="Collapsed" Margin="0,6,0,0">

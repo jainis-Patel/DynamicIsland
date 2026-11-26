@@ -85,7 +85,7 @@
                         <Button DockPanel.Dock="Right" Click="SubmitTask_Click" Style="{StaticResource IslandButton}"
                                 Width="20" Height="20" Padding="0" Margin="4,0,0,0" ToolTipService.ToolTip="Save task">
                             <Border Width="18" Height="18" CornerRadius="9" Background="{DynamicResource AccentBrush}">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE74B;" FontSize="9" Foreground="White"
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE74B;" FontSize="9" Foreground="#0B0B0E"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                         </Button>

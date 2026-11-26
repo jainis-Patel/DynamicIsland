@@ -13,7 +13,7 @@ public partial class MediaView : UserControl
     {
         InitializeComponent();
 
-        BentoMotion.AttachInteractiveSpring(MediaArtworkSquircle, hoverScale: 1.04, pressScale: 0.96);
+        BentoMotion.AttachInteractiveSpring(ExpandedArtDisc, hoverScale: 1.04, pressScale: 0.96);
         BentoMotion.AttachInteractiveSpring(PrevButton, hoverScale: 1.08, pressScale: 0.90);
         BentoMotion.AttachInteractiveSpring(PlayPauseButton, hoverScale: 1.10, pressScale: 0.90);
         BentoMotion.AttachInteractiveSpring(NextButton, hoverScale: 1.08, pressScale: 0.90);
@@ -52,6 +52,9 @@ public partial class MediaView : UserControl
 
     private void FocusMediaPlayer_Click(object sender, MouseButtonEventArgs e) =>
         Island?.FocusMediaPlayer_Click(sender, e);
+
+    private void CycleAlbumArtStyle_Click(object sender, MouseButtonEventArgs e) =>
+        Island?.CycleAlbumArtStyle_Click(sender, e);
 
     private void ClockSystemHudBadge_Click(object sender, MouseButtonEventArgs e) =>
         Island?.ClockSystemHudBadge_Click(sender, e);

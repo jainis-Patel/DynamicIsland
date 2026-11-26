@@ -25,6 +25,9 @@
                 <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
                     <TextBlock x:Name="PetSpeciesBadgeText" Text="🐾 Interactive Companion" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
                 </Border>
+                <Border x:Name="SanctuaryStreakBadge" Visibility="Collapsed" Background="#22FF9F0A" BorderBrush="#44FF9F0A" BorderThickness="1" CornerRadius="6" Padding="5,1" Margin="5,0,0,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="SanctuaryStreakText" Text="🔥 1d" Style="{StaticResource Digits}" FontSize="8" FontWeight="Bold" Foreground="#FF9F0A" />
+                </Border>
             </StackPanel>
 
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
@@ -59,15 +62,24 @@
                     <!-- Ambient Pedestal Spotlight -->
                     <Border Grid.Row="0" Width="120" Height="36" VerticalAlignment="Bottom" Margin="0,0,0,6" CornerRadius="18" Background="#14FFFFFF" IsHitTestVisible="False" />
 
+                    <!-- Micro-Thought Bubble -->
+                    <Border x:Name="StageThoughtBubble" Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0"
+                            Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="7,2" IsHitTestVisible="False" Opacity="0.9">
+                        <TextBlock x:Name="StageThoughtText" Text="👀 Ready to play" FontSize="7.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" MaxWidth="136" />
+                    </Border>
+
                     <!-- Big Interactive Pet (135x105 px) -->
                     <core:VirtualPetControl x:Name="StagePet"
                                             Grid.Row="0"
                                             Width="135" Height="105"
                                             HorizontalAlignment="Center" VerticalAlignment="Center"
                                             Cursor="Hand"
+                                            MouseMove="StagePet_MouseMove"
+                                            MouseLeave="StagePet_MouseLeave"
                                             MouseLeftButtonDown="StagePet_Click"
                                             MouseRightButtonUp="StagePet_RightClick"
-                                            ToolTipService.ToolTip="Click to pet · Right-click for flip trick!" />
+                                            ToolTipService.ToolTip="Click to pet · Right-click for flip trick · Move pointer to guide toys!" />
 
                     <!-- Bottom Info Badge: Name & Mood Status -->
                     <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,2,0,0">

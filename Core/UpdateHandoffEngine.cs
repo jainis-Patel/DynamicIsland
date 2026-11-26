@@ -44,6 +44,16 @@ public static class UpdateHandoffEngine
         }
     }
 
+    internal static string BuildInstallerArguments(int currentPid, string? currentDir)
+    {
+        if (!string.IsNullOrWhiteSpace(currentDir))
+        {
+            string normalizedDir = currentDir.TrimEnd('\\', '/');
+            return $"--install --silent --relaunch --wait-pid {currentPid} --target-dir \"{normalizedDir}\" /DIR=\"{normalizedDir}\" /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /AppParams=\"--updated\"";
+        }
+        return $"--install --silent --relaunch --wait-pid {currentPid} /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /AppParams=\"--updated\"";
+    }
+
     private static bool LaunchInstallerHandoff(string installerExePath)
     {
         App.Log($"[UpdateHandoff] Spawning silent upgrade from: {installerExePath}");
@@ -51,8 +61,7 @@ public static class UpdateHandoffEngine
         int currentPid = Environment.ProcessId;
         string? currentExe = Environment.ProcessPath;
         string? currentDir = !string.IsNullOrEmpty(currentExe) ? Path.GetDirectoryName(currentExe) : null;
-        string targetDirArg = !string.IsNullOrWhiteSpace(currentDir) ? $" --target-dir \"{currentDir}\"" : "";
-        string args = $"--install --silent --relaunch --wait-pid {currentPid}{targetDirArg} /SILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS";
+        string args = BuildInstallerArguments(currentPid, currentDir);
 
         var startInfo = new ProcessStartInfo
         {
@@ -108,7 +117,7 @@ chcp 65001 >nul
 set ""WAITCOUNT=0""
 
 :wait_process
-tasklist /fi ""PID eq %DI_WAIT_PID%"" 2>nul | findstr /i ""%DI_WAIT_PID%"" >nul
+tasklist /nh /fo csv /fi ""PID eq %DI_WAIT_PID%"" 2>nul | findstr /c:"",""%DI_WAIT_PID%"","" >nul
 if not errorlevel 1 goto wait_more
 goto do_backup_prep
 
@@ -225,25 +234,62 @@ if exist ""%DI_NEWFILE%"" del /f /q ""%DI_NEWFILE%"" >nul 2>&1
     }
 
     /// <summary>
-    /// Cleans up obsolete .bak backup files once the updated application has booted and verified stable.
+    /// Cleans up obsolete .bak backup files and stale update downloads once the updated application has booted and verified stable.
     /// </summary>
     public static void CleanupOldBackups()
     {
         try
         {
             string? currentExe = Environment.ProcessPath;
-            if (string.IsNullOrEmpty(currentExe)) return;
-
-            string backupExe = currentExe + BackupExtension;
-            if (File.Exists(backupExe))
+            if (!string.IsNullOrEmpty(currentExe))
             {
-                File.Delete(backupExe);
-                App.Log("[UpdateHandoff] Cleaned up obsolete pre-update backup executable.");
+                string backupExe = currentExe + BackupExtension;
+                if (File.Exists(backupExe))
+                {
+                    File.Delete(backupExe);
+                    App.Log("[UpdateHandoff] Cleaned up obsolete pre-update backup executable.");
+                }
             }
         }
         catch (Exception ex)
         {
             App.Log($"[UpdateHandoff] Non-fatal error cleaning up backup: {ex.Message}");
+        }
+
+        try
+        {
+            string tempUpdatesDir = Path.Combine(Path.GetTempPath(), "DynamicIsland", "Updates");
+            if (Directory.Exists(tempUpdatesDir))
+            {
+                DateTime cutoff = DateTime.UtcNow.AddDays(-3);
+                foreach (var file in Directory.EnumerateFiles(tempUpdatesDir))
+                {
+                    try
+                    {
+                        if (File.GetLastWriteTimeUtc(file) < cutoff)
+                        {
+                            File.Delete(file);
+                        }
+                    }
+                    catch { }
+                }
+
+                foreach (var dir in Directory.EnumerateDirectories(tempUpdatesDir))
+                {
+                    try
+                    {
+                        if (Directory.GetLastWriteTimeUtc(dir) < cutoff)
+                        {
+                            Directory.Delete(dir, recursive: true);
+                        }
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[UpdateHandoff] Non-fatal error cleaning up stale update cache: {ex.Message}");
         }
     }
 }

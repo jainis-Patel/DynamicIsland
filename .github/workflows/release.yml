@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release Tag (e.g. v0.8.0)'
+        description: 'Release Tag (e.g. v0.9.0)'
         required: false
-        default: 'v0.8.0'
+        default: 'v0.9.0'
 
 permissions:
   contents: write
@@ -59,7 +59,7 @@ jobs:
       - name: Build Release
         run: dotnet build -c Release -r win-x64 --no-restore -p:Version=${{ env.VERSION }}
 
-      - name: Run Deterministic Self-Test Suite (72 Checks)
+      - name: Run Deterministic Self-Test Suite
         run: dotnet run -c Release -r win-x64 --no-build -- --self-test
 
       - name: Publish Single-File Native Binary (win-x64)
@@ -173,12 +173,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          Copy-Item -Path "publish/release-manifest.json" -Destination "release-manifest.json" -Force
           git add release-manifest.json
           $status = git status --porcelain release-manifest.json
           if ($status) {
             git commit -m "chore(release): Auto-update release-manifest.json for ${{ env.TAG }} [skip ci]"
-            git pull --rebase origin main
-            git push origin HEAD:main
+            git push origin main
           } else {
             Write-Host "release-manifest.json already up to date."
           }

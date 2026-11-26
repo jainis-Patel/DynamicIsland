@@ -54,6 +54,12 @@ public partial class IslandWindow
         e.Handled = true;
     }
 
+    internal void CycleAlbumArtStyle_Click(object sender, MouseButtonEventArgs e)
+    {
+        CycleAlbumArtStyle();
+        e.Handled = true;
+    }
+
     internal void ClockSystemHudBadge_Click(object sender, MouseButtonEventArgs e)
     {
         SwitchExpandedView(ExpandedView.SystemHud);
@@ -66,6 +72,7 @@ public partial class IslandWindow
         if (media is null || string.IsNullOrWhiteSpace(media.Title)) return;
 
         _lyricsService?.LoadLyricsForTrack(media.Title, media.Artist, media.Duration);
+        ExpandedArtDisc?.PulseTrackChange();
 
         if (_machine.State != IslandState.Expanded)
         {
@@ -125,6 +132,7 @@ public partial class IslandWindow
         if (hasMedia && media is not null)
         {
             _lyricsService?.LoadLyricsForTrack(media.Title, media.Artist, media.Duration);
+        ExpandedArtDisc?.PulseTrackChange();
 
             if (!callActive)
             {
@@ -152,27 +160,8 @@ public partial class IslandWindow
             PrevButton.IsEnabled = media.CanPrevious;
             NextButton.IsEnabled = media.CanNext;
 
-            if (media.Artwork is not null)
-            {
-                if (!ReferenceEquals(CompactArtImage.Source, media.Artwork))
-                {
-                    CompactArtImage.Source = media.Artwork;
-                    ExpandedArtImage.Source = media.Artwork;
-                }
-                CompactArtImage.Visibility = Visibility.Visible;
-                ExpandedArtImage.Visibility = Visibility.Visible;
-                CompactArtFallback.Visibility = Visibility.Collapsed;
-                ExpandedArtFallback.Visibility = Visibility.Collapsed;
-            }
-            else
-            {
-                CompactArtImage.Source = null;
-                ExpandedArtImage.Source = null;
-                CompactArtImage.Visibility = Visibility.Collapsed;
-                ExpandedArtImage.Visibility = Visibility.Collapsed;
-                CompactArtFallback.Visibility = Visibility.Visible;
-                ExpandedArtFallback.Visibility = Visibility.Visible;
-            }
+            CompactArtDisc?.SetArtwork(media.Artwork);
+            ExpandedArtDisc?.SetArtwork(media.Artwork);
 
             if (media.Accent.HasValue)
             {
@@ -199,8 +188,8 @@ public partial class IslandWindow
                     ApplyTheme(_settingsService.Current.ThemeName);
                 }
             }
-            CompactArtImage.Source = null;
-            ExpandedArtImage.Source = null;
+            CompactArtDisc?.SetArtwork(null);
+            ExpandedArtDisc?.SetArtwork(null);
             _lyricsService?.Reset();
             if (!callActive)
             {

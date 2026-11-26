@@ -274,7 +274,46 @@ public sealed record ReleaseHistoryItem(
     string? InstallerSha256 = null,
     long SizeBytes = 0,
     string? ChecksumsUrl = null,
-    string? ManifestUrl = null);
+    string? ManifestUrl = null,
+    string? PortableUrl = null,
+    string? PortableSha256 = null,
+    long PortableSizeBytes = 0)
+{
+    public bool HasDownloadableAsset =>
+        !string.IsNullOrWhiteSpace(InstallerUrl) || !string.IsNullOrWhiteSpace(PortableUrl);
+}
+
+/// <summary>
+/// Outcome status for fetching the latest update manifest from GitHub.
+/// </summary>
+public enum ManifestFetchStatus
+{
+    Success,
+    NotModified,
+    RateLimited,
+    NetworkError,
+    NoReleases
+}
+
+/// <summary>
+/// Detailed result for update manifest queries, preserving rate-limit and error diagnostics.
+/// </summary>
+public sealed record ManifestFetchResult(
+    ManifestFetchStatus Status,
+    UpdateManifest? Manifest,
+    string? ErrorMessage = null,
+    DateTime? RateLimitResetUtc = null,
+    string? Source = null);
+
+/// <summary>
+/// Detailed result for release history queries, preserving rate-limit and error diagnostics.
+/// </summary>
+public sealed record ReleaseHistoryResult(
+    IReadOnlyList<ReleaseHistoryItem> Items,
+    bool IsSuccess,
+    bool IsRateLimited = false,
+    DateTime? RateLimitResetUtc = null,
+    string? ErrorMessage = null);
 
 /// <summary>
 /// Progress reporting snapshot during file download and hash verification.

@@ -2,7 +2,11 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Numerics;
+using System.Text;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -671,5 +675,289 @@ internal static partial class SelfTestRunner
             Assert(lContent.Contains("PackageVersion: 0.9.0"), "Locale YAML must specify version 0.9.0");
             Assert(lContent.Contains("PackageName: Dynamic Island for Windows"), "Locale YAML must specify package name");
         }
+    }
+
+    private sealed class MockGitHubHttpHandler : HttpMessageHandler
+    {
+        private readonly Func<HttpRequestMessage, HttpResponseMessage> _responder;
+        public List<HttpRequestMessage> Requests { get; } = new();
+
+        public MockGitHubHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> responder)
+        {
+            _responder = responder;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+            return Task.FromResult(_responder(request));
+        }
+    }
+
+    private static void TestAutoUpdateAndGitHubVersionControl()
+    {
+        // 1. Stable channel /releases/latest + ETag 304 NotModified caching
+        const string stableSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const string portableSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        int stableCalls = 0;
+
+        using (var stableHandler = new MockGitHubHttpHandler(req =>
+        {
+            string uri = req.RequestUri!.ToString();
+            if (uri.EndsWith("/releases/latest", StringComparison.Ordinal))
+            {
+                stableCalls++;
+                if (req.Headers.IfNoneMatch.Any(e => e.Tag == "\"etag-v091\""))
+                {
+                    return new HttpResponseMessage(HttpStatusCode.NotModified);
+                }
+
+                string json = $$"""
+                {
+                  "tag_name": "v0.9.1",
+                  "prerelease": false,
+                  "draft": false,
+                  "published_at": "2026-11-26T10:00:00Z",
+                  "html_url": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.9.1",
+                  "body": "Stability release",
+                  "assets": [
+                    {
+                      "name": "DynamicIsland-Setup.exe",
+                      "browser_download_url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.1/DynamicIsland-Setup.exe",
+                      "size": 74000000,
+                      "digest": "sha256:{{stableSha}}"
+                    },
+                    {
+                      "name": "DynamicIsland-Portable.zip",
+                      "browser_download_url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.1/DynamicIsland-Portable.zip",
+                      "size": 68000000,
+                      "digest": "sha256:{{portableSha}}"
+                    }
+                  ]
+                }
+                """;
+                var resp = new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
+                };
+                resp.Headers.ETag = new EntityTagHeaderValue("\"etag-v091\"");
+                return resp;
+            }
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }))
+        using (var http = new HttpClient(stableHandler))
+        using (var client = new GitHubReleaseClient(client: http))
+        {
+            var first = client.FetchLatestManifestDetailedAsync(includePrereleases: false).GetAwaiter().GetResult();
+            Assert(first.Status == ManifestFetchStatus.Success, $"Expected Success, got {first.Status}");
+            Assert(first.Manifest != null && first.Manifest.Version == "0.9.1", "Expected v0.9.1 from /releases/latest");
+            Assert(first.Manifest!.Downloads.Installer?.Sha256 == stableSha, "Installer SHA-256 digest must be extracted");
+            Assert(first.Manifest.Downloads.Portable?.Sha256 == portableSha, "Portable SHA-256 digest must be extracted");
+
+            var second = client.FetchLatestManifestDetailedAsync(includePrereleases: false).GetAwaiter().GetResult();
+            Assert(second.Status == ManifestFetchStatus.NotModified, $"Expected NotModified on 304, got {second.Status}");
+            Assert(second.Manifest != null && second.Manifest.Version == "0.9.1", "304 NotModified must return cached manifest");
+            Assert(stableCalls == 2, "Second check should have sent conditional ETag request");
+        }
+
+        // 2. Beta channel queries /releases?per_page=10, skips drafts, and picks highest prerelease
+        using (var betaHandler = new MockGitHubHttpHandler(req =>
+        {
+            string uri = req.RequestUri!.ToString();
+            if (uri.Contains("/releases?per_page=10", StringComparison.Ordinal))
+            {
+                string json = """
+                [
+                  {
+                    "tag_name": "v0.10.0-beta.9",
+                    "prerelease": true,
+                    "draft": true,
+                    "published_at": "2026-11-26T12:00:00Z",
+                    "html_url": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.10.0-beta.9",
+                    "assets": []
+                  },
+                  {
+                    "tag_name": "v0.10.0-beta.2",
+                    "prerelease": true,
+                    "draft": false,
+                    "published_at": "2026-11-26T11:00:00Z",
+                    "html_url": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.10.0-beta.2",
+                    "assets": []
+                  },
+                  {
+                    "tag_name": "v0.9.0",
+                    "prerelease": false,
+                    "draft": false,
+                    "published_at": "2026-11-25T11:00:00Z",
+                    "html_url": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.9.0",
+                    "assets": []
+                  }
+                ]
+                """;
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
+                };
+            }
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }))
+        using (var http = new HttpClient(betaHandler))
+        using (var client = new GitHubReleaseClient(client: http))
+        {
+            var betaResult = client.FetchLatestManifestDetailedAsync(includePrereleases: true).GetAwaiter().GetResult();
+            Assert(betaResult.Status == ManifestFetchStatus.Success, "Beta fetch must succeed");
+            Assert(betaResult.Manifest != null && betaResult.Manifest.Version == "0.10.0-beta.2",
+                $"Beta channel must skip draft and pick 0.10.0-beta.2, got {betaResult.Manifest?.Version}");
+            Assert(betaResult.Manifest!.ParsedChannel == UpdateChannel.Beta, "Prerelease must map to Beta channel");
+        }
+
+        // 3. Rate-limit (403) falls back to raw CDN manifest when available, and returns RateLimited when both fail
+        long resetEpoch = DateTimeOffset.UtcNow.AddMinutes(30).ToUnixTimeSeconds();
+        using (var fallbackHandler = new MockGitHubHttpHandler(req =>
+        {
+            string uri = req.RequestUri!.ToString();
+            if (uri.StartsWith("https://api.github.com/", StringComparison.Ordinal))
+            {
+                var resp = new HttpResponseMessage(HttpStatusCode.Forbidden);
+                resp.Headers.TryAddWithoutValidation("X-RateLimit-Reset", resetEpoch.ToString());
+                return resp;
+            }
+            if (uri.Contains("raw.githubusercontent.com", StringComparison.Ordinal))
+            {
+                string rawJson = $$"""
+                {
+                  "version": "0.9.2",
+                  "releaseTag": "v0.9.2",
+                  "channel": "stable",
+                  "downloads": {
+                    "installer": {
+                      "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.2/DynamicIsland-Setup.exe",
+                      "sha256": "{{stableSha}}",
+                      "sizeBytes": 74000000
+                    }
+                  }
+                }
+                """;
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(rawJson, Encoding.UTF8, "application/json")
+                };
+            }
+            if (req.Method == HttpMethod.Head && uri.Contains("DynamicIsland-Setup.exe", StringComparison.Ordinal))
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK);
+            }
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }))
+        using (var http = new HttpClient(fallbackHandler))
+        using (var client = new GitHubReleaseClient(client: http))
+        {
+            var fallbackRes = client.FetchLatestManifestDetailedAsync(includePrereleases: false).GetAwaiter().GetResult();
+            Assert(fallbackRes.Status == ManifestFetchStatus.Success && fallbackRes.Source == "RawManifest",
+                "API 403 must fall back to raw CDN release-manifest.json");
+            Assert(fallbackRes.Manifest?.Version == "0.9.2", "Fallback manifest version must be 0.9.2");
+        }
+
+        using (var rateLimitOnlyHandler = new MockGitHubHttpHandler(req =>
+        {
+            if (req.RequestUri!.ToString().StartsWith("https://api.github.com/", StringComparison.Ordinal))
+            {
+                var resp = new HttpResponseMessage(HttpStatusCode.Forbidden);
+                resp.Headers.TryAddWithoutValidation("X-RateLimit-Reset", resetEpoch.ToString());
+                return resp;
+            }
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }))
+        using (var http = new HttpClient(rateLimitOnlyHandler))
+        using (var client = new GitHubReleaseClient(client: http))
+        {
+            var rlRes = client.FetchLatestManifestDetailedAsync(includePrereleases: false).GetAwaiter().GetResult();
+            Assert(rlRes.Status == ManifestFetchStatus.RateLimited, $"Expected RateLimited, got {rlRes.Status}");
+            Assert(rlRes.RateLimitResetUtc.HasValue, "RateLimitResetUtc must be parsed from X-RateLimit-Reset");
+
+            var histRes = client.FetchReleaseHistoryDetailedAsync().GetAwaiter().GetResult();
+            Assert(!histRes.IsSuccess && histRes.IsRateLimited, "Release history must report rate limit");
+        }
+
+        // 4. Release history skips drafts, extracts Portable + Installer, and FetchExpectedSha256Async resolves by target
+        using (var histHandler = new MockGitHubHttpHandler(req =>
+        {
+            string json = $$"""
+            [
+              {
+                "tag_name": "v0.9.5-draft",
+                "prerelease": false,
+                "draft": true,
+                "published_at": "2026-11-26T10:00:00Z",
+                "html_url": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.9.5-draft",
+                "assets": []
+              },
+              {
+                "tag_name": "v0.9.0",
+                "prerelease": false,
+                "draft": false,
+                "published_at": "2026-11-26T01:37:00Z",
+                "html_url": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.9.0",
+                "assets": [
+                  {
+                    "name": "DynamicIsland-Setup.exe",
+                    "browser_download_url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.0/DynamicIsland-Setup.exe",
+                    "size": 74358512,
+                    "digest": "sha256:{{stableSha}}"
+                  },
+                  {
+                    "name": "DynamicIsland-Portable.zip",
+                    "browser_download_url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.0/DynamicIsland-Portable.zip",
+                    "size": 68483630,
+                    "digest": "sha256:{{portableSha}}"
+                  }
+                ]
+              }
+            ]
+            """;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+        }))
+        using (var http = new HttpClient(histHandler))
+        using (var client = new GitHubReleaseClient(client: http))
+        {
+            var hist = client.FetchReleaseHistoryDetailedAsync().GetAwaiter().GetResult();
+            Assert(hist.IsSuccess && hist.Items.Count == 1, $"Drafts must be skipped; expected 1 item, got {hist.Items.Count}");
+            var item = hist.Items[0];
+            Assert(item.HasDownloadableAsset, "ReleaseHistoryItem must report HasDownloadableAsset");
+            Assert(item.PortableUrl != null && item.PortableSha256 == portableSha, "Portable URL and SHA-256 must be extracted");
+
+            string? resolvedExe = client.FetchExpectedSha256Async(item, "DynamicIsland-Setup.exe").GetAwaiter().GetResult();
+            string? resolvedZip = client.FetchExpectedSha256Async(item, "DynamicIsland-Portable.zip").GetAwaiter().GetResult();
+            Assert(resolvedExe == stableSha, "Installer SHA-256 must resolve for .exe target");
+            Assert(resolvedZip == portableSha, "Portable SHA-256 must resolve for .zip target");
+        }
+
+        // 5. SelectBestAsset prefers Installer when installed, Portable when portable
+        var downloads = new UpdateDownloads
+        {
+            Installer = new UpdateDownloadAsset { Url = "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.1/DynamicIsland-Setup.exe", Sha256 = stableSha },
+            Portable = new UpdateDownloadAsset { Url = "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.1/DynamicIsland-Portable.zip", Sha256 = portableSha }
+        };
+        var (installedAsset, isInst1) = UpdateManagerService.SelectBestAsset(downloads, isInstalledCopy: true);
+        Assert(isInst1 && installedAsset == downloads.Installer, "Installed copy must prefer Installer");
+        var (portableAsset, isInst2) = UpdateManagerService.SelectBestAsset(downloads, isInstalledCopy: false);
+        Assert(!isInst2 && portableAsset == downloads.Portable, "Portable copy must prefer Portable");
+
+        // 6. BuildInstallerArguments includes Inno Setup silent flags & target directory
+        string args = UpdateHandoffEngine.BuildInstallerArguments(1234, @"C:\Users\Test\AppData\Local\Programs\DynamicIsland");
+        Assert(args.Contains("--wait-pid 1234", StringComparison.Ordinal), "Installer args must include --wait-pid");
+        Assert(args.Contains("/DIR=\"C:\\Users\\Test\\AppData\\Local\\Programs\\DynamicIsland\"", StringComparison.Ordinal), "Installer args must include Inno /DIR");
+        Assert(args.Contains("/SILENT", StringComparison.Ordinal) && args.Contains("/SUPPRESSMSGBOXES", StringComparison.Ordinal) && args.Contains("/NORESTART", StringComparison.Ordinal),
+            "Installer args must include silent non-restarting Inno Setup flags");
+        Assert(args.Contains("/AppParams=\"--updated\"", StringComparison.Ordinal), "Installer args must pass --updated via /AppParams");
+
+        // 7. SemVersion informational version ordering with build metadata
+        Assert(SemVersion.TryParse("0.10.0-beta.1+abc123", out var infoBeta1), "Informational beta1 must parse");
+        Assert(SemVersion.TryParse("0.10.0-beta.2", out var infoBeta2), "Beta2 must parse");
+        Assert(SemVersion.TryParse("0.10.0", out var infoStable), "Stable 0.10.0 must parse");
+        Assert(infoBeta1 < infoBeta2 && infoBeta2 < infoStable, "0.10.0-beta.1+abc123 < 0.10.0-beta.2 < 0.10.0");
     }
 }

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:core="clr-namespace:DynamicIsland.Core"
         Title="Desktop Companion Roam"
-        Width="146" Height="136"
+        Width="116" Height="106"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -12,7 +12,6 @@
         ShowActivated="False"
         ResizeMode="NoResize"
         WindowStartupLocation="Manual"
-        MouseLeftButtonDown="Window_MouseLeftButtonDown"
         MouseEnter="Window_MouseEnter"
         MouseLeave="Window_MouseLeave">
 
@@ -23,22 +22,22 @@
             </ResourceDictionary.MergedDictionaries>
 
             <Style x:Key="FloatMicroBtn" TargetType="Button">
-                <Setter Property="Width" Value="19" />
-                <Setter Property="Height" Value="19" />
+                <Setter Property="Width" Value="18" />
+                <Setter Property="Height" Value="18" />
                 <Setter Property="Padding" Value="0" />
-                <Setter Property="Background" Value="#14FFFFFF" />
-                <Setter Property="BorderBrush" Value="#1FFFFFFF" />
+                <Setter Property="Background" Value="#20FFFFFF" />
+                <Setter Property="BorderBrush" Value="#2FFFFFFF" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="Cursor" Value="Hand" />
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
-                            <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9.5">
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9">
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Bd" Property="Background" Value="#2EFFFFFF" />
+                                    <Setter TargetName="Bd" Property="Background" Value="#3EFFFFFF" />
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -48,58 +47,54 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <!-- Outer Shadow Padding Frame -->
-    <Grid Margin="8">
-        <!-- Root Acrylic Continuous Squircle Card -->
-        <Border x:Name="RootCard"
-                Background="{DynamicResource PillBackgroundBrush}"
-                BorderBrush="{DynamicResource PillStrokeBrush}"
-                BorderThickness="1.2"
-                CornerRadius="20"
-                ClipToBounds="True">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.45" Color="#000000" />
-            </Border.Effect>
+    <!-- Completely Background-Free Transparent Stage: Only the Pet renders on Desktop -->
+    <Grid Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-            <Grid Margin="5,4,5,4">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <!-- Top Micro Toolbar (Reveals on Hover) -->
-                <DockPanel Grid.Row="0" x:Name="TopToolbar" Opacity="0.3" LastChildFill="False">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock x:Name="FloatPetSpeciesGlyph" Text="🐾" FontSize="8.5" VerticalAlignment="Center" Margin="2,0,4,0" />
-                        <TextBlock x:Name="FloatPetNameText" Text="Mochi" FontSize="8.5" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
-                    </StackPanel>
-
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Click="SpecialAction_Click" Style="{StaticResource FloatMicroBtn}" Margin="0,0,3,0" ToolTipService.ToolTip="Play signature species move">
-                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE734;" FontSize="8" Foreground="{DynamicResource CyanBrush}" />
-                        </Button>
-                        <Button Click="ReturnToIsland_Click" Style="{StaticResource FloatMicroBtn}" ToolTipService.ToolTip="Return companion to island capsule">
-                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
-                        </Button>
-                    </StackPanel>
-                </DockPanel>
-
-                <!-- Center: Big Roam Pet (98x80 px) -->
-                <core:VirtualPetControl x:Name="FloatPet"
-                                        Grid.Row="1"
-                                        Width="98" Height="80"
-                                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                                        Cursor="Hand"
-                                        MouseLeftButtonDown="Pet_Click"
-                                        MouseRightButtonUp="Pet_RightClick"
-                                        ToolTipService.ToolTip="Click to pet · Right-click for flip · Drag window to move" />
-
-                <!-- Bottom Micro Pill (Score & Mood) -->
-                <Border Grid.Row="2" Background="#12FFFFFF" CornerRadius="6" Padding="6,1" HorizontalAlignment="Center" Margin="0,1,0,1">
-                    <TextBlock x:Name="FloatStatusText" Text="❤️ 85 · Happy" FontSize="7.5" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
-                </Border>
-            </Grid>
+        <!-- Hover-Only Micro Pill Toolbar (Hidden at rest: Opacity=0, IsHitTestVisible=False) -->
+        <Border Grid.Row="0"
+                x:Name="TopToolbar"
+                HorizontalAlignment="Center"
+                Background="#D4101116"
+                BorderBrush="#2EFFFFFF"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="5,2"
+                Margin="0,0,0,2"
+                Opacity="0"
+                IsHitTestVisible="False">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock x:Name="FloatPetNameText" Text="Mochi" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" Margin="2,0,5,0" MaxWidth="48" TextTrimming="CharacterEllipsis" />
+                <Button Click="SpecialAction_Click" Style="{StaticResource FloatMicroBtn}" Margin="0,0,2.5,0" ToolTipService.ToolTip="Play signature species move">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE734;" FontSize="7.5" Foreground="{DynamicResource CyanBrush}" />
+                </Button>
+                <Button x:Name="AutoRoamToggleBtn" Click="AutoRoamToggle_Click" Style="{StaticResource FloatMicroBtn}" Margin="0,0,2.5,0" ToolTipService.ToolTip="Toggle autonomous desktop roaming">
+                    <TextBlock x:Name="AutoRoamGlyph" Style="{StaticResource Glyph}" Text="&#xE816;" FontSize="7.5" Foreground="{DynamicResource AccentBrush}" />
+                </Button>
+                <Button Click="ReturnToIsland_Click" Style="{StaticResource FloatMicroBtn}" ToolTipService.ToolTip="Return companion to island capsule">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="7" Foreground="{DynamicResource SecondaryBrush}" />
+                </Button>
+            </StackPanel>
         </Border>
+
+        <!-- Frameless Pet Directly on Desktop -->
+        <core:VirtualPetControl x:Name="FloatPet"
+                                Grid.Row="1"
+                                Width="96" Height="80"
+                                HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                                RenderTransformOrigin="0.5,0.5"
+                                Cursor="Hand"
+                                PreviewMouseLeftButtonDown="Pet_PreviewMouseLeftButtonDown"
+                                PreviewMouseMove="Pet_PreviewMouseMove"
+                                PreviewMouseLeftButtonUp="Pet_PreviewMouseLeftButtonUp"
+                                MouseRightButtonUp="Pet_RightClick"
+                                ToolTipService.ToolTip="Click to pet · Right-click for flip · Drag to move">
+            <core:VirtualPetControl.RenderTransform>
+                <ScaleTransform x:Name="FloatPetFlipScale" ScaleX="1" ScaleY="1" />
+            </core:VirtualPetControl.RenderTransform>
+        </core:VirtualPetControl>
     </Grid>
 </Window>

@@ -24,11 +24,15 @@ public sealed partial class VirtualPetControl
             dc.DrawEllipse(CatChestBrush, CatOutlinePen, new Point(5.5, 8.9 + hindR), 1.65, 0.95);
         }
 
-        // 3. Full Torso + Volumetric Shading + Tuxedo Chest Patch
+        // 3. Full Torso + Volumetric Shading + Tuxedo Chest Patch & Ruff
         var torso = sleeping && !IsScampering && !IsPeeking ? LoafTorsoGeo : TorsoGeo;
         dc.DrawGeometry(CatCoatBrush, CatOutlinePen, torso);
         ShadeTorso(dc, torso);
         dc.DrawGeometry(CatChestBrush, null, ChestPatchGeo);
+        if (_isHeroLod)
+        {
+            dc.DrawGeometry(CatChestBrush, null, ChestFluffGeo);
+        }
 
         // Tabby flank stripes on the body & haunches
         dc.DrawLine(CatBodyTabbyPen, new Point(-5.5, 5.2), new Point(-3.9, 5.6));
@@ -57,9 +61,19 @@ public sealed partial class VirtualPetControl
         double ea = _earAng + _earTwitch;
         DrawEar(dc, CatEarL, CatEarInnerL, CatCoatBrush, CatOutlinePen, CatEarInnerBrush, CatPivotL, -(ea + _earFlick));
         DrawEar(dc, CatEarR, CatEarInnerR, CatCoatBrush, CatOutlinePen, CatEarInnerBrush, CatPivotR, ea);
+        if (_isHeroLod)
+        {
+            dc.DrawGeometry(null, CatTabbyPen, EarTuftLGeo);
+            dc.DrawGeometry(null, CatTabbyPen, EarTuftRGeo);
+        }
         dc.DrawEllipse(WhiteSpecularBrush, null, new Point(-4.2, -4.0), 0.9, 0.7);
         dc.DrawEllipse(WhiteSpecularBrush, null, new Point(4.2, -4.0), 0.9, 0.7);
 
+        if (_isHeroLod)
+        {
+            dc.DrawGeometry(CatCoatBrush, null, CheekTuftLGeo);
+            dc.DrawGeometry(CatCoatBrush, null, CheekTuftRGeo);
+        }
         dc.DrawGeometry(CatCoatBrush, CatOutlinePen, CatHeadGeo);
         ShadeHead(dc, CatHeadGeo, CatHeadRect);
         dc.DrawEllipse(CatChestBrush, null, new Point(0, 4.0), 4.6, 3.0);
@@ -77,27 +91,12 @@ public sealed partial class VirtualPetControl
 
         if (mood == PetMood.Happy) DrawBlush(dc, 1.05);
 
-        // Whiskers
-        double wf = _isNearCursor ? 11.0 : 6.0;
-        double w1 = Math.Sin(t * wf) * 0.5, w2 = Math.Sin(t * wf + 1.2) * 0.5;
-        dc.DrawLine(WhiskerPen, new Point(-6.2, 1.2), new Point(-11.6, 0.4 + w1));
-        dc.DrawLine(WhiskerPen, new Point(-6.2, 2.8), new Point(-11.2, 3.8 + w2));
-        dc.DrawLine(WhiskerPen, new Point(6.2, 1.2), new Point(11.6, 0.4 - w1));
-        dc.DrawLine(WhiskerPen, new Point(6.2, 2.8), new Point(11.2, 3.8 - w2));
+        // Curved Tapered Whiskers
+        DrawCurvedWhiskers(dc, t, 1.0);
 
-        // Nose + mouth
-        dc.DrawGeometry(PinkNoseBrush, null, CatNoseGeo);
-        if (mood == PetMood.Happy || mood == PetMood.Dancing)
-        {
-            dc.DrawEllipse(DeepPupilBrush, null, new Point(0, 3.5), 1.25, 1.0);
-            dc.DrawEllipse(DogTongueBrush, null, new Point(0, 4.0), 0.75, 0.55);
-        }
-        else
-        {
-            dc.DrawLine(MouthPen, new Point(0.0, 1.8), new Point(0.0, 2.8));
-            dc.DrawLine(MouthPen, new Point(0.0, 2.8), new Point(-1.2, 3.5));
-            dc.DrawLine(MouthPen, new Point(0.0, 2.8), new Point(1.2, 3.5));
-        }
+        // Sculpted 3D Muzzle + Wet Pink Nose + Mouth
+        DrawRealisticMuzzleAndNose(dc, CatChestBrush, PinkNoseBrush, 1.15, 1.15, 0.85,
+            mood == PetMood.Happy || mood == PetMood.Dancing, true, false, t);
 
         DrawEyes(dc, mood, t, CatIrisBrush, 0);
         DrawAccessory(dc, t);
@@ -135,11 +134,15 @@ public sealed partial class VirtualPetControl
             dc.DrawEllipse(DogUrajiroBrush, DogOutlinePen, new Point(5.5, 8.9 + hindR), 1.7, 0.95);
         }
 
-        // 3. Full Torso + Cream Urajiro Chest Shield
+        // 3. Full Torso + Cream Urajiro Chest Shield & Ruff
         var torso = sleeping && !IsScampering && !IsPeeking ? LoafTorsoGeo : TorsoGeo;
         dc.DrawGeometry(DogCoatBrush, DogOutlinePen, torso);
         ShadeTorso(dc, torso);
         dc.DrawGeometry(DogUrajiroBrush, null, ChestPatchGeo);
+        if (_isHeroLod)
+        {
+            dc.DrawGeometry(DogUrajiroBrush, null, ChestFluffGeo);
+        }
 
         // 4. Front Legs & Cream Socks
         DrawFrontLegsAndPaws(dc, mood, t, DogCoatBrush, DogUrajiroBrush, DogOutlinePen, ToeLinePen, false, IsScampering, IsPeeking);
@@ -158,6 +161,11 @@ public sealed partial class VirtualPetControl
         DrawEar(dc, DogEarL, DogEarInnerL, DogEarDarkBrush, DogOutlinePen, DogUrajiroBrush, DogPivotL, -(ea + _earFlick * 0.6));
         DrawEar(dc, DogEarR, DogEarInnerR, DogEarDarkBrush, DogOutlinePen, DogUrajiroBrush, DogPivotR, ea);
 
+        if (_isHeroLod)
+        {
+            dc.DrawGeometry(DogCoatBrush, null, CheekTuftLGeo);
+            dc.DrawGeometry(DogCoatBrush, null, CheekTuftRGeo);
+        }
         dc.DrawGeometry(DogCoatBrush, DogOutlinePen, DogHeadGeo);
         ShadeHead(dc, DogHeadGeo, DogHeadRect);
         dc.DrawGeometry(DogUrajiroBrush, null, DogUrajiroGeo);
@@ -169,23 +177,9 @@ public sealed partial class VirtualPetControl
 
         if (mood == PetMood.Happy) DrawBlush(dc, 0.95);
 
-        // Mouth / happy tongue blep
-        if (mood == PetMood.Happy || mood == PetMood.Dancing)
-        {
-            double tb = Math.Sin(t * 14.0) * 0.55;
-            dc.DrawEllipse(DeepPupilBrush, null, new Point(0, 4.0), 2.2, 1.8);
-            dc.DrawEllipse(DogTongueBrush, null, new Point(0, 4.8 + tb), 1.9, 2.2);
-            dc.DrawEllipse(WhiteSpecularBrush, null, new Point(-0.5, 4.3 + tb), 0.5, 0.5);
-        }
-        else
-        {
-            dc.DrawLine(MouthPen, new Point(-1.6, 3.8), new Point(0.0, 3.0));
-            dc.DrawLine(MouthPen, new Point(0.0, 3.0), new Point(1.6, 3.8));
-        }
-
-        // Glossy nose
-        dc.DrawEllipse(DarkNoseBrush, null, new Point(0, 1.0), 1.55, 1.15);
-        dc.DrawEllipse(WhiteSpecularBrush, null, new Point(-0.4, 0.7), 0.45, 0.35);
+        // Sculpted Shiba Muzzle + Wet Black Nose + Happy Tongue
+        DrawRealisticMuzzleAndNose(dc, DogUrajiroBrush, DarkNoseBrush, 1.0, 1.55, 1.15,
+            mood == PetMood.Happy || mood == PetMood.Dancing, true, false, t);
 
         DrawEyes(dc, mood, t, DogIrisBrush, 1);
         DrawAccessory(dc, t);
@@ -241,6 +235,11 @@ public sealed partial class VirtualPetControl
         DrawEar(dc, BunnyEarL, BunnyEarInnerL, BunnyCoatBrush, BunnyOutlinePen, BunnyEarInnerBrush, BunnyPivotL, -(ea + _earFlick * 0.8));
         DrawEar(dc, BunnyEarR, BunnyEarInnerR, BunnyCoatBrush, BunnyOutlinePen, BunnyEarInnerBrush, BunnyPivotR, ea);
 
+        if (_isHeroLod)
+        {
+            dc.DrawGeometry(BunnyCoatBrush, null, CheekTuftLGeo);
+            dc.DrawGeometry(BunnyCoatBrush, null, CheekTuftRGeo);
+        }
         dc.DrawGeometry(BunnyCoatBrush, BunnyOutlinePen, BunnyHeadGeo);
         ShadeHead(dc, BunnyHeadGeo, BunnyHeadRect);
         dc.DrawEllipse(BunnyBellyBrush, null, new Point(0, 3.8), 4.2, 2.8);
@@ -248,19 +247,12 @@ public sealed partial class VirtualPetControl
         bool bloom = mood == PetMood.Happy || _squashVelocity < -0.05;
         DrawBlush(dc, bloom ? 1.35 : 1.0);
 
-        // Micro whiskers
-        dc.DrawLine(WhiskerPen, new Point(-4.8, 1.8), new Point(-9.2, 1.2));
-        dc.DrawLine(WhiskerPen, new Point(-4.8, 2.8), new Point(-9.0, 3.5));
-        dc.DrawLine(WhiskerPen, new Point(4.8, 1.8), new Point(9.2, 1.2));
-        dc.DrawLine(WhiskerPen, new Point(4.8, 2.8), new Point(9.0, 3.5));
+        // Curved Micro-Whiskers
+        DrawCurvedWhiskers(dc, t, 0.84);
 
-        // Twitching nose + Y mouth (+ buck teeth when happy)
-        double twitch = Math.Sin(t * 18.0) > 0.6 ? 0.35 : 0.0;
-        dc.DrawEllipse(PinkNoseBrush, null, new Point(0, 1.2 - twitch), 1.2, 0.98);
-        dc.DrawEllipse(WhiteSpecularBrush, null, new Point(-0.35, 0.9 - twitch), 0.35, 0.25);
-        dc.DrawLine(MouthPen, new Point(0.0, 2.2), new Point(0.0, 2.9));
-        dc.DrawLine(MouthPen, new Point(0.0, 2.9), new Point(-1.0, 3.4));
-        dc.DrawLine(MouthPen, new Point(0.0, 2.9), new Point(1.0, 3.4));
+        // Twitching 3D Pink Nose + Y Mouth (+ buck teeth when happy)
+        DrawRealisticMuzzleAndNose(dc, BunnyBellyBrush, PinkNoseBrush, 1.2, 1.2, 0.96,
+            false, false, true, t);
         if (mood == PetMood.Happy)
             dc.DrawRoundedRectangle(WhiteSpecularBrush, null, new Rect(-0.9, 3.1, 1.8, 1.2), 0.3, 0.3);
 
@@ -303,6 +295,10 @@ public sealed partial class VirtualPetControl
         dc.DrawGeometry(FoxCoatBrush, FoxOutlinePen, torso);
         ShadeTorso(dc, torso);
         dc.DrawGeometry(FoxCreamBrush, null, ChestPatchGeo);
+        if (_isHeroLod)
+        {
+            dc.DrawGeometry(FoxCreamBrush, null, ChestFluffGeo);
+        }
 
         // 4. Front Legs & Dark Vulpine Paws
         DrawFrontLegsAndPaws(dc, mood, t, FoxCoatBrush, FoxDarkBrush, FoxOutlinePen, ToeLinePen, true, IsScampering, IsPeeking);
@@ -320,6 +316,13 @@ public sealed partial class VirtualPetControl
         double ea = _earAng + _earTwitch;
         DrawEar(dc, FoxEarL, FoxEarInnerL, FoxDarkBrush, FoxOutlinePen, CatEarInnerBrush, FoxPivotL, -(ea + _earFlick));
         DrawEar(dc, FoxEarR, FoxEarInnerR, FoxDarkBrush, FoxOutlinePen, CatEarInnerBrush, FoxPivotR, ea);
+        if (_isHeroLod)
+        {
+            dc.DrawGeometry(null, FoxOutlinePen, EarTuftLGeo);
+            dc.DrawGeometry(null, FoxOutlinePen, EarTuftRGeo);
+            dc.DrawGeometry(FoxCreamBrush, null, CheekTuftLGeo);
+            dc.DrawGeometry(FoxCreamBrush, null, CheekTuftRGeo);
+        }
 
         dc.DrawGeometry(FoxCoatBrush, FoxOutlinePen, FoxHeadGeo);
         ShadeHead(dc, FoxHeadGeo, CatHeadRect);
@@ -327,25 +330,10 @@ public sealed partial class VirtualPetControl
 
         if (mood == PetMood.Happy || mood == PetMood.Eating) DrawBlush(dc, 1.1);
 
-        // Whiskers
-        double wf = _isNearCursor ? 11.0 : 6.0;
-        double w1 = Math.Sin(t * wf) * 0.45;
-        dc.DrawLine(WhiskerPen, new Point(-6.5, 2.2), new Point(-11.4, 1.5 + w1));
-        dc.DrawLine(WhiskerPen, new Point(6.5, 2.2), new Point(11.4, 1.5 - w1));
-
-        // Dark vulpine nose + mouth
-        dc.DrawEllipse(DarkNoseBrush, null, new Point(0, 1.3), 1.35, 0.95);
-        dc.DrawEllipse(WhiteSpecularBrush, null, new Point(-0.35, 1.05), 0.38, 0.25);
-        if (mood == PetMood.Happy || mood == PetMood.Dancing || mood == PetMood.Eating)
-        {
-            dc.DrawEllipse(DeepPupilBrush, null, new Point(0, 3.6), 1.3, 1.05);
-            dc.DrawEllipse(DogTongueBrush, null, new Point(0, 4.1), 0.85, 0.65);
-        }
-        else
-        {
-            dc.DrawLine(MouthPen, new Point(0.0, 2.2), new Point(-1.3, 3.3));
-            dc.DrawLine(MouthPen, new Point(0.0, 2.2), new Point(1.3, 3.3));
-        }
+        // Curved Whiskers + Vulpine Muzzle & Wet Nose
+        DrawCurvedWhiskers(dc, t, 0.96);
+        DrawRealisticMuzzleAndNose(dc, FoxCreamBrush, DarkNoseBrush, 1.3, 1.35, 0.95,
+            mood == PetMood.Happy || mood == PetMood.Dancing || mood == PetMood.Eating, true, true, t);
 
         DrawEyes(dc, mood, t, FoxIrisBrush, 0);
         DrawAccessory(dc, t);
@@ -402,6 +390,11 @@ public sealed partial class VirtualPetControl
         dc.DrawEllipse(PandaDarkBrush, PandaDarkOutlinePen, new Point(6.4, -5.2), 2.75, 2.65);
         dc.Pop();
 
+        if (_isHeroLod)
+        {
+            dc.DrawGeometry(PandaWhiteBrush, null, CheekTuftLGeo);
+            dc.DrawGeometry(PandaWhiteBrush, null, CheekTuftRGeo);
+        }
         dc.DrawGeometry(PandaWhiteBrush, PandaOutlinePen, DogHeadGeo);
         ShadeHead(dc, DogHeadGeo, DogHeadRect);
 
@@ -411,20 +404,9 @@ public sealed partial class VirtualPetControl
 
         if (mood == PetMood.Happy || mood == PetMood.Eating) DrawBlush(dc, 1.15);
 
-        // Nose & mouth
-        dc.DrawEllipse(DarkNoseBrush, null, new Point(0, 1.25), 1.45, 1.05);
-        dc.DrawEllipse(WhiteSpecularBrush, null, new Point(-0.35, 0.95), 0.4, 0.28);
-        if (mood == PetMood.Happy || mood == PetMood.Dancing || mood == PetMood.Eating)
-        {
-            dc.DrawEllipse(DeepPupilBrush, null, new Point(0, 3.6), 1.4, 1.1);
-            dc.DrawEllipse(DogTongueBrush, null, new Point(0, 4.1), 0.95, 0.7);
-        }
-        else
-        {
-            dc.DrawLine(MouthPen, new Point(0.0, 2.2), new Point(0.0, 2.9));
-            dc.DrawLine(MouthPen, new Point(0.0, 2.9), new Point(-1.2, 3.5));
-            dc.DrawLine(MouthPen, new Point(0.0, 2.9), new Point(1.2, 3.5));
-        }
+        // Sculpted Muzzle + Wet Black Nose
+        DrawRealisticMuzzleAndNose(dc, PandaWhiteBrush, DarkNoseBrush, 1.25, 1.45, 1.05,
+            mood == PetMood.Happy || mood == PetMood.Dancing || mood == PetMood.Eating, true, false, t);
 
         DrawEyes(dc, mood, t, PandaIrisBrush, 1);
         DrawAccessory(dc, t);
@@ -448,12 +430,14 @@ public sealed partial class VirtualPetControl
         wl.RotateAt(-flapAng, DragonWingPivotL.X, DragonWingPivotL.Y);
         Push(dc, wl);
         dc.DrawGeometry(DragonWingBrush, DragonOutlinePen, DragonWingLGeo);
+        if (_isHeroLod) dc.DrawGeometry(null, DragonWingRibPen, DragonWingRibsLGeo);
         dc.Pop();
 
         var wr = Matrix.Identity;
         wr.RotateAt(flapAng, DragonWingPivotR.X, DragonWingPivotR.Y);
         Push(dc, wr);
         dc.DrawGeometry(DragonWingBrush, DragonOutlinePen, DragonWingRGeo);
+        if (_isHeroLod) dc.DrawGeometry(null, DragonWingRibPen, DragonWingRibsRGeo);
         dc.Pop();
 
         // 2. Whipping Dragon Tail with Spade Tip
@@ -499,6 +483,10 @@ public sealed partial class VirtualPetControl
         dc.DrawGeometry(DragonCoatBrush, DragonOutlinePen, DogHeadGeo);
         ShadeHead(dc, DogHeadGeo, DogHeadRect);
         dc.DrawEllipse(DragonBellyBrush, null, new Point(0, 4.1), 4.2, 2.6);
+        if (_isHeroLod)
+        {
+            dc.DrawGeometry(DragonScaleBrush, null, DragonScaleMarksGeo);
+        }
 
         if (mood == PetMood.Happy || mood == PetMood.Eating) DrawBlush(dc, 1.05);
 
@@ -644,21 +632,111 @@ public sealed partial class VirtualPetControl
         {
             var e = new Point(side * 3.6, -1.1);
 
-            dc.DrawEllipse(DeepPupilBrush, null, e, eyeW + 0.18, eyeH + 0.18);
-            dc.DrawEllipse(iris, null, e, eyeW, eyeH);
+            if (_isHeroLod)
+            {
+                dc.DrawGeometry(null, EyelidCreasePen, side < 0 ? UpperLidArcL : UpperLidArcR);
+            }
+
+            dc.DrawEllipse(DeepPupilBrush, null, e, eyeW + 0.16, eyeH + 0.16);
+            dc.DrawEllipse(iris, _isHeroLod ? IrisLimbalPen : null, e, eyeW, eyeH);
+
+            if (_isHeroLod)
+            {
+                // Lower-iris corneal light bounce (caustic) + upper-eyelid shadow
+                dc.DrawEllipse(LowerIrisCausticBrush, null, new Point(e.X, e.Y + eyeH * 0.42), eyeW * 0.72, eyeH * 0.44);
+                dc.DrawEllipse(UpperLidShadowBrush, null, new Point(e.X, e.Y - eyeH * 0.38), eyeW * 0.94, eyeH * 0.56);
+            }
 
             var p = new Point(e.X + px, e.Y + py * (kind == 0 ? 0.5 : 1.0));
-            dc.DrawEllipse(DeepPupilBrush, null, p, pupilW, pupilH);
+            if (kind == 0 && _isHeroLod)
+            {
+                // Tapered almond feline/vulpine/dragon slit pupil
+                double sx = Math.Max(0.32, pupilW / 0.72);
+                double sy = Math.Max(0.5, pupilH);
+                Push(dc, new Matrix(sx, 0, 0, sy, p.X, p.Y));
+                dc.DrawGeometry(DeepPupilBrush, null, AlmondSlitPupilGeo);
+                dc.Pop();
+            }
+            else
+            {
+                dc.DrawEllipse(DeepPupilBrush, null, p, pupilW, pupilH);
+            }
 
             dc.DrawEllipse(EyeRimBrush, null, new Point(e.X + px * 0.2, e.Y + eyeH * 0.62), eyeW * 0.52, 0.3);
 
             if (glintScale > 0.05)
             {
                 double gcx = e.X + px * 0.35, gcy = e.Y + py * 0.35;
-                dc.DrawEllipse(WhiteSpecularBrush, null, new Point(gcx - 0.55, gcy - 0.65 * lid), 0.68 * glintScale, 0.68 * glintScale);
-                dc.DrawEllipse(SoftSecondarySpecularBrush, null, new Point(gcx + 0.55, gcy + 0.55 * lid), 0.38 * glintScale, 0.38 * glintScale);
+                dc.DrawEllipse(WhiteSpecularBrush, null, new Point(gcx - 0.55, gcy - 0.65 * lid), 0.72 * glintScale, 0.66 * glintScale);
+                dc.DrawEllipse(SoftSecondarySpecularBrush, null, new Point(gcx + 0.55, gcy + 0.55 * lid), 0.36 * glintScale, 0.36 * glintScale);
             }
         }
+    }
+
+    private void DrawRealisticMuzzleAndNose(
+        DrawingContext dc,
+        Brush muzzleBrush,
+        Brush noseBrush,
+        double noseY,
+        double noseW,
+        double noseH,
+        bool isHappy,
+        bool showTongue,
+        bool twitchNose,
+        double t)
+    {
+        double ny = noseY - (twitchNose && Math.Sin(t * 14.0) > 0.55 ? 0.28 : 0.0);
+
+        if (_isHeroLod)
+        {
+            // Twin sculpted whisker-pad cushions with soft underside shadow
+            dc.DrawEllipse(MuzzleCushionShadowBrush, null, new Point(-1.35, ny + 1.55), 1.65, 1.15);
+            dc.DrawEllipse(MuzzleCushionShadowBrush, null, new Point(1.35, ny + 1.55), 1.65, 1.15);
+            dc.DrawEllipse(muzzleBrush, null, new Point(-1.25, ny + 1.2), 1.45, 0.98);
+            dc.DrawEllipse(muzzleBrush, null, new Point(1.25, ny + 1.2), 1.45, 0.98);
+        }
+
+        if (isHappy && showTongue)
+        {
+            double tb = Math.Sin(t * 14.0) * 0.35;
+            dc.DrawEllipse(DeepPupilBrush, null, new Point(0, ny + 2.55), 1.55, 1.25);
+            dc.DrawEllipse(DogTongueBrush, null, new Point(0, ny + 3.15 + tb), 1.15, 1.15);
+            dc.DrawEllipse(WhiteSpecularBrush, null, new Point(-0.3, ny + 2.85 + tb), 0.35, 0.3);
+        }
+        else
+        {
+            dc.DrawLine(MouthPen, new Point(0.0, ny + 0.75), new Point(0.0, ny + 1.55));
+            dc.DrawLine(MouthPen, new Point(0.0, ny + 1.55), new Point(-1.2, ny + 2.15));
+            dc.DrawLine(MouthPen, new Point(0.0, ny + 1.55), new Point(1.2, ny + 2.15));
+        }
+
+        // Wet 3D nose + nostrils + glossy specular
+        dc.DrawEllipse(noseBrush, null, new Point(0, ny), noseW, noseH);
+        if (_isHeroLod)
+        {
+            dc.DrawEllipse(NostrilBrush, null, new Point(-noseW * 0.34, ny + noseH * 0.14), 0.24, 0.18);
+            dc.DrawEllipse(NostrilBrush, null, new Point(noseW * 0.34, ny + noseH * 0.14), 0.24, 0.18);
+            dc.DrawEllipse(WetNoseHighlightBrush, null, new Point(-noseW * 0.24, ny - noseH * 0.28), noseW * 0.42, noseH * 0.36);
+        }
+        else
+        {
+            dc.DrawEllipse(WhiteSpecularBrush, null, new Point(-noseW * 0.25, ny - noseH * 0.25), 0.35, 0.25);
+        }
+    }
+
+    private void DrawCurvedWhiskers(DrawingContext dc, double t, double scaleX)
+    {
+        double wf = _isNearCursor ? 11.0 : 6.0;
+        double wy = Math.Sin(t * wf) * 0.35;
+        Push(dc, new Matrix(scaleX, 0, 0, 1.0, 0, wy));
+        dc.DrawGeometry(null, WhiskerPen, CurvedWhiskerL1);
+        dc.DrawGeometry(null, WhiskerPen, CurvedWhiskerL2);
+        dc.Pop();
+
+        Push(dc, new Matrix(scaleX, 0, 0, 1.0, 0, -wy));
+        dc.DrawGeometry(null, WhiskerPen, CurvedWhiskerR1);
+        dc.DrawGeometry(null, WhiskerPen, CurvedWhiskerR2);
+        dc.Pop();
     }
 
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -839,9 +917,13 @@ public sealed partial class VirtualPetControl
         {
             case PetSpecialActionKind.LaserHunt:
             {
-                // Scurrying red laser pointer dot with glowing outer corona & specular core
-                double lx = cx + Math.Sin(p * 18.0) * 9.5;
-                double ly = 23.5 + Math.Cos(p * 14.0) * 2.2;
+                // Scurrying red laser pointer dot (tracks cursor when hovered in Sanctuary)
+                double lx = _hasInteractiveToyTarget
+                    ? cx + _interactiveToyNormX * 11.5
+                    : cx + Math.Sin(p * 18.0) * 9.5;
+                double ly = _hasInteractiveToyTarget
+                    ? 19.5 + _interactiveToyNormY * 4.5
+                    : 23.5 + Math.Cos(p * 14.0) * 2.2;
                 dc.DrawEllipse(LaserDotBrush, null, new Point(lx, ly), 2.5, 2.0);
                 dc.DrawEllipse(WhiteSpecularBrush, null, new Point(lx, ly), 0.8, 0.65);
                 if (p > 0.45)
@@ -853,8 +935,10 @@ public sealed partial class VirtualPetControl
             }
             case PetSpecialActionKind.BallFetch:
             {
-                // Bouncing tennis ball with dynamic parabolic bounce trajectory & felt seams
-                double bx = cx - 13.0 + p * 26.0;
+                // Bouncing tennis ball with dynamic parabolic trajectory (steers toward cursor if hovered)
+                double bx = _hasInteractiveToyTarget
+                    ? cx + (_interactiveToyNormX * 12.0) * Math.Sin(p * Math.PI * 0.5)
+                    : cx - 13.0 + p * 26.0;
                 double by = p < 0.5 ? 23.0 - Math.Sin(p / 0.5 * Math.PI) * 14.0 : (p < 0.82 ? 18.0 + (p - 0.5) * 8.0 : 24.2);
                 dc.DrawEllipse(TennisBallBrush, GoldBellOutlinePen, new Point(bx, by), 2.3, 2.3);
                 dc.DrawLine(TennisBallSeamPen, new Point(bx - 1.3, by - 1.1), new Point(bx + 1.3, by + 1.1));

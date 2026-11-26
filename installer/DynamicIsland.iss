@@ -7,7 +7,7 @@
   #define MyAppVersion "0.9.0"
 #endif
 #define MyAppPublisher "Jainis Patel"
-#define MyAppURL "https://github.com"
+#define MyAppURL "https://github.com/jainis-Patel/DynamicIsland"
 #define MyAppExeName "DynamicIsland.exe"
 
 [Setup]
@@ -53,20 +53,31 @@ Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Name: "{userstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: autostart
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Parameters: "{param:AppParams|}"; Flags: nowait postinstall
 
 [Code]
-// Gracefully signal any running Dynamic Island process to close before upgrading
+// Gracefully signal any running Dynamic Island process to close and wait for its file lock to release before upgrading
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
   AppPath: String;
+  LockTestPath: String;
+  Tries: Integer;
 begin
   Result := '';
   AppPath := ExpandConstant('{app}\{#MyAppExeName}');
+  LockTestPath := AppPath + '.locktest';
   if FileExists(AppPath) then
   begin
     Exec(AppPath, '--stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Sleep(250);
+    for Tries := 0 to 24 do
+    begin
+      if RenameFile(AppPath, LockTestPath) then
+      begin
+        RenameFile(LockTestPath, AppPath);
+        Break;
+      end;
+      Sleep(200);
+    end;
   end;
 end;

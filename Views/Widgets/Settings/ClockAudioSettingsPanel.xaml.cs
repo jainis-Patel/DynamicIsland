@@ -37,6 +37,9 @@ public partial class ClockAudioSettingsPanel : UserControl
     private void VisualizerStyleBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.VisualizerStyleBtn_Click(sender, e);
 
+    private void AlbumArtStyleBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.AlbumArtStyleBtn_Click(sender, e);
+
     private void CameraLensToggleBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.CameraLensToggleBtn_Click(sender, e);
 

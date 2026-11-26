@@ -72,6 +72,7 @@ public sealed class AppSettings
     public int HighCpuAlertThreshold { get; set; } = 80;
     public int HighRamAlertThreshold { get; set; } = 85;
     public string VisualizerStyle { get; set; } = "ClassicBars";
+    public string AlbumArtStyle { get; set; } = "VinylDisc";
     public bool HardwareNotchMode { get; set; } = false;
     public double HardwareNotchWidth { get; set; } = 188.0;
     public double HardwareNotchHeight { get; set; } = 35.0;
@@ -91,6 +92,12 @@ public sealed class AppSettings
     public int PetWaterCount { get; set; } = 0;
     public int PetStretchCount { get; set; } = 0;
     public int PetTreatCount { get; set; } = 0;
+    public bool EnablePetAutoRoam { get; set; } = true;
+    public bool EnablePetContextReactions { get; set; } = true;
+    public int PetCareStreakDays { get; set; } = 0;
+    public string? PetLastCareDate { get; set; }
+    public double? PetFloatX { get; set; }
+    public double? PetFloatY { get; set; }
     public bool EnableChargingPulse { get; set; } = true;
     public int LowBatteryAlertThreshold { get; set; } = 20;
     public bool AutoPowerPlanOnBattery { get; set; } = false;
@@ -247,6 +254,33 @@ internal sealed class SettingsService : IDisposable
         return AvailableVisualizerStyles.FirstOrDefault(s => string.Equals(s, trimmed, StringComparison.OrdinalIgnoreCase)) ?? "ClassicBars";
     }
 
+    public static readonly IReadOnlyList<string> AvailableAlbumArtStyles = new[]
+    {
+        "VinylDisc",
+        "OpticalDisc",
+        "StaticSquircle",
+    };
+
+    public static string NormalizeAlbumArtStyle(string? style)
+    {
+        if (string.IsNullOrWhiteSpace(style)) return "VinylDisc";
+        string trimmed = style.Trim();
+        if (string.Equals(trimmed, "Vinyl", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Disc", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "VinylDisc", StringComparison.OrdinalIgnoreCase))
+            return "VinylDisc";
+        if (string.Equals(trimmed, "Optical", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "CD", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "FullDisc", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "OpticalDisc", StringComparison.OrdinalIgnoreCase))
+            return "OpticalDisc";
+        if (string.Equals(trimmed, "Static", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Squircle", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "StaticSquircle", StringComparison.OrdinalIgnoreCase))
+            return "StaticSquircle";
+        return AvailableAlbumArtStyles.FirstOrDefault(s => string.Equals(s, trimmed, StringComparison.OrdinalIgnoreCase)) ?? "VinylDisc";
+    }
+
     public static readonly IReadOnlyList<string> AvailableDockPositions = new[]
     {
         "Left",
@@ -378,6 +412,13 @@ internal sealed class SettingsService : IDisposable
     public static string NormalizePetAccessory(string? accessory) =>
         AvailablePetAccessories.FirstOrDefault(a => string.Equals(a, accessory?.Trim(), StringComparison.OrdinalIgnoreCase)) ?? "None";
 
+    public static string SanitizePetName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "Mochi";
+        string trimmed = name.Trim();
+        return trimmed.Length > 18 ? trimmed[..18].TrimEnd() : trimmed;
+    }
+
     public static string NormalizeUpdateChannel(string? channel) =>
         string.Equals(channel?.Trim(), "Beta", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(channel?.Trim(), "Canary", StringComparison.OrdinalIgnoreCase)
@@ -445,6 +486,7 @@ internal sealed class SettingsService : IDisposable
         settings.BackdropOpacity = settings.BackdropOpacity <= 0.1 ? 1.0 : Math.Clamp(settings.BackdropOpacity, 0.65, 1.0);
         settings.ClockStyle = NormalizeClockStyle(settings.ClockStyle);
         settings.VisualizerStyle = NormalizeVisualizerStyle(settings.VisualizerStyle);
+        settings.AlbumArtStyle = NormalizeAlbumArtStyle(settings.AlbumArtStyle);
         settings.DockPosition = NormalizeDockPosition(settings.DockPosition);
         settings.ThemeName = NormalizeThemeName(settings.ThemeName);
         settings.ThemeMode = NormalizeThemeMode(settings.ThemeMode);
@@ -452,6 +494,8 @@ internal sealed class SettingsService : IDisposable
         settings.IslandTheme = NormalizeIslandTheme(settings.IslandTheme);
         settings.PetSpecies = NormalizePetSpecies(settings.PetSpecies);
         settings.PetAccessory = NormalizePetAccessory(settings.PetAccessory);
+        settings.PetName = SanitizePetName(settings.PetName);
+        settings.PetCareStreakDays = Math.Max(0, settings.PetCareStreakDays);
         settings.UpdateChannel = NormalizeUpdateChannel(settings.UpdateChannel);
         settings.PhoneBridgeDurationMinutes = settings.PhoneBridgeDurationMinutes <= 0
             ? 15

@@ -122,21 +122,15 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <!-- Album Artwork Squircle with Click-to-Focus Player -->
-                        <Border Width="50" Height="50" CornerRadius="14"
-                                Background="#18FFFFFF" BorderBrush="#25FFFFFF" BorderThickness="1"
-                                ClipToBounds="True" core:RoundedClip.ClipChild="True"
-                                VerticalAlignment="Center" Cursor="Hand"
-                                MouseLeftButtonDown="Artwork_Click"
-                                ToolTipService.ToolTip="Click to open active media player">
-                            <Grid>
-                                <TextBlock x:Name="MiniArtFallback" Style="{StaticResource Glyph}"
-                                           Text="&#xE8D6;" FontSize="20"
-                                           Foreground="{DynamicResource SecondaryBrush}"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                <Image x:Name="MiniArtImage" Stretch="UniformToFill" />
-                            </Grid>
-                        </Border>
+                        <!-- Album Artwork Platter / Squircle with Click-to-Focus Player -->
+                        <core:PlayerDiscControl x:Name="MiniArtDisc"
+                                                DiscSize="48"
+                                                ShowTonearm="True"
+                                                SquircleRadius="14"
+                                                VerticalAlignment="Center"
+                                                Cursor="Hand"
+                                                MouseLeftButtonDown="Artwork_Click"
+                                                ToolTipService.ToolTip="Click to open active media player" />
 
                         <!-- Track Metadata & Interactive Badges -->
                         <StackPanel Grid.Column="1" Margin="11,0,8,0" VerticalAlignment="Center">
@@ -489,20 +483,19 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Mini 28x28 Artwork with Brand Pip -->
-                    <Border Grid.Column="0" Width="28" Height="28" CornerRadius="10"
-                            Background="#18FFFFFF" ClipToBounds="True" core:RoundedClip.ClipChild="True" VerticalAlignment="Center">
-                        <Grid>
-                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE8D6;" FontSize="11"
-                                       Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <Image x:Name="CompactArtImage" Stretch="UniformToFill" />
-                            <Border x:Name="CompactBrandPip" Width="10" Height="10" CornerRadius="5" Background="#D5000000"
-                                    HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,1,1" Visibility="Collapsed">
-                                <Viewbox Width="6.5" Height="6.5" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Path x:Name="CompactBrandPath" Stretch="Uniform" Fill="{DynamicResource AccentBrush}" />
-                                </Viewbox>
-                            </Border>
-                        </Grid>
-                    </Border>
+                    <Grid Grid.Column="0" Width="28" Height="28" VerticalAlignment="Center" ClipToBounds="False">
+                        <core:PlayerDiscControl x:Name="CompactArtDisc"
+                                                DiscSize="28"
+                                                ShowTonearm="False"
+                                                SquircleRadius="10"
+                                                VerticalAlignment="Center" />
+                        <Border x:Name="CompactBrandPip" Width="10" Height="10" CornerRadius="5" Background="#D5000000"
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,0,0" Visibility="Collapsed">
+                            <Viewbox Width="6.5" Height="6.5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Path x:Name="CompactBrandPath" Stretch="Uniform" Fill="{DynamicResource AccentBrush}" />
+                            </Viewbox>
+                        </Border>
+                    </Grid>
 
                     <!-- Title & Artist (Compact Marquee) -->
                     <StackPanel Grid.Column="1" Margin="8,0,6,0" VerticalAlignment="Center">

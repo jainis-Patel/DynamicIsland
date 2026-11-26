@@ -530,13 +530,7 @@
                     <Grid HorizontalAlignment="Left" VerticalAlignment="Center" Margin="11,0,0,0">
                         <Grid x:Name="CompactMediaHost" Visibility="Collapsed">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Border Width="20" Height="20" CornerRadius="10" Background="#1AFFFFFF" ClipToBounds="True" core:RoundedClip.ClipChild="True">
-                                    <Grid>
-                                        <TextBlock x:Name="CompactArtFallback" Style="{StaticResource Glyph}"
-                                                   Text="&#xE8D6;" FontSize="10.5" HorizontalAlignment="Center" Foreground="#86868B" />
-                                        <Image x:Name="CompactArtImage" Stretch="UniformToFill" />
-                                    </Grid>
-                                </Border>
+                                <core:PlayerDiscControl x:Name="CompactArtDisc" DiscSize="20" ShowTonearm="False" SquircleRadius="6" VerticalAlignment="Center" />
                                 <TextBlock x:Name="CompactTrackText" FontSize="11.5" FontWeight="Medium"
                                            Foreground="{DynamicResource PrimaryTextBrush}" Margin="8,0,0,0" MaxWidth="112"
                                            TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Text="Title" />
@@ -908,12 +902,13 @@
 
                 <!-- 3. Drop Shelf & Files (Image 2) -->
                 <Button x:Name="ShelfButton" AutomationProperties.Name="Drop Shelf and Files" Style="{StaticResource DockIconButton}" ToolTip="Drop Shelf &amp; Files (Ctrl+3)">
-                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center" ClipToBounds="False">
                         <TextBlock Style="{StaticResource Glyph}" FontSize="12.5" Text="&#xE8B7;" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         <Border x:Name="DockShelfBadgeHost" Visibility="Collapsed" Background="#32ADE6"
-                                CornerRadius="5" MinWidth="11" Height="11" Padding="2,0" Margin="6,-6,-6,0"
+                                CornerRadius="6.5" MinWidth="13" Height="13" Padding="3,0" Margin="0,-3,-4,0"
                                 HorizontalAlignment="Right" VerticalAlignment="Top">
-                            <TextBlock x:Name="DockShelfBadgeText" Text="0" FontSize="7.5" FontWeight="Bold" Foreground="#0B0B0E"
+                            <TextBlock x:Name="DockShelfBadgeText" Text="0" FontSize="8" FontWeight="Bold" Foreground="#0B0B0E"
+                                       LineHeight="10" LineStackingStrategy="BlockLineHeight"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                     </Grid>
@@ -921,12 +916,13 @@
 
                 <!-- 4. Notification Center (Bell with Live Unread Badge) -->
                 <Button x:Name="NotificationsButton" AutomationProperties.Name="Notification Center" Style="{StaticResource DockIconButton}" ToolTip="Notification Center (Ctrl+4 / Ctrl+Alt+N)">
-                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center" ClipToBounds="False">
                         <TextBlock x:Name="NotificationsButtonGlyph" Style="{StaticResource Glyph}" FontSize="12.5" Text="&#xEA8F;" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         <Border x:Name="NotificationsBadgeHost" Visibility="Collapsed" Background="{DynamicResource AccentBrush}"
-                                CornerRadius="5" MinWidth="11" Height="11" Padding="2,0" Margin="6,-6,-6,0"
+                                CornerRadius="6.5" MinWidth="13" Height="13" Padding="3,0" Margin="0,-3,-4,0"
                                 HorizontalAlignment="Right" VerticalAlignment="Top">
-                            <TextBlock x:Name="NotificationsBadgeText" Text="0" FontSize="7.5" FontWeight="Bold" Foreground="White"
+                            <TextBlock x:Name="NotificationsBadgeText" Text="0" FontSize="8" FontWeight="Bold" Foreground="#0B0B0E"
+                                       LineHeight="10" LineStackingStrategy="BlockLineHeight"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                     </Grid>
@@ -957,11 +953,11 @@
                 </Button>
                 <Button x:Name="SettingsButton" AutomationProperties.Name="Appearance and Settings"
                         Style="{StaticResource FloatingDockUtilityButton}" Margin="0,0,2,0" ToolTip="Appearance &amp; Settings (Ctrl+Alt+S)">
-                    <Grid>
-                        <TextBlock Style="{StaticResource Glyph}" FontSize="11.5" Text="&#xE713;" />
+                    <Grid Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" ClipToBounds="False">
+                        <TextBlock Style="{StaticResource Glyph}" FontSize="11.5" Text="&#xE713;" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         <Border x:Name="SettingsUpdateBadgeDot" Width="6" Height="6" CornerRadius="3"
                                 Background="#30D158" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                Margin="0,-2,-3,0" Visibility="Collapsed" IsHitTestVisible="False" />
+                                Margin="0,-1,-2,0" Visibility="Collapsed" IsHitTestVisible="False" />
                     </Grid>
                 </Button>
                 <Button x:Name="CollapseButton" AutomationProperties.Name="Collapse Dynamic Island" Click="CollapseButton_Click"

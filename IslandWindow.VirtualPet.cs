@@ -203,17 +203,6 @@ public partial class IslandWindow
             TriggerPetScamper();
             _petClickStreak = 0;
         }
-        else
-        {
-            _machine.PushToast(new ToastContent(
-                "\uE76E", // Heart
-                _petService.PetName,
-                msg,
-                ThemeBrushes.PinkColor,
-                TimeSpan.FromSeconds(2.5),
-                TargetView: "pet",
-                Priority: ToastPriority.Feedback));
-        }
         UpdatePetSettingsUI();
         EnsureRendering();
         e.Handled = true;
@@ -223,22 +212,13 @@ public partial class IslandWindow
     {
         if (_petService == null) return;
         e.Handled = true;
-        string msg = _petService.PerformTrick();
+        _petService.PerformTrick();
         TriggerLiquidImpulse(220, -90, 16);
         IdlePetCompanion?.TriggerTrick();
         CompactPetCompanion?.TriggerTrick();
         SettingsHeroPet?.TriggerTrick();
         UpdatePetSettingsUI();
         EnsureRendering();
-        _machine.PushToast(new ToastContent(
-            "\uE734", // Star / Trick
-            $"{_petService.PetName} Flip!",
-            msg,
-            ThemeBrushes.AmberColor,
-            TimeSpan.FromSeconds(2.5),
-            TargetView: "pet",
-            Priority: ToastPriority.Feedback,
-            Category: "pet"));
     }
 
     private PetFloatWindow? _petFloatWindow;
@@ -305,20 +285,19 @@ public partial class IslandWindow
             Category: "pet"));
     }
 
-    internal void PetSpeciesBtn_Click(object sender, RoutedEventArgs e)
+    internal void PetSpeciesPickBtn_Click(object sender, RoutedEventArgs e)
     {
-        _petService?.CycleSpecies();
+        if (sender is not FrameworkElement { Tag: string species } || _petService == null) return;
+        _petService.SetSpecies(species);
         IdlePetCompanion?.PetClickImpulse();
         CompactPetCompanion?.PetClickImpulse();
         SettingsHeroPet?.PetClickImpulse();
         UpdatePetSettingsUI();
         EnsureRendering();
-        string species = _petService?.PetSpecies ?? "Cat";
-        string icon = FormatSpeciesLabel(species);
         _machine.PushToast(new ToastContent(
             "\uE708",
             "Pet Companion Species",
-            $"Switched to {icon}",
+            $"Switched to {FormatSpeciesLabel(_petService.PetSpecies)}",
             ThemeBrushes.PinkColor,
             TimeSpan.FromSeconds(2.0),
             TargetView: "settings",
@@ -326,25 +305,77 @@ public partial class IslandWindow
             Category: "pet"));
     }
 
-    internal void PetAccessoryBtn_Click(object sender, RoutedEventArgs e)
+    internal void PetAccessoryPickBtn_Click(object sender, RoutedEventArgs e)
     {
-        _petService?.CycleAccessory();
+        if (sender is not FrameworkElement { Tag: string accessory } || _petService == null) return;
+        _petService.SetAccessory(accessory);
         IdlePetCompanion?.PetClickImpulse();
         CompactPetCompanion?.PetClickImpulse();
         SettingsHeroPet?.PetClickImpulse();
         UpdatePetSettingsUI();
         EnsureRendering();
-        string acc = _petService?.PetAccessory ?? "None";
-        string label = FormatAccessoryLabel(acc);
         _machine.PushToast(new ToastContent(
             "\uE734",
             "Pet Wardrobe",
-            $"Equipped {label} on {_petService?.PetName ?? "Mochi"}",
+            $"Equipped {FormatAccessoryLabel(_petService.PetAccessory)} on {_petService.PetName}",
             ThemeBrushes.PurpleColor,
             TimeSpan.FromSeconds(2.0),
             TargetView: "settings",
             Priority: ToastPriority.Feedback,
             Category: "pet"));
+    }
+
+    internal void PetCustomNameBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && sender is TextBox tb)
+        {
+            CommitCustomPetName(tb.Text);
+            Keyboard.ClearFocus();
+            e.Handled = true;
+        }
+    }
+
+    internal void PetCustomNameBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox tb)
+        {
+            CommitCustomPetName(tb.Text);
+        }
+    }
+
+    private void CommitCustomPetName(string? rawName)
+    {
+        if (_petService == null) return;
+        string clean = SettingsService.SanitizePetName(rawName);
+        if (string.Equals(clean, _petService.PetName, StringComparison.Ordinal)) return;
+
+        string saved = _petService.SetPetName(clean);
+        IdlePetCompanion?.PetClickImpulse();
+        CompactPetCompanion?.PetClickImpulse();
+        SettingsHeroPet?.PetClickImpulse();
+        UpdatePetSettingsUI();
+        EnsureRendering();
+        _machine.PushToast(new ToastContent(
+            "\uE70F",
+            "Companion Renamed",
+            $"Your companion is now named {saved}!",
+            ThemeBrushes.BlueColor,
+            TimeSpan.FromSeconds(2.0),
+            TargetView: "settings",
+            Priority: ToastPriority.Feedback,
+            Category: "pet"));
+    }
+
+    internal void PetAutoRoamToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        _petService?.ToggleAutoRoam();
+        UpdatePetSettingsUI();
+    }
+
+    internal void PetContextToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        _petService?.ToggleContextReactions();
+        UpdatePetSettingsUI();
     }
 
     internal void PetNameBtn_Click(object sender, RoutedEventArgs e)
@@ -410,18 +441,10 @@ public partial class IslandWindow
     internal void PetInteractBtn_Click(object sender, RoutedEventArgs e)
     {
         if (_petService == null) return;
-        string msg = _petService.Pet();
+        _petService.Pet();
         IdlePetCompanion?.PetClickImpulse();
         CompactPetCompanion?.PetClickImpulse();
         SettingsHeroPet?.PetClickImpulse();
-        _machine.PushToast(new ToastContent(
-            "\uE76E",
-            _petService.PetName,
-            msg,
-            ThemeBrushes.PinkColor,
-            TimeSpan.FromSeconds(3.0),
-            TargetView: null,
-            Priority: ToastPriority.Feedback));
         UpdatePetSettingsUI();
         EnsureRendering();
     }
@@ -501,14 +524,47 @@ public partial class IslandWindow
             if (pp.PetToggleSwitch != null)
                 pp.PetToggleSwitch.IsChecked = enabled;
 
-            if (pp.PetSpeciesText != null)
-                pp.PetSpeciesText.Text = FormatSpeciesLabel(species);
+            if (pp.PetAutoRoamToggleSwitch != null)
+                pp.PetAutoRoamToggleSwitch.IsChecked = _petService.AutoRoamEnabled;
 
-            if (pp.PetAccessoryText != null)
-                pp.PetAccessoryText.Text = FormatAccessoryLabel(accessory);
+            if (pp.PetContextToggleSwitch != null)
+                pp.PetContextToggleSwitch.IsChecked = _petService.ContextReactionsEnabled;
+
+            if (pp.PetCustomNameBox != null && !pp.PetCustomNameBox.IsKeyboardFocusWithin)
+                pp.PetCustomNameBox.Text = name;
 
             if (pp.PetNameBtnText != null)
-                pp.PetNameBtnText.Text = "Rename";
+                pp.PetNameBtnText.Text = "🎲";
+
+            if (pp.PetSettingsStreakBadge != null && pp.PetSettingsStreakText != null)
+            {
+                int streak = _petService.CareStreakDays;
+                pp.PetSettingsStreakBadge.Visibility = streak >= 1 ? Visibility.Visible : Visibility.Collapsed;
+                pp.PetSettingsStreakText.Text = $"🔥 {streak}d";
+            }
+
+            if (pp.PetSpeciesCatBtn != null)
+            {
+                var accent = (Brush)Resources["AccentBrush"];
+                var defaultBorder = (Brush)FindResource("CardBorderBrush");
+                var activeBg = ThemeBrushes.PillToggleActiveBg;
+                var defaultBg = (Brush)FindResource("CardSurfaceBrush");
+
+                StyleCardOptionButton(pp.PetSpeciesCatBtn, species == "Cat", accent, activeBg, defaultBg, defaultBorder);
+                StyleCardOptionButton(pp.PetSpeciesDogBtn, species == "Dog", accent, activeBg, defaultBg, defaultBorder);
+                StyleCardOptionButton(pp.PetSpeciesBunnyBtn, species == "Bunny", accent, activeBg, defaultBg, defaultBorder);
+                StyleCardOptionButton(pp.PetSpeciesFoxBtn, species == "Fox", accent, activeBg, defaultBg, defaultBorder);
+                StyleCardOptionButton(pp.PetSpeciesPandaBtn, species == "Panda", accent, activeBg, defaultBg, defaultBorder);
+                StyleCardOptionButton(pp.PetSpeciesDragonBtn, species == "Dragon", accent, activeBg, defaultBg, defaultBorder);
+
+                StyleCardOptionButton(pp.PetAccNoneBtn, accessory == "None", accent, activeBg, defaultBg, defaultBorder);
+                StyleCardOptionButton(pp.PetAccCrownBtn, accessory == "Crown", accent, activeBg, defaultBg, defaultBorder);
+                StyleCardOptionButton(pp.PetAccWizardBtn, accessory == "WizardHat", accent, activeBg, defaultBg, defaultBorder);
+                StyleCardOptionButton(pp.PetAccHeadphonesBtn, accessory == "Headphones", accent, activeBg, defaultBg, defaultBorder);
+                StyleCardOptionButton(pp.PetAccSunglassesBtn, accessory == "Sunglasses", accent, activeBg, defaultBg, defaultBorder);
+                StyleCardOptionButton(pp.PetAccHaloBtn, accessory == "Halo", accent, activeBg, defaultBg, defaultBorder);
+                StyleCardOptionButton(pp.PetAccSproutBtn, accessory == "Sprout", accent, activeBg, defaultBg, defaultBorder);
+            }
 
             if (pp.PetStatusSummaryText != null)
                 pp.PetStatusSummaryText.Text = $"{name} \u00B7 {affection} XP";

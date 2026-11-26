@@ -107,6 +107,31 @@ internal static class InstallerService
         }
     }
 
+    public static bool IsInstalledAtCurrentLocation(string? exePath = null)
+    {
+        if (IsRunningFromInstallDir(exePath)) return true;
+
+        string? currentExe = exePath ?? Environment.ProcessPath;
+        if (string.IsNullOrEmpty(currentExe)) return false;
+
+        var existing = GetExistingInstallation();
+        if (!existing.IsInstalled || string.IsNullOrWhiteSpace(existing.Location)) return false;
+
+        try
+        {
+            string currentDir = Path.GetFullPath(Path.GetDirectoryName(currentExe) ?? "");
+            string installedDir = Path.GetFullPath(existing.Location);
+            return string.Equals(
+                currentDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                installedDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static bool IsInstallerMode(string[] args, string? exePath = null)
     {
         if (args.Any(a => string.Equals(a, "--install", StringComparison.OrdinalIgnoreCase) ||

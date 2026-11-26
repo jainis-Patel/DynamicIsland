@@ -550,21 +550,16 @@ public partial class WidgetsGalleryView : UserControl
             }
         }
 
-        if (MediaThumbnailImage != null && MediaFallbackGlyph != null)
-        {
-            if (media?.Artwork != null)
-            {
-                MediaThumbnailImage.Source = media.Artwork;
-                MediaThumbnailImage.Visibility = Visibility.Visible;
-                MediaFallbackGlyph.Visibility = Visibility.Collapsed;
-            }
-            else
-            {
-                MediaThumbnailImage.Visibility = Visibility.Collapsed;
-                MediaFallbackGlyph.Visibility = Visibility.Visible;
-            }
-        }
+        MediaArtDisc?.SetArtwork(media?.Artwork);
     }
+
+    internal void ApplyAlbumArtStyle(string? style)
+    {
+        MediaArtDisc?.SetStyle(style);
+    }
+
+    internal bool StepMediaDisc(double dt, bool isPlaying, float bassLevel, bool reducedMotion) =>
+        MediaArtDisc?.StepPhysics(dt, isPlaying, bassLevel, reducedMotion) ?? true;
 
     private void UpdateCalendarUI()
     {
