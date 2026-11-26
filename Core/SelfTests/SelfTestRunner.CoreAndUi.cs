@@ -1564,4 +1564,79 @@ SSID 3 : Home_Router
             if (File.Exists(tempPath)) File.Delete(tempPath);
         }
     }
+
+    private static void TestIpcHookGenerator()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), $"di_hooks_{Guid.NewGuid():N}");
+        try
+        {
+            var (ok, outDir, count, err) = IpcHookGenerator.ExportAll(tempDir);
+            Assert(ok && count == 3 && string.IsNullOrEmpty(err), $"ExportAll failed: {err}");
+
+            string ps1 = File.ReadAllText(Path.Combine(outDir, "claude-island-hook.ps1"));
+            string json = File.ReadAllText(Path.Combine(outDir, "claude-hooks.json"));
+            string cli = File.ReadAllText(Path.Combine(outDir, "di-run.ps1"));
+
+            Assert(ps1.Contains("DynamicIsland.Activities", StringComparison.Ordinal), "PS1 hook must target DynamicIsland.Activities pipe");
+            Assert(cli.Contains("DynamicIsland.Activities", StringComparison.Ordinal), "CLI wrapper must target DynamicIsland.Activities pipe");
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            Assert(doc.RootElement.TryGetProperty("hooks", out _), "claude-hooks.json must contain root 'hooks' object");
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    private static void TestAccessibilityAndHighContrast()
+    {
+        ThemeManager.SetHighContrastOverride(true);
+        try
+        {
+            ThemeManager.Initialize("Dark", "Liquid Glass");
+            Assert(ThemeManager.IsHighContrast, "ThemeManager.IsHighContrast must reflect override");
+            Assert(!ThemeManager.IsLiquidGlass, "Liquid Glass translucency must be bypassed in High Contrast mode");
+        }
+        finally
+        {
+            ThemeManager.SetHighContrastOverride(null);
+            ThemeManager.Initialize("Dark", "Default");
+        }
+
+        string localizedFallback = Localizer.Get("NonExistent_Test_Key", "FallbackValue");
+        Assert(localizedFallback == "FallbackValue", "Localizer.Get must return fallback when key is absent");
+    }
+
+    private static void TestSettingsExportSanitization()
+    {
+        string srcPath = Path.Combine(Path.GetTempPath(), $"di_src_{Guid.NewGuid():N}.json");
+        string expPath = Path.Combine(Path.GetTempPath(), $"di_exp_{Guid.NewGuid():N}.json");
+        try
+        {
+            var settings = new SettingsService(srcPath);
+            settings.Update(s =>
+            {
+                s.ThemeName = "Cyberpunk Cyan";
+                s.GitHubToken = "ghp_secret_token_12345";
+                s.PhoneBridgePassword = "super-secret-password";
+            });
+
+            Assert(settings.ExportToFile(expPath), "ExportToFile must succeed");
+            string exportedJson = File.ReadAllText(expPath);
+            Assert(!exportedJson.Contains("ghp_secret_token_12345", StringComparison.Ordinal), "Exported JSON must strip GitHubToken");
+            Assert(!exportedJson.Contains("super-secret-password", StringComparison.Ordinal), "Exported JSON must strip PhoneBridgePassword");
+            Assert(!exportedJson.Contains("GitHubTokenProtected", StringComparison.Ordinal), "Exported JSON must strip GitHubTokenProtected");
+            Assert(!exportedJson.Contains("PhoneBridgePasswordProtected", StringComparison.Ordinal), "Exported JSON must strip PhoneBridgePasswordProtected");
+
+            var reimported = new SettingsService(Path.Combine(Path.GetTempPath(), $"di_imp_{Guid.NewGuid():N}.json"));
+            Assert(reimported.ImportFromFile(expPath), "ImportFromFile must succeed");
+            Assert(reimported.Current.ThemeName == "Cyberpunk Cyan", "Non-secret theme setting must round-trip");
+            Assert(string.IsNullOrEmpty(reimported.Current.GitHubToken), "Imported GitHubToken must be empty");
+        }
+        finally
+        {
+            if (File.Exists(srcPath)) File.Delete(srcPath);
+            if (File.Exists(expPath)) File.Delete(expPath);
+        }
+    }
 }

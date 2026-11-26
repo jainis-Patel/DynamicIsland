@@ -1,0 +1,22 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <!-- Onboarding -->
+    <sys:String x:Key="Onboarding_WelcomeTitle">Welcome to Dynamic Island</sys:String>
+    <sys:String x:Key="Onboarding_WelcomeSubtitle">Press Ctrl+Alt+G for Command Palette · Click to customize</sys:String>
+
+    <!-- Command Palette -->
+    <sys:String x:Key="CommandPalette_Placeholder">Search, calc, commands...</sys:String>
+    <sys:String x:Key="CommandPalette_Empty">No matching commands or apps found</sys:String>
+
+    <!-- Context Profiles -->
+    <sys:String x:Key="Profile_Default">Default</sys:String>
+    <sys:String x:Key="Profile_Focus">Deep Focus</sys:String>
+    <sys:String x:Key="Profile_Gaming">Gaming / Minimal</sys:String>
+    <sys:String x:Key="Profile_Presenting">Presenting</sys:String>
+
+    <!-- Core HUD & Tray -->
+    <sys:String x:Key="Hud_DoNotDisturb">Do Not Disturb</sys:String>
+    <sys:String x:Key="Hud_DropToShelf">Drop to Shelf</sys:String>
+    <sys:String x:Key="Hooks_ExportedTitle">AI Agent Hooks Exported</sys:String>
+</ResourceDictionary>

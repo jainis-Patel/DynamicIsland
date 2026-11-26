@@ -38,14 +38,25 @@ internal static class ThemeManager
     private static ThemeStyle _currentStyle = ThemeStyle.Default;
     private static int _lastSystemAppsUseLightTheme = -1;
     private static bool _initialized;
+    private static bool? _highContrastOverride;
 
     public static ThemeMode CurrentMode => _currentMode;
     public static AppTheme CurrentTheme => _currentTheme;
     public static ThemeStyle CurrentStyle => _currentStyle;
     public static bool IsDark => _currentTheme == AppTheme.Dark;
     public static bool IsLight => _currentTheme == AppTheme.Light;
-    public static bool IsLiquidGlass => _currentStyle == ThemeStyle.LiquidGlass;
+    public static bool IsHighContrast => _highContrastOverride ?? SystemParameters.HighContrast;
+    public static bool IsLiquidGlass => !IsHighContrast && _currentStyle == ThemeStyle.LiquidGlass;
     public static bool Initialized => _initialized;
+
+    internal static void SetHighContrastOverride(bool? value)
+    {
+        _highContrastOverride = value;
+        if (_initialized)
+        {
+            ApplyThemeCore(_currentTheme, _currentStyle);
+        }
+    }
 
     public static event Action<AppTheme>? ThemeChanged;
     public static event Action<ThemeStyle>? ThemeStyleChanged;
@@ -204,7 +215,7 @@ internal static class ThemeManager
         _currentTheme = theme;
         _currentStyle = nextStyle;
         bool isDark = theme == AppTheme.Dark;
-        bool isLiquid = nextStyle == ThemeStyle.LiquidGlass;
+        bool isLiquid = !IsHighContrast && nextStyle == ThemeStyle.LiquidGlass;
 
         // 1. Update static frozen brushes in ThemeBrushes
         ThemeBrushes.ApplyActiveTheme(isDark, isLiquid);

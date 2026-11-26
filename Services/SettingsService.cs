@@ -529,6 +529,15 @@ internal sealed class SettingsService : IDisposable
         {
             settings.SchemaVersion = 3;
         }
+        try
+        {
+            if (System.IO.File.Exists(path) &&
+                !System.IO.File.ReadAllText(path).Contains(nameof(AppSettings.HasCompletedOnboarding), StringComparison.OrdinalIgnoreCase))
+            {
+                settings.HasCompletedOnboarding = true;
+            }
+        }
+        catch { }
         return settings;
     }
 

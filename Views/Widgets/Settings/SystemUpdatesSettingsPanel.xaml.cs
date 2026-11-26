@@ -88,4 +88,7 @@ public partial class SystemUpdatesSettingsPanel : UserControl
 
     private void OpenReleasesPageBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.OpenReleasesPageBtn_Click(sender, e);
+
+    private void ExportAiHooksBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.ExportAiAgentHooksWithToast();
 }

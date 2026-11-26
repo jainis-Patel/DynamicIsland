@@ -842,6 +842,19 @@ public partial class IslandWindow : Window
         _settingsService.PropertyChanged += OnSettingsPropertyChanged;
         _updateService.StartBackgroundWorker();
         CheckPostUpdateLaunchStatus();
+        if (!_settingsService.Current.HasCompletedOnboarding && !App.IsDiagnosticMode)
+        {
+            _settingsService.Update(s => s.HasCompletedOnboarding = true, nameof(AppSettings.HasCompletedOnboarding));
+            _machine.PushToast(new ToastContent(
+                "\uE734",
+                Localizer.Get("Onboarding_WelcomeTitle", "Welcome to Dynamic Island"),
+                Localizer.Get("Onboarding_WelcomeSubtitle", "Press Ctrl+Alt+G for Command Palette · Click to customize"),
+                ThemeBrushes.BlueColor,
+                TimeSpan.FromSeconds(5.0),
+                TargetView: "settings",
+                Priority: ToastPriority.Notification,
+                Category: "onboarding"));
+        }
     }
 
     // ═════════════════════════════════════════════════════════════════

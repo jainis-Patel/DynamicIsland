@@ -218,6 +218,22 @@
                 </StackPanel>
             </Border>
 
+            <!-- AI Agent & CLI IPC Hooks Card -->
+            <Border Style="{StaticResource SettingsGroupCard}">
+                <DockPanel LastChildFill="False">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="AI Agent &amp; CLI Hooks" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                        <TextBlock Text="Export Claude Code &amp; CLI Live Activity pipe scripts" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                    </StackPanel>
+                    <Button Click="ExportAiHooksBtn_Click" x:Name="ExportAiHooksBtn" DockPanel.Dock="Right" Style="{StaticResource IslandButton}" Height="22" Padding="9,0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE943;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center" />
+                            <TextBlock Text="Export Hooks" FontSize="8.5" FontWeight="Medium" />
+                        </StackPanel>
+                    </Button>
+                </DockPanel>
+            </Border>
+
         </StackPanel>
     </ScrollViewer>
 </UserControl>

@@ -525,7 +525,9 @@
 
                 <!-- ── Compact Live Activity (220x34) ───────────────── -->
                 <Grid x:Name="CompactPanel" Width="228" Height="36" ClipToBounds="False"
-                      HorizontalAlignment="Center" VerticalAlignment="Top">
+                      HorizontalAlignment="Center" VerticalAlignment="Top"
+                      AutomationProperties.Name="Compact Live Activity"
+                      AutomationProperties.LiveSetting="Polite">
                     <!-- Leading Region (Left) -->
                     <Grid HorizontalAlignment="Left" VerticalAlignment="Center" Margin="11,0,0,0">
                         <Grid x:Name="CompactMediaHost" Visibility="Collapsed">
@@ -757,7 +759,9 @@
 
                 <!-- ── Toast / Alert Banner (320x56) ────────────────── -->
                 <Grid x:Name="ToastPanel" Width="336" Height="58"
-                      HorizontalAlignment="Center" VerticalAlignment="Top">
+                      HorizontalAlignment="Center" VerticalAlignment="Top"
+                      AutomationProperties.Name="Dynamic Island Notification Banner"
+                      AutomationProperties.LiveSetting="Polite">
                     <Grid Margin="14,0,14,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -771,14 +775,17 @@
                         </Border>
                         <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
                             <TextBlock x:Name="ToastTitle" FontSize="13" FontWeight="SemiBold"
+                                       AutomationProperties.LiveSetting="Polite"
                                        Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" Text="Volume" />
                             <TextBlock x:Name="ToastSubtitle" FontSize="11.5" Margin="0,1,0,0"
+                                       AutomationProperties.LiveSetting="Polite"
                                        Foreground="{DynamicResource SecondaryBrush}"
                                        TextTrimming="CharacterEllipsis" Text="65%" />
                         </StackPanel>
 
                         <Button x:Name="ToastReplyButton" Grid.Column="2"
                                 Visibility="Collapsed"
+                                AutomationProperties.Name="Quick Reply"
                                 Style="{StaticResource IslandButton}"
                                 Height="26" Padding="8,0" Margin="0"
                                 VerticalAlignment="Center"

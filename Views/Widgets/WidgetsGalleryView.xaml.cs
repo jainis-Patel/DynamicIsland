@@ -921,5 +921,37 @@ public partial class WidgetsGalleryView : UserControl
             e.Handled = true;
         }
     }
+
+    private void NewDropletTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string dir = AppPaths.DropletsDirectory;
+            Directory.CreateDirectory(dir);
+            string samplePath = Path.Combine(dir, "sample-status.droplet.json");
+            if (!File.Exists(samplePath))
+            {
+                string json = """
+{
+  "id": "sample_status",
+  "name": "Sample Status Droplet",
+  "description": "Starter community droplet template",
+  "glyph": "\uE943",
+  "pollIntervalSeconds": 60,
+  "endpointUrl": "",
+  "enabledByDefault": false
+}
+""";
+                File.WriteAllText(samplePath, json);
+            }
+
+            int loaded = Island?.CommunityDroplets?.ScanAndLoadAll(dir) ?? 0;
+            Island?.PushNotificationToast("\uE943", "Community Droplets", $"Template ready · {loaded} droplet(s) loaded", ThemeBrushes.GreenColor);
+        }
+        catch (Exception ex)
+        {
+            Island?.PushNotificationToast("\uE783", "Droplet Template Error", ex.Message, ThemeBrushes.AmberColor);
+        }
+    }
     #endregion
 }

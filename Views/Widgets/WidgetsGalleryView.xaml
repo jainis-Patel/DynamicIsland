@@ -119,6 +119,12 @@
                         <TextBlock x:Name="UnpinAllDesktopText" Text="Unpin (1)" FontSize="8.5" FontWeight="Medium" />
                     </StackPanel>
                 </Button>
+                <Button Click="NewDropletTemplate_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0,0,5,0" ToolTipService.ToolTip="Create a starter Community Droplet JSON template">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE710;" FontSize="8.5" Foreground="{DynamicResource GreenBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                        <TextBlock Text="New Droplet" FontSize="8.5" FontWeight="Medium" />
+                    </StackPanel>
+                </Button>
                 <Button Click="OpenLaunchpad_Click" Style="{StaticResource IslandButton}" Height="22" Padding="9,0" ToolTipService.ToolTip="Open Apps Launchpad (Ctrl+6)">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Style="{StaticResource Glyph}" Text="&#xF0E2;" FontSize="8.5" Foreground="{DynamicResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center" />

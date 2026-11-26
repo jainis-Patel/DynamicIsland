@@ -147,6 +147,9 @@ internal static partial class SelfTestRunner
         Run("SettingsSearchHighLoad: High-load droplet settings are indexed & searchable", TestSettingsSearchHighLoadEntry);
         Run("CommandPalette: Fuzzy ranking, inline math, settings deep-links & system actions", TestCommandPalette);
         Run("ContextProfiles: Built-in presets, override apply/restore & process auto-matching", TestContextProfiles);
+        Run("IpcHookGenerator: Valid JSON/PS1 hook synthesis & pipe target verification", TestIpcHookGenerator);
+        Run("AccessibilityAndHighContrast: High-contrast fallback & AutomationProperties coverage", TestAccessibilityAndHighContrast);
+        Run("SettingsExport: Secret stripping & preset round-trip", TestSettingsExportSanitization);
 
         string summary = skipped > 0
             ? $"\nSelf-Test Summary: {passed} passed, {failed} failed, {skipped} skipped (filter: '{filter}')."
