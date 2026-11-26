@@ -10,6 +10,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using DynamicIsland.Core;
+using DynamicIsland.Services;
 
 namespace DynamicIsland.Views;
 
@@ -34,6 +35,8 @@ public partial class SetupWindow : Window
     private string? _lastErrorDetails;
     private bool _isInstalling;
     private bool _isPreview;
+    private string _selectedStylePreset = "Living Nature";
+    private string _selectedDockPosition = "Center";
 
     public SetupWindow()
     {
@@ -65,11 +68,14 @@ public partial class SetupWindow : Window
         else
         {
             ReadyTitleText.Text = "Install Dynamic Island";
-            ReadySubtitleText.Text = $"Version {InstallerService.AppVersion} is ready.";
+            ReadySubtitleText.Text = "Choose your starting look. You can change everything later in Settings.";
             ActionBtn.Content = "Install";
             ProgressTitleText.Text = "Installing Dynamic Island…";
             ProgressStatusText.Text = "Installing…";
             DoneSubtitleText.Text = "Dynamic Island is ready to use.";
+            FirstTimeSetupPanel.Visibility = Visibility.Visible;
+            FirstTimeTipsPanel.Visibility = Visibility.Visible;
+            UpdateFirstTimeOptionStyles();
         }
 
         // 3. Initialize Options fields
@@ -275,15 +281,21 @@ public partial class SetupWindow : Window
             var progress = new Progress<(int Percent, string StepMessage)>(report =>
             {
                 AnimateProgress(report.Percent);
-                if (report.Percent >= 60)
+                if (!string.IsNullOrWhiteSpace(report.StepMessage))
                 {
-                    ProgressStatusText.Text = "Almost done…";
+                    ProgressStatusText.Text = report.StepMessage;
                 }
                 else
                 {
-                    ProgressStatusText.Text = _isUpgrade ? "Updating…" : "Installing…";
+                    ProgressStatusText.Text = report.Percent >= 60
+                        ? "Almost done…"
+                        : (_isUpgrade ? "Updating…" : "Installing…");
                 }
             });
+
+            AppSettings? initialSettings = _isUpgrade
+                ? null
+                : BuildFirstTimeSettings(_selectedStylePreset, _selectedDockPosition, SetupPetToggle.IsChecked == true);
 
             var result = await Task.Run(() =>
             {
@@ -294,7 +306,7 @@ public partial class SetupWindow : Window
                     autoStartOnBoot: autoStart,
                     errorMessage: out string? err,
                     progress: progress,
-                    initialSettings: null); // Preserves existing user settings, themes, clipboard history on upgrade
+                    initialSettings: initialSettings);
 
                 return (success, err);
             });
@@ -386,6 +398,86 @@ public partial class SetupWindow : Window
         }
 
         Application.Current?.Shutdown();
+    }
+
+    internal static AppSettings BuildFirstTimeSettings(string stylePreset, string dockPosition, bool enableVirtualPet)
+    {
+        var settings = new AppSettings
+        {
+            DockPosition = SettingsService.NormalizeDockPosition(dockPosition),
+            EnableVirtualPet = enableVirtualPet,
+            HasCompletedOnboarding = true
+        };
+
+        if (string.Equals(stylePreset, "Liquid Glass", StringComparison.OrdinalIgnoreCase))
+        {
+            settings.ThemeStyle = "Liquid Glass";
+            settings.IslandTheme = "None";
+        }
+        else if (string.Equals(stylePreset, "Classic OLED", StringComparison.OrdinalIgnoreCase))
+        {
+            settings.ThemeStyle = "Default";
+            settings.IslandTheme = "None";
+        }
+        else
+        {
+            settings.ThemeStyle = "Default";
+            settings.IslandTheme = "Ivy & Blooms";
+        }
+
+        return settings;
+    }
+
+    private void StylePresetBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string preset })
+        {
+            _selectedStylePreset = preset;
+            UpdateFirstTimeOptionStyles();
+        }
+    }
+
+    private void DockPresetBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string dock })
+        {
+            _selectedDockPosition = dock;
+            UpdateFirstTimeOptionStyles();
+        }
+    }
+
+    private void UpdateFirstTimeOptionStyles()
+    {
+        var accent = (Brush)FindResource("BrushAccent");
+        var defaultBg = (Brush)FindResource("BrushElevated");
+        var defaultBorder = (Brush)FindResource("BrushOutline");
+        var primaryText = (Brush)FindResource("BrushTextPrimary");
+        var secondaryText = (Brush)FindResource("BrushTextSecondary");
+
+        void StyleBtn(Button? btn, bool active)
+        {
+            if (btn == null) return;
+            btn.BorderBrush = active ? accent : defaultBorder;
+            btn.Background = active ? defaultBg : Brushes.Transparent;
+            btn.Foreground = active ? primaryText : secondaryText;
+        }
+
+        StyleBtn(StyleOledBtn, string.Equals(_selectedStylePreset, "Classic OLED", StringComparison.OrdinalIgnoreCase));
+        StyleBtn(StyleGlassBtn, string.Equals(_selectedStylePreset, "Liquid Glass", StringComparison.OrdinalIgnoreCase));
+        StyleBtn(StyleNatureBtn, string.Equals(_selectedStylePreset, "Living Nature", StringComparison.OrdinalIgnoreCase));
+
+        StyleBtn(DockLeftBtn, string.Equals(_selectedDockPosition, "Left", StringComparison.OrdinalIgnoreCase));
+        StyleBtn(DockCenterBtn, string.Equals(_selectedDockPosition, "Center", StringComparison.OrdinalIgnoreCase));
+        StyleBtn(DockRightBtn, string.Equals(_selectedDockPosition, "Right", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void OpenNotifSettingsBtn_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            using var _ = Process.Start(new ProcessStartInfo("ms-settings:privacy-notifications") { UseShellExecute = true });
+        }
+        catch { }
     }
 
     private async void Retry_Click(object sender, RoutedEventArgs e)

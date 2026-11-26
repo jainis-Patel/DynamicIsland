@@ -1639,4 +1639,19 @@ SSID 3 : Home_Router
             if (File.Exists(expPath)) File.Delete(expPath);
         }
     }
+
+    private static void TestFirstTimeSetupSynthesis()
+    {
+        var oled = Views.SetupWindow.BuildFirstTimeSettings("Classic OLED", "Left", enableVirtualPet: false);
+        Assert(oled.ThemeStyle == "Default" && oled.IslandTheme == "None", "Classic OLED preset mismatch");
+        Assert(oled.DockPosition == "Left" && !oled.EnableVirtualPet && oled.HasCompletedOnboarding, "Classic OLED flags mismatch");
+
+        var glass = Views.SetupWindow.BuildFirstTimeSettings("Liquid Glass", "right", enableVirtualPet: true);
+        Assert(glass.ThemeStyle == "Liquid Glass" && glass.IslandTheme == "None", "Liquid Glass preset mismatch");
+        Assert(glass.DockPosition == "Right" && glass.EnableVirtualPet && glass.HasCompletedOnboarding, "Liquid Glass flags mismatch");
+
+        var nature = Views.SetupWindow.BuildFirstTimeSettings("Living Nature", "Center", enableVirtualPet: true);
+        Assert(nature.ThemeStyle == "Default" && nature.IslandTheme == "Ivy & Blooms", "Living Nature preset mismatch");
+        Assert(nature.DockPosition == "Center" && nature.EnableVirtualPet && nature.HasCompletedOnboarding, "Living Nature flags mismatch");
+    }
 }

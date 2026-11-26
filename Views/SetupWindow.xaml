@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Dynamic Island Setup"
         Icon="pack://application:,,,/Assets/app.ico"
-        Width="480" Height="360"
+        Width="480" Height="440"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -20,9 +20,9 @@
         </ResourceDictionary>
     </Window.Resources>
 
-    <!-- Main Window Frame (Fixed 480x360 px, 12px radius, solid #121214 with 1px #FFFFFF14 outline) -->
+    <!-- Main Window Frame (Fixed 480x440 px, 12px radius, solid #121214 with 1px #FFFFFF14 outline) -->
     <Border x:Name="SetupWindowFrame"
-            Width="480" Height="360"
+            Width="480" Height="440"
             Background="{StaticResource BrushSurface}"
             BorderBrush="{StaticResource BrushOutline}"
             BorderThickness="1"
@@ -125,7 +125,58 @@
                                    TextWrapping="Wrap"
                                    MaxWidth="380"
                                    LineHeight="20"
-                                   Margin="0,0,0,24" />
+                                   Margin="0,0,0,16" />
+
+                        <!-- First-Time Setup Quick Customization (hidden on upgrades) -->
+                        <Border x:Name="FirstTimeSetupPanel"
+                                Visibility="Collapsed"
+                                Background="{StaticResource BrushElevated}"
+                                BorderBrush="{StaticResource BrushOutline}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="12,10"
+                                Margin="0,0,0,18"
+                                MaxWidth="390">
+                            <StackPanel>
+                                <!-- Visual Style -->
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Style" FontSize="12" Foreground="{StaticResource BrushTextSecondary}" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button x:Name="StyleOledBtn" Tag="Classic OLED" Content="Classic OLED" Click="StylePresetBtn_Click" Style="{StaticResource InstallerSecondaryButton}" Height="24" MinWidth="0" Padding="8,0" FontSize="11" Margin="0,0,4,0" />
+                                        <Button x:Name="StyleGlassBtn" Tag="Liquid Glass" Content="Liquid Glass" Click="StylePresetBtn_Click" Style="{StaticResource InstallerSecondaryButton}" Height="24" MinWidth="0" Padding="8,0" FontSize="11" Margin="0,0,4,0" />
+                                        <Button x:Name="StyleNatureBtn" Tag="Living Nature" Content="Living Nature" Click="StylePresetBtn_Click" Style="{StaticResource InstallerSecondaryButton}" Height="24" MinWidth="0" Padding="8,0" FontSize="11" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Dock Position -->
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Position" FontSize="12" Foreground="{StaticResource BrushTextSecondary}" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button x:Name="DockLeftBtn" Tag="Left" Content="Left" Click="DockPresetBtn_Click" Style="{StaticResource InstallerSecondaryButton}" Height="24" MinWidth="46" Padding="8,0" FontSize="11" Margin="0,0,4,0" />
+                                        <Button x:Name="DockCenterBtn" Tag="Center" Content="Center" Click="DockPresetBtn_Click" Style="{StaticResource InstallerSecondaryButton}" Height="24" MinWidth="54" Padding="8,0" FontSize="11" Margin="0,0,4,0" />
+                                        <Button x:Name="DockRightBtn" Tag="Right" Content="Right" Click="DockPresetBtn_Click" Style="{StaticResource InstallerSecondaryButton}" Height="24" MinWidth="48" Padding="8,0" FontSize="11" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Virtual Pet -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Virtual Pet Companion" FontSize="12" Foreground="{StaticResource BrushTextSecondary}" VerticalAlignment="Center" />
+                                    <CheckBox x:Name="SetupPetToggle" Grid.Column="1" Style="{StaticResource InstallerToggleSwitch}" IsChecked="True" VerticalAlignment="Center" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
 
                         <!-- Action Buttons (Single primary action + secondary text button) -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
@@ -241,7 +292,24 @@
                                    Foreground="{StaticResource BrushTextSecondary}"
                                    HorizontalAlignment="Center"
                                    TextAlignment="Center"
-                                   Margin="0,0,0,24" />
+                                   Margin="0,0,0,14" />
+
+                        <!-- First-Time Quick-Start Tips (hidden on upgrades) -->
+                        <StackPanel x:Name="FirstTimeTipsPanel" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,0,0,18">
+                            <Border Background="{StaticResource BrushElevated}" BorderBrush="{StaticResource BrushOutline}" BorderThickness="1" CornerRadius="10" Padding="12,8" Margin="0,0,0,6" MaxWidth="380">
+                                <TextBlock Text="Hover top pill to expand · Ctrl+Alt+G for Command Palette · Drag files onto pill for Drop Shelf"
+                                           FontSize="11.5"
+                                           Foreground="{StaticResource BrushTextSecondary}"
+                                           TextWrapping="Wrap"
+                                           TextAlignment="Center"
+                                           LineHeight="17" />
+                            </Border>
+                            <Button x:Name="OpenNotifSettingsBtn"
+                                    Content="Enable Windows Notification access…"
+                                    Style="{StaticResource InstallerLinkButton}"
+                                    Click="OpenNotifSettingsBtn_Click"
+                                    HorizontalAlignment="Center" />
+                        </StackPanel>
 
                         <!-- Buttons: Open Dynamic Island / Close -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">

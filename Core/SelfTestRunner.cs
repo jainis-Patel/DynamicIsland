@@ -150,6 +150,7 @@ internal static partial class SelfTestRunner
         Run("IpcHookGenerator: Valid JSON/PS1 hook synthesis & pipe target verification", TestIpcHookGenerator);
         Run("AccessibilityAndHighContrast: High-contrast fallback & AutomationProperties coverage", TestAccessibilityAndHighContrast);
         Run("SettingsExport: Secret stripping & preset round-trip", TestSettingsExportSanitization);
+        Run("FirstTimeSetup: Initial settings synthesis for OLED, Liquid Glass & Living Nature presets", TestFirstTimeSetupSynthesis);
 
         string summary = skipped > 0
             ? $"\nSelf-Test Summary: {passed} passed, {failed} failed, {skipped} skipped (filter: '{filter}')."
