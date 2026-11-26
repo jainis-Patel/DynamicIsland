@@ -51,6 +51,7 @@ internal static class SettingsSearchIndex
         new("High-Load Droplet Alerts", "CPU & RAM high-usage capsule badge toggle and percentage thresholds", "Screen", "Display", "\uE9D9", "high load cpu ram memory alert threshold droplet performance telemetry"),
         new("Browser & Tab Passthrough", "Click Only, Hover 150/260/380ms, Fast-Swipe Guard, Ghost key & Quick Tuck", "Screen", "Display", "\uE8B0", "hover dwell fast swipe guard click only ghost modifier ctrl alt quick tuck browser tabs"),
         new("Auto-Hide & Always Visible", "Hide Dynamic Island like the Windows taskbar; hover top edge to pull back", "Screen", "Display", "\uE8B0", "auto hide autohide taskbar always visible top edge hover reveal"),
+        new("Context Profiles & Auto-Switch", "Deep Focus, Gaming, Presenting presets with process auto-switching", "Screen", "Display", "\uE80F", "context profile focus gaming presenting auto switch obs zoom teams"),
 
         // Alerts (Notifications)
         new("Notification Center", "Inspect notification history ring buffer", "Notifications", "Alerts", "\uEA8F", "notification center history"),

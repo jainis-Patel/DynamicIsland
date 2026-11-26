@@ -1488,4 +1488,80 @@ SSID 3 : Home_Router
         Assert(ramMatches.Any(e => e.CategoryKey == "Screen"),
             "SettingsSearchIndex.Search('ram threshold') must return the Screen/Display category entry");
     }
+
+    private static void TestCommandPalette()
+    {
+        var apps = new[]
+        {
+            new LauncherItem { Name = "Terminal", TargetPath = "wt.exe", Glyph = "\uE756" },
+            new LauncherItem { Name = "Notepad", TargetPath = "notepad.exe", Glyph = "\uE70B" }
+        };
+        var clips = new[]
+        {
+            new ClipboardItem { Title = "API Key", RawText = "sk-proj-secret1234567890", IsSecret = true, Type = ClipboardItemType.Text },
+            new ClipboardItem { Title = "Hello World Snippet", RawText = "console.log('hello')", IsSecret = false, Type = ClipboardItemType.Code }
+        };
+
+        // 1. Inline math must rank first
+        var mathRes = CommandPaletteEngine.Query("12 * 85", apps, clips);
+        Assert(mathRes.Count > 0 && mathRes[0].Kind == CommandResultKind.Math && mathRes[0].Payload == "1020",
+            $"Expected inline math result 1020 at top, got {mathRes.FirstOrDefault()?.Payload}");
+
+        // 2. System action fuzzy match
+        var dndRes = CommandPaletteEngine.Query("dnd", apps, clips);
+        Assert(dndRes.Any(r => r.Kind == CommandResultKind.SystemAction && r.ActionKey == "toggle_dnd"),
+            "Query 'dnd' must surface Toggle Do Not Disturb action");
+
+        // 3. Settings deep-link
+        var glassRes = CommandPaletteEngine.Query("liquid glass", apps, clips);
+        Assert(glassRes.Any(r => r.Kind == CommandResultKind.Setting),
+            "Query 'liquid glass' must surface Settings deep-links");
+
+        // 4. Secret clipboard items must never leak into Command Palette
+        var secretRes = CommandPaletteEngine.Query("API Key", apps, clips);
+        Assert(!secretRes.Any(r => r.Kind == CommandResultKind.Clipboard),
+            "Secret clipboard items must be excluded from Command Palette results");
+
+        // 5. Non-secret clipboard items must be searchable
+        var clipRes = CommandPaletteEngine.Query("Hello World", apps, clips);
+        Assert(clipRes.Any(r => r.Kind == CommandResultKind.Clipboard),
+            "Non-secret clipboard items must be searchable in Command Palette");
+    }
+
+    private static void TestContextProfiles()
+    {
+        string tempPath = Path.Combine(Path.GetTempPath(), $"di_profiles_{Guid.NewGuid():N}.json");
+        try
+        {
+            var settings = new SettingsService(tempPath);
+            settings.Update(s =>
+            {
+                s.DoNotDisturb = false;
+                s.EnableVirtualPet = true;
+                s.AutoHideIsland = false;
+            });
+
+            using var profiles = new ContextProfileService(settings);
+            Assert(profiles.GetAllProfiles().Count >= 4, "Must include at least 4 built-in profiles");
+
+            // Apply Deep Focus -> DND true, Pet false, and snapshot baseline
+            var focus = profiles.ApplyProfile("focus");
+            Assert(focus != null && settings.Current.ActiveProfileId == "focus", "ActiveProfileId must be 'focus'");
+            Assert(settings.Current.DoNotDisturb && !settings.Current.EnableVirtualPet, "Focus profile overrides must apply");
+
+            // Restore Default -> baseline restored
+            profiles.ApplyProfile("default");
+            Assert(settings.Current.ActiveProfileId == "default", "ActiveProfileId must return to 'default'");
+            Assert(!settings.Current.DoNotDisturb && settings.Current.EnableVirtualPet, "Baseline settings must be restored");
+
+            // Process auto-matching
+            string? matched = profiles.MatchProfileForContext(new[] { "explorer", "obs64" }, isOnBattery: false);
+            Assert(string.Equals(matched, "presenting", StringComparison.OrdinalIgnoreCase),
+                $"Expected 'presenting' profile for obs64, got '{matched}'");
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
+    }
 }

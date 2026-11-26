@@ -125,6 +125,11 @@ public sealed class AppSettings
     public string? SkippedVersion { get; set; }
     public DateTime? SkippedVersionDate { get; set; }
     public int PhoneBridgeDurationMinutes { get; set; } = 15;
+    public string ActiveProfileId { get; set; } = "default";
+    public bool EnableAutoProfileSwitching { get; set; } = false;
+    public List<IslandProfile> CustomProfiles { get; set; } = new();
+    public ProfileBaseSnapshot? ProfileBaseSnapshot { get; set; }
+    public bool HasCompletedOnboarding { get; set; } = false;
 
     [JsonIgnore]
     public string? PhoneBridgePassword { get; set; }

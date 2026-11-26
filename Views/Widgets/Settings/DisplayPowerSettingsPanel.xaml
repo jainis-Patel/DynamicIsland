@@ -283,6 +283,36 @@
                 </StackPanel>
             </Border>
 
+            <!-- Context Profiles Card -->
+            <Border Style="{StaticResource SettingsGroupCard}">
+                <StackPanel>
+                    <DockPanel LastChildFill="False" Margin="0,0,0,6">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Context Profiles" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" />
+                            <TextBlock Text="Bundle DND, Pet, Auto-Hide &amp; Low RAM presets" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                            <TextBlock Text="Auto" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,5,0" />
+                            <CheckBox x:Name="AutoProfileSwitchToggle" Click="AutoProfileSwitchToggleBtn_Click" Style="{StaticResource IslandToggleSwitch}" ToolTipService.ToolTip="Auto-switch to Presenting when OBS, Zoom, Teams, or PowerPoint runs" />
+                        </StackPanel>
+                    </DockPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="ProfileDefaultBtn" Tag="default" Click="ContextProfileBtn_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0,0,4,0">
+                            <TextBlock Text="Default" FontSize="8" />
+                        </Button>
+                        <Button x:Name="ProfileFocusBtn" Tag="focus" Click="ContextProfileBtn_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0,0,4,0">
+                            <TextBlock Text="Deep Focus" FontSize="8" />
+                        </Button>
+                        <Button x:Name="ProfileGamingBtn" Tag="gaming" Click="ContextProfileBtn_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0,0,4,0">
+                            <TextBlock Text="Gaming" FontSize="8" />
+                        </Button>
+                        <Button x:Name="ProfilePresentingBtn" Tag="presenting" Click="ContextProfileBtn_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0">
+                            <TextBlock Text="Presenting" FontSize="8" />
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
         </StackPanel>
     </ScrollViewer>
 </UserControl>

@@ -430,6 +430,7 @@ public partial class IslandWindow : Window
     private readonly CommunityDropletService _communityDropletService;
     private readonly UpdateManagerService _updateService;
     private readonly Choreographer _choreographer;
+    private readonly ContextProfileService _contextProfileService;
     private Views.MiniPlayerWindow? _miniPlayerWindow;
     private TrayIconService? _trayIcon;
     private bool _isClosing;
@@ -462,7 +463,22 @@ public partial class IslandWindow : Window
     internal DropShelfService Shelf => _shelfService;
     internal SettingsService Settings => _settingsService;
     internal UpdateManagerService UpdateService => _updateService;
+    internal ContextProfileService ContextProfiles => _contextProfileService;
     internal void NavigateToView(ExpandedView view) => SwitchExpandedView(view);
+    internal void StartPomodoroQuick() => StartPomodoroTimer();
+    internal void ToggleMicMutePublic() => ToggleMicMute();
+    internal void ExportAiAgentHooksWithToast()
+    {
+        var (ok, dir, count, err) = IpcHookGenerator.ExportAll();
+        _machine.PushToast(new ToastContent(
+            ok ? "\uE943" : "\uE783",
+            ok ? "AI Agent Hooks Exported" : "Hook Export Failed",
+            ok ? $"{count} scripts written to {dir}" : (err ?? "Unknown error"),
+            ok ? ThemeBrushes.GreenColor : ThemeBrushes.AmberColor,
+            TimeSpan.FromSeconds(3.2),
+            Priority: ToastPriority.Feedback,
+            Category: "hooks"));
+    }
     internal void PushToast(ToastContent content) => _machine.PushToast(content);
     internal void ShowToast(string glyph, string title, string message, Color accent, string category)
     {
@@ -702,6 +718,18 @@ public partial class IslandWindow : Window
         _updateService.StatusChanged += OnUpdateStatusChanged;
         _updateService.DownloadProgressChanged += OnUpdateDownloadProgressChanged;
         _choreographer = _services.Register(new Choreographer(Dispatcher));
+        _contextProfileService = _services.Register(new ContextProfileService(_settingsService, _choreographer));
+        _contextProfileService.ProfileChanged += prof => Dispatcher.InvokeAsync(() =>
+        {
+            _machine.PushToast(new ToastContent(
+                prof.Glyph,
+                $"Profile: {prof.Name}",
+                prof.Description,
+                ThemeBrushes.BlueColor,
+                TimeSpan.FromSeconds(2.2),
+                Priority: ToastPriority.Feedback,
+                Category: "profile"));
+        });
         _weatherService.AttachChoreographer(_choreographer);
         _calendarService.AttachChoreographer(_choreographer);
         _choreographer.PowerModeChanged += (prev, next) => Dispatcher.InvokeAsync(() =>

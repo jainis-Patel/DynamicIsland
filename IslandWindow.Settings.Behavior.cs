@@ -556,4 +556,41 @@ public partial class IslandWindow
         }
     }
 
+    private void UpdateContextProfilesUI()
+    {
+        var dp = SettingsContainer?.DisplayPowerPanel;
+        if (dp == null || dp.ProfileDefaultBtn == null) return;
+
+        string active = _settingsService.Current.ActiveProfileId ?? "default";
+        var accent = (Brush)Resources["AccentBrush"];
+        var defaultBorder = (Brush)FindResource("CardBorderBrush");
+        var defaultBg = (Brush)FindResource("CardSurfaceBrush");
+
+        StyleAccentToggleButton(dp.ProfileDefaultBtn, string.Equals(active, "default", StringComparison.OrdinalIgnoreCase), accent, defaultBg, defaultBorder);
+        StyleAccentToggleButton(dp.ProfileFocusBtn, string.Equals(active, "focus", StringComparison.OrdinalIgnoreCase), accent, defaultBg, defaultBorder);
+        StyleAccentToggleButton(dp.ProfileGamingBtn, string.Equals(active, "gaming", StringComparison.OrdinalIgnoreCase), accent, defaultBg, defaultBorder);
+        StyleAccentToggleButton(dp.ProfilePresentingBtn, string.Equals(active, "presenting", StringComparison.OrdinalIgnoreCase), accent, defaultBg, defaultBorder);
+
+        if (dp.AutoProfileSwitchToggle != null)
+        {
+            dp.AutoProfileSwitchToggle.IsChecked = _settingsService.Current.EnableAutoProfileSwitching;
+        }
+    }
+
+    internal void ContextProfileBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string profileId })
+        {
+            _contextProfileService?.ApplyProfile(profileId);
+            UpdateContextProfilesUI();
+        }
+    }
+
+    internal void AutoProfileSwitchToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        bool next = !_settingsService.Current.EnableAutoProfileSwitching;
+        _settingsService.Update(s => s.EnableAutoProfileSwitching = next, nameof(AppSettings.EnableAutoProfileSwitching));
+        UpdateContextProfilesUI();
+    }
+
 }

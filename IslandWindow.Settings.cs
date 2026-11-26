@@ -77,6 +77,7 @@ public partial class IslandWindow
             UpdateGhostModifierUI();
             UpdateQuickTuckUI();
             UpdateAutoHideModeUI();
+        UpdateContextProfilesUI();
             UpdateHaloUI();
             UpdateDndUI();
             UpdateBannerModeUI();
@@ -159,6 +160,15 @@ public partial class IslandWindow
             case nameof(AppSettings.UpdateChannel):
             case nameof(AppSettings.LastUpdateCheckTime):
                 UpdateSettingsVersionAndStatusUI();
+                break;
+
+            case nameof(AppSettings.EnableAutoProfileSwitching):
+                _contextProfileService?.SyncChoreRegistration();
+                UpdateContextProfilesUI();
+                break;
+
+            case nameof(AppSettings.ActiveProfileId):
+                UpdateContextProfilesUI();
                 break;
 
             case nameof(AppSettings.HardwareNotchMode):
@@ -300,6 +310,7 @@ public partial class IslandWindow
 
             case nameof(AppSettings.AutoHideIsland):
                 UpdateAutoHideModeUI();
+        UpdateContextProfilesUI();
                 EvaluateAutoHideState();
                 break;
 
@@ -474,6 +485,7 @@ public partial class IslandWindow
         UpdateGhostModifierUI();
         UpdateQuickTuckUI();
         UpdateAutoHideModeUI();
+        UpdateContextProfilesUI();
         UpdateThemeModeUI();
         UpdateThemeStyleUI();
         ApplyThemeStyleVisuals();

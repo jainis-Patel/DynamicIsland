@@ -177,8 +177,9 @@
                             <TextBox x:Name="SearchInputBox" Width="96" Background="Transparent" BorderThickness="0"
                                      Foreground="{DynamicResource PrimaryTextBrush}" FontSize="8.5"
                                      VerticalAlignment="Center" CaretBrush="{DynamicResource AccentBrush}"
-                                     TextChanged="SearchInputBox_TextChanged" />
-                            <TextBlock x:Name="SearchPlaceholder" Text="Search apps &amp; shortcuts..." FontSize="8"
+                                     TextChanged="SearchInputBox_TextChanged"
+                                     PreviewKeyDown="SearchInputBox_PreviewKeyDown" />
+                            <TextBlock x:Name="SearchPlaceholder" Text="Search, calc, commands..." FontSize="8"
                                        Foreground="{DynamicResource SecondaryBrush}" Opacity="0.55"
                                        VerticalAlignment="Center" IsHitTestVisible="False" Margin="1,0,0,0" />
                         </Grid>
@@ -210,6 +211,38 @@
                       PanningMode="VerticalOnly"
                       PreviewMouseWheel="LauncherView_PreviewMouseWheel">
             <StackPanel Margin="0,2,2,14">
+                <!-- Unified Command Palette Results (Visible while searching) -->
+                <ItemsControl x:Name="CommandPaletteResultsControl" Visibility="Collapsed" Margin="0,0,0,6">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="10" Margin="0,0,0,3" Padding="8,5" Cursor="Hand"
+                                    Background="{Binding RowBackground}" BorderBrush="{Binding RowBorder}" BorderThickness="1"
+                                    MouseLeftButtonDown="CommandResult_Click">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="22" Height="22" CornerRadius="6" Background="{DynamicResource ChipBgBrush}" Margin="0,0,8,0">
+                                        <TextBlock Style="{StaticResource Glyph}" Text="{Binding Item.Glyph}" FontSize="10"
+                                                   Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Item.Title}" FontSize="9.5" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Item.Subtitle}" FontSize="7.5"
+                                                   Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <Border Grid.Column="2" CornerRadius="5" Background="{DynamicResource ChipBgBrush}" Padding="5,2" VerticalAlignment="Center" Margin="6,0,0,0">
+                                        <TextBlock Text="{Binding KindLabel}" FontSize="7" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
                 <!-- Unified Grid of All Apps & Widgets (3 columns of 142px + margins = 441px <= 456px) -->
                 <ItemsControl x:Name="LauncherItemsControl" ItemTemplate="{StaticResource UnifiedAppTileTemplate}">
                     <ItemsControl.ItemsPanel>

@@ -245,7 +245,7 @@ public partial class IslandWindow
 
     internal void HudPurgeRamButton_Click(object sender, RoutedEventArgs e) => PurgeIdleRamWithToast();
 
-    private void PurgeIdleRamWithToast()
+    internal void PurgeIdleRamWithToast()
     {
         if (_systemPerfService == null) return;
 

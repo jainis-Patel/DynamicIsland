@@ -110,4 +110,7 @@ public partial class SettingsView : UserControl
 
     private void SettingsOpenDataBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.SettingsOpenDataBtn_Click(sender, e);
+
+    internal void SelectCategory(string categoryKey) =>
+        Island?.SwitchSettingsTab(categoryKey, impulse: true);
 }

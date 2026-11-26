@@ -78,4 +78,10 @@ public partial class DisplayPowerSettingsPanel : UserControl
 
     private void AutoHideModeBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.AutoHideModeBtn_Click(sender, e);
+
+    private void ContextProfileBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.ContextProfileBtn_Click(sender, e);
+
+    private void AutoProfileSwitchToggleBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.AutoProfileSwitchToggleBtn_Click(sender, e);
 }

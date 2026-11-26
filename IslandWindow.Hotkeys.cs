@@ -36,6 +36,7 @@ public partial class IslandWindow
     private const int HotkeyPromptApprove = 22;
     private const int HotkeyPromptReject = 23;
     private const int HotkeyToggleFloat = 24;
+    private const int HotkeyCommandPalette = 25;
 
     private static readonly (int Id, string KeyName, uint DefaultVk)[] HotKeyBindings =
     {
@@ -63,6 +64,7 @@ public partial class IslandWindow
         (HotkeyPromptApprove, "PromptApprove", 0x59), // VK_Y (Ctrl+Alt+Y)
         (HotkeyPromptReject, "PromptReject", 0x55),   // VK_U (Ctrl+Alt+U)
         (HotkeyToggleFloat, "ToggleFloating", 0x46),  // VK_F (Ctrl+Alt+F)
+        (HotkeyCommandPalette, "CommandPalette", 0x47), // VK_G (Ctrl+Alt+G)
     };
 
     private readonly Dictionary<string, bool> _hotkeyRegistrationStatus = new(StringComparer.OrdinalIgnoreCase);
@@ -305,6 +307,7 @@ public partial class IslandWindow
             case HotkeyPromptApprove: TriggerActivePromptDecision("Approve"); break;
             case HotkeyPromptReject: TriggerActivePromptDecision("Reject"); break;
             case HotkeyToggleFloat: ToggleFloatingMode(); break;
+            case HotkeyCommandPalette: SwitchExpandedView(ExpandedView.Launcher); break;
             case HotkeyQuit: Application.Current.Shutdown(); break;
         }
     }

@@ -75,6 +75,16 @@ public partial class LauncherView : UserControl
     private enum LauncherFilterMode { All, Pinned, Folders }
     private LauncherFilterMode _currentFilter = LauncherFilterMode.All;
     private string _searchQuery = "";
+    private List<CommandPaletteItem> _paletteResults = new();
+    private int _selectedPaletteIndex;
+
+    public sealed class CommandPaletteRow
+    {
+        public required CommandPaletteItem Item { get; init; }
+        public required string KindLabel { get; init; }
+        public required Brush RowBackground { get; init; }
+        public required Brush RowBorder { get; init; }
+    }
 
     private List<LauncherDisplayItem> _allCombined = new();
     private List<LauncherDisplayItem> _pinnedOnly = new();
@@ -159,6 +169,30 @@ public partial class LauncherView : UserControl
 
     private void ApplyFilter()
     {
+        bool hasSearch = !string.IsNullOrWhiteSpace(_searchQuery);
+        if (hasSearch)
+        {
+            var apps = Island?.QuickLauncherServiceInstance?.Items;
+            var clips = Island?.ClipboardService?.Items;
+            var profiles = Island?.ContextProfiles?.GetAllProfiles();
+            _paletteResults = CommandPaletteEngine.Query(_searchQuery, apps, clips, profiles).ToList();
+            _selectedPaletteIndex = 0;
+
+            LauncherItemsControl.Visibility = Visibility.Collapsed;
+            CommandPaletteResultsControl.Visibility = _paletteResults.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            RefreshPaletteRows();
+
+            EmptySearchPrompt.Visibility = _paletteResults.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            EmptyAppsPrompt.Visibility = Visibility.Collapsed;
+            UpdateFilterUi();
+            return;
+        }
+
+        _paletteResults.Clear();
+        CommandPaletteResultsControl.ItemsSource = null;
+        CommandPaletteResultsControl.Visibility = Visibility.Collapsed;
+        LauncherItemsControl.Visibility = Visibility.Visible;
+
         IEnumerable<LauncherDisplayItem> source = _currentFilter switch
         {
             LauncherFilterMode.Pinned => _pinnedOnly.Where(i => !i.IsFolder).ToList(),
@@ -166,24 +200,149 @@ public partial class LauncherView : UserControl
             _ => _allCombined
         };
 
-        if (!string.IsNullOrWhiteSpace(_searchQuery))
-        {
-            source = source.Where(item =>
-                item.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ||
-                item.Subtitle.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ||
-                item.FriendlyDescription.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase));
-        }
-
         var list = source.ToList();
         LauncherItemsControl.ItemsSource = list;
 
-        bool hasSearch = !string.IsNullOrWhiteSpace(_searchQuery);
-        EmptySearchPrompt.Visibility = (hasSearch && list.Count == 0) ? Visibility.Visible : Visibility.Collapsed;
-        EmptyAppsPrompt.Visibility = (!hasSearch && _pinnedOnly.Count == 0)
+        EmptySearchPrompt.Visibility = Visibility.Collapsed;
+        EmptyAppsPrompt.Visibility = _pinnedOnly.Count == 0
             ? Visibility.Visible
             : Visibility.Collapsed;
 
         UpdateFilterUi();
+    }
+
+    private void RefreshPaletteRows()
+    {
+        var rows = new List<CommandPaletteRow>(_paletteResults.Count);
+        for (int i = 0; i < _paletteResults.Count; i++)
+        {
+            var item = _paletteResults[i];
+            bool selected = i == _selectedPaletteIndex;
+            rows.Add(new CommandPaletteRow
+            {
+                Item = item,
+                KindLabel = item.Kind switch
+                {
+                    CommandResultKind.Math => "CALC",
+                    CommandResultKind.SystemAction => "ACTION",
+                    CommandResultKind.Profile => "PROFILE",
+                    CommandResultKind.Setting => "SETTING",
+                    CommandResultKind.App => "APP",
+                    CommandResultKind.Clipboard => "CLIP",
+                    _ => "CMD"
+                },
+                RowBackground = selected ? TabActiveBg : AppDefaultBg,
+                RowBorder = selected ? OrangeBorder : AppDefaultBorder
+            });
+        }
+        CommandPaletteResultsControl.ItemsSource = rows;
+    }
+
+    private void SearchInputBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (_paletteResults.Count == 0)
+        {
+            if (e.Key == Key.Escape && !string.IsNullOrEmpty(SearchInputBox.Text))
+            {
+                SearchInputBox.Text = "";
+                e.Handled = true;
+            }
+            return;
+        }
+
+        if (e.Key == Key.Down)
+        {
+            _selectedPaletteIndex = (_selectedPaletteIndex + 1) % _paletteResults.Count;
+            RefreshPaletteRows();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Up)
+        {
+            _selectedPaletteIndex = (_selectedPaletteIndex - 1 + _paletteResults.Count) % _paletteResults.Count;
+            RefreshPaletteRows();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Enter)
+        {
+            if (_selectedPaletteIndex >= 0 && _selectedPaletteIndex < _paletteResults.Count)
+            {
+                ExecuteCommandItem(_paletteResults[_selectedPaletteIndex]);
+                e.Handled = true;
+            }
+        }
+        else if (e.Key == Key.Escape)
+        {
+            SearchInputBox.Text = "";
+            e.Handled = true;
+        }
+    }
+
+    private void CommandResult_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: CommandPaletteRow row })
+        {
+            ExecuteCommandItem(row.Item);
+            e.Handled = true;
+        }
+    }
+
+    private void ExecuteCommandItem(CommandPaletteItem item)
+    {
+        if (Island == null) return;
+
+        switch (item.ActionKey)
+        {
+            case "copy_calc":
+            case "copy_clip":
+                if (!string.IsNullOrEmpty(item.Payload))
+                {
+                    SafeClipboard.TrySetText(item.Payload);
+                    Island.PushNotificationToast("\uE8C8", "Copied", item.Payload, ThemeBrushes.GreenColor);
+                }
+                break;
+            case "switch_profile":
+                if (!string.IsNullOrEmpty(item.Payload))
+                {
+                    Island.ContextProfiles.ApplyProfile(item.Payload);
+                }
+                break;
+            case "open_setting":
+                Island.NavigateToView(ExpandedView.Settings);
+                if (!string.IsNullOrEmpty(item.Payload))
+                {
+                    Island.SettingsContainer?.SelectCategory(item.Payload);
+                }
+                break;
+            case "launch_app":
+                var match = _allCombined.FirstOrDefault(a => string.Equals(a.TargetPath, item.Payload, StringComparison.OrdinalIgnoreCase));
+                if (match != null) LaunchItem(match);
+                break;
+            case "toggle_dnd":
+                Island.Settings.Update(s => s.DoNotDisturb = !s.DoNotDisturb, nameof(AppSettings.DoNotDisturb));
+                Island.PushNotificationToast("\uE708", "Do Not Disturb", Island.Settings.Current.DoNotDisturb ? "Enabled" : "Disabled", ThemeBrushes.BlueColor);
+                break;
+            case "start_pomodoro":
+                Island.StartPomodoroQuick();
+                break;
+            case "toggle_night_light":
+                Island.Settings.Update(s => s.EnableNightLightSim = !s.EnableNightLightSim, nameof(AppSettings.EnableNightLightSim));
+                break;
+            case "toggle_mic_mute":
+                Island.ToggleMicMutePublic();
+                break;
+            case "toggle_low_memory":
+                Island.Settings.Update(s => s.LowMemoryMode = !s.LowMemoryMode, nameof(AppSettings.LowMemoryMode));
+                break;
+            case "open_settings":
+                Island.NavigateToView(ExpandedView.Settings);
+                break;
+            case "purge_ram":
+                Island.PurgeIdleRamWithToast();
+                break;
+            case "export_hooks":
+                Island.ExportAiAgentHooksWithToast();
+                break;
+        }
     }
 
     private void UpdateFilterUi()

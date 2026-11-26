@@ -145,6 +145,8 @@ internal static partial class SelfTestRunner
         Run("WebcamMirror: ExpandedView.Mirror routing & zero-idle service invariant", TestWebcamMirrorInvariants);
         Run("MeetingMirrorAction: Upcoming meeting activity offers both Join and Mirror actions", TestMeetingMirrorAction);
         Run("SettingsSearchHighLoad: High-load droplet settings are indexed & searchable", TestSettingsSearchHighLoadEntry);
+        Run("CommandPalette: Fuzzy ranking, inline math, settings deep-links & system actions", TestCommandPalette);
+        Run("ContextProfiles: Built-in presets, override apply/restore & process auto-matching", TestContextProfiles);
 
         string summary = skipped > 0
             ? $"\nSelf-Test Summary: {passed} passed, {failed} failed, {skipped} skipped (filter: '{filter}')."
