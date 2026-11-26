@@ -81,7 +81,7 @@ public partial class IslandWindow
             }
 
             // 3. Render Expanded HUD card elements when expanded or visible
-            if (SystemHudContainer != null && (SystemHudContainer.Visibility == Visibility.Visible || _currentExpandedView == ExpandedView.SystemHud))
+            if (_systemHudContainer != null && (_systemHudContainer.Visibility == Visibility.Visible || _currentExpandedView == ExpandedView.SystemHud))
             {
                 UpdateHighLoadSnoozeUI();
                 if (HudHardwareSubtitle != null && _systemPerfService != null && !string.IsNullOrWhiteSpace(_systemPerfService.HardwareSummary))

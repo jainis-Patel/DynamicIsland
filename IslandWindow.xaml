@@ -828,15 +828,8 @@
                             <widgets:MediaView x:Name="MediaContainer" />
                             <widgets:ShelfView x:Name="ShelfContainer" Visibility="Collapsed" />
                             <widgets:ClipboardView x:Name="ClipboardContainer" Visibility="Collapsed" />
-                            <widgets:CalcView x:Name="CalcContainer" Visibility="Collapsed" />
                             <widgets:SettingsView x:Name="SettingsContainer" Visibility="Collapsed" />
-                            <widgets:AudioView x:Name="AudioContainer" Visibility="Collapsed" />
-                            <widgets:BatteryView x:Name="BatteryContainer" Visibility="Collapsed" />
-                            <widgets:VoiceMemoView x:Name="VoiceMemoContainer" Visibility="Collapsed" />
-                            <widgets:PeripheralsView x:Name="PeripheralsContainer" Visibility="Collapsed" />
-                            <widgets:NetworkView x:Name="NetworkContainer" Visibility="Collapsed" />
                             <widgets:NotificationsView x:Name="NotificationsContainer" Visibility="Collapsed" />
-                            <widgets:SystemHudView x:Name="SystemHudContainer" Visibility="Collapsed" />
                         </Grid>
                     </Border>
                 </Grid>

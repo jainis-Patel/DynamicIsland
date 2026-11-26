@@ -75,6 +75,7 @@ public partial class IslandWindow
 
     private void InitializeVoiceMemoUI()
     {
+        if (_voiceMemoContainer == null) return;
         if (VoiceMemosItemsControl != null && VoiceMemosItemsControl.ItemsSource == null)
         {
             VoiceMemosItemsControl.ItemsSource = _voiceMemos;

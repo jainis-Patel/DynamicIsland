@@ -27,7 +27,10 @@ public partial class IslandWindow
         {
             AudioButtonGlyph.Text = cur.Glyph;
         }
-        SyncHeroActiveDeviceUI();
+        if (_audioContainer != null)
+        {
+            SyncHeroActiveDeviceUI();
+        }
     }
 
     private void OnDefaultAudioEndpointChanged(AudioEndpointInfo newDef)
@@ -35,8 +38,11 @@ public partial class IslandWindow
         AudioButtonGlyph.Text = newDef.Glyph;
         _volumeService.ReattachDefaultEndpoint();
         _audioSpectrum.NotifyDefaultDeviceChanged();
-        SyncHeroActiveDeviceUI(newDef);
-        SyncMasterVolumeUI();
+        if (_audioContainer != null)
+        {
+            SyncHeroActiveDeviceUI(newDef);
+            SyncMasterVolumeUI();
+        }
         _machine.PushToast(new ToastContent(
             newDef.Glyph,
             "Audio Output Switched",

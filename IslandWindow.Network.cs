@@ -54,6 +54,7 @@ public partial class IslandWindow
         }
 
         // Network Hub Container
+        if (_networkContainer == null) return;
         NetworkIpText.Text = $"IP: {snap.LocalIpv4}";
         NetworkHeroGlyph.Text = snap.Glyph;
         NetworkHeroGlyph.Foreground = snap.IsConnected ? ThemeBrushes.Green : ThemeBrushes.Amber;
@@ -316,7 +317,7 @@ public partial class IslandWindow
 
     private void OnBrightnessChanged(int pct)
     {
-        if (BrightnessSlider == null || BrightnessValueText == null) return;
+        if (_batteryContainer == null || BrightnessSlider == null || BrightnessValueText == null) return;
         BrightnessValueText.Text = $"{pct}%";
         if (!BrightnessSlider.IsMouseCaptureWithin)
         {
@@ -326,7 +327,7 @@ public partial class IslandWindow
 
     internal void BrightnessSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_brightnessService == null || BrightnessValueText == null) return;
+        if (_batteryContainer == null || _brightnessService == null || BrightnessValueText == null) return;
         int pct = (int)Math.Round(e.NewValue);
         BrightnessValueText.Text = $"{pct}%";
         if (BrightnessSlider.IsMouseCaptureWithin)

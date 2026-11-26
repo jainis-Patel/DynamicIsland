@@ -252,6 +252,13 @@ public partial class IslandWindow : Window
     private Views.Widgets.QuickReplyView? _quickReplyContainer;
     private Views.Widgets.PetSanctuaryView? _petSanctuaryContainer;
     private Views.Widgets.MirrorView? _mirrorContainer;
+    private Views.Widgets.CalcView? _calcContainer;
+    private Views.Widgets.AudioView? _audioContainer;
+    private Views.Widgets.BatteryView? _batteryContainer;
+    private Views.Widgets.VoiceMemoView? _voiceMemoContainer;
+    private Views.Widgets.PeripheralsView? _peripheralsContainer;
+    private Views.Widgets.NetworkView? _networkContainer;
+    private Views.Widgets.SystemHudView? _systemHudContainer;
 
     internal Views.Widgets.CalendarTaskView? CalendarContainer => _calendarContainer;
     internal Views.Widgets.NotesView? NotesContainer => _notesContainer;
@@ -265,6 +272,13 @@ public partial class IslandWindow : Window
     internal Views.Widgets.QuickReplyView? QuickReplyContainer => _quickReplyContainer;
     internal Views.Widgets.PetSanctuaryView? PetSanctuaryContainer => _petSanctuaryContainer;
     internal Views.Widgets.MirrorView? MirrorContainer => _mirrorContainer;
+    internal Views.Widgets.CalcView? CalcContainer => _calcContainer;
+    internal Views.Widgets.AudioView? AudioContainer => _audioContainer;
+    internal Views.Widgets.BatteryView? BatteryContainer => _batteryContainer;
+    internal Views.Widgets.VoiceMemoView? VoiceMemoContainer => _voiceMemoContainer;
+    internal Views.Widgets.PeripheralsView? PeripheralsContainer => _peripheralsContainer;
+    internal Views.Widgets.NetworkView? NetworkContainer => _networkContainer;
+    internal Views.Widgets.SystemHudView? SystemHudContainer => _systemHudContainer;
 
     private T MaterializeExpandedView<T>(ref T? slot) where T : FrameworkElement, new()
     {
@@ -290,6 +304,78 @@ public partial class IslandWindow : Window
     internal Views.Widgets.TermiNotchView EnsureTermiContainer() => MaterializeExpandedView(ref _termiContainer);
     internal Views.Widgets.QuickReplyView EnsureQuickReplyContainer() => MaterializeExpandedView(ref _quickReplyContainer);
     internal Views.Widgets.NotesView EnsureNotesContainer() => MaterializeExpandedView(ref _notesContainer);
+    internal Views.Widgets.CalcView EnsureCalcContainer() => MaterializeExpandedView(ref _calcContainer);
+    internal Views.Widgets.SystemHudView EnsureSystemHudContainer() => MaterializeExpandedView(ref _systemHudContainer);
+
+    internal Views.Widgets.AudioView EnsureAudioContainer()
+    {
+        bool isNew = _audioContainer == null;
+        var view = MaterializeExpandedView(ref _audioContainer);
+        if (isNew)
+        {
+            view.AudioEndpointsControl.ItemsSource = _audioEndpoints;
+            view.AudioAppSessionsControl.ItemsSource = _audioAppSessions;
+            if (_audioEndpointService != null)
+            {
+                OnAudioEndpointsChanged(_audioEndpointService.Endpoints);
+                SyncMasterVolumeUI();
+            }
+        }
+        return view;
+    }
+
+    internal Views.Widgets.BatteryView EnsureBatteryContainer()
+    {
+        bool isNew = _batteryContainer == null;
+        var view = MaterializeExpandedView(ref _batteryContainer);
+        if (isNew)
+        {
+            if (_powerPlanService != null) OnPowerStatusChanged(_powerPlanService.Current);
+            if (_brightnessService != null) OnBrightnessChanged(_brightnessService.BrightnessPercent);
+        }
+        return view;
+    }
+
+    internal Views.Widgets.VoiceMemoView EnsureVoiceMemoContainer()
+    {
+        bool isNew = _voiceMemoContainer == null;
+        var view = MaterializeExpandedView(ref _voiceMemoContainer);
+        if (isNew && _voiceMemoService != null)
+        {
+            InitializeVoiceMemoUI();
+        }
+        return view;
+    }
+
+    internal Views.Widgets.PeripheralsView EnsurePeripheralsContainer()
+    {
+        bool isNew = _peripheralsContainer == null;
+        var view = MaterializeExpandedView(ref _peripheralsContainer);
+        if (isNew)
+        {
+            view.PeripheralsItemsControl.ItemsSource = _peripheralDevices;
+            if (_peripheralService != null)
+            {
+                OnPeripheralsChanged(_peripheralService.Devices);
+            }
+        }
+        return view;
+    }
+
+    internal Views.Widgets.NetworkView EnsureNetworkContainer()
+    {
+        bool isNew = _networkContainer == null;
+        var view = MaterializeExpandedView(ref _networkContainer);
+        if (isNew)
+        {
+            view.WifiNetworksItemsControl.ItemsSource = _wifiNetworks;
+            if (_networkService != null)
+            {
+                OnNetworkUpdated(_networkService.Current);
+            }
+        }
+        return view;
+    }
 
     // Observable collections for zero-teardown ItemsControl bindings
     private readonly ObservableCollection<ShelfItem> _shelfItems = new();
@@ -466,15 +552,15 @@ public partial class IslandWindow : Window
             [ExpandedView.Notifications]  = (() => NotificationsContainer, NotificationsButton),
             [ExpandedView.WidgetsGallery] = (() => MaterializeExpandedView(ref _widgetsGalleryContainer), WidgetsGalleryButton),
             [ExpandedView.Launcher]       = (() => MaterializeExpandedView(ref _launcherContainer), LauncherButton),
-            [ExpandedView.Audio]          = (() => AudioContainer, AudioButton),
+            [ExpandedView.Audio]          = (() => EnsureAudioContainer(), AudioButton),
             [ExpandedView.Clipboard]      = (() => ClipboardContainer, ShelfButton),
-            [ExpandedView.SystemHud]      = (() => SystemHudContainer, WidgetsGalleryButton),
-            [ExpandedView.Battery]        = (() => BatteryContainer, WidgetsGalleryButton),
-            [ExpandedView.Network]        = (() => NetworkContainer, WidgetsGalleryButton),
-            [ExpandedView.Peripherals]    = (() => PeripheralsContainer, WidgetsGalleryButton),
-            [ExpandedView.Calc]           = (() => CalcContainer, LauncherButton),
-            [ExpandedView.Notes]          = (() => MaterializeExpandedView(ref _notesContainer), LauncherButton),
-            [ExpandedView.VoiceMemo]      = (() => VoiceMemoContainer, LauncherButton),
+            [ExpandedView.SystemHud]      = (() => EnsureSystemHudContainer(), WidgetsGalleryButton),
+            [ExpandedView.Battery]        = (() => EnsureBatteryContainer(), WidgetsGalleryButton),
+            [ExpandedView.Network]        = (() => EnsureNetworkContainer(), WidgetsGalleryButton),
+            [ExpandedView.Peripherals]    = (() => EnsurePeripheralsContainer(), WidgetsGalleryButton),
+            [ExpandedView.Calc]           = (() => EnsureCalcContainer(), LauncherButton),
+            [ExpandedView.Notes]          = (() => EnsureNotesContainer(), LauncherButton),
+            [ExpandedView.VoiceMemo]      = (() => EnsureVoiceMemoContainer(), LauncherButton),
             [ExpandedView.Converter]      = (() => MaterializeExpandedView(ref _converterContainer), LauncherButton),
             [ExpandedView.Termi]          = (() => MaterializeExpandedView(ref _termiContainer), LauncherButton),
             [ExpandedView.PhoneBridge]    = (() => MaterializeExpandedView(ref _phoneBridgeContainer), LauncherButton),
@@ -492,15 +578,8 @@ public partial class IslandWindow : Window
             MediaContainer,
             ShelfContainer,
             ClipboardContainer,
-            CalcContainer,
             SettingsContainer,
-            AudioContainer,
-            BatteryContainer,
-            VoiceMemoContainer,
-            PeripheralsContainer,
-            NetworkContainer,
-            NotificationsContainer,
-            SystemHudContainer
+            NotificationsContainer
         };
         _dockButtons = _viewRegistry.Values.Select(v => v.DockButton).ToArray();
 
@@ -544,11 +623,7 @@ public partial class IslandWindow : Window
 
         ShelfItemsControl.ItemsSource = _shelfItems;
         ClipboardItemsControl.ItemsSource = _clipboardItems;
-        AudioEndpointsControl.ItemsSource = _audioEndpoints;
-        AudioAppSessionsControl.ItemsSource = _audioAppSessions;
-        PeripheralsItemsControl.ItemsSource = _peripheralDevices;
         NotificationsItemsControl.ItemsSource = _notificationAppGroups;
-        WifiNetworksItemsControl.ItemsSource = _wifiNetworks;
 
         _machine.StateChanged += OnStateChanged;
         _machine.ToastChanged += OnToastChanged;

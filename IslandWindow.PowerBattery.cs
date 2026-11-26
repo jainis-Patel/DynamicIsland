@@ -25,6 +25,17 @@ public partial class IslandWindow
 
         BatteryBadgeText.Text = status.HasBattery ? $"{status.BatteryPercent}%" : "AC";
         BatteryButtonGlyph.Text = status.BatteryGlyph;
+
+        var dpHealthText = SettingsContainer?.DisplayPowerPanel?.BatteryHealthSummaryText;
+        if (dpHealthText != null)
+        {
+            dpHealthText.Text = status.HasBattery
+                ? $"Health: {status.HealthPercent}% \u2022 {(status.IsCharging ? "Charging" : (status.IsAcOnline ? "AC" : "Batt"))}"
+                : "Continuous AC Power";
+        }
+
+        if (_batteryContainer == null) return;
+
         BatteryHeroPercentText.Text = $"{status.BatteryPercent}%";
         BatteryStatusSubtitle.Text = status.StatusSubtitle;
         BatteryTimeEstimate.Text = status.TimeEstimateText;
@@ -41,14 +52,6 @@ public partial class IslandWindow
             BatteryHealthText.Text = status.HasBattery && status.HealthPercent.HasValue
                 ? $"Health: {status.HealthPercent}%"
                 : "Continuous AC";
-        }
-
-        var dpHealthText = SettingsContainer?.DisplayPowerPanel?.BatteryHealthSummaryText;
-        if (dpHealthText != null)
-        {
-            dpHealthText.Text = status.HasBattery
-                ? $"Health: {status.HealthPercent}% \u2022 {(status.IsCharging ? "Charging" : (status.IsAcOnline ? "AC" : "Batt"))}"
-                : "Continuous AC Power";
         }
 
         if (BatteryHeaderBadgeText != null)
@@ -493,7 +496,7 @@ public partial class IslandWindow
     private void ApplyCaffeineMode(bool active, string badgeLabel = "Awake On")
     {
         ApplyCaffeineExecutionState(active);
-        if (CaffeineQuickBtn != null && CaffeineQuickText != null)
+        if (_batteryContainer != null && CaffeineQuickBtn != null && CaffeineQuickText != null)
         {
             if (active)
             {
@@ -764,7 +767,7 @@ public partial class IslandWindow
             }
         }
 
-        if (NightLightQuickBtn != null && NightLightQuickText != null)
+        if (_batteryContainer != null && NightLightQuickBtn != null && NightLightQuickText != null)
         {
             if (s.EnableNightLightSim)
             {

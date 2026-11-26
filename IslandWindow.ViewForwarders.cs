@@ -117,12 +117,12 @@ public partial class IslandWindow
     // -------------------------------------------------------------------------
     //  Calc View Forwarders (CalcContainer)
     // -------------------------------------------------------------------------
-    internal TextBlock CalcExplanationText => CalcContainer.CalcExplanationText;
-    internal ItemsControl CalcHistoryItemsControl => CalcContainer.CalcHistoryItemsControl;
-    internal TextBox CalcInputBox => CalcContainer.CalcInputBox;
-    internal TextBlock CalcPlaceholder => CalcContainer.CalcPlaceholder;
-    internal Border CalcResultHost => CalcContainer.CalcResultHost;
-    internal TextBlock CalcResultText => CalcContainer.CalcResultText;
+    internal TextBlock CalcExplanationText => EnsureCalcContainer().CalcExplanationText;
+    internal ItemsControl CalcHistoryItemsControl => EnsureCalcContainer().CalcHistoryItemsControl;
+    internal TextBox CalcInputBox => EnsureCalcContainer().CalcInputBox;
+    internal TextBlock CalcPlaceholder => EnsureCalcContainer().CalcPlaceholder;
+    internal Border CalcResultHost => EnsureCalcContainer().CalcResultHost;
+    internal TextBlock CalcResultText => EnsureCalcContainer().CalcResultText;
 
     // -------------------------------------------------------------------------
     //  Notes View Forwarders (NotesContainer)
@@ -138,134 +138,134 @@ public partial class IslandWindow
     // -------------------------------------------------------------------------
     //  Audio View Forwarders (AudioContainer)
     // -------------------------------------------------------------------------
-    internal Border AudioAppMixerEmptyPlaceholder => AudioContainer.AudioAppMixerEmptyPlaceholder;
-    internal ScrollViewer AudioAppMixerScrollViewer => AudioContainer.AudioAppMixerScrollViewer;
-    internal ItemsControl AudioAppSessionsControl => AudioContainer.AudioAppSessionsControl;
-    internal ItemsControl AudioEndpointsControl => AudioContainer.AudioEndpointsControl;
-    internal ScrollViewer AudioEndpointsScrollViewer => AudioContainer.AudioEndpointsScrollViewer;
-    internal TextBlock AudioSectionTitle => AudioContainer.AudioSectionTitle;
-    internal Button AudioModeOutputsBtn => AudioContainer.AudioModeOutputsBtn;
-    internal Button AudioModeMixerBtn => AudioContainer.AudioModeMixerBtn;
-    internal Button HardwareMicBtn => AudioContainer.HardwareMicBtn;
-    internal TextBlock HardwareMicGlyph => AudioContainer.HardwareMicGlyph;
-    internal TextBlock HardwareMicText => AudioContainer.HardwareMicText;
-    internal TextBlock HeroDeviceGlyph => AudioContainer.HeroDeviceGlyph;
-    internal TextBlock HeroDeviceNameText => AudioContainer.HeroDeviceNameText;
-    internal TextBlock HeroDeviceTypeText => AudioContainer.HeroDeviceTypeText;
-    internal Border HeroDeviceBatteryBadge => AudioContainer.HeroDeviceBatteryBadge;
-    internal TextBlock HeroDeviceBatteryText => AudioContainer.HeroDeviceBatteryText;
-    internal Button HeroMasterMuteBtn => AudioContainer.HeroMasterMuteBtn;
-    internal TextBlock HeroMasterMuteGlyph => AudioContainer.HeroMasterMuteGlyph;
-    internal TextBlock HeroSpeakerIcon => AudioContainer.HeroSpeakerIcon;
-    internal Slider HeroMasterVolumeSlider => AudioContainer.HeroMasterVolumeSlider;
-    internal TextBlock HeroMasterVolumePercentText => AudioContainer.HeroMasterVolumePercentText;
+    internal Border AudioAppMixerEmptyPlaceholder => EnsureAudioContainer().AudioAppMixerEmptyPlaceholder;
+    internal ScrollViewer AudioAppMixerScrollViewer => EnsureAudioContainer().AudioAppMixerScrollViewer;
+    internal ItemsControl AudioAppSessionsControl => EnsureAudioContainer().AudioAppSessionsControl;
+    internal ItemsControl AudioEndpointsControl => EnsureAudioContainer().AudioEndpointsControl;
+    internal ScrollViewer AudioEndpointsScrollViewer => EnsureAudioContainer().AudioEndpointsScrollViewer;
+    internal TextBlock AudioSectionTitle => EnsureAudioContainer().AudioSectionTitle;
+    internal Button AudioModeOutputsBtn => EnsureAudioContainer().AudioModeOutputsBtn;
+    internal Button AudioModeMixerBtn => EnsureAudioContainer().AudioModeMixerBtn;
+    internal Button HardwareMicBtn => EnsureAudioContainer().HardwareMicBtn;
+    internal TextBlock HardwareMicGlyph => EnsureAudioContainer().HardwareMicGlyph;
+    internal TextBlock HardwareMicText => EnsureAudioContainer().HardwareMicText;
+    internal TextBlock HeroDeviceGlyph => EnsureAudioContainer().HeroDeviceGlyph;
+    internal TextBlock HeroDeviceNameText => EnsureAudioContainer().HeroDeviceNameText;
+    internal TextBlock HeroDeviceTypeText => EnsureAudioContainer().HeroDeviceTypeText;
+    internal Border HeroDeviceBatteryBadge => EnsureAudioContainer().HeroDeviceBatteryBadge;
+    internal TextBlock HeroDeviceBatteryText => EnsureAudioContainer().HeroDeviceBatteryText;
+    internal Button HeroMasterMuteBtn => EnsureAudioContainer().HeroMasterMuteBtn;
+    internal TextBlock HeroMasterMuteGlyph => EnsureAudioContainer().HeroMasterMuteGlyph;
+    internal TextBlock HeroSpeakerIcon => EnsureAudioContainer().HeroSpeakerIcon;
+    internal Slider HeroMasterVolumeSlider => EnsureAudioContainer().HeroMasterVolumeSlider;
+    internal TextBlock HeroMasterVolumePercentText => EnsureAudioContainer().HeroMasterVolumePercentText;
 
     // -------------------------------------------------------------------------
     //  Battery View Forwarders (BatteryContainer)
     // -------------------------------------------------------------------------
-    internal TextBlock BatteryChargingBolt => BatteryContainer.BatteryChargingBolt;
-    internal Border BatteryHeaderBadge => BatteryContainer.BatteryHeaderBadge;
-    internal TextBlock BatteryHeaderBadgeText => BatteryContainer.BatteryHeaderBadgeText;
-    internal System.Windows.Shapes.Ellipse BatteryHeaderDot => BatteryContainer.BatteryHeaderDot;
-    internal System.Windows.Controls.TextBlock BatteryHealthText => BatteryContainer.BatteryHealthText;
-    internal TextBlock BatteryHeroPercentText => BatteryContainer.BatteryHeroPercentText;
-    internal Border BatteryLevelFill => BatteryContainer.BatteryLevelFill;
-    internal TextBlock BatteryStatusSubtitle => BatteryContainer.BatteryStatusSubtitle;
-    internal TextBlock BatteryTimeEstimate => BatteryContainer.BatteryTimeEstimate;
-    internal System.Windows.Controls.Border BatteryWattageBadge => BatteryContainer.BatteryWattageBadge;
-    internal System.Windows.Controls.TextBlock BatteryWattageText => BatteryContainer.BatteryWattageText;
-    internal Slider BrightnessSlider => BatteryContainer.BrightnessSlider;
-    internal TextBlock BrightnessValueText => BatteryContainer.BrightnessValueText;
-    internal Button CaffeineQuickBtn => BatteryContainer.CaffeineQuickBtn;
-    internal TextBlock CaffeineQuickIcon => BatteryContainer.CaffeineQuickIcon;
-    internal TextBlock CaffeineQuickText => BatteryContainer.CaffeineQuickText;
-    internal System.Windows.Controls.Border DisplayRefreshBadge => BatteryContainer.DisplayRefreshBadge;
-    internal System.Windows.Controls.TextBlock DisplayRefreshText => BatteryContainer.DisplayRefreshText;
-    internal System.Windows.Controls.TextBlock DisplayResolutionText => BatteryContainer.DisplayResolutionText;
-    internal System.Windows.Controls.Button NightLightQuickBtn => BatteryContainer.NightLightQuickBtn;
-    internal System.Windows.Controls.TextBlock NightLightQuickIcon => BatteryContainer.NightLightQuickIcon;
-    internal System.Windows.Controls.TextBlock NightLightQuickText => BatteryContainer.NightLightQuickText;
-    internal Border PlanBalancedCard => BatteryContainer.PlanBalancedCard;
-    internal System.Windows.Controls.TextBlock PlanBalancedIcon => BatteryContainer.PlanBalancedIcon;
-    internal System.Windows.Controls.TextBlock PlanBalancedSub => BatteryContainer.PlanBalancedSub;
-    internal System.Windows.Controls.TextBlock PlanBalancedTitle => BatteryContainer.PlanBalancedTitle;
-    internal Border PlanPerfCard => BatteryContainer.PlanPerfCard;
-    internal System.Windows.Controls.TextBlock PlanPerfIcon => BatteryContainer.PlanPerfIcon;
-    internal System.Windows.Controls.TextBlock PlanPerfSub => BatteryContainer.PlanPerfSub;
-    internal System.Windows.Controls.TextBlock PlanPerfTitle => BatteryContainer.PlanPerfTitle;
-    internal Border PlanSaverCard => BatteryContainer.PlanSaverCard;
-    internal System.Windows.Controls.TextBlock PlanSaverIcon => BatteryContainer.PlanSaverIcon;
-    internal System.Windows.Controls.TextBlock PlanSaverSub => BatteryContainer.PlanSaverSub;
-    internal System.Windows.Controls.TextBlock PlanSaverTitle => BatteryContainer.PlanSaverTitle;
+    internal TextBlock BatteryChargingBolt => EnsureBatteryContainer().BatteryChargingBolt;
+    internal Border BatteryHeaderBadge => EnsureBatteryContainer().BatteryHeaderBadge;
+    internal TextBlock BatteryHeaderBadgeText => EnsureBatteryContainer().BatteryHeaderBadgeText;
+    internal System.Windows.Shapes.Ellipse BatteryHeaderDot => EnsureBatteryContainer().BatteryHeaderDot;
+    internal System.Windows.Controls.TextBlock BatteryHealthText => EnsureBatteryContainer().BatteryHealthText;
+    internal TextBlock BatteryHeroPercentText => EnsureBatteryContainer().BatteryHeroPercentText;
+    internal Border BatteryLevelFill => EnsureBatteryContainer().BatteryLevelFill;
+    internal TextBlock BatteryStatusSubtitle => EnsureBatteryContainer().BatteryStatusSubtitle;
+    internal TextBlock BatteryTimeEstimate => EnsureBatteryContainer().BatteryTimeEstimate;
+    internal System.Windows.Controls.Border BatteryWattageBadge => EnsureBatteryContainer().BatteryWattageBadge;
+    internal System.Windows.Controls.TextBlock BatteryWattageText => EnsureBatteryContainer().BatteryWattageText;
+    internal Slider BrightnessSlider => EnsureBatteryContainer().BrightnessSlider;
+    internal TextBlock BrightnessValueText => EnsureBatteryContainer().BrightnessValueText;
+    internal Button CaffeineQuickBtn => EnsureBatteryContainer().CaffeineQuickBtn;
+    internal TextBlock CaffeineQuickIcon => EnsureBatteryContainer().CaffeineQuickIcon;
+    internal TextBlock CaffeineQuickText => EnsureBatteryContainer().CaffeineQuickText;
+    internal System.Windows.Controls.Border DisplayRefreshBadge => EnsureBatteryContainer().DisplayRefreshBadge;
+    internal System.Windows.Controls.TextBlock DisplayRefreshText => EnsureBatteryContainer().DisplayRefreshText;
+    internal System.Windows.Controls.TextBlock DisplayResolutionText => EnsureBatteryContainer().DisplayResolutionText;
+    internal System.Windows.Controls.Button NightLightQuickBtn => EnsureBatteryContainer().NightLightQuickBtn;
+    internal System.Windows.Controls.TextBlock NightLightQuickIcon => EnsureBatteryContainer().NightLightQuickIcon;
+    internal System.Windows.Controls.TextBlock NightLightQuickText => EnsureBatteryContainer().NightLightQuickText;
+    internal Border PlanBalancedCard => EnsureBatteryContainer().PlanBalancedCard;
+    internal System.Windows.Controls.TextBlock PlanBalancedIcon => EnsureBatteryContainer().PlanBalancedIcon;
+    internal System.Windows.Controls.TextBlock PlanBalancedSub => EnsureBatteryContainer().PlanBalancedSub;
+    internal System.Windows.Controls.TextBlock PlanBalancedTitle => EnsureBatteryContainer().PlanBalancedTitle;
+    internal Border PlanPerfCard => EnsureBatteryContainer().PlanPerfCard;
+    internal System.Windows.Controls.TextBlock PlanPerfIcon => EnsureBatteryContainer().PlanPerfIcon;
+    internal System.Windows.Controls.TextBlock PlanPerfSub => EnsureBatteryContainer().PlanPerfSub;
+    internal System.Windows.Controls.TextBlock PlanPerfTitle => EnsureBatteryContainer().PlanPerfTitle;
+    internal Border PlanSaverCard => EnsureBatteryContainer().PlanSaverCard;
+    internal System.Windows.Controls.TextBlock PlanSaverIcon => EnsureBatteryContainer().PlanSaverIcon;
+    internal System.Windows.Controls.TextBlock PlanSaverSub => EnsureBatteryContainer().PlanSaverSub;
+    internal System.Windows.Controls.TextBlock PlanSaverTitle => EnsureBatteryContainer().PlanSaverTitle;
 
     // -------------------------------------------------------------------------
     //  VoiceMemo View Forwarders (VoiceMemoContainer)
     // -------------------------------------------------------------------------
-    internal Button HeroRecordBtn => VoiceMemoContainer.HeroRecordBtn;
-    internal TextBlock HeroRecordGlyph => VoiceMemoContainer.HeroRecordGlyph;
-    internal TextBlock HeroRecordStatus => VoiceMemoContainer.HeroRecordStatus;
-    internal TextBlock HeroRecordTimer => VoiceMemoContainer.HeroRecordTimer;
-    internal TextBlock LastMemoDuration => VoiceMemoContainer.LastMemoDuration;
-    internal TextBlock LastMemoFileName => VoiceMemoContainer.LastMemoFileName;
-    internal StackPanel LastMemoHost => VoiceMemoContainer.LastMemoHost;
-    internal TextBlock MemoPlayGlyph => VoiceMemoContainer.MemoPlayGlyph;
-    internal TextBlock MemoPlayLabel => VoiceMemoContainer.MemoPlayLabel;
-    internal Button MemoPlayPauseBtn => VoiceMemoContainer.MemoPlayPauseBtn;
-    internal StackPanel NoMemoPlaceholder => VoiceMemoContainer.NoMemoPlaceholder;
-    internal System.Windows.Shapes.Rectangle RecBar0 => VoiceMemoContainer.RecBar0;
-    internal System.Windows.Shapes.Rectangle RecBar1 => VoiceMemoContainer.RecBar1;
-    internal System.Windows.Shapes.Rectangle RecBar2 => VoiceMemoContainer.RecBar2;
-    internal System.Windows.Shapes.Rectangle RecBar3 => VoiceMemoContainer.RecBar3;
-    internal System.Windows.Shapes.Rectangle RecBar4 => VoiceMemoContainer.RecBar4;
-    internal Border RecordHalo => VoiceMemoContainer.RecordHalo;
-    internal ItemsControl VoiceMemosItemsControl => VoiceMemoContainer.VoiceMemosItemsControl;
-    internal ScrollViewer VoiceMemosScrollViewer => VoiceMemoContainer.VoiceMemosScrollViewer;
+    internal Button HeroRecordBtn => EnsureVoiceMemoContainer().HeroRecordBtn;
+    internal TextBlock HeroRecordGlyph => EnsureVoiceMemoContainer().HeroRecordGlyph;
+    internal TextBlock HeroRecordStatus => EnsureVoiceMemoContainer().HeroRecordStatus;
+    internal TextBlock HeroRecordTimer => EnsureVoiceMemoContainer().HeroRecordTimer;
+    internal TextBlock LastMemoDuration => EnsureVoiceMemoContainer().LastMemoDuration;
+    internal TextBlock LastMemoFileName => EnsureVoiceMemoContainer().LastMemoFileName;
+    internal StackPanel LastMemoHost => EnsureVoiceMemoContainer().LastMemoHost;
+    internal TextBlock MemoPlayGlyph => EnsureVoiceMemoContainer().MemoPlayGlyph;
+    internal TextBlock MemoPlayLabel => EnsureVoiceMemoContainer().MemoPlayLabel;
+    internal Button MemoPlayPauseBtn => EnsureVoiceMemoContainer().MemoPlayPauseBtn;
+    internal StackPanel NoMemoPlaceholder => EnsureVoiceMemoContainer().NoMemoPlaceholder;
+    internal System.Windows.Shapes.Rectangle RecBar0 => EnsureVoiceMemoContainer().RecBar0;
+    internal System.Windows.Shapes.Rectangle RecBar1 => EnsureVoiceMemoContainer().RecBar1;
+    internal System.Windows.Shapes.Rectangle RecBar2 => EnsureVoiceMemoContainer().RecBar2;
+    internal System.Windows.Shapes.Rectangle RecBar3 => EnsureVoiceMemoContainer().RecBar3;
+    internal System.Windows.Shapes.Rectangle RecBar4 => EnsureVoiceMemoContainer().RecBar4;
+    internal Border RecordHalo => EnsureVoiceMemoContainer().RecordHalo;
+    internal ItemsControl VoiceMemosItemsControl => EnsureVoiceMemoContainer().VoiceMemosItemsControl;
+    internal ScrollViewer VoiceMemosScrollViewer => EnsureVoiceMemoContainer().VoiceMemosScrollViewer;
 
     // -------------------------------------------------------------------------
     //  Peripherals View Forwarders (PeripheralsContainer)
     // -------------------------------------------------------------------------
-    internal Button OpenBluetoothSettingsBtn => PeripheralsContainer.OpenBluetoothSettingsBtn;
-    internal StackPanel PeripheralsEmptyPlaceholder => PeripheralsContainer.PeripheralsEmptyPlaceholder;
-    internal Button PeripheralsFilterBtn => PeripheralsContainer.PeripheralsFilterBtn;
-    internal TextBlock PeripheralsFilterText => PeripheralsContainer.PeripheralsFilterText;
-    internal ItemsControl PeripheralsItemsControl => PeripheralsContainer.PeripheralsItemsControl;
-    internal System.Windows.Controls.ScrollViewer PeripheralsScrollViewer => PeripheralsContainer.PeripheralsScrollViewer;
-    internal Button RefreshPeripheralsBtn => PeripheralsContainer.RefreshPeripheralsBtn;
+    internal Button OpenBluetoothSettingsBtn => EnsurePeripheralsContainer().OpenBluetoothSettingsBtn;
+    internal StackPanel PeripheralsEmptyPlaceholder => EnsurePeripheralsContainer().PeripheralsEmptyPlaceholder;
+    internal Button PeripheralsFilterBtn => EnsurePeripheralsContainer().PeripheralsFilterBtn;
+    internal TextBlock PeripheralsFilterText => EnsurePeripheralsContainer().PeripheralsFilterText;
+    internal ItemsControl PeripheralsItemsControl => EnsurePeripheralsContainer().PeripheralsItemsControl;
+    internal System.Windows.Controls.ScrollViewer PeripheralsScrollViewer => EnsurePeripheralsContainer().PeripheralsScrollViewer;
+    internal Button RefreshPeripheralsBtn => EnsurePeripheralsContainer().RefreshPeripheralsBtn;
 
     // -------------------------------------------------------------------------
     //  Network View Forwarders (NetworkContainer)
     // -------------------------------------------------------------------------
-    internal Border BtToggleCard => NetworkContainer.BtToggleCard;
-    internal TextBlock BtToggleGlyph => NetworkContainer.BtToggleGlyph;
-    internal TextBlock BtToggleStateText => NetworkContainer.BtToggleStateText;
-    internal Border HotspotCard => NetworkContainer.HotspotCard;
-    internal TextBlock NetworkDownSpeedText => NetworkContainer.NetworkDownSpeedText;
-    internal TextBlock NetworkHeroGlyph => NetworkContainer.NetworkHeroGlyph;
-    internal Border NetworkHeroIconBg => NetworkContainer.NetworkHeroIconBg;
-    internal TextBlock NetworkHeroName => NetworkContainer.NetworkHeroName;
-    internal TextBlock NetworkHeroSubtitle => NetworkContainer.NetworkHeroSubtitle;
-    internal Border NetworkIpBadge => NetworkContainer.NetworkIpBadge;
-    internal TextBlock NetworkIpText => NetworkContainer.NetworkIpText;
-    internal Grid NetworkOverviewHost => NetworkContainer.NetworkOverviewHost;
-    internal System.Windows.Controls.Button NetworkPillSpeedToggleBtn => NetworkContainer.NetworkPillSpeedToggleBtn;
-    internal System.Windows.Controls.TextBlock NetworkPillSpeedToggleText => NetworkContainer.NetworkPillSpeedToggleText;
-    internal System.Windows.Shapes.Ellipse NetworkPingDot => NetworkContainer.NetworkPingDot;
-    internal System.Windows.Controls.TextBlock NetworkPingText => NetworkContainer.NetworkPingText;
-    internal TextBlock NetworkSectionTitle => NetworkContainer.NetworkSectionTitle;
-    internal TextBlock NetworkUpSpeedText => NetworkContainer.NetworkUpSpeedText;
-    internal Button OpenNetworkSettingsBtn => NetworkContainer.OpenNetworkSettingsBtn;
-    internal Button ScanWifiModeBtn => NetworkContainer.ScanWifiModeBtn;
-    internal TextBlock ScanWifiModeText => NetworkContainer.ScanWifiModeText;
-    internal Border WifiNetworksCard => NetworkContainer.WifiNetworksCard;
-    internal ItemsControl WifiNetworksItemsControl => NetworkContainer.WifiNetworksItemsControl;
-    internal ScrollViewer WifiNetworksScrollViewer => NetworkContainer.WifiNetworksScrollViewer;
-    internal Grid WifiScannerHost => NetworkContainer.WifiScannerHost;
-    internal Border WifiScannerStatusPlaceholder => NetworkContainer.WifiScannerStatusPlaceholder;
-    internal TextBlock WifiScannerStatusSubtitle => NetworkContainer.WifiScannerStatusSubtitle;
-    internal TextBlock WifiScannerStatusTitle => NetworkContainer.WifiScannerStatusTitle;
-    internal Border WifiToggleCard => NetworkContainer.WifiToggleCard;
-    internal TextBlock WifiToggleGlyph => NetworkContainer.WifiToggleGlyph;
-    internal TextBlock WifiToggleStateText => NetworkContainer.WifiToggleStateText;
+    internal Border BtToggleCard => EnsureNetworkContainer().BtToggleCard;
+    internal TextBlock BtToggleGlyph => EnsureNetworkContainer().BtToggleGlyph;
+    internal TextBlock BtToggleStateText => EnsureNetworkContainer().BtToggleStateText;
+    internal Border HotspotCard => EnsureNetworkContainer().HotspotCard;
+    internal TextBlock NetworkDownSpeedText => EnsureNetworkContainer().NetworkDownSpeedText;
+    internal TextBlock NetworkHeroGlyph => EnsureNetworkContainer().NetworkHeroGlyph;
+    internal Border NetworkHeroIconBg => EnsureNetworkContainer().NetworkHeroIconBg;
+    internal TextBlock NetworkHeroName => EnsureNetworkContainer().NetworkHeroName;
+    internal TextBlock NetworkHeroSubtitle => EnsureNetworkContainer().NetworkHeroSubtitle;
+    internal Border NetworkIpBadge => EnsureNetworkContainer().NetworkIpBadge;
+    internal TextBlock NetworkIpText => EnsureNetworkContainer().NetworkIpText;
+    internal Grid NetworkOverviewHost => EnsureNetworkContainer().NetworkOverviewHost;
+    internal System.Windows.Controls.Button NetworkPillSpeedToggleBtn => EnsureNetworkContainer().NetworkPillSpeedToggleBtn;
+    internal System.Windows.Controls.TextBlock NetworkPillSpeedToggleText => EnsureNetworkContainer().NetworkPillSpeedToggleText;
+    internal System.Windows.Shapes.Ellipse NetworkPingDot => EnsureNetworkContainer().NetworkPingDot;
+    internal System.Windows.Controls.TextBlock NetworkPingText => EnsureNetworkContainer().NetworkPingText;
+    internal TextBlock NetworkSectionTitle => EnsureNetworkContainer().NetworkSectionTitle;
+    internal TextBlock NetworkUpSpeedText => EnsureNetworkContainer().NetworkUpSpeedText;
+    internal Button OpenNetworkSettingsBtn => EnsureNetworkContainer().OpenNetworkSettingsBtn;
+    internal Button ScanWifiModeBtn => EnsureNetworkContainer().ScanWifiModeBtn;
+    internal TextBlock ScanWifiModeText => EnsureNetworkContainer().ScanWifiModeText;
+    internal Border WifiNetworksCard => EnsureNetworkContainer().WifiNetworksCard;
+    internal ItemsControl WifiNetworksItemsControl => EnsureNetworkContainer().WifiNetworksItemsControl;
+    internal ScrollViewer WifiNetworksScrollViewer => EnsureNetworkContainer().WifiNetworksScrollViewer;
+    internal Grid WifiScannerHost => EnsureNetworkContainer().WifiScannerHost;
+    internal Border WifiScannerStatusPlaceholder => EnsureNetworkContainer().WifiScannerStatusPlaceholder;
+    internal TextBlock WifiScannerStatusSubtitle => EnsureNetworkContainer().WifiScannerStatusSubtitle;
+    internal TextBlock WifiScannerStatusTitle => EnsureNetworkContainer().WifiScannerStatusTitle;
+    internal Border WifiToggleCard => EnsureNetworkContainer().WifiToggleCard;
+    internal TextBlock WifiToggleGlyph => EnsureNetworkContainer().WifiToggleGlyph;
+    internal TextBlock WifiToggleStateText => EnsureNetworkContainer().WifiToggleStateText;
 
     // -------------------------------------------------------------------------
     //  Notifications View Forwarders (NotificationsContainer)
@@ -298,40 +298,40 @@ public partial class IslandWindow
     // -------------------------------------------------------------------------
     //  SystemHud View Forwarders (SystemHudContainer)
     // -------------------------------------------------------------------------
-    internal Border HudCpuBarFill => SystemHudContainer.HudCpuBarFill;
-    internal TextBlock HudCpuHeroText => SystemHudContainer.HudCpuHeroText;
-    internal TextBlock HudCpuStatusText => SystemHudContainer.HudCpuStatusText;
-    internal StackPanel HudCpuHeatmapPanel => SystemHudContainer.HudCpuHeatmapPanel;
-    internal Border HudGpuBarFill => SystemHudContainer.HudGpuBarFill;
-    internal TextBlock HudGpuHeroText => SystemHudContainer.HudGpuHeroText;
-    internal TextBlock HudGpuStatusText => SystemHudContainer.HudGpuStatusText;
-    internal Border HudRunawayBanner => SystemHudContainer.HudRunawayBanner;
-    internal TextBlock HudRunawayText => SystemHudContainer.HudRunawayText;
-    internal TextBlock HudHardwareSubtitle => SystemHudContainer.HudHardwareSubtitle;
-    internal Button HudHog1KillBtn => SystemHudContainer.HudHog1KillBtn;
-    internal TextBlock HudHog1KillText => SystemHudContainer.HudHog1KillText;
-    internal TextBlock HudHog1Name => SystemHudContainer.HudHog1Name;
-    internal TextBlock HudHog1Stats => SystemHudContainer.HudHog1Stats;
-    internal Button HudHog2KillBtn => SystemHudContainer.HudHog2KillBtn;
-    internal TextBlock HudHog2KillText => SystemHudContainer.HudHog2KillText;
-    internal TextBlock HudHog2Name => SystemHudContainer.HudHog2Name;
-    internal TextBlock HudHog2Stats => SystemHudContainer.HudHog2Stats;
-    internal Button HudHog3KillBtn => SystemHudContainer.HudHog3KillBtn;
-    internal TextBlock HudHog3KillText => SystemHudContainer.HudHog3KillText;
-    internal TextBlock HudHog3Name => SystemHudContainer.HudHog3Name;
-    internal TextBlock HudHog3Stats => SystemHudContainer.HudHog3Stats;
-    internal Grid HudHogRow1 => SystemHudContainer.HudHogRow1;
-    internal Grid HudHogRow2 => SystemHudContainer.HudHogRow2;
-    internal Grid HudHogRow3 => SystemHudContainer.HudHogRow3;
-    internal Button HudPurgeRamButton => SystemHudContainer.HudPurgeRamButton;
-    internal TextBlock HudPurgeRamText => SystemHudContainer.HudPurgeRamText;
-    internal Button HudPurgeRunawaysButton => SystemHudContainer.HudPurgeRunawaysButton;
-    internal TextBlock HudPurgeRunawaysText => SystemHudContainer.HudPurgeRunawaysText;
-    internal Border HudRamBarFill => SystemHudContainer.HudRamBarFill;
-    internal TextBlock HudRamHeroText => SystemHudContainer.HudRamHeroText;
-    internal TextBlock HudRamStatusText => SystemHudContainer.HudRamStatusText;
-    internal TextBlock HudSystemHealthChip => SystemHudContainer.HudSystemHealthChip;
-    internal Button HudSnoozeResetBtn => SystemHudContainer.HudSnoozeResetBtn;
-    internal TextBlock HudSnoozeResetText => SystemHudContainer.HudSnoozeResetText;
+    internal Border HudCpuBarFill => EnsureSystemHudContainer().HudCpuBarFill;
+    internal TextBlock HudCpuHeroText => EnsureSystemHudContainer().HudCpuHeroText;
+    internal TextBlock HudCpuStatusText => EnsureSystemHudContainer().HudCpuStatusText;
+    internal StackPanel HudCpuHeatmapPanel => EnsureSystemHudContainer().HudCpuHeatmapPanel;
+    internal Border HudGpuBarFill => EnsureSystemHudContainer().HudGpuBarFill;
+    internal TextBlock HudGpuHeroText => EnsureSystemHudContainer().HudGpuHeroText;
+    internal TextBlock HudGpuStatusText => EnsureSystemHudContainer().HudGpuStatusText;
+    internal Border HudRunawayBanner => EnsureSystemHudContainer().HudRunawayBanner;
+    internal TextBlock HudRunawayText => EnsureSystemHudContainer().HudRunawayText;
+    internal TextBlock HudHardwareSubtitle => EnsureSystemHudContainer().HudHardwareSubtitle;
+    internal Button HudHog1KillBtn => EnsureSystemHudContainer().HudHog1KillBtn;
+    internal TextBlock HudHog1KillText => EnsureSystemHudContainer().HudHog1KillText;
+    internal TextBlock HudHog1Name => EnsureSystemHudContainer().HudHog1Name;
+    internal TextBlock HudHog1Stats => EnsureSystemHudContainer().HudHog1Stats;
+    internal Button HudHog2KillBtn => EnsureSystemHudContainer().HudHog2KillBtn;
+    internal TextBlock HudHog2KillText => EnsureSystemHudContainer().HudHog2KillText;
+    internal TextBlock HudHog2Name => EnsureSystemHudContainer().HudHog2Name;
+    internal TextBlock HudHog2Stats => EnsureSystemHudContainer().HudHog2Stats;
+    internal Button HudHog3KillBtn => EnsureSystemHudContainer().HudHog3KillBtn;
+    internal TextBlock HudHog3KillText => EnsureSystemHudContainer().HudHog3KillText;
+    internal TextBlock HudHog3Name => EnsureSystemHudContainer().HudHog3Name;
+    internal TextBlock HudHog3Stats => EnsureSystemHudContainer().HudHog3Stats;
+    internal Grid HudHogRow1 => EnsureSystemHudContainer().HudHogRow1;
+    internal Grid HudHogRow2 => EnsureSystemHudContainer().HudHogRow2;
+    internal Grid HudHogRow3 => EnsureSystemHudContainer().HudHogRow3;
+    internal Button HudPurgeRamButton => EnsureSystemHudContainer().HudPurgeRamButton;
+    internal TextBlock HudPurgeRamText => EnsureSystemHudContainer().HudPurgeRamText;
+    internal Button HudPurgeRunawaysButton => EnsureSystemHudContainer().HudPurgeRunawaysButton;
+    internal TextBlock HudPurgeRunawaysText => EnsureSystemHudContainer().HudPurgeRunawaysText;
+    internal Border HudRamBarFill => EnsureSystemHudContainer().HudRamBarFill;
+    internal TextBlock HudRamHeroText => EnsureSystemHudContainer().HudRamHeroText;
+    internal TextBlock HudRamStatusText => EnsureSystemHudContainer().HudRamStatusText;
+    internal TextBlock HudSystemHealthChip => EnsureSystemHudContainer().HudSystemHealthChip;
+    internal Button HudSnoozeResetBtn => EnsureSystemHudContainer().HudSnoozeResetBtn;
+    internal TextBlock HudSnoozeResetText => EnsureSystemHudContainer().HudSnoozeResetText;
 
 }

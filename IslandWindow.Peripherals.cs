@@ -27,7 +27,10 @@ public partial class IslandWindow
             ? devices.Where(d => d.IsConnected).ToList()
             : devices;
         SyncObservableCollection(_peripheralDevices, filtered);
-        PeripheralsEmptyPlaceholder.Visibility = filtered.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+        if (_peripheralsContainer != null)
+        {
+            PeripheralsEmptyPlaceholder.Visibility = filtered.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+        }
 
         PeripheralsButtonGlyph.Foreground = _peripheralService.HasLowBatteryDevice
             ? ThemeBrushes.Red
