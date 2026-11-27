@@ -166,6 +166,45 @@ public sealed partial class IslandNatureThemeControl : FrameworkElement
     private static readonly StreamGeometry ButterflyHindwingGeometry;
     private static readonly StreamGeometry ButterflyAntennaeGeometry;
 
+    // Winter Frost frozen resources
+    private static readonly Pen WinterVineDarkPen;
+    private static readonly Pen WinterVineLightPen;
+    private static readonly Pen WinterSecDarkPen;
+    private static readonly Pen WinterSecLightPen;
+    private static readonly Pen WinterBranchDarkPen;
+    private static readonly Pen WinterBranchLightPen;
+    private static readonly Pen WinterTwigPen;
+    private static readonly LinearGradientBrush WinterPineDarkBrush;
+    private static readonly LinearGradientBrush WinterPineLightBrush;
+    private static readonly Pen WinterFrostRimPen;
+    private static readonly Pen[] WinterNeedleOutlinePens;
+    private static readonly LinearGradientBrush IcicleFillBrush;
+    private static readonly Pen IcicleRimPen;
+    private static readonly Pen IcicleSpecularPen;
+    private static readonly RadialGradientBrush FrostStarCoreBrush;
+    private static readonly Pen FrostStarRayPen;
+    private static readonly Pen FrostStarSubPen;
+    private static readonly RadialGradientBrush HollyBerryBrush;
+    private static readonly Pen HollyBerryRimPen;
+    private static readonly SolidColorBrush HollyBerrySpecularBrush;
+    private static readonly LinearGradientBrush SnowdropPetalBrush;
+    private static readonly LinearGradientBrush CrystalPetalBrush;
+    private static readonly Pen StamenIcePen;
+    private static readonly SolidColorBrush SilverAntherBrush;
+    private static readonly SolidColorBrush[] SnowAlphaBrushes;
+    private static readonly Pen SnowStarPen;
+    private static readonly LinearGradientBrush FrostCyanWingBrush;
+    private static readonly LinearGradientBrush FrostAuroraWingBrush;
+    private static readonly LinearGradientBrush FrostCrystalWingBrush;
+    private static readonly Pen FrostWingPen;
+    private static readonly SolidColorBrush FrostSpotBrush;
+    private static readonly Brush[] WinterButterflyWingBrushes;
+    private static readonly Pen[] WinterButterflyWingPens;
+    private static readonly Brush[] WinterButterflySpotBrushes;
+    private static readonly StreamGeometry UnitWinterNeedleClusterGeometry;
+    private static readonly StreamGeometry UnitIcicleGeometry;
+    private static readonly StreamGeometry UnitMiniSnowflakeGeometry;
+
     private static readonly double[] ButterflySpeeds = { 11.0, 13.0, 9.0, 12.0 };
     private static readonly double[] ButterflyScales = { 1.0, 0.9, 0.8, 0.85 };
     private static readonly Brush[] ButterflyWingBrushes;
@@ -348,6 +387,105 @@ public sealed partial class IslandNatureThemeControl : FrameworkElement
             ctx.QuadraticBezierTo(new Point(4, -15), new Point(7, -16), isStroked: true, isSmoothJoin: true);
         }
         ButterflyAntennaeGeometry = Freeze(antennae);
+
+        // ── Winter Frost Frozen Brushes, Pens & Geometries ───────────────────
+        WinterVineDarkPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x18, 0x24, 0x30))), 2.8) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round });
+        WinterVineLightPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x9A, 0xD4, 0xF5))), 1.1) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round });
+        WinterSecDarkPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x18, 0x24, 0x30))), 2.0) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round });
+        WinterSecLightPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x9A, 0xD4, 0xF5))), 0.8) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round });
+        WinterBranchDarkPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x18, 0x24, 0x30))), 1.5) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round });
+        WinterBranchLightPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x9A, 0xD4, 0xF5))), 0.6) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round });
+        WinterTwigPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x23, 0x38, 0x46))), 1.4) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
+
+        WinterPineDarkBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0x13, 0x3A, 0x3A), Color.FromRgb(0x2F, 0x73, 0x70), new Point(0, 0), new Point(1, 1)));
+        WinterPineLightBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0x3D, 0x7F, 0x8C), Color.FromRgb(0xC2, 0xEC, 0xFA), new Point(0, 0), new Point(1, 1)));
+        WinterFrostRimPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(145, 210, 244, 255))), 0.65) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
+
+        var winterOutlineColor = Freeze(new SolidColorBrush(Color.FromArgb(120, 200, 242, 255)));
+        WinterNeedleOutlinePens = new Pen[24];
+        for (int i = 0; i < WinterNeedleOutlinePens.Length; i++)
+        {
+            WinterNeedleOutlinePens[i] = Freeze(new Pen(winterOutlineColor, 0.65 / (i + 1)));
+        }
+
+        IcicleFillBrush = Freeze(new LinearGradientBrush(Color.FromArgb(215, 236, 250, 255), Color.FromArgb(145, 110, 196, 245), new Point(0, 0), new Point(0, 1)));
+        IcicleRimPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(150, 200, 240, 255))), 0.55) { LineJoin = PenLineJoin.Round });
+        IcicleSpecularPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(200, 255, 255, 255))), 0.75) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
+
+        FrostStarCoreBrush = Freeze(new RadialGradientBrush(Color.FromRgb(0xFF, 0xFF, 0xFF), Color.FromRgb(0x68, 0xC4, 0xFF)));
+        FrostStarRayPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(230, 224, 247, 255))), 1.15) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
+        FrostStarSubPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(185, 165, 228, 255))), 0.75) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
+
+        var hollyBerry = new RadialGradientBrush(Color.FromRgb(0xFF, 0x5E, 0x78), Color.FromRgb(0xB5, 0x12, 0x2E))
+        {
+            GradientOrigin = new Point(0.35, 0.35)
+        };
+        HollyBerryBrush = Freeze(hollyBerry);
+        HollyBerryRimPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(140, 58, 6, 16))), 0.55));
+        HollyBerrySpecularBrush = Freeze(new SolidColorBrush(Color.FromArgb(230, 255, 245, 248)));
+
+        SnowdropPetalBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0xBF, 0xE4, 0xFF), Color.FromRgb(0xFF, 0xFF, 0xFF), new Point(0, 0), new Point(1, 0)));
+        CrystalPetalBrush = Freeze(new LinearGradientBrush(Color.FromRgb(0xB8, 0xC4, 0xFF), Color.FromRgb(0xF0, 0xF7, 0xFF), new Point(0, 0), new Point(1, 0)));
+        StamenIcePen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromRgb(0x7C, 0xC8, 0xFF))), 0.6));
+        SilverAntherBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xE6, 0xF7, 0xFF)));
+
+        SnowAlphaBrushes = new SolidColorBrush[16];
+        for (int i = 0; i < SnowAlphaBrushes.Length; i++)
+        {
+            double alpha = (i + 1) / 16.0 * 0.78;
+            SnowAlphaBrushes[i] = Freeze(new SolidColorBrush(Color.FromArgb((byte)Math.Clamp((int)Math.Round(alpha * 255.0), 1, 255), 0xEC, 0xF8, 0xFF)));
+        }
+        SnowStarPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(190, 235, 250, 255))), 0.75) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round });
+
+        FrostCyanWingBrush = Freeze(new LinearGradientBrush(Color.FromArgb(220, 0x38, 0x9E, 0xF2), Color.FromArgb(235, 0xE6, 0xF9, 0xFF), new Point(0, 0), new Point(1, 0)));
+        FrostAuroraWingBrush = Freeze(new LinearGradientBrush(Color.FromArgb(220, 0x7A, 0x62, 0xF0), Color.FromArgb(235, 0xD8, 0xF3, 0xFF), new Point(0, 0), new Point(1, 0)));
+        FrostCrystalWingBrush = Freeze(new LinearGradientBrush(Color.FromArgb(215, 0xB8, 0xE2, 0xF8), Color.FromArgb(240, 0xFF, 0xFF, 0xFF), new Point(0, 0), new Point(1, 0)));
+        FrostWingPen = Freeze(new Pen(Freeze(new SolidColorBrush(Color.FromArgb(170, 0x16, 0x38, 0x54))), 1.15) { LineJoin = PenLineJoin.Round });
+        FrostSpotBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF)));
+
+        WinterButterflyWingBrushes = new Brush[] { FrostCyanWingBrush, FrostAuroraWingBrush, FrostCrystalWingBrush, FrostAuroraWingBrush };
+        WinterButterflyWingPens = new Pen[] { FrostWingPen, FrostWingPen, FrostWingPen, FrostWingPen };
+        WinterButterflySpotBrushes = new Brush[] { FrostSpotBrush, FrostSpotBrush, FrostSpotBrush, FrostSpotBrush };
+
+        // 3-needle frosted spruce/holly sprig (unit length = 1.0)
+        var needleCluster = new StreamGeometry();
+        using (var ctx = needleCluster.Open())
+        {
+            ctx.BeginFigure(new Point(0, 0), isFilled: true, isClosed: true);
+            ctx.QuadraticBezierTo(new Point(0.24, -0.34), new Point(0.78, -0.44), isStroked: true, isSmoothJoin: true);
+            ctx.QuadraticBezierTo(new Point(0.55, -0.16), new Point(0.52, -0.11), isStroked: true, isSmoothJoin: true);
+            ctx.QuadraticBezierTo(new Point(0.78, -0.12), new Point(1.0, 0.0), isStroked: true, isSmoothJoin: true);
+            ctx.QuadraticBezierTo(new Point(0.78, 0.12), new Point(0.52, 0.11), isStroked: true, isSmoothJoin: true);
+            ctx.QuadraticBezierTo(new Point(0.55, 0.16), new Point(0.78, 0.44), isStroked: true, isSmoothJoin: true);
+            ctx.QuadraticBezierTo(new Point(0.24, 0.34), new Point(0, 0), isStroked: true, isSmoothJoin: true);
+        }
+        UnitWinterNeedleClusterGeometry = Freeze(needleCluster);
+
+        // Tapered crystalline icicle (width -1..1, height 0..1)
+        var icicleGeom = new StreamGeometry();
+        using (var ctx = icicleGeom.Open())
+        {
+            ctx.BeginFigure(new Point(-1.0, 0.0), isFilled: true, isClosed: true);
+            ctx.LineTo(new Point(1.0, 0.0), isStroked: true, isSmoothJoin: true);
+            ctx.QuadraticBezierTo(new Point(0.45, 0.55), new Point(0.0, 1.0), isStroked: true, isSmoothJoin: true);
+            ctx.QuadraticBezierTo(new Point(-0.45, 0.55), new Point(-1.0, 0.0), isStroked: true, isSmoothJoin: true);
+        }
+        UnitIcicleGeometry = Freeze(icicleGeom);
+
+        // 6-spoke crystal star (unit radius = 1.0)
+        var miniSnow = new StreamGeometry();
+        using (var ctx = miniSnow.Open())
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                double a = i * (Math.PI / 3.0);
+                double dx = Math.Cos(a);
+                double dy = Math.Sin(a);
+                ctx.BeginFigure(new Point(-dx, -dy), isFilled: false, isClosed: false);
+                ctx.LineTo(new Point(dx, dy), isStroked: true, isSmoothJoin: true);
+            }
+        }
+        UnitMiniSnowflakeGeometry = Freeze(miniSnow);
     }
 
     // =========================================================================
@@ -406,6 +544,11 @@ public sealed partial class IslandNatureThemeControl : FrameworkElement
             case "Meadow":
                 if (Layer == ThemeLayer.Underlay) RenderMeadow(dc, p, t);
                 else RenderMeadowButterfly(dc, p, t);
+                break;
+
+            case "Winter Frost":
+                if (Layer == ThemeLayer.Underlay) RenderWinterUnderlay(dc, p, t);
+                else RenderWinterOverlay(dc, p, t);
                 break;
 
             case "Ivy & Blooms":

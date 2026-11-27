@@ -220,6 +220,7 @@ public partial class IslandWindow
         StyleThemeBtn(fp.ThemesTabNoneBtn, fp.ThemesTabNoneText, current == "None");
         StyleThemeBtn(fp.ThemesTabIvyBtn, fp.ThemesTabIvyText, current == "Ivy & Blooms");
         StyleThemeBtn(fp.ThemesTabMeadowBtn, fp.ThemesTabMeadowText, current == "Meadow");
+        StyleThemeBtn(fp.ThemesTabWinterBtn, fp.ThemesTabWinterText, current == "Winter Frost");
 
         if (fp.NatureActiveThemeBadge != null) fp.NatureActiveThemeBadge.Text = current;
         if (fp.NatureThemeSubtext != null)
@@ -228,6 +229,7 @@ public partial class IslandWindow
             {
                 "Ivy & Blooms" => "Climbing leaves, morning glories, wild roses & butterflies",
                 "Meadow" => "Wild meadow grass, daisies, poppies & lavender",
+                "Winter Frost" => "Frosted pine boughs, icicles, holly berries & drifting snow",
                 _ => "Clean island capsule without decorations"
             };
         }
@@ -238,6 +240,8 @@ public partial class IslandWindow
             fp.FloraControlsGroup.IsEnabled = active;
             fp.FloraControlsGroup.Opacity = active ? 1.0 : 0.45;
         }
+
+        UpdateIslandNatureSettingsUI();
     }
 
     internal void IslandThemeBtn_Click(object sender, RoutedEventArgs e)
@@ -323,19 +327,34 @@ public partial class IslandWindow
         StyleCountBtn(fp.NatureButterfly3Btn, fp.NatureButterfly3Text, cur.NatureButterflyCount == 3);
         StyleCountBtn(fp.NatureButterfly4Btn, fp.NatureButterfly4Text, cur.NatureButterflyCount >= 4);
 
+        bool isWinter = SettingsService.NormalizeIslandTheme(cur.IslandTheme) == "Winter Frost";
+
         if (fp.NatureButterflySubtext != null)
         {
-            fp.NatureButterflySubtext.Text = cur.NatureButterflyCount switch
-            {
-                0 => "0 Butterflies · No motion distraction",
-                1 => "1 Butterfly · Monarch solo flight",
-                2 => "2 Butterflies · Monarch & Blue Morpho pair",
-                3 => "3 Butterflies · Monarch, Blue Morpho & White Swallowtail",
-                _ => $"{cur.NatureButterflyCount} Butterflies · Swarm companions"
-            };
+            fp.NatureButterflySubtext.Text = isWinter
+                ? cur.NatureButterflyCount switch
+                {
+                    0 => "0 Companions · Still winter air",
+                    1 => "1 Frost Wing · Ice-Cyan solo flight",
+                    2 => "2 Frost Wings · Ice-Cyan & Aurora pair",
+                    3 => "3 Frost Wings · Cyan, Aurora & Crystal trio",
+                    _ => $"{cur.NatureButterflyCount} Frost Wings · Winter swarm"
+                }
+                : cur.NatureButterflyCount switch
+                {
+                    0 => "0 Butterflies · No motion distraction",
+                    1 => "1 Butterfly · Monarch solo flight",
+                    2 => "2 Butterflies · Monarch & Blue Morpho pair",
+                    3 => "3 Butterflies · Monarch, Blue Morpho & White Swallowtail",
+                    _ => $"{cur.NatureButterflyCount} Butterflies · Swarm companions"
+                };
         }
 
-        // 3. Drifting Pollen
+        // 3. Drifting Pollen / Snowflakes
+        if (fp.NaturePollenLabelText != null)
+        {
+            fp.NaturePollenLabelText.Text = isWinter ? "Drifting Snowflakes" : "Ambient Pollen Motes";
+        }
         if (fp.NaturePollenToggleSwitch != null)
         {
             fp.NaturePollenToggleSwitch.IsChecked = cur.NaturePollenEnabled;
@@ -348,7 +367,8 @@ public partial class IslandWindow
         }
         if (fp.NaturePollenText != null)
         {
-            fp.NaturePollenText.Text = cur.NaturePollenEnabled ? $"{cur.NaturePollenCount} motes" : "Off";
+            string unit = isWinter ? "flakes" : "motes";
+            fp.NaturePollenText.Text = cur.NaturePollenEnabled ? $"{cur.NaturePollenCount} {unit}" : "Off";
         }
     }
 

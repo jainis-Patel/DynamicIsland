@@ -165,6 +165,7 @@ public partial class IslandWindow
         var mood = _petService.CurrentMood;
         string species = _petService.PetSpecies;
         string accessory = _petService.PetAccessory;
+        string renderStyle = _petService.PetRenderStyle;
         string petName = _petService.PetName;
         int affection = _petService.AffectionScore;
 
@@ -289,6 +290,7 @@ public partial class IslandWindow
                 if (IdlePetCompanion.Visibility != Visibility.Visible)
                     IdlePetCompanion.Visibility = Visibility.Visible;
 
+                IdlePetCompanion.RenderStyle = renderStyle;
                 IdlePetCompanion.Species = species;
                 IdlePetCompanion.Accessory = accessory;
                 IdlePetCompanion.Mood = mood;
@@ -322,6 +324,7 @@ public partial class IslandWindow
                 if (CompactPetCompanion.Visibility != Visibility.Visible)
                     CompactPetCompanion.Visibility = Visibility.Visible;
 
+                CompactPetCompanion.RenderStyle = renderStyle;
                 CompactPetCompanion.Species = species;
                 CompactPetCompanion.Accessory = accessory;
                 CompactPetCompanion.Mood = mood;
@@ -360,6 +363,7 @@ public partial class IslandWindow
         // Settings Hero Showcase Pet animation
         if (SettingsHeroPet != null && SettingsHeroPet.IsVisible)
         {
+            SettingsHeroPet.RenderStyle = renderStyle;
             SettingsHeroPet.Species = species;
             SettingsHeroPet.Accessory = accessory;
             SettingsHeroPet.Mood = mood;
@@ -390,6 +394,7 @@ public partial class IslandWindow
             var stagePet = PetSanctuaryContainer.StagePet;
             if (stagePet != null)
             {
+                stagePet.RenderStyle = renderStyle;
                 double stageGazeX = 0, stageGazeY = 0;
                 bool stageHover = false;
                 try

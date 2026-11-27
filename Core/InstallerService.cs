@@ -13,7 +13,7 @@ internal static class InstallerService
 {
     public const string AppDisplayName = "Dynamic Island";
     public const string AppPublisher = "Jainis Patel";
-    public const string AppVersion = "0.9.0";
+    public const string AppVersion = "0.10.0";
 
     public static string GetDefaultInstallDir()
     {

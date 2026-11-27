@@ -28,6 +28,9 @@ public partial class PetSettingsPanel : UserControl
     private void PetSpeciesPickBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.PetSpeciesPickBtn_Click(sender, e);
 
+    private void PetRenderStylePickBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.PetRenderStylePickBtn_Click(sender, e);
+
     private void PetAccessoryPickBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.PetAccessoryPickBtn_Click(sender, e);
 

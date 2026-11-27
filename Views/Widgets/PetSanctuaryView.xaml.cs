@@ -66,12 +66,21 @@ public partial class PetSanctuaryView : UserControl
 
         string species = service.PetSpecies;
         string accessory = service.PetAccessory;
+        string renderStyle = service.PetRenderStyle;
         string name = service.PetName;
         int affection = service.AffectionScore;
         var mood = service.CurrentMood;
 
         // Stage Pet synchronization
+        StagePet.RenderStyle = renderStyle;
         StagePet.Species = species;
+
+        if (RenderStyleToggleText != null)
+        {
+            RenderStyleToggleText.Text = string.Equals(renderStyle, "Realistic3D", StringComparison.OrdinalIgnoreCase)
+                ? "✨ 3D"
+                : "🎨 2D";
+        }
         StagePet.Accessory = accessory;
         StagePet.Mood = mood;
         StagePet.PetName = name;
@@ -359,5 +368,23 @@ public partial class PetSanctuaryView : UserControl
     private void RoamDesktopBtn_Click(object sender, RoutedEventArgs e)
     {
         _window?.TogglePetFloatWindow();
+    }
+
+    private void ToggleRenderStyleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_petService == null) return;
+        string next = _petService.ToggleRenderStyle();
+        StagePet.PetClickImpulse();
+        RefreshUI();
+        bool is3D = string.Equals(next, "Realistic3D", StringComparison.OrdinalIgnoreCase);
+        _window?.PushToast(new ToastContent(
+            "\uE708",
+            "Pet Visual Style",
+            is3D ? "Switched to 3D Realistic" : "Switched to 2D Classic (Backup)",
+            ThemeBrushes.AccentColor,
+            TimeSpan.FromSeconds(2.0),
+            TargetView: "pet",
+            Priority: ToastPriority.Feedback,
+            Category: "pet"));
     }
 }

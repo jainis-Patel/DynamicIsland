@@ -305,6 +305,29 @@ public partial class IslandWindow
             Category: "pet"));
     }
 
+    internal void PetRenderStylePickBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string style } || _petService == null) return;
+        _petService.SetRenderStyle(style);
+        IdlePetCompanion?.PetClickImpulse();
+        CompactPetCompanion?.PetClickImpulse();
+        SettingsHeroPet?.PetClickImpulse();
+        _petFloatWindow?.RefreshUI();
+        PetSanctuaryContainer?.RefreshUI();
+        UpdatePetSettingsUI();
+        EnsureRendering();
+        bool is3D = string.Equals(_petService.PetRenderStyle, "Realistic3D", StringComparison.OrdinalIgnoreCase);
+        _machine.PushToast(new ToastContent(
+            "\uE708",
+            "Pet Visual Style",
+            is3D ? "Switched to 3D Realistic" : "Switched to 2D Classic (Backup)",
+            ThemeBrushes.AccentColor,
+            TimeSpan.FromSeconds(2.0),
+            TargetView: "settings",
+            Priority: ToastPriority.Feedback,
+            Category: "pet"));
+    }
+
     internal void PetAccessoryPickBtn_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: string accessory } || _petService == null) return;
@@ -514,6 +537,7 @@ public partial class IslandWindow
         bool enabled = _petService.IsEnabled;
         string species = _petService.PetSpecies;
         string accessory = _petService.PetAccessory;
+        string renderStyle = _petService.PetRenderStyle;
         string name = _petService.PetName;
         int affection = _petService.AffectionScore;
         int interval = _petService.ReminderIntervalMinutes;
@@ -550,6 +574,9 @@ public partial class IslandWindow
                 var activeBg = ThemeBrushes.PillToggleActiveBg;
                 var defaultBg = (Brush)FindResource("CardSurfaceBrush");
 
+                StyleCardOptionButton(pp.PetStyle3DBtn, renderStyle == "Realistic3D", accent, activeBg, defaultBg, defaultBorder);
+                StyleCardOptionButton(pp.PetStyle2DBtn, renderStyle == "Classic2D", accent, activeBg, defaultBg, defaultBorder);
+
                 StyleCardOptionButton(pp.PetSpeciesCatBtn, species == "Cat", accent, activeBg, defaultBg, defaultBorder);
                 StyleCardOptionButton(pp.PetSpeciesDogBtn, species == "Dog", accent, activeBg, defaultBg, defaultBorder);
                 StyleCardOptionButton(pp.PetSpeciesBunnyBtn, species == "Bunny", accent, activeBg, defaultBg, defaultBorder);
@@ -584,6 +611,7 @@ public partial class IslandWindow
 
         if (IdlePetCompanion != null)
         {
+            IdlePetCompanion.RenderStyle = renderStyle;
             IdlePetCompanion.Species = species;
             IdlePetCompanion.Accessory = accessory;
             IdlePetCompanion.Visibility = enabled && _machine.State == IslandState.Idle
@@ -592,6 +620,7 @@ public partial class IslandWindow
         }
         if (CompactPetCompanion != null)
         {
+            CompactPetCompanion.RenderStyle = renderStyle;
             CompactPetCompanion.Species = species;
             CompactPetCompanion.Accessory = accessory;
             CompactPetCompanion.Visibility = enabled && _machine.State == IslandState.Compact
@@ -602,6 +631,7 @@ public partial class IslandWindow
         // Hero Showcase Card updates
         if (pp?.SettingsHeroPet != null)
         {
+            pp.SettingsHeroPet.RenderStyle = renderStyle;
             pp.SettingsHeroPet.Species = species;
             pp.SettingsHeroPet.Accessory = accessory;
             pp.SettingsHeroPet.Mood = _petService.CurrentMood;

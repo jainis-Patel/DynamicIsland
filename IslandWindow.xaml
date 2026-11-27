@@ -506,20 +506,20 @@
                         </StackPanel>
 
                         <!-- Virtual Pet Companion (Idle • Snoozes, Blinks, reacts to cursor & clicks) -->
-                        <core:VirtualPetControl x:Name="IdlePetCompanion" Width="28" Height="24" Margin="6,0,0,0"
-                                                VerticalAlignment="Center" Cursor="Hand" Panel.ZIndex="10"
-                                                ClipToBounds="False"
-                                                RenderTransformOrigin="0.5,0.5"
-                                                MouseLeftButtonDown="PetCompanion_Click"
-                                                MouseRightButtonUp="PetCompanion_RightClick"
-                                                ToolTip="Virtual Pet Companion · Click to pet · Double-click for Big Playground · Right-click for flip!">
-                            <core:VirtualPetControl.RenderTransform>
+                        <core:PetHostControl x:Name="IdlePetCompanion" Width="28" Height="24" Margin="6,0,0,0"
+                                             VerticalAlignment="Center" Cursor="Hand" Panel.ZIndex="10"
+                                             ClipToBounds="False"
+                                             RenderTransformOrigin="0.5,0.5"
+                                             MouseLeftButtonDown="PetCompanion_Click"
+                                             MouseRightButtonUp="PetCompanion_RightClick"
+                                             ToolTip="Virtual Pet Companion · Click to pet · Double-click for Big Playground · Right-click for flip!">
+                            <core:PetHostControl.RenderTransform>
                                 <TransformGroup>
                                     <ScaleTransform x:Name="IdlePetScale" ScaleX="1" ScaleY="1" />
                                     <TranslateTransform x:Name="IdlePetTranslate" X="0" Y="0" />
                                 </TransformGroup>
-                            </core:VirtualPetControl.RenderTransform>
-                        </core:VirtualPetControl>
+                            </core:PetHostControl.RenderTransform>
+                        </core:PetHostControl>
                     </StackPanel>
                 </Grid>
 
@@ -628,20 +628,20 @@
                     <!-- Trailing Region (Right): Live 4-band audio waveform -->
                     <!-- Trailing Region (Right): Live Audio Visualizer Host & Dancing Companion Pet -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
-                        <core:VirtualPetControl x:Name="CompactPetCompanion" Width="26" Height="24" Margin="0,0,6,0"
-                                                VerticalAlignment="Center" Cursor="Hand" Panel.ZIndex="10"
-                                                ClipToBounds="False"
-                                                RenderTransformOrigin="0.5,0.5"
-                                                MouseLeftButtonDown="PetCompanion_Click"
-                                                MouseRightButtonUp="PetCompanion_RightClick"
-                                                ToolTip="Virtual Pet Companion · Click to pet · Double-click for Big Playground · Right-click for flip!">
-                            <core:VirtualPetControl.RenderTransform>
+                        <core:PetHostControl x:Name="CompactPetCompanion" Width="26" Height="24" Margin="0,0,6,0"
+                                             VerticalAlignment="Center" Cursor="Hand" Panel.ZIndex="10"
+                                             ClipToBounds="False"
+                                             RenderTransformOrigin="0.5,0.5"
+                                             MouseLeftButtonDown="PetCompanion_Click"
+                                             MouseRightButtonUp="PetCompanion_RightClick"
+                                             ToolTip="Virtual Pet Companion · Click to pet · Double-click for Big Playground · Right-click for flip!">
+                            <core:PetHostControl.RenderTransform>
                                 <TransformGroup>
                                     <ScaleTransform x:Name="CompactPetScale" ScaleX="1" ScaleY="1" />
                                     <TranslateTransform x:Name="CompactPetTranslate" X="0" Y="0" />
                                 </TransformGroup>
-                            </core:VirtualPetControl.RenderTransform>
-                        </core:VirtualPetControl>
+                            </core:PetHostControl.RenderTransform>
+                        </core:PetHostControl>
 
                         <Grid x:Name="CompactVisualizerHost" VerticalAlignment="Center"
                               Cursor="Hand" MouseLeftButtonDown="CompactVisualizer_Click"

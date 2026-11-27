@@ -82,6 +82,7 @@ internal sealed class VirtualPetService : IDisposable
 
     public string PetSpecies => _settings.Current.PetSpecies;
     public string PetAccessory => _settings.Current.PetAccessory;
+    public string PetRenderStyle => _settings.Current.PetRenderStyle;
     public string PetName => _settings.Current.PetName;
     public int AffectionScore => _settings.Current.PetAffectionScore;
     public int WaterCount => _settings.Current.PetWaterCount;
@@ -421,6 +422,22 @@ internal sealed class VirtualPetService : IDisposable
         string normalized = SettingsService.NormalizePetAccessory(accessory);
         _settings.Update(s => s.PetAccessory = normalized, nameof(AppSettings.PetAccessory));
         SetHappyMood();
+    }
+
+    public void SetRenderStyle(string style)
+    {
+        string normalized = SettingsService.NormalizePetRenderStyle(style);
+        _settings.Update(s => s.PetRenderStyle = normalized, nameof(AppSettings.PetRenderStyle));
+        SetHappyMood();
+    }
+
+    public string ToggleRenderStyle()
+    {
+        string next = string.Equals(PetRenderStyle, "Realistic3D", StringComparison.OrdinalIgnoreCase)
+            ? "Classic2D"
+            : "Realistic3D";
+        SetRenderStyle(next);
+        return next;
     }
 
     public string CyclePetName()

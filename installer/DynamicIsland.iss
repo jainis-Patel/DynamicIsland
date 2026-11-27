@@ -4,7 +4,7 @@
 
 #define MyAppName "Dynamic Island"
 #ifndef MyAppVersion
-  #define MyAppVersion "0.9.0"
+  #define MyAppVersion "0.10.0"
 #endif
 #define MyAppPublisher "Jainis Patel"
 #define MyAppURL "https://github.com/jainis-Patel/DynamicIsland"

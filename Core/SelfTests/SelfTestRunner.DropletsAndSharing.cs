@@ -938,10 +938,26 @@ internal static partial class SelfTestRunner
                 Assert(win.LyricsLinesHost.Children.Count == 2 && win.LyricsStatusText.Text == "Synced",
                     "Scrollable lyrics drawer must render all synced lines");
 
+                var firstLineBorder = (System.Windows.Controls.Border)win.LyricsLinesHost.Children[0];
+                var firstLineStack = (System.Windows.Controls.StackPanel)firstLineBorder.Child;
+                var firstLineText = (System.Windows.Controls.TextBlock)firstLineStack.Children[0];
+                var firstLineProg = (System.Windows.Controls.Border)firstLineStack.Children[1];
+                Assert(firstLineText.TextAlignment == TextAlignment.Left && firstLineBorder.BorderThickness.Left == 3.0,
+                    "SpringWave must render left-aligned editorial layout with accent left bar");
+
                 win.LyricsAnimStyleBtn.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
                 Assert(testSettings.Current.LyricsAnimationStyle == "KaraokeGlow" &&
-                       win.LyricsAnimStyleText.Text.Contains("Glow"),
-                    $"Cycling lyrics animation must switch to KaraokeGlow, got '{testSettings.Current.LyricsAnimationStyle}'");
+                       win.LyricsAnimStyleText.Text.Contains("Glow") &&
+                       firstLineText.TextAlignment == TextAlignment.Center &&
+                       firstLineProg.Visibility == Visibility.Visible,
+                    $"Cycling lyrics animation must switch to KaraokeGlow design, got '{testSettings.Current.LyricsAnimationStyle}'");
+
+                win.LyricsAnimStyleBtn.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                Assert(testSettings.Current.LyricsAnimationStyle == "MinimalFade" &&
+                       win.LyricsAnimStyleText.Text.Contains("Minimal") &&
+                       firstLineText.TextAlignment == TextAlignment.Center &&
+                       firstLineProg.Visibility == Visibility.Collapsed,
+                    $"Cycling lyrics animation must switch to MinimalFade design, got '{testSettings.Current.LyricsAnimationStyle}'");
 
                 lyricsSvc.SetTrackForTest(new TrackLyrics
                 {
@@ -953,6 +969,10 @@ internal static partial class SelfTestRunner
                 win.UpdateLyricsDisplay();
                 Assert(win.LyricsLinesHost.Children.Count == 2 && win.LyricsStatusText.Text == "Plain Lyrics",
                     "Plain lyrics fallback must render all plain lines");
+                var plainTb = (System.Windows.Controls.TextBlock)win.LyricsLinesHost.Children[0];
+                Assert(plainTb.TextAlignment == TextAlignment.Center, "Plain lyrics must respect MinimalFade alignment");
+                win.LyricsAnimStyleBtn.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                Assert(plainTb.TextAlignment == TextAlignment.Left, "Plain lyrics must switch to SpringWave left alignment");
             }
             finally
             {

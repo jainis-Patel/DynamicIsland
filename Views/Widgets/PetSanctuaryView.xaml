@@ -31,6 +31,9 @@
             </StackPanel>
 
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Click="ToggleRenderStyleBtn_Click" Style="{StaticResource IslandButton}" Height="21" Padding="7,0" Margin="0,0,4,0" ToolTipService.ToolTip="Switch between 3D Realistic and 2D Classic pets">
+                    <TextBlock x:Name="RenderStyleToggleText" Text="✨ 3D" FontSize="8" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                </Button>
                 <Button Click="RoamDesktopBtn_Click" Style="{StaticResource IslandButton}" Height="21" Padding="7,0" Margin="0,0,4,0" ToolTipService.ToolTip="Pop-out floating desktop companion (roam multi-monitors)">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Style="{StaticResource Glyph}" Text="&#xE7C4;" FontSize="9" Foreground="{DynamicResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
@@ -70,16 +73,16 @@
                     </Border>
 
                     <!-- Big Interactive Pet (135x105 px) -->
-                    <core:VirtualPetControl x:Name="StagePet"
-                                            Grid.Row="0"
-                                            Width="135" Height="105"
-                                            HorizontalAlignment="Center" VerticalAlignment="Center"
-                                            Cursor="Hand"
-                                            MouseMove="StagePet_MouseMove"
-                                            MouseLeave="StagePet_MouseLeave"
-                                            MouseLeftButtonDown="StagePet_Click"
-                                            MouseRightButtonUp="StagePet_RightClick"
-                                            ToolTipService.ToolTip="Click to pet · Right-click for flip trick · Move pointer to guide toys!" />
+                    <core:PetHostControl x:Name="StagePet"
+                                         Grid.Row="0"
+                                         Width="135" Height="105"
+                                         HorizontalAlignment="Center" VerticalAlignment="Center"
+                                         Cursor="Hand"
+                                         MouseMove="StagePet_MouseMove"
+                                         MouseLeave="StagePet_MouseLeave"
+                                         MouseLeftButtonDown="StagePet_Click"
+                                         MouseRightButtonUp="StagePet_RightClick"
+                                         ToolTipService.ToolTip="Click to pet · Right-click for flip trick · Move pointer to guide toys!" />
 
                     <!-- Bottom Info Badge: Name & Mood Status -->
                     <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,2,0,0">

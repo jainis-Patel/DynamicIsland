@@ -133,7 +133,7 @@ public partial class IslandWindow
     // -------------------------------------------------------------------------
     //  Settings View Forwarders (Minimal cross-partial accessor)
     // -------------------------------------------------------------------------
-    internal DynamicIsland.Core.VirtualPetControl? SettingsHeroPet => _settingsContainer?.PetPanel.SettingsHeroPet;
+    internal DynamicIsland.Core.PetHostControl? SettingsHeroPet => _settingsContainer?.PetPanel.SettingsHeroPet;
 
     // -------------------------------------------------------------------------
     //  Audio View Forwarders (AudioContainer)

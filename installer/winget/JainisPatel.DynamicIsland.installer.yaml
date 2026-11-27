@@ -1,5 +1,5 @@
 PackageIdentifier: JainisPatel.DynamicIsland
-PackageVersion: 0.9.0
+PackageVersion: 0.10.0
 Platform:
   - Windows.Desktop
 MinimumOSVersion: 10.0.19041.0
@@ -12,7 +12,7 @@ InstallModes:
 Installers:
   - Architecture: x64
     InstallerType: inno
-    InstallerUrl: https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.0/DynamicIsland-Setup.exe
+    InstallerUrl: https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.10.0/DynamicIsland-Setup.exe
     InstallerSha256: A5D9482265EE3460D66D9F924BCFC81B8C8C7C0EC8FC67E267D77E6AAFE39691
     UpgradeBehavior: install
 ManifestType: installer

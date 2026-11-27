@@ -1173,15 +1173,84 @@ SSID 3 : Home_Router
                 mi.Invoke(heroPet, new object[] { dc });
             }
         }
+
+        // 5. Realistic 3D Pet Engine, Texture Bakery, Mesh Builder & PetHostControl Style Switching
+        Assert(SettingsService.AvailablePetRenderStyles.Count == 2, "AvailablePetRenderStyles must contain Classic2D and Realistic3D");
+        Assert(SettingsService.NormalizePetRenderStyle("classic2d") == "Classic2D", "NormalizePetRenderStyle must normalize classic2d");
+        Assert(SettingsService.NormalizePetRenderStyle("REALISTIC3D") == "Realistic3D", "NormalizePetRenderStyle must normalize REALISTIC3D");
+        Assert(SettingsService.NormalizePetRenderStyle("unknown") == "Realistic3D", "Unknown render style must fallback to Realistic3D");
+
+        string styleTempPath = Path.Combine(Path.GetTempPath(), $"di_pet_style_test_{Guid.NewGuid():N}.json");
+        try
+        {
+            var styleSettings = new SettingsService(styleTempPath);
+            using var stylePetSvc = new VirtualPetService(Application.Current.Dispatcher, styleSettings);
+            Assert(stylePetSvc.PetRenderStyle == "Realistic3D", "Default PetRenderStyle must be Realistic3D");
+            string toggled = stylePetSvc.ToggleRenderStyle();
+            Assert(toggled == "Classic2D" && stylePetSvc.PetRenderStyle == "Classic2D", "ToggleRenderStyle must switch to Classic2D");
+            stylePetSvc.SetRenderStyle("Realistic3D");
+            Assert(stylePetSvc.PetRenderStyle == "Realistic3D", "SetRenderStyle must restore Realistic3D");
+        }
+        finally
+        {
+            try { if (File.Exists(styleTempPath)) File.Delete(styleTempPath); } catch { }
+        }
+
+        foreach (bool heroLod in new[] { false, true })
+        {
+            foreach (string sp in SettingsService.AvailablePetSpecies)
+            {
+                var coat = DynamicIsland.Core.Pet3D.Pet3DTextureBakery.GetCoatTexture(sp, heroLod);
+                var head = DynamicIsland.Core.Pet3D.Pet3DTextureBakery.GetHeadTexture(sp, heroLod);
+                var iris = DynamicIsland.Core.Pet3D.Pet3DTextureBakery.GetIrisTexture(sp);
+                Assert(coat.IsFrozen && head.IsFrozen && iris.IsFrozen, "3D textures must be frozen");
+                Assert(DynamicIsland.Core.Pet3D.Pet3DMeshBuilder.GetSculptedHead(sp, heroLod).Positions.Count > 20, "Head mesh must have vertices");
+                Assert(DynamicIsland.Core.Pet3D.Pet3DMeshBuilder.GetEarMesh(sp, false, heroLod).Positions.Count > 10, "Ear mesh must have vertices");
+            }
+        }
+
+        foreach (string sp in SettingsService.AvailablePetSpecies)
+        {
+            var pet3D = new DynamicIsland.Core.Pet3D.VirtualPet3DControl
+            {
+                Width = 135,
+                Height = 105,
+                Species = sp,
+                Accessory = "Crown",
+                Mood = PetMood.Awake
+            };
+            pet3D.Measure(new Size(135, 105));
+            pet3D.Arrange(new Rect(0, 0, 135, 105));
+            pet3D.PetClickImpulse();
+            pet3D.TriggerTrick();
+            pet3D.TriggerSpecialAction();
+            pet3D.UpdateTick(1.0, isNearCursor: true, gazeX: 0.5, gazeY: -0.2);
+            pet3D.Dance(0.6f, 0.4f, 1.2);
+            foreach (string acc in SettingsService.AvailablePetAccessories)
+            {
+                pet3D.Accessory = acc;
+            }
+        }
+
+        var host = new PetHostControl { Width = 96, Height = 80, Species = "Fox", RenderStyle = "Realistic3D" };
+        host.Measure(new Size(96, 80));
+        host.Arrange(new Rect(0, 0, 96, 80));
+        Assert(host.Children.Count == 1 && host.Children[0] is DynamicIsland.Core.Pet3D.VirtualPet3DControl, "PetHostControl must host VirtualPet3DControl in Realistic3D mode");
+        host.RenderStyle = "Classic2D";
+        Assert(host.Children.Count == 1 && host.Children[0] is VirtualPetControl, "PetHostControl must host VirtualPetControl in Classic2D mode");
+        host.UpdateTick(1.5, isNearCursor: true, gazeX: 0.1, gazeY: 0.1);
+        host.RenderStyle = "Realistic3D";
+        Assert(host.Children.Count == 1 && host.Children[0] is DynamicIsland.Core.Pet3D.VirtualPet3DControl, "PetHostControl must switch back to VirtualPet3DControl");
     }
 
     private static void TestIslandNatureThemes()
     {
-        // 1. Verify available nature themes exist (None, Ivy & Blooms, Meadow)
-        Assert(SettingsService.AvailableIslandThemes.Count == 3, "AvailableIslandThemes should contain 3 themes");
+        // 1. Verify available nature themes exist (None, Ivy & Blooms, Meadow, Winter Frost)
+        Assert(SettingsService.AvailableIslandThemes.Count == 4, "AvailableIslandThemes should contain 4 themes");
         Assert(SettingsService.AvailableIslandThemes.Contains("None"), "Must include None");
         Assert(SettingsService.AvailableIslandThemes.Contains("Ivy & Blooms"), "Must include Ivy & Blooms");
         Assert(SettingsService.AvailableIslandThemes.Contains("Meadow"), "Must include Meadow");
+        Assert(SettingsService.AvailableIslandThemes.Contains("Winter Frost"), "Must include Winter Frost");
 
         // 2. Normalization & alias resolution
         Assert(SettingsService.NormalizeIslandTheme("ivy") == "Ivy & Blooms", "Must normalize 'ivy' to Ivy & Blooms");
@@ -1192,10 +1261,20 @@ SSID 3 : Home_Router
         Assert(SettingsService.NormalizeIslandTheme("sakura") == "Ivy & Blooms", "Must map legacy 'sakura' to Ivy & Blooms");
         Assert(SettingsService.NormalizeIslandTheme("tree") == "Ivy & Blooms", "Must map legacy 'tree' to Ivy & Blooms");
         Assert(SettingsService.NormalizeIslandTheme("meadow") == "Meadow", "Must resolve 'meadow'");
+        Assert(SettingsService.NormalizeIslandTheme("winter") == "Winter Frost", "Must resolve 'winter' to Winter Frost");
+        Assert(SettingsService.NormalizeIslandTheme("Winter Frost") == "Winter Frost", "Must resolve 'Winter Frost'");
+        Assert(SettingsService.NormalizeIslandTheme("frost") == "Winter Frost", "Must resolve 'frost' to Winter Frost");
+        Assert(SettingsService.NormalizeIslandTheme("snow") == "Winter Frost", "Must resolve 'snow' to Winter Frost");
         Assert(SettingsService.NormalizeIslandTheme("clean") == "None", "Must resolve 'clean' to None");
         Assert(SettingsService.NormalizeIslandTheme("none") == "None", "Must resolve 'none'");
         Assert(SettingsService.NormalizeIslandTheme(null) == "Ivy & Blooms", "Null fallback must default to Ivy & Blooms");
         Assert(SettingsService.NormalizeIslandTheme("unknown_theme") == "Ivy & Blooms", "Unknown fallback must be Ivy & Blooms");
+
+        // 2b. Search index coverage for Winter Frost
+        var winterMatches = SettingsSearchIndex.Search("winter");
+        Assert(winterMatches.Any(e => e.CategoryKey == "Themes"), "Search 'winter' must route to Themes (Flora)");
+        var icicleMatches = SettingsSearchIndex.Search("icicles");
+        Assert(icicleMatches.Any(e => e.CategoryKey == "Themes"), "Search 'icicles' must route to Themes (Flora)");
 
         // 3. Settings persistence round-trip
         string tempPath = Path.Combine(Path.GetTempPath(), $"di_nature_theme_test_{Guid.NewGuid():N}.json");
@@ -1213,7 +1292,7 @@ SSID 3 : Home_Router
 
             settings.Update(s =>
             {
-                s.IslandTheme = "Meadow";
+                s.IslandTheme = "Winter Frost";
                 s.NatureDensity = 1.15;
                 s.NatureScale = 1.05;
                 s.NatureDropLength = 85.0;
@@ -1225,7 +1304,7 @@ SSID 3 : Home_Router
             settings.SaveNow();
 
             var reloaded = new SettingsService(tempPath);
-            Assert(reloaded.Current.IslandTheme == "Meadow", "Must persist Meadow across reload");
+            Assert(reloaded.Current.IslandTheme == "Winter Frost", "Must persist Winter Frost across reload");
             Assert(Math.Abs(reloaded.Current.NatureDensity - 1.15) < 1e-4, "Must persist NatureDensity across reload");
             Assert(Math.Abs(reloaded.Current.NatureScale - 1.05) < 1e-4, "Must persist NatureScale across reload");
             Assert(Math.Abs(reloaded.Current.NatureDropLength - 85.0) < 1e-4, "Must persist NatureDropLength across reload");
@@ -1237,6 +1316,35 @@ SSID 3 : Home_Router
         finally
         {
             if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
+
+        // 4. Headless Winter Frost rendering verification on Underlay & Overlay
+        var underlay = new IslandNatureThemeControl { ThemeName = "Winter Frost", Layer = ThemeLayer.Underlay };
+        var overlay = new IslandNatureThemeControl { ThemeName = "Winter Frost", Layer = ThemeLayer.Overlay };
+        var renderMethod = typeof(IslandNatureThemeControl).GetMethod(
+            "OnRender",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert(renderMethod != null, "IslandNatureThemeControl.OnRender must exist");
+
+        var testPill = new Rect(266, 0, 180, 34);
+        foreach (var (timeVal, reduced) in new[] { (1.5, false), (12.0, false), (9.0, true) })
+        {
+            underlay.Step(timeVal, testPill, reduced, density: 0.90, scale: 0.95, dropLength: 70.0, butterflyCount: 3, bloomDensity: 1.0, pollenEnabled: true, pollenCount: 18);
+            overlay.Step(timeVal, testPill, reduced, density: 0.90, scale: 0.95, dropLength: 70.0, butterflyCount: 3, bloomDensity: 1.0, pollenEnabled: true, pollenCount: 18);
+
+            var vUnder = new DrawingVisual();
+            using (var dc = vUnder.RenderOpen())
+            {
+                renderMethod!.Invoke(underlay, new object[] { dc });
+            }
+            Assert(vUnder.Drawing != null && vUnder.Drawing.Bounds.Width > 0, $"Winter Frost Underlay must render geometry at t={timeVal}");
+
+            var vOver = new DrawingVisual();
+            using (var dc = vOver.RenderOpen())
+            {
+                renderMethod!.Invoke(overlay, new object[] { dc });
+            }
+            Assert(vOver.Drawing != null && vOver.Drawing.Bounds.Width > 0, $"Winter Frost Overlay must render geometry at t={timeVal}");
         }
     }
 

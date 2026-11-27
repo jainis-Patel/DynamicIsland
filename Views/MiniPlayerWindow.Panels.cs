@@ -785,9 +785,25 @@ public partial class MiniPlayerWindow
         public TimeSpan? NextTimestamp { get; init; }
     }
 
+    private static readonly System.Windows.Media.Effects.DropShadowEffect ActiveGlowEffect = CreateFrozenActiveGlowEffect();
+
+    private static System.Windows.Media.Effects.DropShadowEffect CreateFrozenActiveGlowEffect()
+    {
+        var fx = new System.Windows.Media.Effects.DropShadowEffect
+        {
+            Color = Color.FromRgb(0xFF, 0x9F, 0x0A),
+            BlurRadius = 10,
+            ShadowDepth = 0,
+            Opacity = 0.65
+        };
+        fx.Freeze();
+        return fx;
+    }
+
     private readonly List<LyricLineVisual> _lyricVisuals = new();
     private TrackLyrics? _renderedLyricsTrack;
     private int _renderedActiveLineIdx = -2;
+    private string _lastAppliedLyricsStyle = "";
     private long _userLyricsScrollUntilTick;
     private int _lyricsScrollAnimVersion;
 
@@ -940,6 +956,7 @@ public partial class MiniPlayerWindow
         else
         {
             LyricsStatusText.Text = "Plain Lyrics";
+            ApplyPlainLyricsStyle(CurrentLyricsAnimStyle);
         }
     }
 
@@ -977,6 +994,7 @@ public partial class MiniPlayerWindow
                     Margin = new Thickness(6, 3, 6, 3)
                 });
             }
+            ApplyPlainLyricsStyle(CurrentLyricsAnimStyle);
             LyricsScrollViewer.ScrollToTop();
             return;
         }
@@ -1057,45 +1075,136 @@ public partial class MiniPlayerWindow
         }
     }
 
+    private void ApplyPlainLyricsStyle(string style)
+    {
+        _lastAppliedLyricsStyle = style;
+        Brush primaryBrush = (Brush)FindResource("PrimaryTextBrush");
+        Brush accentBrush = (Brush)FindResource("AccentBrush");
+        Brush secondaryBrush = (Brush)FindResource("SecondaryBrush");
+
+        foreach (UIElement child in LyricsLinesHost.Children)
+        {
+            if (child is not TextBlock tb) continue;
+            switch (style)
+            {
+                case "SpringWave":
+                    tb.TextAlignment = TextAlignment.Left;
+                    tb.FontSize = 12.5;
+                    tb.FontWeight = FontWeights.SemiBold;
+                    tb.Foreground = primaryBrush;
+                    tb.Opacity = 0.90;
+                    tb.Margin = new Thickness(10, 4, 10, 4);
+                    break;
+                case "KaraokeGlow":
+                    tb.TextAlignment = TextAlignment.Center;
+                    tb.FontSize = 12.0;
+                    tb.FontWeight = FontWeights.SemiBold;
+                    tb.Foreground = accentBrush;
+                    tb.Opacity = 0.95;
+                    tb.Margin = new Thickness(8, 5, 8, 5);
+                    break;
+                default: // MinimalFade
+                    tb.TextAlignment = TextAlignment.Center;
+                    tb.FontSize = 11.0;
+                    tb.FontWeight = FontWeights.Normal;
+                    tb.Foreground = secondaryBrush;
+                    tb.Opacity = 0.82;
+                    tb.Margin = new Thickness(6, 2.5, 6, 2.5);
+                    break;
+            }
+        }
+    }
+
     private void ApplyLyricsActiveLine(int activeIdx, bool animate)
     {
         _renderedActiveLineIdx = activeIdx;
-        if (_lyricVisuals.Count == 0) return;
+        string style = CurrentLyricsAnimStyle;
+        _lastAppliedLyricsStyle = style;
 
-        string style = IsReducedLyricsMotion ? "MinimalFade" : CurrentLyricsAnimStyle;
+        if (_lyricVisuals.Count == 0)
+        {
+            ApplyPlainLyricsStyle(style);
+            return;
+        }
+
         bool useAnimation = animate && !IsReducedLyricsMotion;
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
         var animDuration = TimeSpan.FromMilliseconds(240);
 
+        Brush primaryBrush = (Brush)FindResource("PrimaryTextBrush");
         Brush accentBrush = (Brush)FindResource("AccentBrush");
         Brush secondaryBrush = (Brush)FindResource("SecondaryBrush");
 
+        int effectiveIdx = activeIdx >= 0 ? activeIdx : 0;
         LyricLineVisual? activeVisual = null;
 
         foreach (var v in _lyricVisuals)
         {
-            bool isActive = v.Index == activeIdx;
+            bool isActive = v.Index == effectiveIdx;
             if (isActive) activeVisual = v;
 
-            int dist = activeIdx >= 0 ? Math.Abs(v.Index - activeIdx) : v.Index + 1;
+            int dist = Math.Abs(v.Index - effectiveIdx);
 
-            double targetOpacity = style == "MinimalFade"
-                ? (isActive ? 1.0 : 0.42)
-                : isActive
-                    ? 1.0
-                    : dist == 1 ? 0.58 : dist == 2 ? 0.36 : 0.22;
+            double targetOpacity;
+            double targetScale;
 
-            double targetScale = isActive
-                ? (style == "KaraokeGlow" ? 1.06 : style == "SpringWave" ? 1.05 : 1.0)
-                : 1.0;
+            if (style == "SpringWave")
+            {
+                // Apple Music Editorial Left-Aligned
+                v.TextBlock.TextAlignment = TextAlignment.Left;
+                v.Container.RenderTransformOrigin = new Point(0.0, 0.5);
+                v.TextBlock.FontSize = isActive ? 15.0 : 12.0;
+                v.TextBlock.FontWeight = isActive ? FontWeights.Bold : FontWeights.SemiBold;
+                v.TextBlock.Foreground = isActive ? primaryBrush : secondaryBrush;
+                v.TextBlock.Effect = null;
 
-            v.TextBlock.FontSize = isActive ? 13.5 : 11.5;
-            v.TextBlock.FontWeight = isActive ? FontWeights.Bold : FontWeights.Medium;
-            v.TextBlock.Foreground = isActive ? accentBrush : secondaryBrush;
+                v.Container.Background = Brushes.Transparent;
+                v.Container.BorderThickness = isActive ? new Thickness(3, 0, 0, 0) : new Thickness(0);
+                v.Container.BorderBrush = isActive ? accentBrush : Brushes.Transparent;
+                v.Container.CornerRadius = new CornerRadius(2);
+                v.Container.Padding = isActive ? new Thickness(10, 6, 8, 6) : new Thickness(10, 4, 8, 4);
 
-            v.Container.Background = (isActive && style == "KaraokeGlow")
-                ? CurrentTrackBgBrush
-                : Brushes.Transparent;
+                targetOpacity = isActive ? 1.0 : dist == 1 ? 0.52 : dist == 2 ? 0.30 : 0.16;
+                targetScale = isActive ? 1.04 : 1.0;
+            }
+            else if (style == "KaraokeGlow")
+            {
+                // Centered Spotlight Card + Glow + Live Progress Bar
+                v.TextBlock.TextAlignment = TextAlignment.Center;
+                v.Container.RenderTransformOrigin = new Point(0.5, 0.5);
+                v.TextBlock.FontSize = isActive ? 14.5 : 11.0;
+                v.TextBlock.FontWeight = isActive ? FontWeights.Bold : FontWeights.Medium;
+                v.TextBlock.Foreground = isActive ? accentBrush : secondaryBrush;
+                v.TextBlock.Effect = isActive ? ActiveGlowEffect : null;
+
+                v.Container.Background = isActive ? CurrentTrackBgBrush : Brushes.Transparent;
+                v.Container.BorderThickness = isActive ? new Thickness(1) : new Thickness(0);
+                v.Container.BorderBrush = isActive ? accentBrush : Brushes.Transparent;
+                v.Container.CornerRadius = new CornerRadius(12);
+                v.Container.Padding = isActive ? new Thickness(12, 7, 12, 7) : new Thickness(8, 4, 8, 4);
+
+                targetOpacity = isActive ? 1.0 : dist == 1 ? 0.48 : dist == 2 ? 0.30 : 0.18;
+                targetScale = isActive ? 1.05 : 1.0;
+            }
+            else
+            {
+                // MinimalFade: Compact Clean Centered Reader
+                v.TextBlock.TextAlignment = TextAlignment.Center;
+                v.Container.RenderTransformOrigin = new Point(0.5, 0.5);
+                v.TextBlock.FontSize = isActive ? 12.5 : 10.5;
+                v.TextBlock.FontWeight = isActive ? FontWeights.SemiBold : FontWeights.Normal;
+                v.TextBlock.Foreground = isActive ? primaryBrush : secondaryBrush;
+                v.TextBlock.Effect = null;
+
+                v.Container.Background = isActive ? SubtleSurfaceBrush : Brushes.Transparent;
+                v.Container.BorderThickness = new Thickness(0);
+                v.Container.BorderBrush = Brushes.Transparent;
+                v.Container.CornerRadius = new CornerRadius(6);
+                v.Container.Padding = new Thickness(8, 3.5, 8, 3.5);
+
+                targetOpacity = isActive ? 1.0 : 0.35;
+                targetScale = 1.0;
+            }
 
             if (v.ProgressBar != null)
             {
@@ -1116,7 +1225,7 @@ public partial class MiniPlayerWindow
 
                 if (style == "SpringWave" && dist <= 3)
                 {
-                    double startY = isActive ? 5.0 : (v.Index > activeIdx ? 3.5 : -2.5);
+                    double startY = isActive ? 5.0 : (v.Index > effectiveIdx ? 3.5 : -2.5);
                     v.Translate.Y = startY;
                     v.Translate.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0.0, TimeSpan.FromMilliseconds(260)) { EasingFunction = ease });
                 }
@@ -1202,10 +1311,12 @@ public partial class MiniPlayerWindow
 
     private void UpdateLyricsLineProgress(TimeSpan pos)
     {
-        if (_renderedActiveLineIdx < 0 || _renderedActiveLineIdx >= _lyricVisuals.Count) return;
-        if (CurrentLyricsAnimStyle != "KaraokeGlow" || IsReducedLyricsMotion) return;
+        if (_lyricVisuals.Count == 0) return;
+        int effectiveIdx = _renderedActiveLineIdx >= 0 ? _renderedActiveLineIdx : 0;
+        if (effectiveIdx >= _lyricVisuals.Count) return;
+        if (CurrentLyricsAnimStyle != "KaraokeGlow") return;
 
-        var active = _lyricVisuals[_renderedActiveLineIdx];
+        var active = _lyricVisuals[effectiveIdx];
         if (active.ProgressScale == null) return;
 
         TimeSpan endTs = active.NextTimestamp ?? (_mediaService.Current?.Duration > active.Timestamp

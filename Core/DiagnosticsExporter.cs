@@ -31,7 +31,7 @@ internal static class DiagnosticsExporter
 
             var proc = Process.GetCurrentProcess();
             var gc = GC.GetGCMemoryInfo();
-            string appVer = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.9.0";
+            string appVer = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.10.0";
 
             JsonNode? sanitizedSettingsNode = null;
             try

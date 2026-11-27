@@ -1,20 +1,20 @@
 ﻿{
-    "version": "0.9.0",
-    "releaseTag": "v0.9.0",
+    "version": "0.10.0",
+    "releaseTag": "v0.10.0",
     "channel": "stable",
-    "releaseDate": "2026-11-26T01:37:00Z",
+    "releaseDate": "2026-11-27T03:05:00Z",
     "minWindowsBuild": "10.0.19041.0",
-    "changelogUrl": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.9.0",
-    "summary": "Redesigned Widgets Gallery Bento cards fixing header badge collisions & CPU name truncation, expanded Notifications & Dock Bar clipping fix, unified frosted Tray/Launcher/DropShelf/Caffeine menus with Segoe Fluent icons, Pre-Call Webcam Mirror, Smart Clipboard Transforms, and 86-test suite.",
+    "changelogUrl": "https://github.com/jainis-Patel/DynamicIsland/releases/tag/v0.10.0",
+    "summary": "3D Virtual Pets, Living Nature Themes, Mini Player upgrades, Universal Command Palette, Context Profiles, IPC hook exporter, a11y/localization, first-time setup presets & startup diagnostics.",
     "isCritical": false,
     "downloads": {
         "installer": {
-            "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.0/DynamicIsland-Setup.exe",
+            "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.10.0/DynamicIsland-Setup.exe",
             "sha256": "a5d9482265ee3460d66d9f924bcfc81b8c8c7c0ec8fc67e267d77e6aafe39691",
             "sizeBytes": 74358512
         },
         "portable": {
-            "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.9.0/DynamicIsland-Portable.zip",
+            "url": "https://github.com/jainis-Patel/DynamicIsland/releases/download/v0.10.0/DynamicIsland-Portable.zip",
             "sha256": "eaae6ed01ed1d49d7aaa84ab07b2bedab7be4df77e7d4ca6f90f4a43b831f898",
             "sizeBytes": 68483630
         }

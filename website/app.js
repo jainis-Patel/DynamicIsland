@@ -506,7 +506,7 @@
       h: 64,
       r: 26,
       halo: "radial-gradient(circle, rgba(48,209,88,0.34) 0%, transparent 72%)",
-      html: `<div class="sim-idle-row"><span><strong style="color:#30d158;">WhatsApp</strong> · Alex: Ship v0.9.0?</span><span class="phase-chip done">Notification</span></div>`
+      html: `<div class="sim-idle-row"><span><strong style="color:#30d158;">WhatsApp</strong> · Alex: Ship v0.10.0?</span><span class="phase-chip done">Notification</span></div>`
     },
     critical: {
       priority: 3,

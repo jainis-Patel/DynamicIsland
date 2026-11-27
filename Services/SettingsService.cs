@@ -16,7 +16,7 @@ public sealed class AppSettings
     public string ThemeName { get; set; } = "Solar Amber";
     public string ThemeMode { get; set; } = "System"; // "System", "Dark", "Light"
     public string ThemeStyle { get; set; } = "Default"; // "Default", "Liquid Glass"
-    /// <summary>Living island nature overlay theme: "None", "Ivy &amp; Blooms", "Sakura Branch", "Blossom Tree", "Meadow".</summary>
+    /// <summary>Living island nature overlay theme: "None", "Ivy &amp; Blooms", "Meadow", "Winter Frost".</summary>
     public string IslandTheme { get; set; } = "Ivy & Blooms";
     /// <summary>Living nature botanical growth density from 0.20 (sparse/minimal) to 1.50 (lush). Default 0.70.</summary>
     public double NatureDensity { get; set; } = 0.70;
@@ -86,6 +86,7 @@ public sealed class AppSettings
     public bool EnableVirtualPet { get; set; } = true;
     public string PetSpecies { get; set; } = "Cat";
     public string PetAccessory { get; set; } = "None";
+    public string PetRenderStyle { get; set; } = "Realistic3D";
     public string PetName { get; set; } = "Mochi";
     public int WellnessReminderMinutes { get; set; } = 30;
     public int PetAffectionScore { get; set; } = 25;
@@ -434,6 +435,7 @@ internal sealed class SettingsService : IDisposable
         "None",
         "Ivy & Blooms",
         "Meadow",
+        "Winter Frost",
     };
 
     public static string NormalizeIslandTheme(string? theme)
@@ -449,6 +451,10 @@ internal sealed class SettingsService : IDisposable
             string.Equals(trimmed, "Flower Meadow", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(trimmed, "Grass", StringComparison.OrdinalIgnoreCase))
             return "Meadow";
+        if (trimmed.Contains("winter", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Contains("frost", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Snow", StringComparison.OrdinalIgnoreCase))
+            return "Winter Frost";
 
         // "Ivy & Blooms", "Leaves", "Leaves & Blooms", or legacy "Sakura" / "Tree" all map to the refined botanical leaves theme
         return "Ivy & Blooms";
@@ -480,6 +486,15 @@ internal sealed class SettingsService : IDisposable
 
     public static string NormalizePetAccessory(string? accessory) =>
         AvailablePetAccessories.FirstOrDefault(a => string.Equals(a, accessory?.Trim(), StringComparison.OrdinalIgnoreCase)) ?? "None";
+
+    public static readonly IReadOnlyList<string> AvailablePetRenderStyles = new[]
+    {
+        "Classic2D",
+        "Realistic3D",
+    };
+
+    public static string NormalizePetRenderStyle(string? style) =>
+        AvailablePetRenderStyles.FirstOrDefault(s => string.Equals(s, style?.Trim(), StringComparison.OrdinalIgnoreCase)) ?? "Realistic3D";
 
     public static string SanitizePetName(string? name)
     {
@@ -563,6 +578,7 @@ internal sealed class SettingsService : IDisposable
         settings.IslandTheme = NormalizeIslandTheme(settings.IslandTheme);
         settings.PetSpecies = NormalizePetSpecies(settings.PetSpecies);
         settings.PetAccessory = NormalizePetAccessory(settings.PetAccessory);
+        settings.PetRenderStyle = NormalizePetRenderStyle(settings.PetRenderStyle);
         settings.PetName = SanitizePetName(settings.PetName);
         settings.PetCareStreakDays = Math.Max(0, settings.PetCareStreakDays);
         settings.UpdateChannel = NormalizeUpdateChannel(settings.UpdateChannel);
@@ -703,6 +719,7 @@ internal sealed class SettingsService : IDisposable
             s.EnableVirtualPet = true;
             s.PetSpecies = "Cat";
             s.PetAccessory = "None";
+            s.PetRenderStyle = "Realistic3D";
             s.PetName = "Mochi";
             s.WellnessReminderMinutes = 30;
             s.PetAffectionScore = 25;

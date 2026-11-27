@@ -25,9 +25,9 @@ internal static class SettingsSearchIndex
         new("Rim & Motion Effects", "Edge border, ambient halo glow, reduced motion & pulse test", "Appearance", "Appearance", "\uE7E8", "edge border specular glow halo reduced motion pulse"),
 
         // Flora
-        new("Botanical Overlay", "Disabled, Ivy & Blooms, or Wild Meadow", "Themes", "Flora", "\uEC0A", "flora nature botanical ivy blooms meadow overlay theme"),
+        new("Botanical Overlay", "Disabled, Ivy & Blooms, Wild Meadow, or Winter Frost", "Themes", "Flora", "\uEC0A", "flora nature botanical ivy blooms meadow winter frost snow icicles pine holly overlay theme"),
         new("Density Profiles & Sliders", "Minimal, Subtle, Balanced, Lush, Vine & Bloom sliders", "Themes", "Flora", "\uEC0A", "density vine bloom foliage scale cascade drop"),
-        new("Fluttering Companions & Pollen", "Butterfly count (0-4) and ambient pollen motes", "Themes", "Flora", "\uEC0A", "butterfly butterflies pollen motes particles"),
+        new("Fluttering Companions & Pollen", "Butterfly / frost-wing count (0-4) and ambient pollen or snowflakes", "Themes", "Flora", "\uEC0A", "butterfly butterflies pollen motes particles snowflakes snow frost wings"),
 
         // Clock & Audio
         new("Idle Clock Face", "8 horology & digital clock styles for the idle capsule", "Clock", "Clock & Audio", "\uE823", "clock face minimal seconds date badge analog neon flip matrix jump hour"),

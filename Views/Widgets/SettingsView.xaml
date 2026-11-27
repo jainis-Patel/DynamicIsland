@@ -28,7 +28,7 @@
                 </Border>
                 <TextBlock Style="{StaticResource SectionTitle}" Text="Settings" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <Border Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource ChipBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="4,1" Margin="5,0,0,0" VerticalAlignment="Center">
-                    <TextBlock x:Name="AppVersionText" Text="0.9.0" Style="{StaticResource Digits}" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" />
+                    <TextBlock x:Name="AppVersionText" Text="0.10.0" Style="{StaticResource Digits}" FontSize="7.5" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" />
                 </Border>
             </StackPanel>
 

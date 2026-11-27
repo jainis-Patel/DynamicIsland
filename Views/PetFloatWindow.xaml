@@ -81,20 +81,20 @@
         </Border>
 
         <!-- Frameless Pet Directly on Desktop -->
-        <core:VirtualPetControl x:Name="FloatPet"
-                                Grid.Row="1"
-                                Width="96" Height="80"
-                                HorizontalAlignment="Center" VerticalAlignment="Bottom"
-                                RenderTransformOrigin="0.5,0.5"
-                                Cursor="Hand"
-                                PreviewMouseLeftButtonDown="Pet_PreviewMouseLeftButtonDown"
-                                PreviewMouseMove="Pet_PreviewMouseMove"
-                                PreviewMouseLeftButtonUp="Pet_PreviewMouseLeftButtonUp"
-                                MouseRightButtonUp="Pet_RightClick"
-                                ToolTipService.ToolTip="Click to pet · Right-click for flip · Drag to move">
-            <core:VirtualPetControl.RenderTransform>
+        <core:PetHostControl x:Name="FloatPet"
+                             Grid.Row="1"
+                             Width="96" Height="80"
+                             HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                             RenderTransformOrigin="0.5,0.5"
+                             Cursor="Hand"
+                             PreviewMouseLeftButtonDown="Pet_PreviewMouseLeftButtonDown"
+                             PreviewMouseMove="Pet_PreviewMouseMove"
+                             PreviewMouseLeftButtonUp="Pet_PreviewMouseLeftButtonUp"
+                             MouseRightButtonUp="Pet_RightClick"
+                             ToolTipService.ToolTip="Click to pet · Right-click for flip · Drag to move">
+            <core:PetHostControl.RenderTransform>
                 <ScaleTransform x:Name="FloatPetFlipScale" ScaleX="1" ScaleY="1" />
-            </core:VirtualPetControl.RenderTransform>
-        </core:VirtualPetControl>
+            </core:PetHostControl.RenderTransform>
+        </core:PetHostControl>
     </Grid>
 </Window>

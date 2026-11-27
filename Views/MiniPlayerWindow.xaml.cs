@@ -697,7 +697,8 @@ public partial class MiniPlayerWindow : Window
         {
             ApplyAlbumArtStyle(style);
             SyncLyricsAnimationStyleLabel();
-            if (_activeDrawer == DrawerState.Lyrics)
+            if (_activeDrawer == DrawerState.Lyrics &&
+                !string.Equals(_lastAppliedLyricsStyle, CurrentLyricsAnimStyle, StringComparison.OrdinalIgnoreCase))
             {
                 ApplyLyricsActiveLine(_lyricsService.CurrentIndex, animate: false);
             }

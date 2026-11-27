@@ -270,10 +270,12 @@ public partial class PetFloatWindow : Window
     {
         string species = _petService.PetSpecies;
         string accessory = _petService.PetAccessory;
+        string renderStyle = _petService.PetRenderStyle;
         string name = _petService.PetName;
         int affection = _petService.AffectionScore;
         var mood = _petService.CurrentMood;
 
+        FloatPet.RenderStyle = renderStyle;
         FloatPet.Species = species;
         FloatPet.Accessory = accessory;
         FloatPet.Mood = mood;
