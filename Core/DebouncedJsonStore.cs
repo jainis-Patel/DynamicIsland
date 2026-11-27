@@ -15,6 +15,7 @@ internal sealed class DebouncedJsonStore<T> : IDisposable
     private readonly int _delayMs;
     private readonly object _timerLock = new();
     private readonly object _fileLock = new();
+    private readonly object _flushLock = new();
     private readonly Timer _timer;
 
     private bool _dirty;
@@ -66,24 +67,34 @@ internal sealed class DebouncedJsonStore<T> : IDisposable
 
     private void FlushCore(bool requireExistingDir)
     {
-        lock (_timerLock)
+        lock (_flushLock)
         {
-            if (!_dirty) return;
-            _dirty = false;
-            try { _timer.Change(Timeout.Infinite, Timeout.Infinite); } catch { }
-        }
-
-        if (requireExistingDir)
-        {
-            string? dir = Path.GetDirectoryName(_filePath);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            lock (_timerLock)
             {
-                return;
+                if (!_dirty) return;
+                _dirty = false;
+                try { _timer.Change(Timeout.Infinite, Timeout.Infinite); } catch { }
+            }
+
+            if (requireExistingDir)
+            {
+                string? dir = Path.GetDirectoryName(_filePath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                {
+                    return;
+                }
+            }
+
+            try
+            {
+                T snapshot = _snapshotProvider();
+                AtomicJsonStore.Save(_filePath, snapshot, _fileLock, _options);
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[DebouncedJsonStore] Flush failed for '{_filePath}': {ex.Message}");
             }
         }
-
-        T snapshot = _snapshotProvider();
-        AtomicJsonStore.Save(_filePath, snapshot, _fileLock, _options);
     }
 
     public void Dispose()
@@ -98,16 +109,26 @@ internal sealed class DebouncedJsonStore<T> : IDisposable
             try { _timer.Dispose(); } catch { }
         }
 
-        if (wasDirty)
+        lock (_flushLock)
         {
-            try
+            bool stillDirty;
+            lock (_timerLock)
             {
-                T snapshot = _snapshotProvider();
-                AtomicJsonStore.Save(_filePath, snapshot, _fileLock, _options);
+                stillDirty = wasDirty || _dirty;
+                _dirty = false;
             }
-            catch (Exception ex)
+
+            if (stillDirty)
             {
-                App.Log($"[DebouncedJsonStore] Dispose flush failed for '{_filePath}': {ex.Message}");
+                try
+                {
+                    T snapshot = _snapshotProvider();
+                    AtomicJsonStore.Save(_filePath, snapshot, _fileLock, _options);
+                }
+                catch (Exception ex)
+                {
+                    App.Log($"[DebouncedJsonStore] Dispose flush failed for '{_filePath}': {ex.Message}");
+                }
             }
         }
     }

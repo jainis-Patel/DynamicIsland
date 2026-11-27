@@ -39,6 +39,23 @@ internal static class SafeProcessLauncher
         return StartShellTarget(uri.AbsoluteUri);
     }
 
+    public static bool TryOpenUri(string? uriText, IReadOnlySet<string> allowedSchemes)
+    {
+        if (string.IsNullOrWhiteSpace(uriText)) return false;
+        string trimmed = uriText.Trim();
+        if (trimmed.Contains('\r') || trimmed.Contains('\n') || trimmed.Contains('\0'))
+            return false;
+
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) ||
+            !allowedSchemes.Contains(uri.Scheme))
+        {
+            App.Log($"[SafeProcessLauncher] Blocked unsafe URI scheme: '{trimmed}'");
+            return false;
+        }
+
+        return StartShellTarget(uri.AbsoluteUri);
+    }
+
     public static bool TryOpenShellUri(string? uriText)
     {
         if (string.IsNullOrWhiteSpace(uriText)) return false;
