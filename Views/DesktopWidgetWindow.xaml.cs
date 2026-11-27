@@ -32,6 +32,9 @@ public enum DesktopWidgetKind
 public partial class DesktopWidgetWindow : Window
 {
     private static readonly Dictionary<DesktopWidgetKind, DesktopWidgetWindow> ActiveWidgets = new();
+    private static bool _isFullscreenSuppressed;
+    private static bool _suppressPersistence;
+    public static bool IsFullscreenSuppressed => _isFullscreenSuppressed;
     public static event Action? ActiveWidgetsChanged;
 
     private static readonly Color AmberColor = Color.FromRgb(0xFF, 0x9F, 0x0A);
@@ -96,18 +99,127 @@ public partial class DesktopWidgetWindow : Window
         win.Top = Math.Min(workArea.Bottom - win.Height - 12.0, topStart + rowOffset);
 
         win.Show();
+        if (_isFullscreenSuppressed)
+        {
+            win._refreshTimer.Stop();
+            win.Visibility = Visibility.Hidden;
+        }
+        PersistActiveWidgets(island);
         ActiveWidgetsChanged?.Invoke();
         return win;
     }
 
-    public static void CloseAll()
+    public static (double Left, double Top) ClampWidgetPosition(double left, double top, double width, double height, Rect workArea)
     {
+        return WindowPlacementHelper.ClampToWorkArea(
+            left, top, width, height,
+            workArea.Left, workArea.Top, workArea.Right, workArea.Bottom,
+            margin: 12.0);
+    }
+
+    public static IReadOnlyList<PinnedDesktopWidgetState> CapturePinnedStates()
+    {
+        return ActiveWidgets.Values
+            .Select(w => new PinnedDesktopWidgetState
+            {
+                Kind = w._kind.ToString(),
+                Left = w.Left,
+                Top = w.Top,
+                IsTopmost = w._isTopmostPinned,
+                IsGhost = w._isGhostTranslucent
+            })
+            .ToList();
+    }
+
+    private static void PersistActiveWidgets(IslandWindow? island)
+    {
+        if (_suppressPersistence || App.IsDiagnosticMode || island == null) return;
+        island.Settings?.Update(s => s.PinnedDesktopWidgets = CapturePinnedStates().ToList(), nameof(AppSettings.PinnedDesktopWidgets));
+    }
+
+    public static void SetFullscreenSuppressed(bool suppressed)
+    {
+        _isFullscreenSuppressed = suppressed;
         foreach (var win in ActiveWidgets.Values.ToArray())
         {
-            try { win.Close(); } catch { }
+            if (suppressed)
+            {
+                win._refreshTimer.Stop();
+                win.Visibility = Visibility.Hidden;
+            }
+            else
+            {
+                win.Visibility = Visibility.Visible;
+                win.RefreshData();
+                win._refreshTimer.Start();
+            }
         }
-        ActiveWidgets.Clear();
-        ActiveWidgetsChanged?.Invoke();
+    }
+
+    public static void RestorePinnedWidgets(IslandWindow island)
+    {
+        if (App.IsDiagnosticMode || island == null) return;
+        var saved = island.Settings?.Current?.PinnedDesktopWidgets;
+        if (saved == null || saved.Count == 0) return;
+
+        var workArea = SystemParameters.WorkArea;
+        _suppressPersistence = true;
+        try
+        {
+            foreach (var item in saved.ToArray())
+            {
+                if (!Enum.TryParse<DesktopWidgetKind>(item.Kind, ignoreCase: true, out var kind)) continue;
+                if (ActiveWidgets.ContainsKey(kind)) continue;
+
+                var win = new DesktopWidgetWindow(kind, island);
+                ActiveWidgets[kind] = win;
+                var (clampedLeft, clampedTop) = ClampWidgetPosition(item.Left, item.Top, win.Width, win.Height, workArea);
+                win.Left = clampedLeft;
+                win.Top = clampedTop;
+                win.ApplyRestoredFlags(item.IsTopmost, item.IsGhost);
+                win.Show();
+                if (_isFullscreenSuppressed)
+                {
+                    win._refreshTimer.Stop();
+                    win.Visibility = Visibility.Hidden;
+                }
+            }
+            ActiveWidgetsChanged?.Invoke();
+        }
+        finally
+        {
+            _suppressPersistence = false;
+        }
+    }
+
+    private void ApplyRestoredFlags(bool isTopmost, bool isGhost)
+    {
+        _isTopmostPinned = isTopmost;
+        Topmost = isTopmost;
+        PinTopmostGlyph.Foreground = isTopmost ? ThemeBrushes.Amber : ThemeBrushes.SecondaryText;
+
+        _isGhostTranslucent = isGhost;
+        RootCard.Opacity = isGhost ? 0.78 : 1.0;
+        OpacityToggleGlyph.Foreground = isGhost ? ThemeBrushes.Amber : ThemeBrushes.SecondaryText;
+    }
+
+    public static void CloseAll(bool preserveSavedState = false)
+    {
+        bool prev = _suppressPersistence;
+        _suppressPersistence = preserveSavedState;
+        try
+        {
+            foreach (var win in ActiveWidgets.Values.ToArray())
+            {
+                try { win.Close(); } catch { }
+            }
+            ActiveWidgets.Clear();
+            ActiveWidgetsChanged?.Invoke();
+        }
+        finally
+        {
+            _suppressPersistence = prev;
+        }
     }
 
     public DesktopWidgetWindow(DesktopWidgetKind kind, IslandWindow? island = null)
@@ -140,6 +252,7 @@ public partial class DesktopWidgetWindow : Window
         if (ActiveWidgets.TryGetValue(_kind, out var current) && ReferenceEquals(current, this))
         {
             ActiveWidgets.Remove(_kind);
+            PersistActiveWidgets(_island);
             ActiveWidgetsChanged?.Invoke();
         }
         base.OnClosed(e);
@@ -296,6 +409,7 @@ public partial class DesktopWidgetWindow : Window
         {
             DragMove();
             SnapToWorkAreaEdges();
+            PersistActiveWidgets(_island);
         }
         catch (Exception ex)
         {
@@ -345,6 +459,7 @@ public partial class DesktopWidgetWindow : Window
         _isGhostTranslucent = !_isGhostTranslucent;
         RootCard.Opacity = _isGhostTranslucent ? 0.78 : 1.0;
         OpacityToggleGlyph.Foreground = _isGhostTranslucent ? ThemeBrushes.Amber : ThemeBrushes.SecondaryText;
+        PersistActiveWidgets(_island);
         e.Handled = true;
     }
 
@@ -353,6 +468,7 @@ public partial class DesktopWidgetWindow : Window
         _isTopmostPinned = !_isTopmostPinned;
         Topmost = _isTopmostPinned;
         PinTopmostGlyph.Foreground = _isTopmostPinned ? ThemeBrushes.Amber : ThemeBrushes.SecondaryText;
+        PersistActiveWidgets(_island);
         e.Handled = true;
     }
 

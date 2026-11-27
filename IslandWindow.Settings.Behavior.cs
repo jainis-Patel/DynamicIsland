@@ -575,6 +575,10 @@ public partial class IslandWindow
         {
             dp.AutoProfileSwitchToggle.IsChecked = _settingsService.Current.EnableAutoProfileSwitching;
         }
+        if (dp.LinkPomodoroFocusToggle != null)
+        {
+            dp.LinkPomodoroFocusToggle.IsChecked = _settingsService.Current.LinkPomodoroToFocusProfile;
+        }
     }
 
     internal void ContextProfileBtn_Click(object sender, RoutedEventArgs e)
@@ -591,6 +595,28 @@ public partial class IslandWindow
         bool next = !_settingsService.Current.EnableAutoProfileSwitching;
         _settingsService.Update(s => s.EnableAutoProfileSwitching = next, nameof(AppSettings.EnableAutoProfileSwitching));
         UpdateContextProfilesUI();
+    }
+
+    internal void LinkPomodoroFocusToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        bool next = !_settingsService.Current.LinkPomodoroToFocusProfile;
+        _settingsService.Update(s => s.LinkPomodoroToFocusProfile = next, nameof(AppSettings.LinkPomodoroToFocusProfile));
+        UpdateContextProfilesUI();
+    }
+
+    internal void SaveCustomProfileBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_contextProfileService == null) return;
+        _contextProfileService.SaveCurrentAsCustomProfile("Custom");
+        UpdateContextProfilesUI();
+        _machine.PushToast(new ToastContent(
+            "\uE734",
+            Localizer.Get("Profile_SavedTitle", "Profile Saved"),
+            Localizer.Get("Profile_SavedBody", "Custom baseline snapshot updated"),
+            ThemeBrushes.GreenColor,
+            TimeSpan.FromSeconds(2.2),
+            Priority: ToastPriority.Feedback,
+            Category: "profile"));
     }
 
 }

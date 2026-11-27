@@ -35,32 +35,7 @@ jobs:
 
       - name: Validate Release & WinGet Manifests
         shell: pwsh
-        run: |
-          [xml]$csproj = Get-Content DynamicIsland.csproj -Raw
-          $projVersion = ($csproj.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1).Version.Trim()
-          if ([string]::IsNullOrWhiteSpace($projVersion)) { throw "Missing <Version> in DynamicIsland.csproj" }
-
-          $manifest = Get-Content release-manifest.json -Raw | ConvertFrom-Json
-          foreach ($field in @('version', 'releaseTag')) {
-            if ([string]::IsNullOrWhiteSpace($manifest.$field)) { throw "Missing '$field' in release-manifest.json" }
-          }
-          if ([string]::IsNullOrWhiteSpace($manifest.downloads.installer.sha256) -or
-              [string]::IsNullOrWhiteSpace($manifest.downloads.portable.sha256)) {
-            throw "Missing download SHA-256 hashes in release-manifest.json"
-          }
-          if ($manifest.version -ne $projVersion) {
-            throw "Version mismatch: DynamicIsland.csproj=$projVersion vs release-manifest.json=$($manifest.version)"
-          }
-
-          foreach ($yaml in Get-ChildItem installer/winget -Filter *.yaml) {
-            $match = Select-String -Path $yaml.FullName -Pattern '^PackageVersion:\s*(.+)$' | Select-Object -First 1
-            if (-not $match) { throw "Missing PackageVersion in $($yaml.Name)" }
-            $yamlVer = $match.Matches[0].Groups[1].Value.Trim()
-            if ($yamlVer -ne $projVersion) {
-              throw "WinGet version mismatch in $($yaml.Name): $yamlVer vs $projVersion"
-            }
-          }
-          Write-Host "Verified release-manifest.json and WinGet manifests match v$projVersion."
+        run: ./scripts/SyncVersion.ps1 -VerifyOnly
 
       - name: Run Deterministic Self-Test Suite
         shell: pwsh
@@ -71,8 +46,12 @@ jobs:
             Remove-Item self-test-report.txt -Force
           }
 
-      - name: Memory Diagnostic Smoke Check
-        run: dotnet run -c Release -r win-x64 --no-build -- --diagnose-memory
+      - name: Startup & Memory Diagnostic Smoke Check
+        run: dotnet run -c Release -r win-x64 --no-build -- --diagnose-startup
 
       - name: Publish Single-File Release
         run: dotnet publish DynamicIsland.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish/
+
+      - name: Verify Published Single-File Binary
+        shell: pwsh
+        run: ./publish/DynamicIsland.exe --self-test

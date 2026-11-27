@@ -118,6 +118,10 @@ public sealed class AppSettings
     public double? MiniPlayerX { get; set; }
     public double? MiniPlayerY { get; set; }
     public bool MiniPlayerCompact { get; set; } = false;
+    public string MiniPlayerViewMode { get; set; } = "Full";
+    public bool MiniPlayerOpen { get; set; } = false;
+    public bool MiniPlayerAutoReopen { get; set; } = true;
+    public string LyricsAnimationStyle { get; set; } = "SpringWave";
     public bool AutoCheckUpdates { get; set; } = true;
     public bool AutoDownloadUpdates { get; set; } = true;
     public string UpdateChannel { get; set; } = "Stable";
@@ -130,6 +134,10 @@ public sealed class AppSettings
     public List<IslandProfile> CustomProfiles { get; set; } = new();
     public ProfileBaseSnapshot? ProfileBaseSnapshot { get; set; }
     public bool HasCompletedOnboarding { get; set; } = false;
+    public List<PinnedDesktopWidgetState> PinnedDesktopWidgets { get; set; } = new();
+    public bool LinkPomodoroToFocusProfile { get; set; } = false;
+    public int CompletedFocusMinutesToday { get; set; } = 0;
+    public string? LastFocusDateIso { get; set; }
 
     [JsonIgnore]
     public string? PhoneBridgePassword { get; set; }
@@ -148,6 +156,15 @@ public sealed class AppSettings
     [JsonPropertyName("GitHubToken")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? LegacyGitHubToken { get; set; }
+}
+
+public sealed class PinnedDesktopWidgetState
+{
+    public string Kind { get; set; } = "";
+    public double Left { get; set; }
+    public double Top { get; set; }
+    public bool IsTopmost { get; set; }
+    public bool IsGhost { get; set; }
 }
 
 public sealed record ThemePalette(string Name, Color Accent, Color Glow, Color? LightAccent = null, Color? LightGlow = null)
@@ -284,6 +301,53 @@ internal sealed class SettingsService : IDisposable
             string.Equals(trimmed, "StaticSquircle", StringComparison.OrdinalIgnoreCase))
             return "StaticSquircle";
         return AvailableAlbumArtStyles.FirstOrDefault(s => string.Equals(s, trimmed, StringComparison.OrdinalIgnoreCase)) ?? "VinylDisc";
+    }
+
+    public static readonly IReadOnlyList<string> AvailableMiniPlayerViewModes = new[]
+    {
+        "Full",
+        "Compact",
+        "Showcase",
+    };
+
+    public static string NormalizeMiniPlayerViewMode(string? mode)
+    {
+        if (string.IsNullOrWhiteSpace(mode)) return "Full";
+        string trimmed = mode.Trim();
+        if (string.Equals(trimmed, "Compact", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Pill", StringComparison.OrdinalIgnoreCase))
+            return "Compact";
+        if (string.Equals(trimmed, "Showcase", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Cover", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Art", StringComparison.OrdinalIgnoreCase))
+            return "Showcase";
+        return AvailableMiniPlayerViewModes.FirstOrDefault(m => string.Equals(m, trimmed, StringComparison.OrdinalIgnoreCase)) ?? "Full";
+    }
+
+    public static readonly IReadOnlyList<string> AvailableLyricsAnimationStyles = new[]
+    {
+        "SpringWave",
+        "KaraokeGlow",
+        "MinimalFade",
+    };
+
+    public static string NormalizeLyricsAnimationStyle(string? style)
+    {
+        if (string.IsNullOrWhiteSpace(style)) return "SpringWave";
+        string trimmed = style.Trim();
+        if (string.Equals(trimmed, "SpringWave", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Spring", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Wave", StringComparison.OrdinalIgnoreCase))
+            return "SpringWave";
+        if (string.Equals(trimmed, "KaraokeGlow", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Karaoke", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Glow", StringComparison.OrdinalIgnoreCase))
+            return "KaraokeGlow";
+        if (string.Equals(trimmed, "MinimalFade", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Minimal", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "Fade", StringComparison.OrdinalIgnoreCase))
+            return "MinimalFade";
+        return AvailableLyricsAnimationStyles.FirstOrDefault(s => string.Equals(s, trimmed, StringComparison.OrdinalIgnoreCase)) ?? "SpringWave";
     }
 
     public static readonly IReadOnlyList<string> AvailableDockPositions = new[]
@@ -666,12 +730,18 @@ internal sealed class SettingsService : IDisposable
             s.MiniPlayerX = null;
             s.MiniPlayerY = null;
             s.MiniPlayerCompact = false;
+            s.MiniPlayerViewMode = "Full";
+            s.MiniPlayerOpen = false;
+            s.MiniPlayerAutoReopen = true;
+            s.LyricsAnimationStyle = "SpringWave";
             s.AutoCheckUpdates = true;
             s.AutoDownloadUpdates = true;
             s.UpdateChannel = "Stable";
             s.PhoneBridgeDurationMinutes = 15;
             s.PhoneBridgePassword = null;
             s.PhoneBridgePasswordProtected = null;
+            s.PinnedDesktopWidgets.Clear();
+            s.LinkPomodoroToFocusProfile = false;
         });
     }
 

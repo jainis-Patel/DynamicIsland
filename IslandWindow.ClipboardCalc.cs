@@ -24,13 +24,40 @@ public partial class IslandWindow
 
     private void OnClipboardChanged() => RefreshClipboardView();
 
+    private void SyncPasteQueueLiveActivity()
+    {
+        if (_liveActivityHub == null || _clipboardService == null) return;
+        int count = _clipboardService.PasteQueueCount;
+        if (count > 0)
+        {
+            string nextTitle = _clipboardService.PeekNextPasteTitle() ?? "Clip";
+            _liveActivityHub.Publish(new LiveActivityItem(
+                Id: "paste_queue_active",
+                Source: "Clipboard",
+                Title: $"Paste Queue \u00B7 {count} left",
+                Subtitle: $"Next: {nextTitle}",
+                Glyph: "\uE8C8",
+                AccentColor: ThemeBrushes.BlueColor,
+                Priority: 55,
+                TargetViewKey: "clipboard",
+                Actions: new[]
+                {
+                    new LiveActivityAction("Clear", "\uE711", () => _clipboardService.ClearPasteQueue())
+                }));
+        }
+        else
+        {
+            _liveActivityHub.Complete("paste_queue_active");
+        }
+    }
+
     private void RefreshClipboardView()
     {
         var filtered = _clipboardService.GetFilteredItems(_clipSearchQuery, _activeClipFilter);
-        int totalCount = _clipboardService.Items.Count;
-        ClipboardBadgeText.Text = totalCount.ToString();
-        ClipboardBadgeText.Visibility = totalCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+        SyncObservableCollection(_clipboardItems, filtered);
+        if (_clipboardContainer == null) return;
 
+        int totalCount = _clipboardService.Items.Count;
         if (!string.IsNullOrWhiteSpace(_clipSearchQuery) || _activeClipFilter != ClipboardCategoryFilter.All)
         {
             ClipboardCountText.Text = $"{filtered.Count} / {totalCount} items";
@@ -47,7 +74,6 @@ public partial class IslandWindow
                 ? $"Queue ({_clipboardService.PasteQueueCount})"
                 : "Queue";
         }
-        SyncObservableCollection(_clipboardItems, filtered);
         UpdateClipboardScrollButtons();
     }
 

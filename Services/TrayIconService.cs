@@ -43,6 +43,11 @@ internal sealed class TrayIconOptions
     public Action<string>? SetThemeStyle { get; init; }
     public Func<string>? GetIslandTheme { get; init; }
     public Action<string>? SetIslandTheme { get; init; }
+    public Action? OnCommandPalette { get; init; }
+    public Action? OnExportDiagnostics { get; init; }
+    public Func<IReadOnlyList<IslandProfile>>? GetProfiles { get; init; }
+    public Func<string>? GetActiveProfileId { get; init; }
+    public Action<string>? OnSelectProfile { get; init; }
 }
 
 /// <summary>
@@ -85,6 +90,11 @@ internal sealed class TrayIconService : IDisposable
     private readonly Action<string>? _setThemeStyle;
     private readonly Func<string>? _getIslandTheme;
     private readonly Action<string>? _setIslandTheme;
+    private readonly Action? _onCommandPalette;
+    private readonly Action? _onExportDiagnostics;
+    private readonly Func<IReadOnlyList<IslandProfile>>? _getProfiles;
+    private readonly Func<string>? _getActiveProfileId;
+    private readonly Action<string>? _onSelectProfile;
     private IntPtr _hIcon;
     private bool _added;
 
@@ -123,6 +133,11 @@ internal sealed class TrayIconService : IDisposable
             options.GetIslandTheme,
             options.SetIslandTheme)
     {
+        _onCommandPalette = options.OnCommandPalette;
+        _onExportDiagnostics = options.OnExportDiagnostics;
+        _getProfiles = options.GetProfiles;
+        _getActiveProfileId = options.GetActiveProfileId;
+        _onSelectProfile = options.OnSelectProfile;
     }
 
     public TrayIconService(
@@ -266,6 +281,13 @@ internal sealed class TrayIconService : IDisposable
         itemExpand.FontWeight = FontWeights.SemiBold;
         itemExpand.Click += (_, _) => _onExpand();
         menu.Items.Add(itemExpand);
+
+        if (_onCommandPalette != null)
+        {
+            var itemPalette = CreateItem("Command Palette... (Ctrl+Alt+G)", "\uE721", ThemeBrushes.Accent);
+            itemPalette.Click += (_, _) => _onCommandPalette();
+            menu.Items.Add(itemPalette);
+        }
 
         if (_onShelf != null)
         {
@@ -466,6 +488,32 @@ internal sealed class TrayIconService : IDisposable
                 menuNature.Items.Add(item);
             }
             menu.Items.Add(menuNature);
+        }
+
+        if (_getProfiles != null && _onSelectProfile != null)
+        {
+            var menuProfiles = CreateItem("Context Profile", "\uE734");
+            string activeId = _getActiveProfileId?.Invoke() ?? "default";
+            foreach (var prof in _getProfiles())
+            {
+                var pItem = new MenuItem
+                {
+                    Header = prof.Name,
+                    IsCheckable = true,
+                    IsChecked = string.Equals(prof.Id, activeId, StringComparison.OrdinalIgnoreCase)
+                };
+                string profId = prof.Id;
+                pItem.Click += (_, _) => _onSelectProfile(profId);
+                menuProfiles.Items.Add(pItem);
+            }
+            menu.Items.Add(menuProfiles);
+        }
+
+        if (_onExportDiagnostics != null)
+        {
+            var itemDiag = CreateItem("Export Diagnostics Bundle", "\uE9D9");
+            itemDiag.Click += (_, _) => _onExportDiagnostics();
+            menu.Items.Add(itemDiag);
         }
 
 #if DEBUG

@@ -91,13 +91,12 @@ public partial class IslandWindow
     private void OnShelfChanged()
     {
         string badgeCount = _shelfService.Count > 99 ? "99+" : _shelfService.Count.ToString();
-        ShelfBadgeText.Text = badgeCount;
-        ShelfBadgeText.Visibility = _shelfService.HasItems ? Visibility.Visible : Visibility.Collapsed;
         if (DockShelfBadgeHost != null && DockShelfBadgeText != null)
         {
             DockShelfBadgeText.Text = badgeCount;
             DockShelfBadgeHost.Visibility = _shelfService.HasItems ? Visibility.Visible : Visibility.Collapsed;
         }
+        if (_shelfContainer == null) return;
         ShelfCountText.Text = _shelfService.HasItems
             ? $"{_shelfService.Count} item{(_shelfService.Count == 1 ? "" : "s")} \u00B7 {_shelfService.TotalSizeFormatted}"
             : "0 items";

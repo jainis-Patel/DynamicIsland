@@ -443,12 +443,16 @@ public partial class IslandWindow
         }
     }
 
-    internal async void InstallUpdateBtn_Click(object sender, RoutedEventArgs e)
+    private readonly SingleFlightGate _installUpdateGate = new();
+
+    internal void InstallUpdateBtn_Click(object sender, RoutedEventArgs e)
     {
-        var su = SettingsContainer?.SystemUpdatesPanel;
-        try
+        _ = _installUpdateGate.TryRunAsync(async () =>
         {
-            if (_updateService.Status == UpdateStatus.ReadyToInstall)
+            var su = SettingsContainer?.SystemUpdatesPanel;
+            try
+            {
+                if (_updateService.Status == UpdateStatus.ReadyToInstall)
             {
                 _updateService.ApplyUpdateAndRestart();
                 return;
@@ -483,16 +487,17 @@ public partial class IslandWindow
                     if (su?.UpdateProgressText != null) su.UpdateProgressText.Text = _updateService.LastErrorMessage ?? "Download failed";
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            App.Log($"[Settings] InstallUpdateBtn_Click error: {ex}");
-            if (!_isClosing)
-            {
-                if (su?.InstallUpdateBtnText != null) su.InstallUpdateBtnText.Text = "Retry Download";
-                if (su?.UpdateProgressText != null) su.UpdateProgressText.Text = ex.Message;
             }
-        }
+            catch (Exception ex)
+            {
+                App.Log($"[Settings] InstallUpdateBtn_Click error: {ex}");
+                if (!_isClosing)
+                {
+                    if (su?.InstallUpdateBtnText != null) su.InstallUpdateBtnText.Text = "Retry Download";
+                    if (su?.UpdateProgressText != null) su.UpdateProgressText.Text = ex.Message;
+                }
+            }
+        }, "Updates.Install");
     }
 
     internal void AutoCheckToggleBtn_Click(object sender, RoutedEventArgs e)

@@ -1,5 +1,6 @@
 using System;
 using System.Windows.Threading;
+using DynamicIsland.Core;
 
 namespace DynamicIsland.Services;
 
@@ -47,10 +48,12 @@ public sealed record WellnessAlert(
 /// </summary>
 internal sealed class VirtualPetService : IDisposable
 {
+    public const string ChoreId = "virtual_pet_wellness";
     private readonly Dispatcher _dispatcher;
     private readonly SettingsService _settings;
     private readonly DispatcherTimer? _wellnessTimer;
     private readonly DispatcherTimer? _happyResetTimer;
+    private Choreographer? _choreographer;
 
     private DateTime _lastReminderTime = DateTime.UtcNow;
     private DateTime _lastHappyTime = DateTime.MinValue;
@@ -124,6 +127,14 @@ internal sealed class VirtualPetService : IDisposable
         }
     }
 
+    public void AttachChoreographer(Choreographer choreographer)
+    {
+        if (_disposed || choreographer == null) return;
+        _choreographer = choreographer;
+        _wellnessTimer?.Stop();
+        UpdateWellnessTimerState();
+    }
+
     private void UpdateWellnessTimerState()
     {
         if (_disposed || _wellnessTimer == null) return;
@@ -131,6 +142,14 @@ internal sealed class VirtualPetService : IDisposable
         if (!IsEnabled || mins <= 0)
         {
             _wellnessTimer.Stop();
+            _choreographer?.Unregister(ChoreId);
+            return;
+        }
+
+        if (_choreographer != null)
+        {
+            _wellnessTimer.Stop();
+            _choreographer.Register(ChoreId, () => OnWellnessTimerTick(null, EventArgs.Empty), 60, PowerSensitivity.Suspended);
             return;
         }
 
@@ -600,6 +619,7 @@ internal sealed class VirtualPetService : IDisposable
     {
         _disposed = true;
         _settings.PropertyChanged -= OnSettingsPropertyChanged;
+        _choreographer?.Unregister(ChoreId);
         _wellnessTimer?.Stop();
         _happyResetTimer?.Stop();
     }

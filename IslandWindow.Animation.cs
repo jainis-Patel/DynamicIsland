@@ -106,6 +106,7 @@ public partial class IslandWindow
                 System.Windows.Automation.AutomationProperties.SetName(
                     SecondaryDroplet,
                     $"High {(_highLoadIsRamPriority ? "RAM" : "CPU")} usage {_highLoadPercent} percent");
+                AccessibilityHelper.AnnounceLiveRegion(SecondaryDroplet);
             }
             _appliedDroplet = -1;
         }
@@ -286,6 +287,7 @@ public partial class IslandWindow
 
         if (previous == IslandState.Expanded && next != IslandState.Expanded)
         {
+            _viewBackStack.Clear();
             if (_currentExpandedView == ExpandedView.SystemHud)
             {
                 _systemPerfService?.SetHudExpanded(false);
@@ -400,6 +402,7 @@ public partial class IslandWindow
         ToastIconBg.Background = _lastToastBgBrush;
         ToastTitle.Text = toast.Title;
         ToastSubtitle.Text = toast.Subtitle;
+        AccessibilityHelper.AnnounceLiveRegion(ToastPanel);
         PillGlowColor.Color = toast.Accent;
         PillGlowSecondaryColor.Color = toast.Accent;
 

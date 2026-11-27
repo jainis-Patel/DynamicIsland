@@ -20,128 +20,37 @@ namespace DynamicIsland;
 
 public partial class IslandWindow : Window
 {
-    private readonly record struct PillShape(double Width, double Height, double Radius);
-
     public const double CanvasWidthDip = 760.0;
     public const double CanvasHeightDip = 660.0;
 
-    /// <summary>
-    /// Optical geometry targets tuned with golden-ratio aspect proportions and continuous squircle radii.
-    /// </summary>
-    private static readonly IReadOnlyDictionary<IslandState, PillShape> Shapes = new Dictionary<IslandState, PillShape>
-    {
-        [IslandState.Idle]     = new(148, 30, 15),
-        [IslandState.Compact]  = new(228, 36, 18),
-        [IslandState.Toast]    = new(336, 58, 29),
-        [IslandState.Expanded] = new(484, 176, 34),
-        [IslandState.Hidden]   = new(120, 24, 12),
-    };
-
-    // Unified width (484 DIP) with harmonized vertical rhythm steps (multiples of 8px); Settings uses Left-Rail (536x368)
-    private static readonly PillShape SettingsExpandedShape   = new(536, 368, 36);
-    private static readonly PillShape ClipboardExpandedShape  = new(588, 296, 36);
-    private static readonly PillShape NetworkExpandedShape    = new(484, 196, 34);
-    private static readonly PillShape BatteryExpandedShape    = new(484, 216, 34);
-    private static readonly PillShape SystemHudExpandedShape  = new(484, 232, 34);
-    private static readonly PillShape LyricsExpandedShape     = new(484, 216, 34);
-    private static readonly PillShape ConverterExpandedShape  = new(484, 232, 36);
-    private static readonly PillShape WidgetsGalleryExpandedShape = new(520, 356, 36);
-    private static readonly PillShape LauncherExpandedShape   = new(484, 320, 36);
-    private static readonly PillShape TermiExpandedShape      = new(484, 232, 36);
-    private static readonly PillShape PhoneBridgeExpandedShape = new(484, 288, 36);
-    private static readonly PillShape MechSoundsExpandedShape  = new(484, 220, 34);
-    private static readonly PillShape CaptureStudioExpandedShape = new(484, 232, 36);
-    private static readonly PillShape CalendarExpandedShape   = new(484, 256, 36);
-    private static readonly PillShape NotesExpandedShape      = new(484, 240, 36);
-    private static readonly PillShape AudioExpandedShape      = new(484, 340, 36);
-    private static readonly PillShape ShelfExpandedShape      = new(588, 268, 36);
-    private static readonly PillShape QuickReplyExpandedShape = new(484, 156, 36);
-    private static readonly PillShape PetExpandedShape        = new(484, 216, 34);
-    private static readonly PillShape MirrorExpandedShape     = new(484, 248, 36);
-
-    // Tactile interaction constants (WWDC Fluid Interfaces spec)
-    private const double HoverWidthSwell = 10.0;
-    private const double HoverHeightSwell = 2.5;
-    private const double PressWidthTension = -6.0;
-    private const double PressHeightTension = -1.5;
+    private static IReadOnlyDictionary<IslandState, PillShape> Shapes => IslandShapeTable.BaseShapes;
 
     private PillShape GetNotificationsExpandedShape()
     {
         int totalCount = _notificationListener?.HistoryCount ?? _notificationHistoryItems.Count;
         int count = _notificationAppGroups.Count;
-        if (count <= 0)
-        {
-            return new PillShape(484, totalCount > 0 ? 228 : 196, 36);
-        }
-
-        int expandedExtraItems = _notificationAppGroups.Where(g => g.IsExpanded).Sum(g => Math.Min(g.Notifications.Count - 1, 3));
-        int visibleCount = Math.Clamp(count + expandedExtraItems, 1, 4);
-        double targetHeight = Math.Clamp(126 + (visibleCount * 82), 224, 412);
-        return new PillShape(484, targetHeight, 38);
+        int expandedExtraItems = count > 0
+            ? _notificationAppGroups.Where(g => g.IsExpanded).Sum(g => Math.Min(g.Notifications.Count - 1, 3))
+            : 0;
+        return IslandShapeTable.GetNotificationsExpandedShape(totalCount, count, expandedExtraItems);
     }
 
-    private static PillShape GetToastShape(ToastContent? toast)
-    {
-        if (toast != null && (toast.OnPromptDecision != null || !string.IsNullOrWhiteSpace(toast.PromptActivityId)))
-        {
-            double w = !string.IsNullOrWhiteSpace(toast.DiffText) ? 416 : 384;
-            return new PillShape(w, 58, 29);
-        }
-        if (toast?.CanReply == true)
-        {
-            return new PillShape(368, 58, 29);
-        }
-        return Shapes[IslandState.Toast];
-    }
+    private static PillShape GetToastShape(ToastContent? toast) => IslandShapeTable.GetToastShape(toast);
 
-    /// <summary>
-    /// Enforces a strict 2-signal visual budget in Idle state so the pill never turns into a cluttered taskbar.
-    /// Priority: NetworkSpeed -> VirtualPet/Lottie -> Base Clock.
-    /// </summary>
     private PillShape GetIdleShape()
     {
         bool hardwareNotch = _settingsService?.Current?.HardwareNotchMode ?? false;
         bool isDetached = _isDetachedPiP || (_settingsService?.Current.IsDetachedFloating ?? false);
-        if (hardwareNotch && !isDetached)
-        {
-            double notchW = _settingsService?.Current?.HardwareNotchWidth ?? 188.0;
-            double notchH = _settingsService?.Current?.HardwareNotchHeight ?? 35.0;
-            double notchR = _settingsService?.Current?.HardwareNotchRadius ?? 12.0;
-            return new PillShape(notchW, notchH, notchR);
-        }
-
-        string style = SettingsService.NormalizeClockStyle(_settingsService?.Current?.ClockStyle);
-
-        double baseW = style switch
-        {
-            "Seconds"   => 158,
-            "DateBadge" => 184,
-            "Analog"    => 160,
-            "Neon"      => 144,
-            "Flip"      => 154,
-            "Matrix"    => 176,
-            "JumpHour"  => 164,
-            _           => 142,
-        };
-
-        // Cap concurrent idle complications to prevent visual bloat
-        double complicationExtra = 0;
-        if (_settingsService?.Current?.ShowNetworkSpeedInIdle == true)
-        {
-            complicationExtra = 44; // Clean bandwidth pill
-        }
-        else if (_settingsService?.Current?.EnableVirtualPet == true)
-        {
-            complicationExtra = 28;
-        }
-
-        if (_settingsService?.Current?.ShowCameraLensIcon == false)
-        {
-            complicationExtra -= 12;
-        }
-
-        double finalW = Math.Clamp(baseW + complicationExtra, 104, 244);
-        return new PillShape(finalW, 30, 15);
+        return IslandShapeTable.GetIdleShape(
+            hardwareNotch: hardwareNotch,
+            isDetached: isDetached,
+            notchWidth: _settingsService?.Current?.HardwareNotchWidth ?? 188.0,
+            notchHeight: _settingsService?.Current?.HardwareNotchHeight ?? 35.0,
+            notchRadius: _settingsService?.Current?.HardwareNotchRadius ?? 12.0,
+            clockStyle: _settingsService?.Current?.ClockStyle,
+            showNetworkSpeedInIdle: _settingsService?.Current?.ShowNetworkSpeedInIdle ?? false,
+            enableVirtualPet: _settingsService?.Current?.EnableVirtualPet ?? false,
+            showCameraLensIcon: _settingsService?.Current?.ShowCameraLensIcon ?? true);
     }
 
     private PillShape GetTargetShape(IslandState state, ExpandedView? viewOverride = null)
@@ -151,35 +60,13 @@ public partial class IslandWindow : Window
         if (state == IslandState.Expanded)
         {
             var activeView = viewOverride ?? _currentExpandedView;
-            baseShape = activeView switch
-            {
-                ExpandedView.Calendar      => CalendarExpandedShape,
-                ExpandedView.Settings      => SettingsExpandedShape,
-                ExpandedView.Clipboard     => ClipboardExpandedShape,
-                ExpandedView.Shelf         => ShelfExpandedShape,
-                ExpandedView.Notes         => NotesExpandedShape,
-                ExpandedView.Audio         => AudioExpandedShape,
-                ExpandedView.Network       => NetworkExpandedShape,
-                ExpandedView.Battery       => BatteryExpandedShape,
-                ExpandedView.SystemHud     => SystemHudExpandedShape,
-                ExpandedView.Converter     => ConverterExpandedShape,
-                ExpandedView.WidgetsGallery => WidgetsGalleryExpandedShape,
-                ExpandedView.Launcher      => LauncherExpandedShape,
-                ExpandedView.Termi         => TermiExpandedShape,
-                ExpandedView.PhoneBridge   => PhoneBridgeExpandedShape,
-                ExpandedView.MechSounds    => MechSoundsExpandedShape,
-                ExpandedView.CaptureStudio => CaptureStudioExpandedShape,
-                ExpandedView.QuickReply    => QuickReplyExpandedShape,
-                ExpandedView.Pet           => PetExpandedShape,
-                ExpandedView.Mirror        => MirrorExpandedShape,
-                ExpandedView.Notifications => GetNotificationsExpandedShape(),
-                ExpandedView.Media when _mediaService.Current == null || string.IsNullOrWhiteSpace(_mediaService.Current.Title)
-                                           => new PillShape(484, 114, 28),
-                ExpandedView.Media when _lyricsService?.HasLyrics == true && _settingsService?.Current?.EnableSyncedLyrics != false && !_preferClockHeaderInMedia
-                                           => LyricsExpandedShape,
-                ExpandedView.Media         => new PillShape(484, 152, 34),
-                _                          => Shapes[IslandState.Expanded]
-            };
+            bool hasMedia = _mediaService.Current != null && !string.IsNullOrWhiteSpace(_mediaService.Current.Title);
+            bool showLyrics = _lyricsService?.HasLyrics == true && _settingsService?.Current?.EnableSyncedLyrics != false && !_preferClockHeaderInMedia;
+            baseShape = IslandShapeTable.GetExpandedViewShape(
+                activeView,
+                hasMedia,
+                showLyrics,
+                activeView == ExpandedView.Notifications ? GetNotificationsExpandedShape() : default);
         }
         else if (state == IslandState.Idle)
         {
@@ -194,26 +81,7 @@ public partial class IslandWindow : Window
             baseShape = Shapes[state];
         }
 
-        // Apply tactile magnetic hover swell & press-down tension in collapsed states
-        if (state is IslandState.Idle or IslandState.Compact)
-        {
-            if (_isPillPressed)
-            {
-                baseShape = new PillShape(
-                    baseShape.Width + PressWidthTension,
-                    baseShape.Height + PressHeightTension,
-                    (baseShape.Height + PressHeightTension) * 0.5);
-            }
-            else if (_pointerInside)
-            {
-                baseShape = new PillShape(
-                    baseShape.Width + HoverWidthSwell,
-                    baseShape.Height + HoverHeightSwell,
-                    (baseShape.Height + HoverHeightSwell) * 0.5);
-            }
-        }
-
-        return baseShape;
+        return IslandShapeTable.ApplyPointerTension(baseShape, state, _isPillPressed, _pointerInside);
     }
 
     private static readonly ToastContent[] DemoToasts =
@@ -259,6 +127,11 @@ public partial class IslandWindow : Window
     private Views.Widgets.PeripheralsView? _peripheralsContainer;
     private Views.Widgets.NetworkView? _networkContainer;
     private Views.Widgets.SystemHudView? _systemHudContainer;
+    private Views.Widgets.ShelfView? _shelfContainer;
+    private Views.Widgets.ClipboardView? _clipboardContainer;
+    private Views.Widgets.NotificationsView? _notificationsContainer;
+    private Views.Widgets.SettingsView? _settingsContainer;
+    private Views.Widgets.ActivityInspectorView? _activityInspectorContainer;
 
     internal Views.Widgets.CalendarTaskView? CalendarContainer => _calendarContainer;
     internal Views.Widgets.NotesView? NotesContainer => _notesContainer;
@@ -279,6 +152,11 @@ public partial class IslandWindow : Window
     internal Views.Widgets.PeripheralsView? PeripheralsContainer => _peripheralsContainer;
     internal Views.Widgets.NetworkView? NetworkContainer => _networkContainer;
     internal Views.Widgets.SystemHudView? SystemHudContainer => _systemHudContainer;
+    internal Views.Widgets.ShelfView? ShelfContainer => _shelfContainer;
+    internal Views.Widgets.ClipboardView? ClipboardContainer => _clipboardContainer;
+    internal Views.Widgets.NotificationsView? NotificationsContainer => _notificationsContainer;
+    internal Views.Widgets.SettingsView? SettingsContainer => _settingsContainer;
+    internal Views.Widgets.ActivityInspectorView? ActivityInspectorContainer => _activityInspectorContainer;
 
     private T MaterializeExpandedView<T>(ref T? slot) where T : FrameworkElement, new()
     {
@@ -377,6 +255,64 @@ public partial class IslandWindow : Window
         return view;
     }
 
+    internal Views.Widgets.ShelfView EnsureShelfContainer()
+    {
+        bool isNew = _shelfContainer == null;
+        var view = MaterializeExpandedView(ref _shelfContainer);
+        if (isNew)
+        {
+            view.ShelfItemsControl.ItemsSource = _shelfItems;
+            if (_shelfService != null) OnShelfChanged();
+        }
+        return view;
+    }
+
+    internal Views.Widgets.ClipboardView EnsureClipboardContainer()
+    {
+        bool isNew = _clipboardContainer == null;
+        var view = MaterializeExpandedView(ref _clipboardContainer);
+        if (isNew)
+        {
+            view.ClipboardItemsControl.ItemsSource = _clipboardItems;
+            if (_clipboardService != null) RefreshClipboardView();
+        }
+        return view;
+    }
+
+    internal Views.Widgets.NotificationsView EnsureNotificationsContainer()
+    {
+        bool isNew = _notificationsContainer == null;
+        var view = MaterializeExpandedView(ref _notificationsContainer);
+        if (isNew)
+        {
+            view.NotificationsItemsControl.ItemsSource = _notificationAppGroups;
+            if (_notificationListener != null) OnNotificationHistoryChanged();
+        }
+        return view;
+    }
+
+    internal Views.Widgets.SettingsView EnsureSettingsContainer()
+    {
+        bool isNew = _settingsContainer == null;
+        var view = MaterializeExpandedView(ref _settingsContainer);
+        if (isNew && _settingsService != null)
+        {
+            SyncSettingsContainerUI();
+        }
+        return view;
+    }
+
+    internal Views.Widgets.ActivityInspectorView EnsureActivityInspectorContainer()
+    {
+        bool isNew = _activityInspectorContainer == null;
+        var view = MaterializeExpandedView(ref _activityInspectorContainer);
+        if (isNew)
+        {
+            view.RefreshList();
+        }
+        return view;
+    }
+
     // Observable collections for zero-teardown ItemsControl bindings
     private readonly ObservableCollection<ShelfItem> _shelfItems = new();
     private readonly ObservableCollection<ClipboardItem> _clipboardItems = new();
@@ -459,6 +395,7 @@ public partial class IslandWindow : Window
     internal WebcamMirrorService WebcamMirror => _services.Get<WebcamMirrorService>();
     internal CommunityDropletService CommunityDroplets => _communityDropletService;
     internal DropletRegistry? Droplets => _dropletRegistry;
+    internal LiveActivityHub? LiveActivityHubInstance => _liveActivityHub;
     internal ClipboardHistoryService ClipboardService => _clipboardService;
     internal DropShelfService Shelf => _shelfService;
     internal SettingsService Settings => _settingsService;
@@ -478,6 +415,32 @@ public partial class IslandWindow : Window
             TimeSpan.FromSeconds(3.2),
             Priority: ToastPriority.Feedback,
             Category: "hooks"));
+    }
+
+    internal void ExportDiagnosticsWithToast()
+    {
+        var (ok, path, err) = DiagnosticsExporter.ExportBundle(null, _settingsService.Current, _choreographer);
+        _machine.PushToast(new ToastContent(
+            ok ? "\uE9D9" : "\uE783",
+            ok ? "Diagnostics Exported" : "Diagnostics Failed",
+            ok ? $"Saved to {System.IO.Path.GetFileName(path)}" : (err ?? "Unknown error"),
+            ok ? ThemeBrushes.BlueColor : ThemeBrushes.AmberColor,
+            TimeSpan.FromSeconds(3.2),
+            Priority: ToastPriority.Feedback,
+            Category: "diagnostics"));
+    }
+
+    internal void ReplayOnboardingWithToast()
+    {
+        _machine.PushToast(new ToastContent(
+            "\uE734",
+            Localizer.Get("Onboarding_WelcomeTitle", "Welcome to Dynamic Island"),
+            Localizer.Get("Onboarding_QuickTour", "Hover/click pill to expand · Ctrl+Alt+G Command Palette · Drag files to Shelf"),
+            ThemeBrushes.BlueColor,
+            TimeSpan.FromSeconds(5.5),
+            TargetView: "launcher",
+            Priority: ToastPriority.Notification,
+            Category: "onboarding"));
     }
     internal void PushToast(ToastContent content) => _machine.PushToast(content);
     internal void ShowToast(string glyph, string title, string message, Color accent, string category)
@@ -564,12 +527,12 @@ public partial class IslandWindow : Window
         {
             [ExpandedView.Media]          = (() => MediaContainer, MediaHomeButton),
             [ExpandedView.Calendar]       = (() => MaterializeExpandedView(ref _calendarContainer), CalendarButton),
-            [ExpandedView.Shelf]          = (() => ShelfContainer, ShelfButton),
-            [ExpandedView.Notifications]  = (() => NotificationsContainer, NotificationsButton),
+            [ExpandedView.Shelf]          = (() => EnsureShelfContainer(), ShelfButton),
+            [ExpandedView.Notifications]  = (() => EnsureNotificationsContainer(), NotificationsButton),
             [ExpandedView.WidgetsGallery] = (() => MaterializeExpandedView(ref _widgetsGalleryContainer), WidgetsGalleryButton),
             [ExpandedView.Launcher]       = (() => MaterializeExpandedView(ref _launcherContainer), LauncherButton),
             [ExpandedView.Audio]          = (() => EnsureAudioContainer(), AudioButton),
-            [ExpandedView.Clipboard]      = (() => ClipboardContainer, ShelfButton),
+            [ExpandedView.Clipboard]      = (() => EnsureClipboardContainer(), ShelfButton),
             [ExpandedView.SystemHud]      = (() => EnsureSystemHudContainer(), WidgetsGalleryButton),
             [ExpandedView.Battery]        = (() => EnsureBatteryContainer(), WidgetsGalleryButton),
             [ExpandedView.Network]        = (() => EnsureNetworkContainer(), WidgetsGalleryButton),
@@ -585,17 +548,14 @@ public partial class IslandWindow : Window
             [ExpandedView.QuickReply]     = (() => MaterializeExpandedView(ref _quickReplyContainer), NotificationsButton),
             [ExpandedView.Pet]            = (() => MaterializeExpandedView(ref _petSanctuaryContainer), WidgetsGalleryButton),
             [ExpandedView.Mirror]         = (() => MaterializeExpandedView(ref _mirrorContainer), LauncherButton),
-            [ExpandedView.Settings]       = (() => SettingsContainer, SettingsButton),
+            [ExpandedView.ActivityInspector] = (() => EnsureActivityInspectorContainer(), NotificationsButton),
+            [ExpandedView.Settings]       = (() => EnsureSettingsContainer(), SettingsButton),
         };
 
         _orderedViews = _viewRegistry.Keys.ToList();
         _materializedContainers = new List<FrameworkElement>
         {
-            MediaContainer,
-            ShelfContainer,
-            ClipboardContainer,
-            SettingsContainer,
-            NotificationsContainer
+            MediaContainer
         };
         _dockButtons = _viewRegistry.Values.Select(v => v.DockButton).ToArray();
 
@@ -637,10 +597,6 @@ public partial class IslandWindow : Window
             CompactWaveGeometry.Figures.Add(_compactWaveFigure);
         }
 
-        ShelfItemsControl.ItemsSource = _shelfItems;
-        ClipboardItemsControl.ItemsSource = _clipboardItems;
-        NotificationsItemsControl.ItemsSource = _notificationAppGroups;
-
         _machine.StateChanged += OnStateChanged;
         _machine.ToastChanged += OnToastChanged;
 
@@ -659,6 +615,8 @@ public partial class IslandWindow : Window
             _peripheralService?.SetSuspended(fullscreen);
             _choreographer?.SetSuspended(fullscreen);
             _cursor?.SetSuspended(fullscreen);
+            Views.DesktopWidgetWindow.SetFullscreenSuppressed(fullscreen);
+            _miniPlayerWindow?.SetFullscreenSuppressed(fullscreen);
             UpdateNatureThemeTimerState();
         };
 
@@ -669,11 +627,11 @@ public partial class IslandWindow : Window
         _audioEndpointService = _services.Register(new AudioEndpointService(Dispatcher));
         _mediaService = _services.Register(new MediaSessionService(Dispatcher));
         _audioSpectrum = _services.Register(new AudioSpectrum());
-        _powerPlanService = _services.Register(new PowerPlanService(Dispatcher, _settingsService));
+        _powerPlanService = _services.Register(new PowerPlanService(Dispatcher, _settingsService, deferInitialRefresh: true));
         _bluetoothMonitor = _services.Register(new BluetoothMonitor(Dispatcher));
         _volumeService = _services.Register(new VolumeService(Dispatcher, _audioEndpointService.SharedEnumerator));
         _shelfService = _services.Register(new DropShelfService());
-        _privacyService = _services.Register(new PrivacyIndicatorService(Dispatcher, _audioEndpointService.SharedEnumerator));
+        _privacyService = _services.Register(new PrivacyIndicatorService(Dispatcher, _audioEndpointService.SharedEnumerator, deferDeviceInit: true));
         _notificationListener = _services.Register(new NotificationListenerService(Dispatcher, () => _settingsService.Current));
         _clipboardService = _services.Register(new ClipboardHistoryService(Dispatcher));
         _downloadService = _services.Register(new DownloadTrackerService(Dispatcher));
@@ -692,17 +650,13 @@ public partial class IslandWindow : Window
         _petService.MoodChanged += _ => Dispatcher.InvokeAsync(UpdatePetSettingsUI);
         _systemPerfService = _services.Register(new SystemPerformanceService(() => _settingsService.Current));
         _systemPerfService.VitalsUpdated += OnSystemVitalsUpdated;
-        _systemPerfService.Start();
 
         _liveActivityHub = new LiveActivityHub();
         _liveActivityHub.Changed += () => Dispatcher.InvokeAsync(EvaluateActivity);
         _liveActivityIpcService = _services.Register(new LiveActivityIpcService(_liveActivityHub));
-        _liveActivityIpcService.Start();
         _meetingModeService = _services.Register(new MeetingModeService(Dispatcher, _calendarService, _privacyService, _liveActivityHub));
-        _meetingModeService.Start();
         _dropletRegistry = new DropletRegistry(_settingsService);
         _communityDropletService = _services.Register(new CommunityDropletService(_dropletRegistry, _liveActivityHub));
-        _communityDropletService.Start();
         _jiggleBasketService = _services.Register(new JiggleBasketService(Dispatcher, _shelfService, () => _dropletRegistry.IsEnabled("jiggle_basket")));
         _services.RegisterLazy(() => new NotesService());
         _services.RegisterLazy(() => new TaskService());
@@ -719,6 +673,7 @@ public partial class IslandWindow : Window
         _updateService.DownloadProgressChanged += OnUpdateDownloadProgressChanged;
         _choreographer = _services.Register(new Choreographer(Dispatcher));
         _contextProfileService = _services.Register(new ContextProfileService(_settingsService, _choreographer));
+        _services.Register(new PomodoroFocusCoordinator(_countdownService, _settingsService, _contextProfileService));
         _contextProfileService.ProfileChanged += prof => Dispatcher.InvokeAsync(() =>
         {
             _machine.PushToast(new ToastContent(
@@ -732,6 +687,12 @@ public partial class IslandWindow : Window
         });
         _weatherService.AttachChoreographer(_choreographer);
         _calendarService.AttachChoreographer(_choreographer);
+        _peripheralService.AttachChoreographer(_choreographer);
+        _notificationListener.AttachChoreographer(_choreographer);
+        _privacyService.AttachChoreographer(_choreographer);
+        _communityDropletService.AttachChoreographer(_choreographer);
+        _petService.AttachChoreographer(_choreographer);
+        _meetingModeService.AttachChoreographer(_choreographer);
         _choreographer.PowerModeChanged += (prev, next) => Dispatcher.InvokeAsync(() =>
         {
             UpdateSpectrumActivity();
@@ -793,6 +754,7 @@ public partial class IslandWindow : Window
         _notificationListener.NotificationReceived += toast => _machine.PushToast(toast);
         _notificationListener.HistoryChanged += () => Dispatcher.InvokeAsync(OnNotificationHistoryChanged);
         _clipboardService.Changed += OnClipboardChanged;
+        _clipboardService.PasteQueueChanged += () => Dispatcher.InvokeAsync(SyncPasteQueueLiveActivity);
         _downloadService.ActiveDownloadsChanged += OnDownloadsChanged;
         _downloadService.DownloadCompleted += OnDownloadCompleted;
         _audioEndpointService.EndpointsChanged += OnAudioEndpointsChanged;
@@ -840,8 +802,8 @@ public partial class IslandWindow : Window
         InitializeFloatingState();
         ApplySettings();
         _settingsService.PropertyChanged += OnSettingsPropertyChanged;
-        _updateService.StartBackgroundWorker();
         CheckPostUpdateLaunchStatus();
+        Dispatcher.InvokeAsync(RunPostPaintBoot, DispatcherPriority.ContextIdle);
         if (!_settingsService.Current.HasCompletedOnboarding && !App.IsDiagnosticMode)
         {
             _settingsService.Update(s => s.HasCompletedOnboarding = true, nameof(AppSettings.HasCompletedOnboarding));
@@ -854,6 +816,22 @@ public partial class IslandWindow : Window
                 TargetView: "settings",
                 Priority: ToastPriority.Notification,
                 Category: "onboarding"));
+        }
+    }
+
+    private void RunPostPaintBoot()
+    {
+        if (_isClosing) return;
+        _powerPlanService.Refresh();
+        _systemPerfService.Start();
+        _liveActivityIpcService.Start();
+        _meetingModeService.Start();
+        _communityDropletService.Start();
+        _updateService.StartBackgroundWorker();
+        Views.DesktopWidgetWindow.RestorePinnedWidgets(this);
+        if (!App.IsDiagnosticMode && _settingsService.Current.MiniPlayerAutoReopen && _settingsService.Current.MiniPlayerOpen)
+        {
+            OpenMiniPlayerCore(activateAndCollapse: false);
         }
     }
 
@@ -956,6 +934,10 @@ public partial class IslandWindow : Window
                         {
                             targetView = actTarget;
                         }
+                        else
+                        {
+                            targetView = ExpandedView.ActivityInspector;
+                        }
                     }
                 }
                 else
@@ -1029,26 +1011,27 @@ public partial class IslandWindow : Window
             }
         };
 
-        MediaHomeButton.Click     += (_, _) => SwitchExpandedView(ExpandedView.Media, true);
-        CalendarButton.Click      += (_, _) => SwitchExpandedView(ExpandedView.Calendar, true);
+        MediaHomeButton.Click     += (_, _) => { _viewBackStack.Clear(); SwitchExpandedView(ExpandedView.Media, true, recordHistory: false); };
+        CalendarButton.Click      += (_, _) => { _viewBackStack.Clear(); SwitchExpandedView(ExpandedView.Calendar, true, recordHistory: false); };
         StartPauseButton.Click    += (_, _) => ToggleStopwatch();
         PomodoroButton.Click      += (_, _) => StartPomodoroTimer();
         ResetButton.Click         += (_, _) => ResetStopwatch();
         ShelfButton.Click         += (_, _) =>
         {
+            _viewBackStack.Clear();
             if (_machine.State == IslandState.Expanded && _currentExpandedView == ExpandedView.Shelf)
-                SwitchExpandedView(ExpandedView.Clipboard, true);
+                SwitchExpandedView(ExpandedView.Clipboard, true, recordHistory: false);
             else if (_machine.State == IslandState.Expanded && _currentExpandedView == ExpandedView.Clipboard)
-                SwitchExpandedView(ExpandedView.Shelf, true);
+                SwitchExpandedView(ExpandedView.Shelf, true, recordHistory: false);
             else
-                SwitchExpandedView(ExpandedView.Shelf, true);
+                SwitchExpandedView(ExpandedView.Shelf, true, recordHistory: false);
         };
         ClearShelfButton.Click     += (_, _) => _shelfService.Clear();
-        NotificationsButton.Click  += (_, _) => SwitchExpandedView(ExpandedView.Notifications, true);
-        WidgetsGalleryButton.Click += (_, _) => SwitchExpandedView(ExpandedView.WidgetsGallery, true);
-        LauncherButton.Click       += (_, _) => SwitchExpandedView(ExpandedView.Launcher, true);
-        AudioButton.Click          += (_, _) => SwitchExpandedView(ExpandedView.Audio, true);
-        SettingsButton.Click       += (_, _) => SwitchExpandedView(ExpandedView.Settings, true);
+        NotificationsButton.Click  += (_, _) => { _viewBackStack.Clear(); SwitchExpandedView(ExpandedView.Notifications, true, recordHistory: false); };
+        WidgetsGalleryButton.Click += (_, _) => { _viewBackStack.Clear(); SwitchExpandedView(ExpandedView.WidgetsGallery, true, recordHistory: false); };
+        LauncherButton.Click       += (_, _) => { _viewBackStack.Clear(); SwitchExpandedView(ExpandedView.Launcher, true, recordHistory: false); };
+        AudioButton.Click          += (_, _) => { _viewBackStack.Clear(); SwitchExpandedView(ExpandedView.Audio, true, recordHistory: false); };
+        SettingsButton.Click       += (_, _) => { _viewBackStack.Clear(); SwitchExpandedView(ExpandedView.Settings, true, recordHistory: false); };
         PreviewKeyDown            += IslandWindow_PreviewKeyDown;
 
         if (FloatingDockHost != null)
@@ -1116,16 +1099,45 @@ public partial class IslandWindow : Window
     public double IslandCenterDipX => (_windowRectPx.Left + _windowRectPx.Width / 2.0) / DpiScaleValue;
     public double IslandTopDipY => _windowRectPx.Top / DpiScaleValue;
 
-    public void DetachMiniPlayer()
+    public void DetachMiniPlayer() => OpenMiniPlayerCore(activateAndCollapse: true);
+
+    private void OpenMiniPlayerCore(bool activateAndCollapse)
     {
         if (_miniPlayerWindow != null && _miniPlayerWindow.IsLoaded)
         {
-            _miniPlayerWindow.Activate();
+            if (activateAndCollapse)
+            {
+                _miniPlayerWindow.Activate();
+            }
             return;
         }
 
-        _miniPlayerWindow = new Views.MiniPlayerWindow(_mediaService, _lyricsService, _volumeService, _mediaSongListService, _audioSpectrum, _settingsService);
+        _miniPlayerWindow = new Views.MiniPlayerWindow(
+            _mediaService,
+            _lyricsService,
+            _volumeService,
+            _mediaSongListService,
+            _audioSpectrum,
+            _settingsService,
+            _audioEndpointService);
         _miniPlayerWindow.Closed += (_, _) => _miniPlayerWindow = null;
+
+        string resolvedMode = _settingsService.Current.MiniPlayerCompact
+            ? "Compact"
+            : SettingsService.NormalizeMiniPlayerViewMode(_settingsService.Current.MiniPlayerViewMode);
+
+        double targetW = resolvedMode switch
+        {
+            "Compact" => 286.0,
+            "Showcase" => 300.0,
+            _ => 408.0
+        };
+        double targetH = resolvedMode switch
+        {
+            "Compact" => 64.0,
+            "Showcase" => 348.0,
+            _ => 240.0
+        };
 
         double scale = DpiScaleValue;
         double islandCenterDipX = IslandCenterDipX;
@@ -1137,7 +1149,7 @@ public partial class IslandWindow : Window
                            !double.IsNaN(savedX.Value) && !double.IsInfinity(savedX.Value) &&
                            !double.IsNaN(savedY.Value) && !double.IsInfinity(savedY.Value);
 
-        double targetLeft = hasSavedPos ? savedX!.Value : islandCenterDipX - (_miniPlayerWindow.Width / 2.0);
+        double targetLeft = hasSavedPos ? savedX!.Value : islandCenterDipX - (targetW / 2.0);
         // Position comfortably right below the collapsed island pill (which is ~36 DIPs tall)
         double targetTop = hasSavedPos ? savedY!.Value : islandTopDipY + 54.0;
 
@@ -1150,8 +1162,8 @@ public partial class IslandWindow : Window
                 (targetLeft, targetTop) = WindowPlacementHelper.ClampToWorkArea(
                     targetLeft,
                     targetTop,
-                    _miniPlayerWindow.Width,
-                    _miniPlayerWindow.Height,
+                    targetW,
+                    targetH,
                     mi.rcWork.Left / scale,
                     mi.rcWork.Top / scale,
                     mi.rcWork.Right / scale,
@@ -1162,15 +1174,30 @@ public partial class IslandWindow : Window
 
         _miniPlayerWindow.Left = targetLeft;
         _miniPlayerWindow.Top = targetTop;
-        _miniPlayerWindow.Show();
-        _miniPlayerWindow.Activate();
 
-        if (_settingsService.Current.MiniPlayerCompact)
+        if (!activateAndCollapse)
         {
-            _miniPlayerWindow.SetCompactModeExternal(true);
+            _miniPlayerWindow.ShowActivated = false;
+        }
+        _miniPlayerWindow.Show();
+        if (!activateAndCollapse)
+        {
+            _miniPlayerWindow.ShowActivated = true;
         }
 
-        _machine.CollapseNow();
+        _miniPlayerWindow.SetViewModeExternal(resolvedMode);
+        _settingsService.Update(s => s.MiniPlayerOpen = true);
+
+        if (_isFullscreenSuppressed)
+        {
+            _miniPlayerWindow.SetFullscreenSuppressed(true);
+        }
+
+        if (activateAndCollapse)
+        {
+            _miniPlayerWindow.Activate();
+            _machine.CollapseNow();
+        }
     }
 
     public bool ShareFilesViaWindows(IEnumerable<string> filePaths, string? title = null) =>
@@ -1204,9 +1231,9 @@ public partial class IslandWindow : Window
         _tuckRestoreTimer?.Stop();
         StopRendering();
 
-        try { if (_miniPlayerWindow != null) { _miniPlayerWindow.Close(); _miniPlayerWindow = null; } } catch { }
+        try { if (_miniPlayerWindow != null) { _miniPlayerWindow.CloseForAppShutdown(); _miniPlayerWindow = null; } } catch { }
         try { if (_petFloatWindow != null) { _petFloatWindow.Close(); _petFloatWindow = null; } } catch { }
-        try { Views.DesktopWidgetWindow.CloseAll(); } catch { }
+        try { Views.DesktopWidgetWindow.CloseAll(preserveSavedState: true); } catch { }
 
         UnregisterAllHotKeys();
         UninstallVolumeKeyHook();

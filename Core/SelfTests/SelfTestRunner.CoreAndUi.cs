@@ -1654,4 +1654,366 @@ SSID 3 : Home_Router
         Assert(nature.ThemeStyle == "Default" && nature.IslandTheme == "Ivy & Blooms", "Living Nature preset mismatch");
         Assert(nature.DockPosition == "Center" && nature.EnableVirtualPet && nature.HasCompletedOnboarding, "Living Nature flags mismatch");
     }
+
+    private static void TestIslandShapeTableInvariants()
+    {
+        var notch = IslandShapeTable.GetIdleShape(true, false, 188, 35, 12, "Minimal", true, true, true);
+        Assert(notch.Width == 188 && notch.Height == 35 && notch.Radius == 12, "Hardware notch must override idle dimensions");
+
+        var netIdle = IslandShapeTable.GetIdleShape(false, false, 188, 35, 12, "Minimal", true, true, true);
+        Assert(netIdle.Width == 186 && netIdle.Height == 30, $"Expected 186x30 idle net shape, got {netIdle.Width}x{netIdle.Height}");
+
+        var promptDiff = IslandShapeTable.GetToastShape(new ToastContent("\uE943", "AI", "Sub", ThemeBrushes.BlueColor, TimeSpan.FromSeconds(3), PromptActivityId: "p1", DiffText: "+a"));
+        Assert(promptDiff.Width == 416, $"Expected prompt diff toast width 416, got {promptDiff.Width}");
+
+        var notifShape = IslandShapeTable.GetNotificationsExpandedShape(5, 3, 2);
+        Assert(notifShape.Width == 484 && notifShape.Height == 412, $"Expected clamped 484x412 notifications shape, got {notifShape.Width}x{notifShape.Height}");
+
+        var hover = IslandShapeTable.ApplyPointerTension(new PillShape(148, 30, 15), IslandState.Idle, false, true);
+        Assert(hover.Width == 158 && hover.Height == 32.5, "Hover swell math mismatch");
+    }
+
+    private static void TestChoreographerFullConsolidation()
+    {
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        string petSettingsPath = Path.Combine(Path.GetTempPath(), $"di_pet_{Guid.NewGuid():N}.json");
+        string dropletSettingsPath = Path.Combine(Path.GetTempPath(), $"di_drop_{Guid.NewGuid():N}.json");
+        try
+        {
+            using var chore = new Choreographer(dispatcher);
+            var settingsSvc = new SettingsService(petSettingsPath);
+            settingsSvc.Update(s =>
+            {
+                s.EnableVirtualPet = true;
+                s.WellnessReminderMinutes = 30;
+            });
+
+            using var pet = new VirtualPetService(dispatcher, settingsSvc);
+            pet.AttachChoreographer(chore);
+
+            using var peripherals = new PeripheralDeviceService(dispatcher);
+            peripherals.AttachChoreographer(chore);
+            peripherals.SetExpanded(true);
+
+            var dropSettings = new SettingsService(dropletSettingsPath);
+            var registry = new DropletRegistry(dropSettings);
+            var hub = new LiveActivityHub();
+            using var community = new CommunityDropletService(registry, hub);
+            community.AttachChoreographer(chore);
+
+            var ids = chore.GetRegisteredChoreIds();
+            Assert(ids.Contains(VirtualPetService.ChoreId), "VirtualPetService must register wellness chore");
+            Assert(ids.Contains(PeripheralDeviceService.ChoreId), "PeripheralDeviceService must register poll chore when expanded");
+
+            peripherals.Dispose();
+            pet.Dispose();
+            var idsAfter = chore.GetRegisteredChoreIds();
+            Assert(!idsAfter.Contains(VirtualPetService.ChoreId), "VirtualPetService.Dispose must unregister wellness chore");
+            Assert(!idsAfter.Contains(PeripheralDeviceService.ChoreId), "PeripheralDeviceService.Dispose must unregister poll chore");
+        }
+        finally
+        {
+            if (File.Exists(petSettingsPath)) File.Delete(petSettingsPath);
+            if (File.Exists(dropletSettingsPath)) File.Delete(dropletSettingsPath);
+        }
+    }
+
+    private static void TestDiagnosticsBundleSanitization()
+    {
+        for (int i = 0; i < 210; i++)
+        {
+            App.Log($"[TestDiag] Ring check #{i}");
+        }
+        var logs = App.GetRecentLogs();
+        Assert(logs.Count <= 200 && logs.Count > 0, $"RecentLogs ring must be capped at 200, got {logs.Count}");
+
+        string outPath = Path.Combine(Path.GetTempPath(), $"di_diag_{Guid.NewGuid():N}.json");
+        try
+        {
+            var settings = new AppSettings
+            {
+                ThemeName = "Aurora",
+                GitHubToken = "ghp_diag_secret_999",
+                PhoneBridgePassword = "diag_secret_password"
+            };
+            using var chore = new Choreographer(Dispatcher.CurrentDispatcher);
+            var (ok, filePath, err) = DiagnosticsExporter.ExportBundle(outPath, settings, chore);
+            Assert(ok && File.Exists(filePath) && string.IsNullOrEmpty(err), $"ExportBundle failed: {err}");
+
+            string json = File.ReadAllText(filePath);
+            Assert(!json.Contains("ghp_diag_secret_999", StringComparison.Ordinal), "Diagnostics bundle must strip GitHubToken");
+            Assert(!json.Contains("diag_secret_password", StringComparison.Ordinal), "Diagnostics bundle must strip PhoneBridgePassword");
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            Assert(doc.RootElement.TryGetProperty("memory", out _), "Diagnostics bundle must contain 'memory'");
+            Assert(doc.RootElement.TryGetProperty("choreographer", out _), "Diagnostics bundle must contain 'choreographer'");
+            Assert(doc.RootElement.TryGetProperty("recentLogs", out _), "Diagnostics bundle must contain 'recentLogs'");
+        }
+        finally
+        {
+            if (File.Exists(outPath)) File.Delete(outPath);
+        }
+    }
+
+    private static void TestCommandPaletteV2Prefixes()
+    {
+        var clips = new[]
+        {
+            new ClipboardItem { Title = "Secret Key", RawText = "sk-live-999", IsSecret = true, Type = ClipboardItemType.Text },
+            new ClipboardItem { Title = "Deploy Script", RawText = "dotnet publish -c Release", IsSecret = false, Type = ClipboardItemType.Code }
+        };
+        var audio = new[]
+        {
+            new AudioEndpointInfo { Id = "ep1", Name = "AirPods Pro", DeviceType = "Bluetooth", Volume = 0.80f, IsDefault = true, Glyph = "\uE7F6" },
+            new AudioEndpointInfo { Id = "ep2", Name = "Studio Display Speakers", DeviceType = "Speakers", Volume = 0.50f, IsDefault = false, Glyph = "\uE7F5" }
+        };
+        var windows = new[]
+        {
+            new OpenWindowEntry(new IntPtr(101), "Visual Studio Code", "Code"),
+            new OpenWindowEntry(new IntPtr(202), "Windows Terminal", "WindowsTerminal")
+        };
+
+        var clipRes = CommandPaletteEngine.Query("clip:", null, clips, null, 12, audio, windows);
+        Assert(clipRes.Count == 1 && clipRes[0].Kind == CommandResultKind.Clipboard && clipRes[0].Title == "Deploy Script",
+            "clip: prefix must return non-secret clips and exclude IsSecret items");
+
+        var audioRes = CommandPaletteEngine.Query("audio:airpods", null, clips, null, 12, audio, windows);
+        Assert(audioRes.Count == 1 && audioRes[0].Kind == CommandResultKind.AudioEndpoint && audioRes[0].ActionKey == "switch_audio",
+            "audio: prefix must match audio endpoints");
+
+        var winRes = CommandPaletteEngine.Query("win:terminal", null, clips, null, 12, audio, windows);
+        Assert(winRes.Count == 1 && winRes[0].Kind == CommandResultKind.Window && winRes[0].ActionKey == "focus_window",
+            "win: prefix must match open windows");
+
+        var setRes = CommandPaletteEngine.Query("set:glass", null, clips, null, 12, audio, windows);
+        Assert(setRes.Any(r => r.Kind == CommandResultKind.Setting), "set: prefix must match settings");
+    }
+
+    private static void TestLanShareTrustedSessionToken()
+    {
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        var shelf = new DropShelfService();
+        using var clip = new ClipboardHistoryService(dispatcher);
+        using var lan = new LanQuickShareService(dispatcher, shelf, clip);
+
+        string token = lan.IssueTrustedDeviceToken(TimeSpan.FromHours(1));
+        Assert(lan.ValidateTrustedDeviceToken(token), "Freshly issued trusted device token must validate");
+
+        string expired = lan.IssueTrustedDeviceToken(TimeSpan.FromSeconds(-10));
+        Assert(!lan.ValidateTrustedDeviceToken(expired), "Expired trusted device token must be rejected");
+
+        string tampered = token[..^2] + (token.EndsWith("aa") ? "bb" : "aa");
+        Assert(!lan.ValidateTrustedDeviceToken(tampered), "Tampered trusted device token must be rejected");
+
+        lan.RevokeTrustedDevices();
+        Assert(!lan.ValidateTrustedDeviceToken(token), "RevokeTrustedDevices must immediately invalidate previously issued tokens");
+    }
+
+    private static void TestLocalizationPackAndCustomProfiles()
+    {
+        string enUsPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Resources", "Strings.en-US.xaml");
+        if (!File.Exists(enUsPath))
+        {
+            enUsPath = Path.Combine(Directory.GetCurrentDirectory(), "Resources", "Strings.en-US.xaml");
+        }
+        if (File.Exists(enUsPath))
+        {
+            string xaml = File.ReadAllText(enUsPath);
+            int keyCount = System.Text.RegularExpressions.Regex.Matches(xaml, "x:Key=\"").Count;
+            Assert(keyCount >= 45, $"Expected >= 45 localization keys in Strings.en-US.xaml, found {keyCount}");
+        }
+
+        string langPath = Path.Combine(Path.GetTempPath(), $"di_lang_{Guid.NewGuid():N}.xaml");
+        string profPath = Path.Combine(Path.GetTempPath(), $"di_cprof_{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(langPath,
+                "<ResourceDictionary xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\" xmlns:sys=\"clr-namespace:System;assembly=mscorlib\">" +
+                "<sys:String x:Key=\"Hud_DoNotDisturb\">Nicht stören</sys:String>" +
+                "</ResourceDictionary>");
+            Assert(Localizer.TryLoadExternalLanguagePack(langPath), "TryLoadExternalLanguagePack must load valid XAML dictionary");
+            Assert(Localizer.Get("Hud_DoNotDisturb", "Do Not Disturb") == "Nicht stören", "External language pack must override key");
+            Localizer.ClearOverrides();
+
+            var settings = new SettingsService(profPath);
+            settings.Update(s => s.DoNotDisturb = true);
+            using var profiles = new ContextProfileService(settings);
+            var saved = profiles.SaveCurrentAsCustomProfile("My Studio", new[] { "Resolve" }, triggerOnBattery: false);
+            Assert(profiles.GetAllProfiles().Any(p => p.Id == saved.Id && p.DoNotDisturb == true), "Saved custom profile must persist");
+            Assert(profiles.RemoveCustomProfile(saved.Id), "RemoveCustomProfile must remove saved custom profile");
+        }
+        finally
+        {
+            Localizer.ClearOverrides();
+            if (File.Exists(langPath)) File.Delete(langPath);
+            if (File.Exists(profPath)) File.Delete(profPath);
+        }
+    }
+
+    private static void TestDesktopWidgetPersistenceAndClamping()
+    {
+        var workArea = new Rect(0, 0, 1920, 1040);
+        var (clampedX, clampedY) = Views.DesktopWidgetWindow.ClampWidgetPosition(5000, -400, 220, 140, workArea);
+        Assert(clampedX <= 1920 - 220 - 12.0 && clampedY >= 12.0,
+            $"Off-screen widget coordinates must clamp inside work area, got ({clampedX}, {clampedY})");
+
+        var settings = new AppSettings();
+        settings.PinnedDesktopWidgets.Add(new PinnedDesktopWidgetState
+        {
+            Kind = "Vitals",
+            Left = 1600,
+            Top = 80,
+            IsTopmost = true,
+            IsGhost = true
+        });
+        string json = System.Text.Json.JsonSerializer.Serialize(settings);
+        var back = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json);
+        Assert(back != null && back.PinnedDesktopWidgets.Count == 1 && back.PinnedDesktopWidgets[0].IsTopmost && back.PinnedDesktopWidgets[0].IsGhost,
+            "PinnedDesktopWidgets must round-trip in AppSettings");
+
+        Views.DesktopWidgetWindow.SetFullscreenSuppressed(true);
+        Assert(Views.DesktopWidgetWindow.IsFullscreenSuppressed, "SetFullscreenSuppressed(true) must set flag");
+        Views.DesktopWidgetWindow.SetFullscreenSuppressed(false);
+        Assert(!Views.DesktopWidgetWindow.IsFullscreenSuppressed, "SetFullscreenSuppressed(false) must clear flag");
+    }
+
+    private static void TestViewNavigationBackStack()
+    {
+        var stack = new ViewNavigationStack();
+        stack.Push(ExpandedView.Media);
+        stack.Push(ExpandedView.Media); // consecutive duplicate ignored
+        Assert(stack.Count == 1, "Consecutive duplicate push must be ignored");
+
+        for (int i = 0; i < 12; i++)
+        {
+            stack.Push(i % 2 == 0 ? ExpandedView.Settings : ExpandedView.Calendar);
+        }
+        Assert(stack.Count == ViewNavigationStack.MaxDepth, $"Back-stack must cap at {ViewNavigationStack.MaxDepth}");
+
+        Assert(stack.TryPop(out var top) && top == ExpandedView.Calendar, "Top popped view must be Calendar");
+        stack.Clear();
+        Assert(stack.Count == 0 && !stack.TryPop(out _), "Clear must empty back-stack");
+    }
+
+    private static void TestSingleFlightGateConcurrency()
+    {
+        var gate = new SingleFlightGate();
+        var tcs = new TaskCompletionSource();
+        var firstTask = gate.TryRunAsync(() => tcs.Task, "SelfTest.First");
+        Assert(gate.IsBusy, "Gate must report IsBusy while first task is pending");
+
+        bool secondStarted = gate.TryRunAsync(() => Task.CompletedTask, "SelfTest.Second").GetAwaiter().GetResult();
+        Assert(!secondStarted, "Concurrent second call must be rejected while busy");
+
+        tcs.SetResult();
+        bool firstStarted = firstTask.GetAwaiter().GetResult();
+        Assert(firstStarted && !gate.IsBusy, "Gate must reset IsBusy after completion");
+
+        bool faultedStarted = gate.TryRunAsync(() => Task.FromException(new InvalidOperationException("expected")), "SelfTest.Fault").GetAwaiter().GetResult();
+        Assert(faultedStarted && !gate.IsBusy, "Gate must observe exceptions and reset IsBusy");
+    }
+
+    private static void TestPomodoroFocusLinkAndImageActions()
+    {
+        string tempSettings = Path.Combine(Path.GetTempPath(), $"di_pomo_{Guid.NewGuid():N}.json");
+        string tempDir = Path.Combine(Path.GetTempPath(), $"di_img_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var settings = new SettingsService(tempSettings);
+            settings.Update(s =>
+            {
+                s.LinkPomodoroToFocusProfile = true;
+                s.DoNotDisturb = false;
+                s.ActiveProfileId = "default";
+            });
+
+            using var profiles = new ContextProfileService(settings);
+            using var timer = new CountdownTimerService();
+            using var coord = new PomodoroFocusCoordinator(timer, settings, profiles);
+
+            timer.StartPomodoro();
+            Assert(string.Equals(settings.Current.ActiveProfileId, "focus", StringComparison.OrdinalIgnoreCase),
+                "Pomodoro start must auto-activate Deep Focus profile");
+
+            timer.AdvanceSimulated(TimeSpan.FromMinutes(25));
+            Assert(settings.Current.CompletedFocusMinutesToday >= 25,
+                "Completed Pomodoro must increment CompletedFocusMinutesToday");
+            Assert(string.Equals(settings.Current.ActiveProfileId, "default", StringComparison.OrdinalIgnoreCase),
+                "Completed Pomodoro must restore previous profile");
+
+            string srcPng = Path.Combine(tempDir, "sample.png");
+            var bmp = BitmapSource.Create(64, 64, 96, 96, PixelFormats.Bgra32, null, new byte[64 * 64 * 4], 64 * 4);
+            bmp.Freeze();
+            using (var fs = new FileStream(srcPng, FileMode.Create, FileAccess.Write))
+            {
+                var enc = new PngBitmapEncoder();
+                enc.Frames.Add(BitmapFrame.Create(bmp));
+                enc.Save(fs);
+            }
+
+            var stripRes = FileActionPipeline.ExecuteAsync(FileActionKind.StripExifLossless, new[] { srcPng }).GetAwaiter().GetResult();
+            Assert(stripRes.Success && stripRes.OutputPaths.Count == 1 && File.Exists(stripRes.OutputPaths[0]),
+                "StripExifLossless must produce clean 1:1 PNG");
+
+            var halfRes = FileActionPipeline.ExecuteAsync(FileActionKind.ResizeHalf, new[] { srcPng }).GetAwaiter().GetResult();
+            Assert(halfRes.Success && halfRes.OutputPaths.Count == 1 && File.Exists(halfRes.OutputPaths[0]),
+                "ResizeHalf must produce resized PNG");
+            using (var outFs = new FileStream(halfRes.OutputPaths[0], FileMode.Open, FileAccess.Read))
+            {
+                var dec = BitmapDecoder.Create(outFs, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
+                Assert(dec.Frames[0].PixelWidth == 32 && dec.Frames[0].PixelHeight == 32,
+                    $"Expected 32x32 resized image, got {dec.Frames[0].PixelWidth}x{dec.Frames[0].PixelHeight}");
+            }
+        }
+        finally
+        {
+            if (File.Exists(tempSettings)) File.Delete(tempSettings);
+            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    private static void TestLiveActivityLogRingAndInspectorRouting()
+    {
+        var hub = new LiveActivityHub();
+        hub.Publish(new LiveActivityItem(Id: "build_1", Source: "CLI", Title: "Build", Subtitle: "Running"));
+        for (int i = 0; i < 25; i++)
+        {
+            Assert(hub.AppendLog("build_1", $"line {i}"), "AppendLog must succeed for active activity");
+        }
+        var item = hub.Activities.First(a => a.Id == "build_1");
+        Assert(item.LogLines != null && item.LogLines.Count == 20 && item.LogLines[0] == "line 5",
+            "AppendLog must cap at 20 lines keeping newest");
+
+        hub.Publish(new LiveActivityItem(Id: "build_1", Source: "CLI", Title: "Build", Subtitle: "Updated"));
+        item = hub.Activities.First(a => a.Id == "build_1");
+        Assert(item.LogLines != null && item.LogLines.Count == 20, "Publish update without LogLines must preserve existing log ring");
+
+        Assert(ExpandedViewExtensions.TryParseKey("activityinspector", out var insp) && insp == ExpandedView.ActivityInspector,
+            "'activityinspector' must resolve to ExpandedView.ActivityInspector");
+        Assert(ExpandedViewExtensions.TryParseKey("activity", out var hud) && hud == ExpandedView.SystemHud,
+            "'activity' must remain mapped to ExpandedView.SystemHud");
+    }
+
+    private static void TestPortableModePathResolution()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), $"di_port_{Guid.NewGuid():N}");
+        string baseDir = Path.Combine(tempRoot, "app");
+        string localApp = Path.Combine(tempRoot, "local");
+        Directory.CreateDirectory(baseDir);
+        Directory.CreateDirectory(localApp);
+        try
+        {
+            var (portDir, isPort) = AppPaths.ResolveDataDirectoryCore(baseDir, localApp, hasPortableFlag: true);
+            Assert(isPort && string.Equals(portDir, Path.Combine(baseDir, "data"), StringComparison.OrdinalIgnoreCase),
+                $"Expected portable data dir under baseDir, got '{portDir}'");
+
+            var (stdDir, isStdPort) = AppPaths.ResolveDataDirectoryCore(baseDir, localApp, hasPortableFlag: false);
+            Assert(!isStdPort && string.Equals(stdDir, Path.Combine(localApp, "DynamicIsland"), StringComparison.OrdinalIgnoreCase),
+                $"Expected standard LocalAppData dir, got '{stdDir}'");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, recursive: true);
+        }
+    }
 }

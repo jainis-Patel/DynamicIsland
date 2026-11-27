@@ -230,6 +230,15 @@ internal sealed partial class ClipboardHistoryService : IDisposable
     }
 
     public event Action? Changed;
+    public event Action? PasteQueueChanged;
+
+    public string? PeekNextPasteTitle()
+    {
+        lock (_pasteQueue)
+        {
+            return _pasteQueue.Count > 0 ? _pasteQueue[0].Title : null;
+        }
+    }
 
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(50);
     private static readonly Regex HexColorRegex = new(@"^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$", RegexOptions.Compiled, RegexTimeout);

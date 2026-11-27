@@ -17,6 +17,8 @@ public enum FileActionKind
     ConvertToPng,
     ConvertToJpg,
     StripExifAndResize,
+    StripExifLossless,
+    ResizeHalf,
     ImagesToPdf,
     MergePdfs,
     CompressVideo720p,
@@ -104,6 +106,16 @@ internal static class FileActionPipeline
                 "Strip Metadata / Max 1920px",
                 "Clean EXIF & downscale large photos",
                 "\uE72E"));
+            list.Add(new FileActionOption(
+                FileActionKind.StripExifLossless,
+                "Strip EXIF Only (1:1)",
+                "Remove GPS & camera metadata at full resolution",
+                "\uE72E"));
+            list.Add(new FileActionOption(
+                FileActionKind.ResizeHalf,
+                "Resize 50%",
+                "Scale images to half width & height",
+                "\uE740"));
         }
 
         if (pdfCount >= 2 || allPdfs)
@@ -174,6 +186,8 @@ internal static class FileActionPipeline
                 FileActionKind.ConvertToPng => await Task.Run(() => ConvertImages(files, ".png", maxDim: 0, progress, ct), ct),
                 FileActionKind.ConvertToJpg => await Task.Run(() => ConvertImages(files, ".jpg", maxDim: 0, progress, ct), ct),
                 FileActionKind.StripExifAndResize => await Task.Run(() => ConvertImages(files, null, maxDim: 1920, progress, ct), ct),
+                FileActionKind.StripExifLossless => await Task.Run(() => ConvertImagesCore(files, null, maxDim: 0, progress, scaleFactor: 1.0, suffixOverride: "_noexif", ct), ct),
+                FileActionKind.ResizeHalf => await Task.Run(() => ConvertImagesCore(files, null, maxDim: 0, progress, scaleFactor: 0.5, suffixOverride: "_50pct", ct), ct),
                 FileActionKind.ImagesToPdf => await Task.Run(() => ConvertImagesToPdf(files, progress, ct), ct),
                 FileActionKind.MergePdfs => await Task.Run(() => MergePdfFiles(files, progress, ct), ct),
                 FileActionKind.CompressVideo720p => await TranscodeVideosAsync(files, VideoEncodingQuality.HD720p, progress, ct),
@@ -200,7 +214,17 @@ internal static class FileActionPipeline
         string? targetExt,
         int maxDim = 0,
         IProgress<double>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default) =>
+        ConvertImagesCore(files, targetExt, maxDim, progress, scaleFactor: 1.0, suffixOverride: null, ct);
+
+    private static FileActionResult ConvertImagesCore(
+        IReadOnlyList<string> files,
+        string? targetExt,
+        int maxDim,
+        IProgress<double>? progress,
+        double scaleFactor,
+        string? suffixOverride,
+        CancellationToken ct)
     {
         var images = files.Where(IsImageFile).ToList();
         if (images.Count == 0)
@@ -221,7 +245,7 @@ internal static class FileActionPipeline
 
             string dir = Path.GetDirectoryName(src) ?? Path.GetTempPath();
             string stem = Path.GetFileNameWithoutExtension(src);
-            string suffix = maxDim > 0 ? "_clean" : "_converted";
+            string suffix = suffixOverride ?? (maxDim > 0 ? "_clean" : "_converted");
             string outPath = GetUniqueFilePath(dir, $"{stem}{suffix}", ext);
 
             try
@@ -236,7 +260,11 @@ internal static class FileActionPipeline
 
                     BitmapSource frame = decoder.Frames[0];
 
-                    if (maxDim > 0 && (frame.PixelWidth > maxDim || frame.PixelHeight > maxDim))
+                    if (scaleFactor > 0.01 && Math.Abs(scaleFactor - 1.0) > 0.001)
+                    {
+                        frame = new TransformedBitmap(frame, new ScaleTransform(scaleFactor, scaleFactor));
+                    }
+                    else if (maxDim > 0 && (frame.PixelWidth > maxDim || frame.PixelHeight > maxDim))
                     {
                         double scale = Math.Min((double)maxDim / frame.PixelWidth, (double)maxDim / frame.PixelHeight);
                         frame = new TransformedBitmap(frame, new ScaleTransform(scale, scale));

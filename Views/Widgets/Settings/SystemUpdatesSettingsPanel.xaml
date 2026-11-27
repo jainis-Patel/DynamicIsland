@@ -79,6 +79,12 @@
                         <TextBlock Text="Export, restore or factory reset JSON profile" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
                     </StackPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Click="ExportDiagnosticsBtn_Click" x:Name="ExportDiagnosticsBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0" ToolTipService.ToolTip="Export sanitized diagnostics JSON bundle to Desktop">
+                            <TextBlock Text="Diagnostics" FontSize="8" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" />
+                        </Button>
+                        <Button Click="ReplayOnboardingBtn_Click" x:Name="ReplayOnboardingBtn" Style="{StaticResource IslandButton}" Height="20" Padding="7,0" Margin="0,0,3,0" ToolTipService.ToolTip="Show quick-start onboarding tips">
+                            <TextBlock Text="Guide" FontSize="8" FontWeight="Medium" />
+                        </Button>
                         <Button Click="ExportSettingsBtn_Click" x:Name="ExportSettingsBtn" Style="{StaticResource IslandButton}" Height="20" Padding="8,0" Margin="0,0,3,0">
                             <TextBlock Text="Export" FontSize="8.5" FontWeight="Medium" />
                         </Button>

@@ -31,10 +31,6 @@ public partial class IslandWindow
         {
             PeripheralsEmptyPlaceholder.Visibility = filtered.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
         }
-
-        PeripheralsButtonGlyph.Foreground = _peripheralService.HasLowBatteryDevice
-            ? ThemeBrushes.Red
-            : ThemeBrushes.PrimaryText;
     }
 
     internal void PeripheralsFilterBtn_Click(object sender, RoutedEventArgs e)
@@ -66,9 +62,11 @@ public partial class IslandWindow
             Priority: ToastPriority.Critical));
     }
 
-    internal async void RefreshPeripheralsBtn_Click(object sender, RoutedEventArgs e)
+    private readonly SingleFlightGate _peripheralsRefreshGate = new();
+
+    internal void RefreshPeripheralsBtn_Click(object sender, RoutedEventArgs e)
     {
-        try
+        _ = _peripheralsRefreshGate.TryRunAsync(async () =>
         {
             await _peripheralService.RefreshAsync();
             if (_isClosing) return;
@@ -81,11 +79,7 @@ public partial class IslandWindow
                 TargetView: "peripherals",
                 Priority: ToastPriority.Feedback,
                 Category: "peripherals"));
-        }
-        catch (Exception ex)
-        {
-            App.Log($"[Peripherals] Refresh failed: {ex.Message}");
-        }
+        }, "Peripherals.Refresh");
     }
 
     internal void OpenBluetoothSettingsBtn_Click(object sender, RoutedEventArgs e)

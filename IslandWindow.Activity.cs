@@ -125,8 +125,23 @@ public partial class IslandWindow
 
         bool needsSubSecond = expandedMediaActive || compactLyricsActive || idleAnalogActive;
 
-        // 50ms (20Hz) only when active media scrubber/lyrics or analog sweep hand is visible; 1s (1Hz) otherwise
-        var targetInterval = needsSubSecond ? TimeSpan.FromMilliseconds(50) : TimeSpan.FromSeconds(1);
+        // 50ms (20Hz) only when active media scrubber/lyrics or analog sweep hand is visible;
+        // 1s when seconds/timer/non-idle activity is visible; minute-aligned otherwise for zero-idle overhead.
+        TimeSpan targetInterval;
+        if (needsSubSecond)
+        {
+            targetInterval = TimeSpan.FromMilliseconds(50);
+        }
+        else if (currentStyle == "Seconds" || timerRunning || _machine.State != IslandState.Idle)
+        {
+            targetInterval = TimeSpan.FromSeconds(1);
+        }
+        else
+        {
+            int secsToNextMin = Math.Clamp(60 - DateTime.Now.Second, 1, 60);
+            targetInterval = TimeSpan.FromSeconds(secsToNextMin);
+        }
+
         if (_clockTimer != null && _clockTimer.Interval != targetInterval)
         {
             _clockTimer.Interval = targetInterval;
@@ -243,6 +258,7 @@ public partial class IslandWindow
         {
             UpdateMediaTimelineUI();
         }
+        UpdateClockTimerInterval();
     }
 
     private string? _lastPositionText;

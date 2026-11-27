@@ -9,7 +9,9 @@ public enum CommandResultKind
     Profile,
     Setting,
     App,
-    Clipboard
+    Clipboard,
+    AudioEndpoint,
+    Window
 }
 
 public sealed record CommandPaletteItem(
@@ -23,9 +25,10 @@ public sealed record CommandPaletteItem(
     int Score = 0);
 
 /// <summary>
-/// Unified, deterministic fuzzy-ranked Command Palette engine aggregating inline math/unit
+/// Unified, deterministic fuzzy-ranked Command Palette 2.0 engine aggregating inline math/unit
 /// conversions, built-in Island actions, Context Profiles, Settings deep-links, pinned apps,
-/// and non-sensitive clipboard items.
+/// non-sensitive clipboard items, audio endpoints, and open desktop windows.
+/// Supports prefix-scoped queries (<c>clip:</c>, <c>audio:</c>, <c>win:</c>, <c>set:</c>, <c>app:</c>).
 /// </summary>
 internal static class CommandPaletteEngine
 {
@@ -39,6 +42,8 @@ internal static class CommandPaletteEngine
         ("open_settings", "Open Settings", "Configure appearance, droplets, and hotkeys", "\uE713", "settings preferences config"),
         ("purge_ram", "Purge Idle RAM", "Trim working set and compact managed heap", "\uE9D9", "purge ram memory trim buster cleanup"),
         ("export_hooks", "Export AI Agent Hooks", "Generate Claude Code & CLI pipe scripts", "\uE943", "ai agent hooks claude pipe ipc export"),
+        ("export_diagnostics", "Export Diagnostics Bundle", "Save sanitized diagnostics JSON to Desktop", "\uE9D9", "diagnostics debug log bundle export support"),
+        ("replay_onboarding", "Show Quick-Start Guide", "Replay onboarding tips and shortcuts", "\uE734", "onboarding guide help tour tips"),
     };
 
     public static IReadOnlyList<CommandPaletteItem> Query(
@@ -46,12 +51,20 @@ internal static class CommandPaletteEngine
         IReadOnlyList<LauncherItem>? apps = null,
         IReadOnlyList<ClipboardItem>? clips = null,
         IReadOnlyList<IslandProfile>? profiles = null,
-        int maxResults = 12)
+        int maxResults = 12,
+        IReadOnlyList<AudioEndpointInfo>? audioEndpoints = null,
+        IReadOnlyList<OpenWindowEntry>? openWindows = null)
     {
         string trimmed = input?.Trim() ?? "";
         if (string.IsNullOrEmpty(trimmed))
         {
             return Array.Empty<CommandPaletteItem>();
+        }
+
+        // Prefix-scoped providers (clip:, audio:, win:, set:, app:)
+        if (TryExtractPrefix(trimmed, out string prefix, out string subQuery))
+        {
+            return QueryPrefixed(prefix, subQuery, apps, clips, audioEndpoints, openWindows, maxResults);
         }
 
         var results = new List<CommandPaletteItem>();
@@ -108,9 +121,90 @@ internal static class CommandPaletteEngine
         }
 
         // 4. Settings Deep-Links
+        AddSettingMatches(results, trimmed);
+
+        // 5. Pinned Apps & Folders
+        AddAppMatches(results, trimmed, apps);
+
+        // 6. Audio Endpoints
+        AddAudioMatches(results, trimmed, audioEndpoints);
+
+        // 7. Open Windows
+        AddWindowMatches(results, trimmed, openWindows);
+
+        // 8. Recent Non-Sensitive Clipboard Items (never expose secrets)
+        AddClipMatches(results, trimmed, clips);
+
+        return results
+            .OrderByDescending(r => r.Score)
+            .ThenBy(r => r.Title, StringComparer.OrdinalIgnoreCase)
+            .Take(maxResults)
+            .ToList();
+    }
+
+    private static bool TryExtractPrefix(string input, out string prefix, out string subQuery)
+    {
+        int colon = input.IndexOf(':');
+        if (colon > 0 && colon <= 8)
+        {
+            string candidate = input[..colon].Trim().ToLowerInvariant();
+            if (candidate is "clip" or "audio" or "win" or "set" or "settings" or "app")
+            {
+                prefix = candidate;
+                subQuery = input[(colon + 1)..].Trim();
+                return true;
+            }
+        }
+
+        prefix = "";
+        subQuery = "";
+        return false;
+    }
+
+    private static IReadOnlyList<CommandPaletteItem> QueryPrefixed(
+        string prefix,
+        string subQuery,
+        IReadOnlyList<LauncherItem>? apps,
+        IReadOnlyList<ClipboardItem>? clips,
+        IReadOnlyList<AudioEndpointInfo>? audioEndpoints,
+        IReadOnlyList<OpenWindowEntry>? openWindows,
+        int maxResults)
+    {
+        var results = new List<CommandPaletteItem>();
+        switch (prefix)
+        {
+            case "clip":
+                AddClipMatches(results, subQuery, clips, includeAllWhenEmpty: true);
+                break;
+            case "audio":
+                AddAudioMatches(results, subQuery, audioEndpoints, includeAllWhenEmpty: true);
+                break;
+            case "win":
+                AddWindowMatches(results, subQuery, openWindows, includeAllWhenEmpty: true);
+                break;
+            case "set":
+            case "settings":
+                AddSettingMatches(results, subQuery, includeAllWhenEmpty: true);
+                break;
+            case "app":
+                AddAppMatches(results, subQuery, apps, includeAllWhenEmpty: true);
+                break;
+        }
+
+        return results
+            .OrderByDescending(r => r.Score)
+            .ThenBy(r => r.Title, StringComparer.OrdinalIgnoreCase)
+            .Take(maxResults)
+            .ToList();
+    }
+
+    private static void AddSettingMatches(List<CommandPaletteItem> results, string query, bool includeAllWhenEmpty = false)
+    {
         foreach (var entry in SettingsSearchIndex.Entries)
         {
-            int score = ScoreMatch(trimmed, entry.Title, entry.Subtitle, entry.Keywords);
+            int score = string.IsNullOrEmpty(query) && includeAllWhenEmpty
+                ? 100
+                : ScoreMatch(query, entry.Title, entry.Subtitle, entry.Keywords);
             if (score > 0)
             {
                 results.Add(new CommandPaletteItem(
@@ -124,55 +218,103 @@ internal static class CommandPaletteEngine
                     Score: score + 15));
             }
         }
+    }
 
-        // 5. Pinned Apps & Folders
-        if (apps != null)
+    private static void AddAppMatches(List<CommandPaletteItem> results, string query, IReadOnlyList<LauncherItem>? apps, bool includeAllWhenEmpty = false)
+    {
+        if (apps == null) return;
+        foreach (var app in apps)
         {
-            foreach (var app in apps)
+            int score = string.IsNullOrEmpty(query) && includeAllWhenEmpty
+                ? 100
+                : ScoreMatch(query, app.Name, app.TargetPath, app.IsFolder ? "folder" : "app");
+            if (score > 0)
             {
-                int score = ScoreMatch(trimmed, app.Name, app.TargetPath, app.IsFolder ? "folder" : "app");
-                if (score > 0)
-                {
-                    results.Add(new CommandPaletteItem(
-                        Id: $"app:{app.Id}",
-                        Title: app.Name,
-                        Subtitle: app.IsFolder ? $"Open folder · {app.TargetPath}" : $"Launch app · {app.TargetPath}",
-                        Glyph: app.Glyph,
-                        Kind: CommandResultKind.App,
-                        ActionKey: "launch_app",
-                        Payload: app.TargetPath,
-                        Score: score + 25));
-                }
+                results.Add(new CommandPaletteItem(
+                    Id: $"app:{app.Id}",
+                    Title: app.Name,
+                    Subtitle: app.IsFolder ? $"Open folder · {app.TargetPath}" : $"Launch app · {app.TargetPath}",
+                    Glyph: app.Glyph,
+                    Kind: CommandResultKind.App,
+                    ActionKey: "launch_app",
+                    Payload: app.TargetPath,
+                    Score: score + 25));
             }
         }
+    }
 
-        // 6. Recent Non-Sensitive Clipboard Items (never expose secrets)
-        if (clips != null)
+    private static void AddClipMatches(List<CommandPaletteItem> results, string query, IReadOnlyList<ClipboardItem>? clips, bool includeAllWhenEmpty = false)
+    {
+        if (clips == null) return;
+        int idx = 0;
+        foreach (var clip in clips)
         {
-            foreach (var clip in clips)
+            idx++;
+            if (clip.IsSecret || string.IsNullOrWhiteSpace(clip.RawText)) continue;
+            int score = string.IsNullOrEmpty(query) && includeAllWhenEmpty
+                ? Math.Max(10, 200 - idx)
+                : ScoreMatch(query, clip.Title, clip.Subtitle, $"clipboard copy {clip.TypeTag}");
+            if (score > 0)
             {
-                if (clip.IsSecret || string.IsNullOrWhiteSpace(clip.RawText)) continue;
-                int score = ScoreMatch(trimmed, clip.Title, clip.Subtitle, $"clipboard copy {clip.TypeTag}");
-                if (score > 0)
-                {
-                    results.Add(new CommandPaletteItem(
-                        Id: $"clip:{clip.Id}",
-                        Title: clip.Title,
-                        Subtitle: $"Clipboard ({clip.TypeTag}) · Enter to copy",
-                        Glyph: "\uE8C8",
-                        Kind: CommandResultKind.Clipboard,
-                        ActionKey: "copy_clip",
-                        Payload: clip.RawText,
-                        Score: score + 10));
-                }
+                results.Add(new CommandPaletteItem(
+                    Id: $"clip:{clip.Id}",
+                    Title: clip.Title,
+                    Subtitle: $"Clipboard ({clip.TypeTag}) · Enter to copy",
+                    Glyph: "\uE8C8",
+                    Kind: CommandResultKind.Clipboard,
+                    ActionKey: "copy_clip",
+                    Payload: clip.RawText,
+                    Score: score + 10));
             }
         }
+    }
 
-        return results
-            .OrderByDescending(r => r.Score)
-            .ThenBy(r => r.Title, StringComparer.OrdinalIgnoreCase)
-            .Take(maxResults)
-            .ToList();
+    private static void AddAudioMatches(List<CommandPaletteItem> results, string query, IReadOnlyList<AudioEndpointInfo>? endpoints, bool includeAllWhenEmpty = false)
+    {
+        if (endpoints == null) return;
+        foreach (var ep in endpoints)
+        {
+            int score = string.IsNullOrEmpty(query) && includeAllWhenEmpty
+                ? (ep.IsDefault ? 180 : 120)
+                : ScoreMatch(query, ep.Name, ep.DeviceType, $"audio sound speaker headphones output");
+            if (score > 0)
+            {
+                results.Add(new CommandPaletteItem(
+                    Id: $"audio:{ep.Id}",
+                    Title: ep.IsDefault ? $"{ep.Name} (Active)" : ep.Name,
+                    Subtitle: $"{ep.DeviceType} · {(int)Math.Round(ep.Volume * 100)}% · Enter to switch",
+                    Glyph: ep.Glyph,
+                    Kind: CommandResultKind.AudioEndpoint,
+                    ActionKey: "switch_audio",
+                    Payload: ep.Id,
+                    Score: score + 20));
+            }
+        }
+    }
+
+    private static void AddWindowMatches(List<CommandPaletteItem> results, string query, IReadOnlyList<OpenWindowEntry>? windows, bool includeAllWhenEmpty = false)
+    {
+        if (windows == null) return;
+        int idx = 0;
+        foreach (var win in windows)
+        {
+            idx++;
+            int score = string.IsNullOrEmpty(query) && includeAllWhenEmpty
+                ? Math.Max(10, 180 - idx)
+                : ScoreMatch(query, win.Title, win.ProcessName, $"window focus switch {win.ProcessName}");
+            if (score > 0)
+            {
+                results.Add(new CommandPaletteItem(
+                    Id: $"win:{win.Hwnd}",
+                    Title: win.Title,
+                    Subtitle: string.IsNullOrEmpty(win.ProcessName) ? "Window · Enter to focus" : $"{win.ProcessName} · Enter to focus",
+                    Glyph: "\uE737",
+                    Kind: CommandResultKind.Window,
+                    ActionKey: "focus_window",
+                    Payload: win.Hwnd.ToInt64().ToString(),
+                    Score: score + 18));
+            }
+        }
     }
 
     public static int ScoreMatch(string query, string title, string? subtitle = null, string? keywords = null)

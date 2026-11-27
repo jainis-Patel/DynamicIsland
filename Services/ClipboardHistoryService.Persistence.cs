@@ -122,6 +122,7 @@ internal sealed partial class ClipboardHistoryService
             count = _pasteQueue.Count;
         }
         Changed?.Invoke();
+        PasteQueueChanged?.Invoke();
         return count;
     }
 
@@ -144,6 +145,7 @@ internal sealed partial class ClipboardHistoryService
                 CopyItem(next, plainTextOnly: true);
             }
             Changed?.Invoke();
+            PasteQueueChanged?.Invoke();
         }
         return next;
     }
@@ -156,6 +158,7 @@ internal sealed partial class ClipboardHistoryService
             _pasteQueue.Clear();
         }
         Changed?.Invoke();
+        PasteQueueChanged?.Invoke();
     }
 
     public void Remove(string id)

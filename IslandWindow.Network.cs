@@ -21,11 +21,6 @@ public partial class IslandWindow
 
     private void OnNetworkUpdated(NetworkStatusSnapshot snap)
     {
-        if (NetworkButtonGlyph == null) return;
-
-        NetworkButtonGlyph.Text = snap.Glyph;
-        NetworkButtonGlyph.Foreground = snap.IsConnected ? ThemeBrushes.PrimaryText : ThemeBrushes.Amber;
-
         // Hero Clock Wi-Fi & Bandwidth Badges
         ClockWifiGlyph.Text = snap.Glyph;
         ClockWifiGlyph.Foreground = snap.IsConnected ? ThemeBrushes.Green : ThemeBrushes.Amber;
@@ -178,10 +173,13 @@ public partial class IslandWindow
         }
     }
 
-    internal async void BtToggleCard_Click(object sender, MouseButtonEventArgs e)
+    private readonly SingleFlightGate _btToggleGate = new();
+    private readonly SingleFlightGate _wifiConnectGate = new();
+
+    internal void BtToggleCard_Click(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
-        try
+        _ = _btToggleGate.TryRunAsync(async () =>
         {
             TriggerLiquidImpulse(180, -70, 22);
             bool toggled = await _networkService.ToggleBluetoothRadioAsync();
@@ -199,11 +197,7 @@ public partial class IslandWindow
                     Priority: ToastPriority.Feedback,
                     Category: "bluetooth"));
             }
-        }
-        catch (Exception ex)
-        {
-            App.Log($"[Network] BtToggleCard failed: {ex.Message}");
-        }
+        }, "Network.BtToggleCard");
     }
 
     internal void WifiNetworksCard_Click(object sender, MouseButtonEventArgs e)
@@ -280,12 +274,12 @@ public partial class IslandWindow
         }
     }
 
-    internal async void WifiNetworkCard_Click(object sender, MouseButtonEventArgs e)
+    internal void WifiNetworkCard_Click(object sender, MouseButtonEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: WifiNetworkInfo net }) return;
         e.Handled = true;
 
-        try
+        _ = _wifiConnectGate.TryRunAsync(async () =>
         {
             var (ok, msg) = await _networkService.ConnectWifiNetworkAsync(net);
             if (_isClosing) return;
@@ -298,11 +292,7 @@ public partial class IslandWindow
                 TargetView: "network",
                 Priority: ToastPriority.Feedback,
                 Category: "wifi"));
-        }
-        catch (Exception ex)
-        {
-            App.Log($"[Network] WifiNetworkCard connect failed: {ex.Message}");
-        }
+        }, "Network.WifiConnect");
     }
 
     internal void HotspotCard_Click(object sender, MouseButtonEventArgs e)

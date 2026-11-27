@@ -84,4 +84,10 @@ public partial class DisplayPowerSettingsPanel : UserControl
 
     private void AutoProfileSwitchToggleBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.AutoProfileSwitchToggleBtn_Click(sender, e);
+
+    private void LinkPomodoroFocusToggleBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.LinkPomodoroFocusToggleBtn_Click(sender, e);
+
+    private void SaveCustomProfileBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.SaveCustomProfileBtn_Click(sender, e);
 }

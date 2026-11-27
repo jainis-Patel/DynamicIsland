@@ -17,6 +17,7 @@ namespace DynamicIsland.Views;
 
 public partial class MiniPlayerWindow : Window
 {
+    private enum PlayerViewMode { Full, Compact, Showcase }
     private enum DrawerState { None, Songs, Lyrics }
     private enum SongsTab { AlbumTracks, ActivePlayers, History }
 
@@ -38,20 +39,26 @@ public partial class MiniPlayerWindow : Window
     private readonly MediaSongListService _songListService;
     private readonly AudioSpectrum? _spectrum;
     private readonly SettingsService? _settingsService;
+    private readonly AudioEndpointService? _audioEndpointService;
     private readonly float[] _spectrumBands = new float[AudioSpectrum.BandCount];
     private bool _discRendering;
     private TimeSpan _lastDiscFrame = TimeSpan.Zero;
 
     private readonly DispatcherTimer _posTimer;
     private readonly DispatcherTimer _eqTimer;
+    private DispatcherTimer? _copyFeedbackTimer;
     private readonly Random _rng = new();
 
     private bool _isUserSeeking;
     private bool _isUserVolumeSeeking;
     private bool _isUpdatingVolumeUi;
     private int _activePlayersRenderVersion;
-    private bool _isCompactMode;
+    private PlayerViewMode _viewMode = PlayerViewMode.Full;
     private bool _isPinned = true;
+    private bool _wasShown;
+    private bool _isFullscreenSuppressed;
+    private bool _isClosed;
+    private bool _closingForAppShutdown;
     private DrawerState _activeDrawer = DrawerState.None;
     private SongsTab _activeSongsTab = SongsTab.AlbumTracks;
 
@@ -65,6 +72,10 @@ public partial class MiniPlayerWindow : Window
     private const double FullHeightWithDrawer = 484;
     private const double CompactWidth = 286;
     private const double CompactHeight = 64;
+    private const double ShowcaseWidth = 300;
+    private const double ShowcaseHeight = 348;
+
+    public bool IsFullscreenSuppressed => _isFullscreenSuppressed;
 
     internal MiniPlayerWindow(
         MediaSessionService mediaService,
@@ -72,7 +83,8 @@ public partial class MiniPlayerWindow : Window
         VolumeService volumeService,
         MediaSongListService songListService,
         AudioSpectrum? spectrum = null,
-        SettingsService? settingsService = null)
+        SettingsService? settingsService = null,
+        AudioEndpointService? audioEndpointService = null)
     {
         _mediaService = mediaService;
         _lyricsService = lyricsService;
@@ -80,6 +92,7 @@ public partial class MiniPlayerWindow : Window
         _songListService = songListService;
         _spectrum = spectrum;
         _settingsService = settingsService;
+        _audioEndpointService = audioEndpointService;
 
         InitializeComponent();
 
@@ -116,6 +129,7 @@ public partial class MiniPlayerWindow : Window
 
         SourceInitialized += (_, _) =>
         {
+            _wasShown = true;
             var hwnd = FloatingWindowHelper.ApplyToolWindowStyles(this, noActivate: false);
             if (hwnd != IntPtr.Zero)
             {
@@ -147,6 +161,12 @@ public partial class MiniPlayerWindow : Window
         {
             _settingsService.Changed += OnSettingsChanged;
         }
+        if (_audioEndpointService != null)
+        {
+            _audioEndpointService.EndpointsChanged += OnAudioEndpointsChanged;
+            _audioEndpointService.DefaultChanged += OnDefaultAudioEndpointChanged;
+        }
+        PreviewKeyDown += MiniPlayerWindow_PreviewKeyDown;
 
         // Scrubber thumb drag handling
         MiniTimelineSlider.AddHandler(Thumb.DragStartedEvent, new DragStartedEventHandler((_, _) => _isUserSeeking = true));
@@ -179,35 +199,24 @@ public partial class MiniPlayerWindow : Window
 
         Loaded += (_, _) =>
         {
+            _wasShown = true;
             ApplyAlbumArtStyle(_settingsService?.Current.AlbumArtStyle);
             RefreshAll();
+            SyncAudioOutputButton();
+            SyncLyricsAnimationStyleLabel();
             UpdateVolumeDisplay(_volumeService.CurrentVolume, _volumeService.IsMuted);
+            if (_isFullscreenSuppressed)
+            {
+                Topmost = false;
+                Visibility = Visibility.Hidden;
+                return;
+            }
             if (_mediaService.Current?.IsPlaying ?? false)
             {
                 _posTimer.Start();
                 _eqTimer.Start();
             }
             EnsureDiscRendering();
-        };
-
-        Closed += (_, _) =>
-        {
-            StopDiscRendering();
-            PersistPlacementState();
-            _posTimer.Stop();
-            _eqTimer.Stop();
-            _fetchCts?.Cancel();
-            _mediaService.Changed -= OnMediaChanged;
-            _mediaService.TrackChanged -= OnTrackChanged;
-            _lyricsService.LineChanged -= OnLyricLineChanged;
-            _lyricsService.LyricsLoaded -= OnLyricsLoaded;
-            _volumeService.VolumeChanged -= OnVolumeChanged;
-            _songListService.HistoryChanged -= OnHistoryChanged;
-            ThemeManager.ThemeChanged -= OnThemeChanged;
-            if (_settingsService != null)
-            {
-                _settingsService.Changed -= OnSettingsChanged;
-            }
         };
     }
 
@@ -309,16 +318,62 @@ public partial class MiniPlayerWindow : Window
 
     private void PersistPlacementState()
     {
-        if (IslandWindow.Instance?.Settings is { } settingsService &&
+        var settingsService = _settingsService ?? IslandWindow.Instance?.Settings;
+        if (settingsService != null &&
             !double.IsNaN(Left) && !double.IsInfinity(Left) &&
             !double.IsNaN(Top) && !double.IsInfinity(Top))
         {
+            string modeStr = _viewMode.ToString();
+            bool isCompact = _viewMode == PlayerViewMode.Compact;
+            bool openState = !_isClosed || _closingForAppShutdown;
             settingsService.Update(s =>
             {
                 s.MiniPlayerX = Left;
                 s.MiniPlayerY = Top;
-                s.MiniPlayerCompact = _isCompactMode;
+                s.MiniPlayerCompact = isCompact;
+                s.MiniPlayerViewMode = modeStr;
+                s.MiniPlayerOpen = openState;
             });
+        }
+    }
+
+    public void CloseForAppShutdown()
+    {
+        _closingForAppShutdown = true;
+        Close();
+    }
+
+    public void SetFullscreenSuppressed(bool suppressed)
+    {
+        if (_isClosed) return;
+        _isFullscreenSuppressed = suppressed;
+
+        if (suppressed)
+        {
+            _posTimer.Stop();
+            _eqTimer.Stop();
+            StopDiscRendering();
+            CloseAudioOutputFlyout();
+            Topmost = false;
+            if (_wasShown)
+            {
+                Visibility = Visibility.Hidden;
+            }
+        }
+        else
+        {
+            Topmost = _isPinned;
+            if (_wasShown)
+            {
+                Visibility = Visibility.Visible;
+            }
+            RefreshAll();
+            if (_mediaService.Current?.IsPlaying ?? false)
+            {
+                if (!_posTimer.IsEnabled) _posTimer.Start();
+                if (!_eqTimer.IsEnabled) _eqTimer.Start();
+            }
+            EnsureDiscRendering();
         }
     }
 
@@ -333,20 +388,27 @@ public partial class MiniPlayerWindow : Window
             MiniArtistText.Text = "System Audio";
             CompactTitleText.Text = "Not Playing";
             CompactArtistText.Text = "System Audio";
+            ShowcaseTitleText.Text = "Not Playing";
+            ShowcaseArtistText.Text = "System Audio";
+            ShowcaseLyricText.Visibility = Visibility.Collapsed;
 
             MiniArtDisc?.SetArtwork(null);
             CompactArtDisc?.SetArtwork(null);
+            ShowcaseArtDisc?.SetArtwork(null);
 
             MiniPlayPauseGlyph.Text = "\uE768";
             CompactPlayPauseGlyph.Text = "\uE768";
+            ShowcasePlayPauseGlyph.Text = "\uE768";
 
             SourceAppText.Text = "Media";
             SourceAppLogoBox.Visibility = Visibility.Collapsed;
             SourceAppIcon.Visibility = Visibility.Visible;
             SourceCycleIcon.Visibility = Visibility.Collapsed;
+            ShowcaseSourceText.Text = "Media";
             TrackIndexBadge.Visibility = Visibility.Collapsed;
             MiniAmbientStop.Color = ThemeBrushes.AmberColor;
             if (CompactBrandPip != null) CompactBrandPip.Visibility = Visibility.Collapsed;
+            if (ShowcaseProgressFill != null) ShowcaseProgressFill.Width = 0;
 
             ResetEqualizerBars();
             return;
@@ -359,13 +421,17 @@ public partial class MiniPlayerWindow : Window
         MiniArtistText.Text = artist;
         CompactTitleText.Text = title;
         CompactArtistText.Text = artist;
+        ShowcaseTitleText.Text = title;
+        ShowcaseArtistText.Text = artist;
 
         MiniPlayPauseGlyph.Text = s.IsPlaying ? "\uE769" : "\uE768";
         CompactPlayPauseGlyph.Text = s.IsPlaying ? "\uE769" : "\uE768";
+        ShowcasePlayPauseGlyph.Text = s.IsPlaying ? "\uE769" : "\uE768";
 
         // Artwork & Ambient Reactive Halo
         MiniArtDisc?.SetArtwork(s.Artwork);
         CompactArtDisc?.SetArtwork(s.Artwork);
+        ShowcaseArtDisc?.SetArtwork(s.Artwork);
 
         var accentColor = s.Accent ?? ThemeBrushes.AmberColor;
         MiniAmbientStop.Color = accentColor;
@@ -379,6 +445,12 @@ public partial class MiniPlayerWindow : Window
         SourceAppIcon.Visibility = Visibility.Collapsed;
         SourceAppBadge.ToolTip = $"Playing on {brand.DisplayName} · Click to cycle active media players";
         SourceCycleIcon.Visibility = s.ActiveSessionCount > 1 ? Visibility.Visible : Visibility.Collapsed;
+
+        ShowcaseSourceText.Text = brand.DisplayName;
+        ShowcaseBrandPath.Data = brand.IconGeometry;
+        ShowcaseBrandPath.Fill = brand.BrandBrush;
+
+        UpdateShowcaseLyricLine();
 
         // Compact pill brand indicator
         if (CompactBrandPath != null && CompactBrandPip != null)
@@ -484,14 +556,23 @@ public partial class MiniPlayerWindow : Window
             {
                 MiniTimelineSlider.Value = pct;
             }
+            if (ShowcaseProgressTrack != null && ShowcaseProgressFill != null && ShowcaseProgressTrack.ActualWidth > 0)
+            {
+                ShowcaseProgressFill.Width = ShowcaseProgressTrack.ActualWidth * (pct / 100.0);
+            }
         }
         else
         {
             if (MiniTimelineSlider.Value != 0) MiniTimelineSlider.Value = 0;
+            if (ShowcaseProgressFill != null) ShowcaseProgressFill.Width = 0;
         }
 
         // Keep lyrics continuous and synced even if Dynamic Island is collapsed
         _lyricsService.UpdatePosition(pos);
+        if (_activeDrawer == DrawerState.Lyrics)
+        {
+            UpdateLyricsLineProgress(pos);
+        }
     }
 
     private void CommitSeek()
@@ -587,26 +668,26 @@ public partial class MiniPlayerWindow : Window
         if (_spectrum != null)
         {
             _spectrum.ReadBands(_spectrumBands);
-            EqBar0.Height = Math.Clamp(3 + (int)(_spectrumBands[0] * 12f), 3, 14);
-            EqBar1.Height = Math.Clamp(3 + (int)(_spectrumBands[1] * 14f), 3, 16);
-            EqBar2.Height = Math.Clamp(3 + (int)(_spectrumBands[2] * 13f), 3, 15);
-            EqBar3.Height = Math.Clamp(3 + (int)(_spectrumBands[3] * 11f), 3, 13);
+            EqScale0.ScaleY = Math.Clamp(0.22 + _spectrumBands[0] * 0.78, 0.22, 1.0);
+            EqScale1.ScaleY = Math.Clamp(0.22 + _spectrumBands[1] * 0.88, 0.22, 1.0);
+            EqScale2.ScaleY = Math.Clamp(0.22 + _spectrumBands[2] * 0.84, 0.22, 1.0);
+            EqScale3.ScaleY = Math.Clamp(0.22 + _spectrumBands[3] * 0.74, 0.22, 1.0);
         }
         else
         {
-            EqBar0.Height = 3 + _rng.Next(0, 6);
-            EqBar1.Height = 4 + _rng.Next(0, 8);
-            EqBar2.Height = 4 + _rng.Next(0, 7);
-            EqBar3.Height = 3 + _rng.Next(0, 6);
+            EqScale0.ScaleY = 0.25 + _rng.NextDouble() * 0.55;
+            EqScale1.ScaleY = 0.32 + _rng.NextDouble() * 0.68;
+            EqScale2.ScaleY = 0.30 + _rng.NextDouble() * 0.62;
+            EqScale3.ScaleY = 0.24 + _rng.NextDouble() * 0.52;
         }
     }
 
     private void ResetEqualizerBars()
     {
-        EqBar0.Height = 3;
-        EqBar1.Height = 3;
-        EqBar2.Height = 3;
-        EqBar3.Height = 3;
+        EqScale0.ScaleY = 0.22;
+        EqScale1.ScaleY = 0.22;
+        EqScale2.ScaleY = 0.22;
+        EqScale3.ScaleY = 0.22;
     }
 
     private void OnSettingsChanged()
@@ -615,6 +696,11 @@ public partial class MiniPlayerWindow : Window
         Dispatcher.InvokeAsync(() =>
         {
             ApplyAlbumArtStyle(style);
+            SyncLyricsAnimationStyleLabel();
+            if (_activeDrawer == DrawerState.Lyrics)
+            {
+                ApplyLyricsActiveLine(_lyricsService.CurrentIndex, animate: false);
+            }
             EnsureDiscRendering();
         });
     }
@@ -624,17 +710,26 @@ public partial class MiniPlayerWindow : Window
         string normalized = SettingsService.NormalizeAlbumArtStyle(style);
         MiniArtDisc?.SetStyle(normalized);
         CompactArtDisc?.SetStyle(normalized);
+        ShowcaseArtDisc?.SetStyle(normalized);
         EnsureDiscRendering();
     }
 
+    private PlayerDiscControl? GetActiveDiscControl() => _viewMode switch
+    {
+        PlayerViewMode.Compact => CompactArtDisc,
+        PlayerViewMode.Showcase => ShowcaseArtDisc,
+        _ => MiniArtDisc
+    };
+
     private void EnsureDiscRendering()
     {
-        if (_discRendering) return;
+        if (_discRendering || _isFullscreenSuppressed || _isClosed) return;
         string style = SettingsService.NormalizeAlbumArtStyle(_settingsService?.Current.AlbumArtStyle);
         if (style == "StaticSquircle") return;
 
         bool isPlaying = _mediaService.Current?.IsPlaying ?? false;
-        bool settled = (MiniArtDisc?.IsSettled ?? true) && (CompactArtDisc?.IsSettled ?? true);
+        var activeDisc = GetActiveDiscControl();
+        bool settled = activeDisc?.IsSettled ?? true;
         if (!isPlaying && settled) return;
 
         _discRendering = true;
@@ -651,6 +746,12 @@ public partial class MiniPlayerWindow : Window
 
     private void OnDiscRendering(object? sender, EventArgs e)
     {
+        if (_isFullscreenSuppressed || _isClosed)
+        {
+            StopDiscRendering();
+            return;
+        }
+
         var now = ((RenderingEventArgs)e).RenderingTime;
         if (now == _lastDiscFrame) return;
         double dt = _lastDiscFrame == TimeSpan.Zero ? 1.0 / 60.0 : (now - _lastDiscFrame).TotalSeconds;
@@ -668,9 +769,9 @@ public partial class MiniPlayerWindow : Window
             bass = _spectrumBands[0];
         }
 
-        bool miniSettled = MiniArtDisc?.StepPhysics(dt, isPlaying, bass, reduced) ?? true;
-        bool compactSettled = CompactArtDisc?.StepPhysics(dt, isPlaying, bass, reduced) ?? true;
-        if (miniSettled && compactSettled)
+        var activeDisc = GetActiveDiscControl();
+        bool activeSettled = activeDisc?.StepPhysics(dt, isPlaying, bass, reduced) ?? true;
+        if (activeSettled)
         {
             StopDiscRendering();
         }
@@ -682,7 +783,7 @@ public partial class MiniPlayerWindow : Window
         Dispatcher.InvokeAsync(() =>
         {
             RefreshAll();
-            if (_mediaService.Current?.IsPlaying ?? false)
+            if (!_isFullscreenSuppressed && (_mediaService.Current?.IsPlaying ?? false))
             {
                 if (!_posTimer.IsEnabled) _posTimer.Start();
                 if (!_eqTimer.IsEnabled) _eqTimer.Start();
@@ -710,10 +811,18 @@ public partial class MiniPlayerWindow : Window
         });
 
     private void OnLyricLineChanged(string prev, string current, string next, int idx) =>
-        Dispatcher.InvokeAsync(UpdateLyricsDisplay);
+        Dispatcher.InvokeAsync(() =>
+        {
+            UpdateShowcaseLyricLine();
+            UpdateLyricsDisplay();
+        });
 
     private void OnLyricsLoaded() =>
-        Dispatcher.InvokeAsync(UpdateLyricsDisplay);
+        Dispatcher.InvokeAsync(() =>
+        {
+            UpdateShowcaseLyricLine();
+            UpdateLyricsDisplay();
+        });
 
     private void OnHistoryChanged() =>
         Dispatcher.InvokeAsync(() =>
@@ -769,29 +878,82 @@ public partial class MiniPlayerWindow : Window
             : (Brush)FindResource("PrimaryTextBrush");
     }
 
-    private void CompactMode_Click(object sender, RoutedEventArgs e) => SetCompactMode(true);
-    private void ExpandFromCompact_Click(object sender, RoutedEventArgs e) => SetCompactMode(false);
+    private void CompactMode_Click(object sender, RoutedEventArgs e) => SetViewMode(PlayerViewMode.Compact);
+    private void ExpandFromCompact_Click(object sender, RoutedEventArgs e) => SetViewMode(PlayerViewMode.Full);
+    private void ShowcaseMode_Click(object sender, RoutedEventArgs e) => SetViewMode(PlayerViewMode.Showcase);
+    private void ExitShowcase_Click(object sender, RoutedEventArgs e) => SetViewMode(PlayerViewMode.Full);
 
-    internal void SetCompactModeExternal(bool compact) => SetCompactMode(compact);
-
-    private void SetCompactMode(bool compact)
+    private void ShowcaseArtStyle_Click(object sender, RoutedEventArgs e)
     {
-        _isCompactMode = compact;
+        if (_settingsService == null) return;
+        string current = SettingsService.NormalizeAlbumArtStyle(_settingsService.Current.AlbumArtStyle);
+        var styles = SettingsService.AvailableAlbumArtStyles;
+        int idx = 0;
+        for (int i = 0; i < styles.Count; i++)
+        {
+            if (string.Equals(styles[i], current, StringComparison.OrdinalIgnoreCase))
+            {
+                idx = i;
+                break;
+            }
+        }
+        string next = styles[(idx + 1) % styles.Count];
+        _settingsService.Update(s => s.AlbumArtStyle = next, nameof(AppSettings.AlbumArtStyle));
+    }
 
-        if (compact)
+    internal void SetCompactModeExternal(bool compact) =>
+        SetViewMode(compact ? PlayerViewMode.Compact : PlayerViewMode.Full, persist: false);
+
+    internal void SetViewModeExternal(string? mode)
+    {
+        string normalized = SettingsService.NormalizeMiniPlayerViewMode(mode);
+        var target = normalized switch
+        {
+            "Compact" => PlayerViewMode.Compact,
+            "Showcase" => PlayerViewMode.Showcase,
+            _ => PlayerViewMode.Full
+        };
+        SetViewMode(target, persist: false);
+    }
+
+    private void SetViewMode(PlayerViewMode mode, bool persist = true)
+    {
+        _viewMode = mode;
+
+        if (mode != PlayerViewMode.Full)
         {
             CloseDrawers();
-            FullPlayerView.Visibility = Visibility.Collapsed;
-            CompactPillView.Visibility = Visibility.Visible;
-            FadeInElement(CompactPillView);
-            AnimateWindowSize(CompactWidth, CompactHeight);
+            CloseAudioOutputFlyout();
         }
-        else
+
+        FullPlayerView.Visibility = mode == PlayerViewMode.Full ? Visibility.Visible : Visibility.Collapsed;
+        CompactPillView.Visibility = mode == PlayerViewMode.Compact ? Visibility.Visible : Visibility.Collapsed;
+        ShowcaseView.Visibility = mode == PlayerViewMode.Showcase ? Visibility.Visible : Visibility.Collapsed;
+
+        MiniAmbientHalo.Opacity = mode == PlayerViewMode.Showcase ? 0.34 : 0.22;
+        MiniAmbientHalo.Height = mode == PlayerViewMode.Showcase ? 210 : 140;
+
+        switch (mode)
         {
-            CompactPillView.Visibility = Visibility.Collapsed;
-            FullPlayerView.Visibility = Visibility.Visible;
-            FadeInElement(FullPlayerView);
-            AnimateWindowSize(FullWidth, FullHeightBase);
+            case PlayerViewMode.Compact:
+                FadeInElement(CompactPillView);
+                AnimateWindowSize(CompactWidth, CompactHeight);
+                break;
+            case PlayerViewMode.Showcase:
+                UpdateShowcaseLyricLine();
+                FadeInElement(ShowcaseView);
+                AnimateWindowSize(ShowcaseWidth, ShowcaseHeight);
+                break;
+            default:
+                FadeInElement(FullPlayerView);
+                AnimateWindowSize(FullWidth, CalculateDrawerTargetHeight());
+                break;
+        }
+
+        EnsureDiscRendering();
+        if (persist)
+        {
+            PersistPlacementState();
         }
     }
 
@@ -909,19 +1071,27 @@ public partial class MiniPlayerWindow : Window
         if (s == null || string.IsNullOrWhiteSpace(s.Title)) return;
 
         string text = string.IsNullOrWhiteSpace(s.Artist) ? s.Title : $"{s.Artist} - {s.Title}";
-        try
+        if (SafeClipboard.TrySetText(text))
         {
-            Clipboard.SetDataObject(text);
             CopyTrackGlyph.Text = "\uE73E"; // Checkmark feedback
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
-            timer.Tick += (_, _) =>
-            {
-                CopyTrackGlyph.Text = "\uE8C8";
-                timer.Stop();
-            };
-            timer.Start();
+            _copyFeedbackTimer ??= CreateCopyFeedbackTimer();
+            _copyFeedbackTimer.Stop();
+            _copyFeedbackTimer.Start();
         }
-        catch { }
+    }
+
+    private DispatcherTimer CreateCopyFeedbackTimer()
+    {
+        var timer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
+        {
+            Interval = TimeSpan.FromSeconds(1.5)
+        };
+        timer.Tick += (_, _) =>
+        {
+            CopyTrackGlyph.Text = "\uE8C8";
+            timer.Stop();
+        };
+        return timer;
     }
 
     private void SearchTrack_Click(object sender, RoutedEventArgs e)

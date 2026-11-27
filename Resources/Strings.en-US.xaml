@@ -4,19 +4,63 @@
     <!-- Onboarding -->
     <sys:String x:Key="Onboarding_WelcomeTitle">Welcome to Dynamic Island</sys:String>
     <sys:String x:Key="Onboarding_WelcomeSubtitle">Press Ctrl+Alt+G for Command Palette · Click to customize</sys:String>
+    <sys:String x:Key="Onboarding_QuickTour">Hover/click pill to expand · Ctrl+Alt+G Command Palette · Drag files to Shelf</sys:String>
 
     <!-- Command Palette -->
-    <sys:String x:Key="CommandPalette_Placeholder">Search, calc, commands...</sys:String>
+    <sys:String x:Key="CommandPalette_Placeholder">Search, calc, clip:, audio:, win:...</sys:String>
     <sys:String x:Key="CommandPalette_Empty">No matching commands or apps found</sys:String>
+    <sys:String x:Key="CommandPalette_CopyHint">Enter to copy</sys:String>
+    <sys:String x:Key="CommandPalette_SwitchAudio">Audio Output Switched</sys:String>
+    <sys:String x:Key="CommandPalette_FocusWindow">Focused Window</sys:String>
 
     <!-- Context Profiles -->
     <sys:String x:Key="Profile_Default">Default</sys:String>
     <sys:String x:Key="Profile_Focus">Deep Focus</sys:String>
     <sys:String x:Key="Profile_Gaming">Gaming / Minimal</sys:String>
     <sys:String x:Key="Profile_Presenting">Presenting</sys:String>
+    <sys:String x:Key="Profile_SavedTitle">Profile Saved</sys:String>
+    <sys:String x:Key="Profile_SavedBody">Custom baseline snapshot updated</sys:String>
 
     <!-- Core HUD & Tray -->
     <sys:String x:Key="Hud_DoNotDisturb">Do Not Disturb</sys:String>
     <sys:String x:Key="Hud_DropToShelf">Drop to Shelf</sys:String>
+    <sys:String x:Key="Hud_DropSubtitle">Hold files &amp; paste anywhere</sys:String>
+    <sys:String x:Key="Hud_MicMuted">Microphone Muted</sys:String>
+    <sys:String x:Key="Hud_MicUnmuted">Microphone Unmuted</sys:String>
+    <sys:String x:Key="Hud_HighLoadCpu">High CPU Usage</sys:String>
+    <sys:String x:Key="Hud_HighLoadRam">High RAM Usage</sys:String>
+
+    <!-- Dock & Navigation -->
+    <sys:String x:Key="Dock_Home">Home · Now Playing &amp; Vitals (Ctrl+1)</sys:String>
+    <sys:String x:Key="Dock_Calendar">Calendar &amp; Tasks (Ctrl+2)</sys:String>
+    <sys:String x:Key="Dock_Shelf">Drop Shelf &amp; Files (Ctrl+3)</sys:String>
+    <sys:String x:Key="Dock_Notifications">Notification Center (Ctrl+4)</sys:String>
+    <sys:String x:Key="Dock_Widgets">Widgets Gallery · Bento Dashboard (Ctrl+5)</sys:String>
+    <sys:String x:Key="Dock_Launcher">Apps Launchpad · Command Palette (Ctrl+6)</sys:String>
+    <sys:String x:Key="Dock_Audio">Music &amp; Audio Endpoints (Ctrl+7)</sys:String>
+    <sys:String x:Key="Dock_Pin">Pin Expanded (Stay Open on Mouse Leave)</sys:String>
+    <sys:String x:Key="Dock_Settings">Appearance &amp; Settings (Ctrl+Alt+S)</sys:String>
+    <sys:String x:Key="Dock_Collapse">Collapse (Esc)</sys:String>
+
+    <!-- Diagnostics, Hooks & Updates -->
     <sys:String x:Key="Hooks_ExportedTitle">AI Agent Hooks Exported</sys:String>
+    <sys:String x:Key="Diagnostics_ExportedTitle">Diagnostics Exported</sys:String>
+    <sys:String x:Key="Diagnostics_FailedTitle">Diagnostics Failed</sys:String>
+    <sys:String x:Key="Updates_Checking">Checking for updates...</sys:String>
+    <sys:String x:Key="Updates_UpToDate">You're up to date</sys:String>
+    <sys:String x:Key="Updates_Available">Update Available</sys:String>
+    <sys:String x:Key="Updates_ChannelStable">Stable</sys:String>
+    <sys:String x:Key="Updates_ChannelBeta">Beta</sys:String>
+
+    <!-- Settings Categories -->
+    <sys:String x:Key="Settings_Appearance">Appearance</sys:String>
+    <sys:String x:Key="Settings_Themes">Living Themes</sys:String>
+    <sys:String x:Key="Settings_Clock">Clock &amp; Audio</sys:String>
+    <sys:String x:Key="Settings_Droplets">Droplets</sys:String>
+    <sys:String x:Key="Settings_Dock">Dock Pins</sys:String>
+    <sys:String x:Key="Settings_Display">Display &amp; Power</sys:String>
+    <sys:String x:Key="Settings_Notifications">Notifications</sys:String>
+    <sys:String x:Key="Settings_Pet">Virtual Pet</sys:String>
+    <sys:String x:Key="Settings_Shortcuts">Shortcuts</sys:String>
+    <sys:String x:Key="Settings_Updates">System &amp; Updates</sys:String>
 </ResourceDictionary>

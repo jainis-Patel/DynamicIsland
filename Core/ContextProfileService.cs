@@ -187,6 +187,61 @@ internal sealed class ContextProfileService : IDisposable
         return target;
     }
 
+    public IslandProfile SaveCurrentAsCustomProfile(
+        string name,
+        IEnumerable<string>? triggerProcesses = null,
+        bool? triggerOnBattery = null)
+    {
+        string cleanName = string.IsNullOrWhiteSpace(name) ? "Custom" : name.Trim();
+        string id = string.Concat(cleanName.ToLowerInvariant().Where(c => char.IsLetterOrDigit(c) || c == '_'));
+        if (string.IsNullOrEmpty(id)) id = "custom";
+
+        var cur = _settingsService.Current;
+        var profile = new IslandProfile
+        {
+            Id = id,
+            Name = cleanName,
+            Glyph = "\uE734",
+            Description = "User-saved custom profile",
+            ThemeStyle = cur.ThemeStyle,
+            IslandTheme = cur.IslandTheme,
+            DoNotDisturb = cur.DoNotDisturb,
+            AutoHideIsland = cur.AutoHideIsland,
+            EnableVirtualPet = cur.EnableVirtualPet,
+            LowMemoryMode = cur.LowMemoryMode,
+            EnableAmbientGlow = cur.EnableAmbientGlow,
+            TriggerProcessNames = triggerProcesses?.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? new List<string>(),
+            TriggerOnBattery = triggerOnBattery
+        };
+
+        _settingsService.Update(s =>
+        {
+            s.CustomProfiles ??= new List<IslandProfile>();
+            s.CustomProfiles.RemoveAll(p => string.Equals(p.Id, profile.Id, StringComparison.OrdinalIgnoreCase));
+            s.CustomProfiles.Add(profile);
+            s.ActiveProfileId = profile.Id;
+        }, nameof(AppSettings.CustomProfiles));
+
+        ProfileChanged?.Invoke(profile);
+        return profile;
+    }
+
+    public bool RemoveCustomProfile(string profileId)
+    {
+        if (string.IsNullOrWhiteSpace(profileId)) return false;
+        bool removed = false;
+        _settingsService.Update(s =>
+        {
+            if (s.CustomProfiles == null) return;
+            removed = s.CustomProfiles.RemoveAll(p => string.Equals(p.Id, profileId, StringComparison.OrdinalIgnoreCase)) > 0;
+            if (removed && string.Equals(s.ActiveProfileId, profileId, StringComparison.OrdinalIgnoreCase))
+            {
+                s.ActiveProfileId = "default";
+            }
+        }, nameof(AppSettings.CustomProfiles));
+        return removed;
+    }
+
     public string? MatchProfileForContext(IReadOnlyCollection<string> runningProcessNames, bool isOnBattery)
     {
         foreach (var profile in GetAllProfiles())

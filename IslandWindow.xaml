@@ -833,10 +833,6 @@
                     <Border Margin="16,14,16,14" CornerRadius="18" Background="Transparent" core:RoundedClip.ClipChild="True">
                         <Grid x:Name="ExpandedViewsHost">
                             <widgets:MediaView x:Name="MediaContainer" />
-                            <widgets:ShelfView x:Name="ShelfContainer" Visibility="Collapsed" />
-                            <widgets:ClipboardView x:Name="ClipboardContainer" Visibility="Collapsed" />
-                            <widgets:SettingsView x:Name="SettingsContainer" Visibility="Collapsed" />
-                            <widgets:NotificationsView x:Name="NotificationsContainer" Visibility="Collapsed" />
                         </Grid>
                     </Border>
                 </Grid>
@@ -940,7 +936,7 @@
 
                 <!-- 7. Media & Sound Endpoints -->
                 <Button x:Name="AudioButton" AutomationProperties.Name="Audio and Music" Style="{StaticResource DockIconButton}" ToolTip="Music &amp; Audio Endpoints (Ctrl+7)">
-                    <TextBlock Style="{StaticResource Glyph}" FontSize="12.5" Text="&#xE8D6;" />
+                    <TextBlock x:Name="AudioButtonGlyph" Style="{StaticResource Glyph}" FontSize="12.5" Text="&#xE8D6;" />
                 </Button>
 
                 <!-- Subtle Vertical Apple Divider -->
@@ -967,63 +963,6 @@
             </StackPanel>
             </Grid>
         </Border>
-
-        <!-- Collapsed Helper Elements to preserve named references for background services -->
-        <Grid Visibility="Collapsed" IsHitTestVisible="False">
-            <ScrollViewer x:Name="DockScrollViewer" />
-            <Button x:Name="ClipboardButton">
-                <TextBlock x:Name="ClipboardBadgeText" />
-            </Button>
-            <Button x:Name="ShelfBadgeHost">
-                <TextBlock x:Name="ShelfBadgeText" />
-            </Button>
-            <Button x:Name="CalcButton" />
-            <Button x:Name="NotesButton" />
-            <Button x:Name="ConverterButton">
-                <TextBlock x:Name="ConverterButtonGlyph" />
-            </Button>
-            <Button x:Name="TermiButton">
-                <TextBlock x:Name="TermiButtonGlyph" />
-            </Button>
-            <Button x:Name="PhoneBridgeButton">
-                <TextBlock x:Name="PhoneBridgeButtonGlyph" />
-            </Button>
-            <Button x:Name="MechSoundsButton">
-                <TextBlock x:Name="MechSoundsButtonGlyph" />
-            </Button>
-            <Button x:Name="CaptureStudioButton">
-                <TextBlock x:Name="CaptureStudioButtonGlyph" />
-            </Button>
-            <Button x:Name="BatteryButton">
-                <StackPanel>
-                    <TextBlock x:Name="BatteryButtonGlyph" />
-                    <TextBlock x:Name="BatteryBadgeText" />
-                </StackPanel>
-            </Button>
-            <Button x:Name="SystemHudButton">
-                <StackPanel>
-                    <TextBlock x:Name="SystemHudButtonGlyph" />
-                    <TextBlock x:Name="SystemHudBadgeText" />
-                </StackPanel>
-            </Button>
-            <Button x:Name="RecordButton">
-                <StackPanel>
-                    <TextBlock x:Name="RecordButtonGlyph" />
-                    <TextBlock x:Name="RecordBadgeText" />
-                </StackPanel>
-            </Button>
-            <Button x:Name="PeripheralsButton">
-                <TextBlock x:Name="PeripheralsButtonGlyph" />
-            </Button>
-            <Button x:Name="NetworkButton">
-                <TextBlock x:Name="NetworkButtonGlyph" />
-            </Button>
-            <Button x:Name="MicMuteButton">
-                <TextBlock x:Name="MicMuteGlyph" />
-            </Button>
-            <TextBlock x:Name="AudioButtonGlyph" />
-            <TextBlock x:Name="LauncherButtonGlyph" />
-        </Grid>
 
         <!-- iOS-Style Split-Droplet Secondary Activity Bubble / High-Load Capsule -->
         <Border x:Name="SecondaryDroplet" Width="32" Height="32" CornerRadius="16"

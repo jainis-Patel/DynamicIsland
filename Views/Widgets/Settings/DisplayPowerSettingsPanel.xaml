@@ -292,6 +292,8 @@
                             <TextBlock Text="Bundle DND, Pet, Auto-Hide &amp; Low RAM presets" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                            <TextBlock Text="Pomodoro" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <CheckBox x:Name="LinkPomodoroFocusToggle" Click="LinkPomodoroFocusToggleBtn_Click" Style="{StaticResource IslandToggleSwitch}" Margin="0,0,8,0" ToolTipService.ToolTip="Auto-activate Deep Focus profile when a Pomodoro timer starts" />
                             <TextBlock Text="Auto" FontSize="7.5" Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,5,0" />
                             <CheckBox x:Name="AutoProfileSwitchToggle" Click="AutoProfileSwitchToggleBtn_Click" Style="{StaticResource IslandToggleSwitch}" ToolTipService.ToolTip="Auto-switch to Presenting when OBS, Zoom, Teams, or PowerPoint runs" />
                         </StackPanel>
@@ -306,8 +308,11 @@
                         <Button x:Name="ProfileGamingBtn" Tag="gaming" Click="ContextProfileBtn_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0,0,4,0">
                             <TextBlock Text="Gaming" FontSize="8" />
                         </Button>
-                        <Button x:Name="ProfilePresentingBtn" Tag="presenting" Click="ContextProfileBtn_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0">
+                        <Button x:Name="ProfilePresentingBtn" Tag="presenting" Click="ContextProfileBtn_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0,0,4,0">
                             <TextBlock Text="Presenting" FontSize="8" />
+                        </Button>
+                        <Button x:Name="SaveCustomProfileBtn" Click="SaveCustomProfileBtn_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0" ToolTipService.ToolTip="Save current settings as your Custom profile">
+                            <TextBlock Text="+ Save Custom" FontSize="8" Foreground="{DynamicResource AccentBrush}" />
                         </Button>
                     </StackPanel>
                 </StackPanel>

@@ -66,8 +66,10 @@ internal sealed class PeripheralDeviceService : IDisposable
 {
     private const string PKEY_BatteryLevel = "{104ea319-6ee2-4701-bd47-8ddbf425bbe5} 2";
 
+    public const string ChoreId = "peripherals_poll";
     private readonly Dispatcher _ui;
     private readonly DispatcherTimer _pollTimer;
+    private Choreographer? _choreographer;
     private readonly HashSet<string> _alertedLowBatteryIds = new(StringComparer.OrdinalIgnoreCase);
     private List<PeripheralDeviceInfo> _devices = new();
     private bool _useSimulatedFallback;
@@ -101,9 +103,18 @@ internal sealed class PeripheralDeviceService : IDisposable
         RefreshAsync().FireAndForget("Peripherals.Start");
     }
 
+    public void AttachChoreographer(Choreographer choreographer)
+    {
+        if (_disposed || choreographer == null) return;
+        _choreographer = choreographer;
+        _pollTimer.Stop();
+        UpdatePollTimerState();
+    }
+
     public void Stop()
     {
         _pollTimer.Stop();
+        _choreographer?.Unregister(ChoreId);
     }
 
     public void SetExpanded(bool expanded)
@@ -129,6 +140,25 @@ internal sealed class PeripheralDeviceService : IDisposable
         if (_disposed || _isSuspended)
         {
             _pollTimer.Stop();
+            _choreographer?.Unregister(ChoreId);
+            return;
+        }
+
+        if (_choreographer != null)
+        {
+            _pollTimer.Stop();
+            if (_isExpanded)
+            {
+                _choreographer.Register(ChoreId, () => RefreshAsync().FireAndForget("Peripherals.Chore"), 10, PowerSensitivity.Suspended);
+            }
+            else if (_hasXInputControllers)
+            {
+                _choreographer.Register(ChoreId, () => RefreshAsync().FireAndForget("Peripherals.Chore"), 60, PowerSensitivity.Suspended);
+            }
+            else
+            {
+                _choreographer.Unregister(ChoreId);
+            }
             return;
         }
 
@@ -460,5 +490,6 @@ internal sealed class PeripheralDeviceService : IDisposable
     {
         _disposed = true;
         _pollTimer.Stop();
+        _choreographer?.Unregister(ChoreId);
     }
 }

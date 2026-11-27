@@ -76,6 +76,11 @@ public sealed class Choreographer : IDisposable
         get { lock (_lock) return _suspended; }
     }
 
+    public IReadOnlyList<string> GetRegisteredChoreIds()
+    {
+        lock (_lock) return _chores.Keys.ToArray();
+    }
+
     public PowerGovernorMode CurrentMode
     {
         get

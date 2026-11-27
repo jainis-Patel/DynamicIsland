@@ -40,7 +40,21 @@ public sealed class CommunityDropletService : IDisposable
     private readonly HashSet<string> _trustedShellCommands = new(StringComparer.OrdinalIgnoreCase);
 
     private FileSystemWatcher? _watcher;
+    private Choreographer? _choreographer;
     private volatile bool _disposed;
+
+    public void AttachChoreographer(Choreographer choreographer)
+    {
+        if (_disposed || choreographer == null) return;
+        _choreographer = choreographer;
+        foreach (var def in _loadedDroplets.Values)
+        {
+            if (_registry.IsEnabled(def.Id) && !string.IsNullOrWhiteSpace(def.Endpoint))
+            {
+                StartDropletPolling(def);
+            }
+        }
+    }
 
     public IReadOnlyCollection<CommunityDropletDefinition> LoadedDroplets => _loadedDroplets.Values.ToList();
 
@@ -263,14 +277,22 @@ public sealed class CommunityDropletService : IDisposable
         StopDropletPolling(def.Id);
         if (_disposed) return;
 
-        var timer = new DispatcherTimer(
-            TimeSpan.FromSeconds(Math.Clamp(def.RefreshIntervalSec, 5, 86400)),
-            DispatcherPriority.Background,
-            (_, _) => _ = PollEndpointGuardedAsync(def),
-            _uiDispatcher);
+        int intervalSec = Math.Clamp(def.RefreshIntervalSec, 5, 86400);
+        if (_choreographer != null)
+        {
+            _choreographer.Register($"community_droplet:{def.Id}", () => Task.Run(() => PollEndpointGuardedAsync(def)).FireAndForget("CommunityDroplet.Chore"), intervalSec, PowerSensitivity.Relaxed);
+        }
+        else
+        {
+            var timer = new DispatcherTimer(
+                TimeSpan.FromSeconds(intervalSec),
+                DispatcherPriority.Background,
+                (_, _) => _ = PollEndpointGuardedAsync(def),
+                _uiDispatcher);
 
-        _pollTimers[def.Id] = timer;
-        timer.Start();
+            _pollTimers[def.Id] = timer;
+            timer.Start();
+        }
 
         // Immediate background poll
         Task.Run(() => PollEndpointGuardedAsync(def)).FireAndForget("CommunityDroplet.Poll");
@@ -296,6 +318,7 @@ public sealed class CommunityDropletService : IDisposable
 
     private void StopDropletPolling(string id)
     {
+        _choreographer?.Unregister($"community_droplet:{id}");
         if (_pollTimers.TryRemove(id, out var timer))
         {
             if (_uiDispatcher.CheckAccess())
@@ -736,6 +759,10 @@ public sealed class CommunityDropletService : IDisposable
         }
         _debounceTokens.Clear();
 
+        foreach (var id in _loadedDroplets.Keys)
+        {
+            _choreographer?.Unregister($"community_droplet:{id}");
+        }
         foreach (var timer in _pollTimers.Values)
         {
             if (_uiDispatcher.CheckAccess())

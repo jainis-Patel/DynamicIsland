@@ -26,6 +26,8 @@ public partial class App : Application
     private static readonly object LogWriteLock = new();
     private static readonly ConcurrentDictionary<string, long> DebugLogLastTicks = new(StringComparer.Ordinal);
     private const long DebugLogCooldownMs = 60_000;
+    private static readonly ConcurrentQueue<string> RecentLogs = new();
+    private const int MaxRecentLogs = 200;
 
     private static readonly Channel<string> LogChannel = Channel.CreateBounded<string>(
         new BoundedChannelOptions(256)
@@ -43,13 +45,18 @@ public partial class App : Application
         _ = Task.Run(ProcessLogQueueAsync);
     }
 
+    public static IReadOnlyList<string> GetRecentLogs() => RecentLogs.ToArray();
+
     /// <summary>
     /// Non-blocking asynchronous logger. Queues log entries in memory and flushes on a background worker
     /// so disk I/O never stalls the 60-240 Hz WPF UI thread.
     /// </summary>
     public static void Log(string msg)
     {
-        LogChannel.Writer.TryWrite($"[{DateTime.Now:HH:mm:ss.fff}] {msg}");
+        string entry = $"[{DateTime.Now:HH:mm:ss.fff}] {msg}";
+        RecentLogs.Enqueue(entry);
+        while (RecentLogs.Count > MaxRecentLogs && RecentLogs.TryDequeue(out _)) { }
+        LogChannel.Writer.TryWrite(entry);
     }
 
     /// <summary>

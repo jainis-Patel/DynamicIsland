@@ -24,22 +24,22 @@ public partial class IslandWindow
         if (_voiceMemoService.IsRecording)
         {
             _voiceMemoService.StopRecording();
-            RecordButtonGlyph.Text = "\uE7C8";
-            RecordBadgeText.Text = "Memo";
-            RecordBadgeText.Foreground = ThemeBrushes.PrimaryText;
-            HeroRecordGlyph.Text = "\uE7C8";
-            HeroRecordStatus.Text = "Saving voice note to Drop Shelf...";
-            RecordHalo.Opacity = 0;
+            if (_voiceMemoContainer != null)
+            {
+                HeroRecordGlyph.Text = "\uE7C8";
+                HeroRecordStatus.Text = "Saving voice note to Drop Shelf...";
+                RecordHalo.Opacity = 0;
+            }
             EvaluateActivity();
         }
         else if (_voiceMemoService.StartRecording())
         {
-            RecordButtonGlyph.Text = "\uE71A";
-            RecordBadgeText.Text = "Recording";
-            RecordBadgeText.Foreground = ThemeBrushes.Red;
-            HeroRecordGlyph.Text = "\uE71A";
-            HeroRecordStatus.Text = "Recording audio... Click to save";
-            RecordHalo.Opacity = 0.5;
+            if (_voiceMemoContainer != null)
+            {
+                HeroRecordGlyph.Text = "\uE71A";
+                HeroRecordStatus.Text = "Recording audio... Click to save";
+                RecordHalo.Opacity = 0.5;
+            }
             EvaluateActivity();
             EnsureRendering();
             _machine.PushToast(new ToastContent(
@@ -57,17 +57,21 @@ public partial class IslandWindow
 
     private void OnVoiceMemoTick(float peak, TimeSpan elapsed)
     {
-        HeroRecordTimer.Text = elapsed.ToString(@"mm\:ss\.f");
         CompactRecordText.Text = elapsed.ToString(@"mm\:ss");
 
-        double h = Math.Clamp(peak * 14.0, 3.0, 14.0);
-        RecBar0.Height = Math.Max(3, h * 0.5);
-        RecBar1.Height = Math.Max(3, h * 0.8);
-        RecBar2.Height = Math.Max(3, h * 1.0);
-        RecBar3.Height = Math.Max(3, h * 0.7);
-        RecBar4.Height = Math.Max(3, h * 0.4);
+        if (_voiceMemoContainer != null)
+        {
+            HeroRecordTimer.Text = elapsed.ToString(@"mm\:ss\.f");
 
-        RecordHalo.Opacity = Math.Clamp(0.2 + peak * 0.8, 0.2, 0.95);
+            double h = Math.Clamp(peak * 14.0, 3.0, 14.0);
+            RecBar0.Height = Math.Max(3, h * 0.5);
+            RecBar1.Height = Math.Max(3, h * 0.8);
+            RecBar2.Height = Math.Max(3, h * 1.0);
+            RecBar3.Height = Math.Max(3, h * 0.7);
+            RecBar4.Height = Math.Max(3, h * 0.4);
+
+            RecordHalo.Opacity = Math.Clamp(0.2 + peak * 0.8, 0.2, 0.95);
+        }
         EnsureRendering();
     }
 
@@ -98,13 +102,13 @@ public partial class IslandWindow
 
     private void OnVoiceMemoCompleted(VoiceMemoInfo info)
     {
-        HeroRecordTimer.Text = "00:00";
-        HeroRecordStatus.Text = "Ready";
-        RecordBadgeText.Text = "Memo";
-        RecordBadgeText.Foreground = ThemeBrushes.PrimaryText;
-        RecordButtonGlyph.Text = "\uE7C8";
-        HeroRecordGlyph.Text = "\uE7C8";
-        RecordHalo.Opacity = 0;
+        if (_voiceMemoContainer != null)
+        {
+            HeroRecordTimer.Text = "00:00";
+            HeroRecordStatus.Text = "Ready";
+            HeroRecordGlyph.Text = "\uE7C8";
+            RecordHalo.Opacity = 0;
+        }
 
         InitializeVoiceMemoUI();
 

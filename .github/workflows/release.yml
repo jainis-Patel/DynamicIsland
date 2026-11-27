@@ -176,11 +176,12 @@ jobs:
           git fetch origin main
           git checkout -B main origin/main
           Copy-Item -Path "publish/release-manifest.json" -Destination "release-manifest.json" -Force
-          git add release-manifest.json
-          $status = git status --porcelain release-manifest.json
+          ./scripts/SyncVersion.ps1 -Version "${{ env.VERSION }}"
+          git add DynamicIsland.csproj release-manifest.json installer/winget/*.yaml website/index.html
+          $status = git status --porcelain DynamicIsland.csproj release-manifest.json installer/winget/ website/index.html
           if ($status) {
-            git commit -m "chore(release): Auto-update release-manifest.json for ${{ env.TAG }} [skip ci]"
+            git commit -m "chore(release): Sync version & release-manifest.json for ${{ env.TAG }} [skip ci]"
             git push origin main
           } else {
-            Write-Host "release-manifest.json already up to date."
+            Write-Host "Version & release-manifest.json already up to date."
           }

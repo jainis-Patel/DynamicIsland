@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using DynamicIsland.Core;
@@ -108,11 +110,23 @@ internal sealed class MediaSongListService : IDisposable
         "media", "media player", "vlc", "windows media player", "groove music"
     };
 
+    private const int MaxHistoryItems = 50;
     private readonly Dispatcher _ui;
     private readonly MediaSessionService _mediaService;
+    private readonly string _historyFilePath;
+    private readonly DebouncedJsonStore<List<PersistedSongHistoryItem>> _historyStore;
     private readonly ConcurrentDictionary<string, AlbumTracklistResult> _cache = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<PlayedSongRecord> _history = new();
     private readonly object _historyLock = new();
+
+    private sealed record PersistedSongHistoryItem(
+        string Title,
+        string Artist,
+        string Album,
+        string SourceApp,
+        long DurationTicks,
+        DateTime PlayedAt,
+        string? ArtworkJpegBase64 = null);
 
     public IReadOnlyList<PlayedSongRecord> History
     {
@@ -124,10 +138,19 @@ internal sealed class MediaSongListService : IDisposable
 
     public event Action? HistoryChanged;
 
-    public MediaSongListService(Dispatcher ui, MediaSessionService mediaService)
+    public MediaSongListService(Dispatcher ui, MediaSessionService mediaService, string? historyFilePath = null)
     {
         _ui = ui;
         _mediaService = mediaService;
+        _historyFilePath = string.IsNullOrWhiteSpace(historyFilePath)
+            ? Path.Combine(AppPaths.DataDirectory, "playback_history.json")
+            : historyFilePath;
+        _historyStore = new DebouncedJsonStore<List<PersistedSongHistoryItem>>(
+            _historyFilePath,
+            BuildHistorySnapshot,
+            delayMs: 500);
+
+        LoadHistoryFromDisk();
         _mediaService.TrackChanged += OnTrackChanged;
         RecordCurrentTrack();
     }
@@ -139,17 +162,38 @@ internal sealed class MediaSongListService : IDisposable
         var current = _mediaService.Current;
         if (current == null || string.IsNullOrWhiteSpace(current.Title)) return;
 
-        string title = current.Title.Trim();
-        string artist = current.Artist?.Trim() ?? "";
-        string album = current.AlbumTitle?.Trim() ?? "";
+        RecordTrackCore(
+            current.Title,
+            current.Artist ?? "",
+            current.AlbumTitle ?? "",
+            current.Source,
+            current.Duration,
+            current.Artwork);
+    }
+
+    internal void RecordTrackCore(
+        string title,
+        string artist,
+        string album,
+        string sourceApp,
+        TimeSpan duration,
+        BitmapSource? artwork,
+        DateTime? playedAt = null)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return;
+
+        string cleanTitle = title.Trim();
+        string cleanArtist = artist?.Trim() ?? "";
+        string cleanAlbum = album?.Trim() ?? "";
+        string normalizedArtist = string.IsNullOrWhiteSpace(cleanArtist) ? "Unknown Artist" : cleanArtist;
 
         lock (_historyLock)
         {
             if (_history.Count > 0)
             {
                 var last = _history[0];
-                if (string.Equals(last.Title, title, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(last.Artist, artist, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(last.Title, cleanTitle, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(last.Artist, normalizedArtist, StringComparison.OrdinalIgnoreCase))
                 {
                     return; // Avoid duplicating immediate repeats
                 }
@@ -157,22 +201,134 @@ internal sealed class MediaSongListService : IDisposable
 
             _history.Insert(0, new PlayedSongRecord
             {
-                Title = title,
-                Artist = string.IsNullOrWhiteSpace(artist) ? "Unknown Artist" : artist,
-                Album = album,
-                SourceApp = current.Source,
-                Artwork = current.Artwork,
-                Duration = current.Duration,
-                PlayedAt = DateTime.Now
+                Title = cleanTitle,
+                Artist = normalizedArtist,
+                Album = cleanAlbum,
+                SourceApp = sourceApp,
+                Artwork = artwork,
+                Duration = duration,
+                PlayedAt = playedAt ?? DateTime.Now
             });
 
-            if (_history.Count > 60)
+            if (_history.Count > MaxHistoryItems)
             {
-                _history.RemoveAt(_history.Count - 1);
+                _history.RemoveRange(MaxHistoryItems, _history.Count - MaxHistoryItems);
             }
         }
 
+        _historyStore.ScheduleSave();
         HistoryChanged?.Invoke();
+    }
+
+    public void ClearHistory()
+    {
+        lock (_historyLock)
+        {
+            if (_history.Count == 0) return;
+            _history.Clear();
+        }
+        _historyStore.ScheduleSave();
+        HistoryChanged?.Invoke();
+    }
+
+    private List<PersistedSongHistoryItem> BuildHistorySnapshot()
+    {
+        List<PlayedSongRecord> copy;
+        lock (_historyLock)
+        {
+            copy = _history.Take(MaxHistoryItems).ToList();
+        }
+
+        var snapshot = new List<PersistedSongHistoryItem>(copy.Count);
+        foreach (var rec in copy)
+        {
+            snapshot.Add(new PersistedSongHistoryItem(
+                rec.Title,
+                rec.Artist,
+                rec.Album,
+                rec.SourceApp,
+                rec.Duration.Ticks,
+                rec.PlayedAt,
+                EncodeArtworkThumbnail(rec.Artwork)));
+        }
+        return snapshot;
+    }
+
+    private void LoadHistoryFromDisk()
+    {
+        try
+        {
+            var items = AtomicJsonStore.Load(_historyFilePath, () => new List<PersistedSongHistoryItem>());
+            if (items.Count == 0) return;
+
+            lock (_historyLock)
+            {
+                _history.Clear();
+                foreach (var item in items.Take(MaxHistoryItems))
+                {
+                    if (string.IsNullOrWhiteSpace(item.Title)) continue;
+                    _history.Add(new PlayedSongRecord
+                    {
+                        Title = item.Title,
+                        Artist = string.IsNullOrWhiteSpace(item.Artist) ? "Unknown Artist" : item.Artist,
+                        Album = item.Album ?? "",
+                        SourceApp = item.SourceApp ?? "",
+                        Artwork = DecodeArtworkThumbnail(item.ArtworkJpegBase64),
+                        Duration = item.DurationTicks > 0 ? TimeSpan.FromTicks(item.DurationTicks) : TimeSpan.Zero,
+                        PlayedAt = item.PlayedAt
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[MediaSongList] LoadHistoryFromDisk failed: {ex.Message}");
+        }
+    }
+
+    private static string? EncodeArtworkThumbnail(BitmapSource? src)
+    {
+        if (src == null || src.PixelWidth <= 0 || src.PixelHeight <= 0) return null;
+        try
+        {
+            double maxDim = Math.Max(src.PixelWidth, src.PixelHeight);
+            BitmapSource target = src;
+            if (maxDim > 40.0)
+            {
+                double scale = 40.0 / maxDim;
+                target = new TransformedBitmap(src, new ScaleTransform(scale, scale));
+            }
+            var encoder = new JpegBitmapEncoder { QualityLevel = 75 };
+            encoder.Frames.Add(BitmapFrame.Create(target));
+            using var ms = new MemoryStream();
+            encoder.Save(ms);
+            return Convert.ToBase64String(ms.ToArray());
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static BitmapSource? DecodeArtworkThumbnail(string? base64)
+    {
+        if (string.IsNullOrWhiteSpace(base64)) return null;
+        try
+        {
+            byte[] bytes = Convert.FromBase64String(base64);
+            using var ms = new MemoryStream(bytes);
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.StreamSource = ms;
+            bmp.EndInit();
+            bmp.Freeze();
+            return bmp;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -394,5 +550,6 @@ internal sealed class MediaSongListService : IDisposable
     public void Dispose()
     {
         _mediaService.TrackChanged -= OnTrackChanged;
+        _historyStore.Dispose();
     }
 }

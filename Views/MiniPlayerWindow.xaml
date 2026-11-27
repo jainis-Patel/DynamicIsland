@@ -166,14 +166,30 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- Mini Live Audio Equalizer Bars -->
+                                <!-- Mini Live Audio Equalizer Bars (GPU ScaleY) -->
                                 <Border Margin="6,0,0,0" CornerRadius="6" Background="#14FFFFFF"
                                         BorderBrush="#1CFFFFFF" BorderThickness="1" Padding="4,2" Height="17" VerticalAlignment="Center">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Height="12">
-                                        <Rectangle x:Name="EqBar0" Style="{StaticResource Bar}" Height="7" Width="2" Margin="1,0" VerticalAlignment="Bottom" />
-                                        <Rectangle x:Name="EqBar1" Style="{StaticResource Bar}" Height="11" Width="2" Margin="1,0" VerticalAlignment="Bottom" />
-                                        <Rectangle x:Name="EqBar2" Style="{StaticResource Bar}" Height="9" Width="2" Margin="1,0" VerticalAlignment="Bottom" />
-                                        <Rectangle x:Name="EqBar3" Style="{StaticResource Bar}" Height="6" Width="2" Margin="1,0" VerticalAlignment="Bottom" />
+                                        <Rectangle x:Name="EqBar0" Style="{StaticResource Bar}" Height="12" Width="2" Margin="1,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1">
+                                            <Rectangle.RenderTransform>
+                                                <ScaleTransform x:Name="EqScale0" ScaleY="0.22" />
+                                            </Rectangle.RenderTransform>
+                                        </Rectangle>
+                                        <Rectangle x:Name="EqBar1" Style="{StaticResource Bar}" Height="12" Width="2" Margin="1,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1">
+                                            <Rectangle.RenderTransform>
+                                                <ScaleTransform x:Name="EqScale1" ScaleY="0.22" />
+                                            </Rectangle.RenderTransform>
+                                        </Rectangle>
+                                        <Rectangle x:Name="EqBar2" Style="{StaticResource Bar}" Height="12" Width="2" Margin="1,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1">
+                                            <Rectangle.RenderTransform>
+                                                <ScaleTransform x:Name="EqScale2" ScaleY="0.22" />
+                                            </Rectangle.RenderTransform>
+                                        </Rectangle>
+                                        <Rectangle x:Name="EqBar3" Style="{StaticResource Bar}" Height="12" Width="2" Margin="1,0" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1">
+                                            <Rectangle.RenderTransform>
+                                                <ScaleTransform x:Name="EqScale3" ScaleY="0.22" />
+                                            </Rectangle.RenderTransform>
+                                        </Rectangle>
                                     </StackPanel>
                                 </Border>
 
@@ -192,6 +208,12 @@
                             <Button x:Name="PinButton" Style="{StaticResource PlayerCircleBtn}" Width="24" Height="24"
                                     ToolTipService.ToolTip="Toggle Always-on-Top" Click="PinButton_Click">
                                 <TextBlock x:Name="PinGlyph" Style="{StaticResource Glyph}" Text="&#xE718;" FontSize="9.5" />
+                            </Button>
+
+                            <!-- Album Art Showcase Toggle -->
+                            <Button x:Name="ShowcaseToggleBtn" Style="{StaticResource PlayerCircleBtn}" Width="24" Height="24" Margin="3,0,0,0"
+                                    ToolTipService.ToolTip="Album Art Showcase Mode" Click="ShowcaseMode_Click">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B9;" FontSize="9.5" />
                             </Button>
 
                             <!-- Mini Pill Compact Toggle -->
@@ -295,15 +317,19 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <!-- Volume Control (Mute Toggle + Inline Slider) -->
+                            <!-- Volume Control (Mute Toggle + Inline Slider + Audio Output Switcher) -->
                             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Button x:Name="MiniVolumeMuteBtn" Style="{StaticResource PlayerCircleBtn}" Width="22" Height="22"
                                         Click="VolumeMute_Click" ToolTipService.ToolTip="Toggle Mute">
                                     <TextBlock x:Name="MiniVolumeGlyph" Style="{StaticResource Glyph}" FontSize="9.5" Text="&#xE767;" />
                                 </Button>
                                 <Slider x:Name="MiniVolumeSlider" Style="{StaticResource IslandSlider}"
-                                        Width="68" Margin="5,0,0,0" Minimum="0" Maximum="100" Value="50"
+                                        Width="64" Margin="5,0,0,0" Minimum="0" Maximum="100" Value="50"
                                         ValueChanged="VolumeSlider_ValueChanged" ToolTipService.ToolTip="System Master Volume" />
+                                <Button x:Name="AudioOutputBtn" Style="{StaticResource PlayerCircleBtn}" Width="22" Height="22" Margin="5,0,0,0"
+                                        Click="AudioOutputBtn_Click" ToolTipService.ToolTip="Switch Audio Output Device">
+                                    <TextBlock x:Name="MiniOutputDeviceGlyph" Style="{StaticResource Glyph}" FontSize="9.5" Text="&#xE7F5;" />
+                                </Button>
                             </StackPanel>
 
                             <!-- Right Tools: Queue / Lyrics / Search / Copy -->
@@ -419,16 +445,25 @@
                                         </ScrollViewer>
                                     </Grid>
 
-                                    <!-- TAB 3: Session History View -->
+                                    <!-- TAB 3: Playback History View -->
                                     <Grid x:Name="HistoryPanel" Visibility="Collapsed">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="*" />
                                         </Grid.RowDefinitions>
 
-                                        <TextBlock Grid.Row="0" FontSize="10" FontWeight="Medium"
-                                                   Foreground="{DynamicResource SecondaryBrush}" Margin="4,0,0,4"
-                                                   Text="Recently Played in this Session:" />
+                                        <Grid Grid.Row="0" Margin="4,0,2,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" FontSize="10" FontWeight="Medium"
+                                                       Foreground="{DynamicResource SecondaryBrush}" VerticalAlignment="Center"
+                                                       Text="Recently Played" />
+                                            <Button x:Name="ClearHistoryBtn" Grid.Column="1" Style="{StaticResource PlayerSegmentBtn}"
+                                                    Height="18" Padding="6,0" FontSize="9" Content="Clear"
+                                                    Click="ClearHistory_Click" ToolTipService.ToolTip="Clear playback history" />
+                                        </Grid>
 
                                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                             <StackPanel x:Name="HistoryListHost" />
@@ -447,29 +482,74 @@
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
 
-                                <!-- Lyrics Header with Provider indicator -->
+                                <!-- Lyrics Header with Provider & Animation Style Switcher -->
                                 <Grid Grid.Row="0" Margin="0,0,0,6">
-                                    <TextBlock FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
-                                               Text="♪ Synced Karaoke Lyrics (LRCLIB)" VerticalAlignment="Center" />
-                                    <TextBlock x:Name="LyricsStatusText" FontSize="9.5" Foreground="{DynamicResource SecondaryBrush}"
-                                               HorizontalAlignment="Right" VerticalAlignment="Center" Text="" />
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
+                                               Text="♪ Lyrics" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="LyricsStatusText" Grid.Column="1" FontSize="9.5" Foreground="{DynamicResource SecondaryBrush}"
+                                               Margin="6,0,4,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Text="" />
+                                    <Button x:Name="LyricsAnimStyleBtn" Grid.Column="2" Style="{StaticResource PlayerSegmentBtn}"
+                                            Height="20" Padding="7,0" Background="#18FFFFFF"
+                                            Click="LyricsAnimStyleBtn_Click"
+                                            ToolTipService.ToolTip="Cycle Lyrics Animation (Spring Wave / Karaoke Glow / Minimal Fade)">
+                                        <TextBlock x:Name="LyricsAnimStyleText" FontSize="9.5" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource PrimaryTextBrush}" Text="✦ Wave" />
+                                    </Button>
                                 </Grid>
 
-                                <!-- Karaoke Stage: Previous, Active (Highlighted), Next -->
-                                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <StackPanel x:Name="LyricsStageHost" VerticalAlignment="Center">
-                                        <TextBlock x:Name="LyricLinePrev" FontSize="10" Foreground="{DynamicResource SecondaryBrush}"
-                                                   Opacity="0.4" TextTrimming="CharacterEllipsis" TextAlignment="Center" Margin="0,2" />
-                                        <TextBlock x:Name="LyricLineCurrent" FontSize="14" FontWeight="Bold"
-                                                   Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap"
-                                                   TextAlignment="Center" Margin="0,5" Text="♪ Loading lyrics..." />
-                                        <TextBlock x:Name="LyricLineNext" FontSize="10" Foreground="{DynamicResource SecondaryBrush}"
-                                                   Opacity="0.5" TextTrimming="CharacterEllipsis" TextAlignment="Center" Margin="0,2" />
+                                <!-- Lyrics Stage: Empty/Loading State OR Full Scrollable Lines -->
+                                <Grid Grid.Row="1">
+                                    <StackPanel x:Name="LyricsEmptyStatePanel" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+                                        <TextBlock x:Name="LyricsEmptyText" FontSize="11.5" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource SecondaryBrush}" TextWrapping="Wrap"
+                                                   TextAlignment="Center" Margin="8,0" Text="♪ Loading lyrics..." />
+                                        <Button x:Name="LyricsRetryBtn" Style="{StaticResource PlayerSegmentBtn}"
+                                                Margin="0,8,0,0" Height="22" Padding="10,0" Background="#1CFFFFFF"
+                                                Foreground="{DynamicResource PrimaryTextBrush}" Content="Retry Search"
+                                                Click="LyricsRetry_Click" Visibility="Collapsed" />
                                     </StackPanel>
-                                </ScrollViewer>
+
+                                    <ScrollViewer x:Name="LyricsScrollViewer" VerticalScrollBarVisibility="Hidden"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  PreviewMouseWheel="LyricsScrollViewer_PreviewMouseWheel">
+                                        <StackPanel x:Name="LyricsLinesHost" Margin="2,28,2,28" />
+                                    </ScrollViewer>
+                                </Grid>
                             </Grid>
                         </Border>
                     </Grid>
+
+                    <!-- In-Card Audio Output Switcher Flyout (avoids Win32 Popup airspace/DPI issues) -->
+                    <Border x:Name="AudioOutputFlyout" Grid.RowSpan="5" VerticalAlignment="Bottom"
+                            Margin="0,0,0,38" Panel.ZIndex="30" Visibility="Collapsed"
+                            Background="#F216161B" BorderBrush="#2EFFFFFF" BorderThickness="1"
+                            CornerRadius="14" Padding="8" MaxHeight="172">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity="0.55" Color="#000000" />
+                        </Border.Effect>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid Grid.Row="0" Margin="2,0,0,6">
+                                <TextBlock FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"
+                                           Text="Audio Output" VerticalAlignment="Center" />
+                                <Button Style="{StaticResource PlayerCircleBtn}" Width="18" Height="18" HorizontalAlignment="Right"
+                                        Click="CloseAudioOutputFlyout_Click" ToolTipService.ToolTip="Close">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="7.5" />
+                                </Button>
+                            </Grid>
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel x:Name="AudioOutputListHost" />
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
                 </Grid>
 
                 <!-- ═══════════════════════════════════════════════════════ -->
@@ -517,6 +597,101 @@
                                 Click="ExpandFromCompact_Click" ToolTipService.ToolTip="Expand Player">
                             <TextBlock Style="{StaticResource Glyph}" FontSize="9" Text="&#xE740;" />
                         </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- ═══════════════════════════════════════════════════════ -->
+                <!--  MODE 3: ALBUM ART SHOWCASE VIEW                       -->
+                <!-- ═══════════════════════════════════════════════════════ -->
+                <Grid x:Name="ShowcaseView" Margin="14,12,14,12" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Top Bar: Source Brand + Mode Controls -->
+                    <Grid Grid.Row="0">
+                        <Border x:Name="ShowcaseSourceBadge" HorizontalAlignment="Left" CornerRadius="6" Background="#18FFFFFF"
+                                BorderBrush="#25FFFFFF" BorderThickness="1" Padding="6,2" Cursor="Hand"
+                                MouseLeftButtonDown="SourceBadge_Click"
+                                ToolTipService.ToolTip="Click to cycle active media players">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Viewbox Width="10" Height="10" Margin="0,0,4,0" VerticalAlignment="Center">
+                                    <Path x:Name="ShowcaseBrandPath" Stretch="Uniform" Fill="{DynamicResource AccentBrush}" />
+                                </Viewbox>
+                                <TextBlock x:Name="ShowcaseSourceText" FontSize="9.5" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}" Text="Media" />
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button x:Name="ShowcaseArtStyleBtn" Style="{StaticResource PlayerCircleBtn}" Width="24" Height="24"
+                                    Click="ShowcaseArtStyle_Click" ToolTipService.ToolTip="Cycle Cover Style (Vinyl / Optical / Squircle)">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE790;" FontSize="9.5" />
+                            </Button>
+                            <Button x:Name="ExitShowcaseBtn" Style="{StaticResource PlayerCircleBtn}" Width="24" Height="24" Margin="3,0,0,0"
+                                    Click="ExitShowcase_Click" ToolTipService.ToolTip="Back to Full Player">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE73F;" FontSize="9.5" />
+                            </Button>
+                            <Button x:Name="ShowcaseCloseBtn" Style="{StaticResource PlayerCircleBtn}" Width="24" Height="24" Margin="3,0,0,0"
+                                    Click="Close_Click" ToolTipService.ToolTip="Close Detached Player">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="9" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Centered Large Artwork Disc / Squircle -->
+                    <core:PlayerDiscControl Grid.Row="1" x:Name="ShowcaseArtDisc"
+                                            DiscSize="152"
+                                            ShowTonearm="True"
+                                            SquircleRadius="28"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Cursor="Hand"
+                                            MouseLeftButtonDown="Artwork_Click"
+                                            ToolTipService.ToolTip="Click to open active media player" />
+
+                    <!-- Track Metadata & Optional Live Lyric -->
+                    <StackPanel Grid.Row="2" Margin="6,2,6,8" HorizontalAlignment="Center">
+                        <TextBlock x:Name="ShowcaseTitleText" FontSize="13.5" FontWeight="Bold"
+                                   Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis"
+                                   TextAlignment="Center" Text="Not Playing" Cursor="Hand"
+                                   MouseLeftButtonDown="Title_Click"
+                                   ToolTipService.ToolTip="Click to copy Track Title" />
+                        <TextBlock x:Name="ShowcaseArtistText" FontSize="11"
+                                   Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis"
+                                   TextAlignment="Center" Margin="0,1.5,0,0" Text="System Audio" />
+                        <TextBlock x:Name="ShowcaseLyricText" FontSize="10.5" FontWeight="Medium"
+                                   Foreground="{DynamicResource AccentBrush}" TextTrimming="CharacterEllipsis"
+                                   TextAlignment="Center" Margin="0,4,0,0" Visibility="Collapsed" />
+                    </StackPanel>
+
+                    <!-- Slim Progress Bar & Transport Triad -->
+                    <StackPanel Grid.Row="3">
+                        <Border x:Name="ShowcaseProgressTrack" Height="3" CornerRadius="1.5" Background="#20FFFFFF"
+                                Margin="14,0,14,10" ClipToBounds="True">
+                            <Border x:Name="ShowcaseProgressFill" HorizontalAlignment="Left" Width="0"
+                                    Background="{DynamicResource AccentBrush}" CornerRadius="1.5" />
+                        </Border>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Button Style="{StaticResource PlayerCircleBtn}" Width="30" Height="30" Margin="4,0"
+                                    Click="Prev_Click" ToolTipService.ToolTip="Previous Track">
+                                <TextBlock Style="{StaticResource Glyph}" FontSize="11" Text="&#xE892;" />
+                            </Button>
+                            <Button Style="{StaticResource PlayerCircleBtn}" Width="38" Height="38" Margin="8,0"
+                                    Background="{DynamicResource MediaPlayButtonBgBrush}"
+                                    Foreground="{DynamicResource MediaPlayButtonFgBrush}"
+                                    Click="PlayPause_Click" ToolTipService.ToolTip="Play / Pause">
+                                <TextBlock x:Name="ShowcasePlayPauseGlyph" Style="{StaticResource Glyph}" FontSize="13.5" Text="&#xE768;" />
+                            </Button>
+                            <Button Style="{StaticResource PlayerCircleBtn}" Width="30" Height="30" Margin="4,0"
+                                    Click="Next_Click" ToolTipService.ToolTip="Next Track">
+                                <TextBlock Style="{StaticResource Glyph}" FontSize="11" Text="&#xE893;" />
+                            </Button>
+                        </StackPanel>
                     </StackPanel>
                 </Grid>
             </Grid>

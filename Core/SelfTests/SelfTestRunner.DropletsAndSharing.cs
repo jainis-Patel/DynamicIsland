@@ -810,6 +810,162 @@ internal static partial class SelfTestRunner
         Assert(pausedPos == TimeSpan.FromSeconds(50), "Paused track should not extrapolate position");
     }
 
+    private static void TestMiniPlayerUpgrades()
+    {
+        // 1. ViewMode & LyricsAnimationStyle normalization + SettingsService round-trip
+        Assert(SettingsService.NormalizeMiniPlayerViewMode("Showcase") == "Showcase", "Showcase mode must normalize");
+        Assert(SettingsService.NormalizeMiniPlayerViewMode("art") == "Showcase", "art alias must normalize to Showcase");
+        Assert(SettingsService.NormalizeMiniPlayerViewMode("pill") == "Compact", "pill alias must normalize to Compact");
+        Assert(SettingsService.NormalizeMiniPlayerViewMode("unknown") == "Full", "Unknown view mode must fallback to Full");
+
+        Assert(SettingsService.NormalizeLyricsAnimationStyle("KaraokeGlow") == "KaraokeGlow", "KaraokeGlow must normalize");
+        Assert(SettingsService.NormalizeLyricsAnimationStyle("glow") == "KaraokeGlow", "glow alias must normalize to KaraokeGlow");
+        Assert(SettingsService.NormalizeLyricsAnimationStyle("fade") == "MinimalFade", "fade alias must normalize to MinimalFade");
+        Assert(SettingsService.NormalizeLyricsAnimationStyle("other") == "SpringWave", "Unknown animation style must fallback to SpringWave");
+
+        string tempSettingsPath = Path.Combine(Path.GetTempPath(), $"di_mini_settings_{Guid.NewGuid():N}.json");
+        string tempHistoryPath = Path.Combine(Path.GetTempPath(), $"di_mini_history_{Guid.NewGuid():N}.json");
+        try
+        {
+            using (var settings = new SettingsService(tempSettingsPath))
+            {
+                settings.Update(s =>
+                {
+                    s.MiniPlayerViewMode = "Showcase";
+                    s.MiniPlayerOpen = true;
+                    s.MiniPlayerAutoReopen = false;
+                    s.LyricsAnimationStyle = "KaraokeGlow";
+                });
+                settings.SaveNow();
+            }
+
+            using (var reloaded = new SettingsService(tempSettingsPath))
+            {
+                Assert(reloaded.Current.MiniPlayerViewMode == "Showcase", "MiniPlayerViewMode must persist");
+                Assert(reloaded.Current.MiniPlayerOpen, "MiniPlayerOpen must persist");
+                Assert(!reloaded.Current.MiniPlayerAutoReopen, "MiniPlayerAutoReopen must persist");
+                Assert(reloaded.Current.LyricsAnimationStyle == "KaraokeGlow", "LyricsAnimationStyle must persist");
+
+                reloaded.ResetToDefaults();
+                Assert(reloaded.Current.MiniPlayerViewMode == "Full", "ResetToDefaults must reset MiniPlayerViewMode");
+                Assert(!reloaded.Current.MiniPlayerOpen, "ResetToDefaults must reset MiniPlayerOpen");
+                Assert(reloaded.Current.MiniPlayerAutoReopen, "ResetToDefaults must reset MiniPlayerAutoReopen");
+                Assert(reloaded.Current.LyricsAnimationStyle == "SpringWave", "ResetToDefaults must reset LyricsAnimationStyle");
+            }
+
+            // 2. Persistent playback history with artwork thumbnail round-trip & clear
+            var ui = Dispatcher.CurrentDispatcher;
+            using var mediaSvc = new MediaSessionService(ui);
+            using var audioSvc = new AudioEndpointService(ui);
+            using var volumeSvc = new VolumeService(ui, audioSvc.SharedEnumerator);
+            using var lyricsSvc = new LyricsService(ui);
+
+            var bmp = new WriteableBitmap(4, 4, 96, 96, PixelFormats.Bgra32, null);
+            bmp.WritePixels(new Int32Rect(0, 0, 4, 4), new byte[4 * 4 * 4], 4 * 4, 0);
+            bmp.Freeze();
+
+            using (var historySvc = new MediaSongListService(ui, mediaSvc, tempHistoryPath))
+            {
+                historySvc.RecordTrackCore("Starlight", "Muse", "Black Holes", "Spotify", TimeSpan.FromMinutes(4), bmp);
+                historySvc.RecordTrackCore("Starlight", "Muse", "Black Holes", "Spotify", TimeSpan.FromMinutes(4), bmp); // Immediate duplicate ignored
+                Assert(historySvc.History.Count == 1, $"Expected 1 deduplicated history item, got {historySvc.History.Count}");
+            }
+
+            using (var reloadedHistory = new MediaSongListService(ui, mediaSvc, tempHistoryPath))
+            {
+                Assert(reloadedHistory.History.Count == 1, $"Expected 1 persisted history item after reload, got {reloadedHistory.History.Count}");
+                var rec = reloadedHistory.History[0];
+                Assert(rec.Title == "Starlight" && rec.Artist == "Muse" && rec.SourceApp == "Spotify", "Persisted track metadata mismatch");
+                Assert(rec.Artwork is { IsFrozen: true }, "Persisted artwork thumbnail must decode as frozen BitmapSource");
+
+                reloadedHistory.ClearHistory();
+                Assert(reloadedHistory.History.Count == 0, "ClearHistory must empty history list");
+            }
+
+            // 3. Headless MiniPlayerWindow checks (GPU EQ, View Modes, Fullscreen Suppression, Scrollable/Plain Lyrics)
+            var app = Application.Current ?? new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            var stylesUri = new Uri("pack://application:,,,/DynamicIsland;component/Resources/IslandStyles.xaml", UriKind.Absolute);
+            if (!app.Resources.MergedDictionaries.Any(d => d.Source == stylesUri))
+            {
+                app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = stylesUri });
+            }
+
+            using var testSettings = new SettingsService(tempSettingsPath);
+            using var songSvc = new MediaSongListService(ui, mediaSvc, tempHistoryPath);
+            var win = new Views.MiniPlayerWindow(mediaSvc, lyricsSvc, volumeSvc, songSvc, null, testSettings, audioSvc);
+            try
+            {
+                Assert(win.EqBar0.RenderTransform is ScaleTransform &&
+                       win.EqBar1.RenderTransform is ScaleTransform &&
+                       !ReferenceEquals(win.EqBar0.RenderTransform, win.EqBar1.RenderTransform),
+                    "EQ bars must use distinct GPU ScaleTransforms");
+
+                win.SetViewModeExternal("Showcase");
+                Assert(win.ShowcaseView.Visibility == Visibility.Visible &&
+                       win.FullPlayerView.Visibility == Visibility.Collapsed &&
+                       win.CompactPillView.Visibility == Visibility.Collapsed,
+                    "Showcase view mode must show ShowcaseView and hide Full/Compact");
+
+                win.SetViewModeExternal("Compact");
+                Assert(win.CompactPillView.Visibility == Visibility.Visible &&
+                       win.ShowcaseView.Visibility == Visibility.Collapsed,
+                    "Compact view mode must show CompactPillView");
+
+                win.SetViewModeExternal("Full");
+                Assert(win.FullPlayerView.Visibility == Visibility.Visible,
+                    "Full view mode must restore FullPlayerView");
+
+                win.SetFullscreenSuppressed(true);
+                Assert(win.IsFullscreenSuppressed && !win.Topmost,
+                    "SetFullscreenSuppressed(true) must suppress Topmost");
+                win.SetFullscreenSuppressed(false);
+                Assert(!win.IsFullscreenSuppressed && win.Topmost,
+                    "SetFullscreenSuppressed(false) must restore Topmost");
+
+                // Open lyrics drawer & test synced + plain lyrics + animation style cycling
+                win.ToggleLyricsBtn.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                lyricsSvc.SetTrackForTest(new TrackLyrics
+                {
+                    Title = "Test Song",
+                    Artist = "Test Artist",
+                    SyncedLines = new[]
+                    {
+                        new LrcLine(TimeSpan.FromSeconds(1), "Line one"),
+                        new LrcLine(TimeSpan.FromSeconds(5), "Line two")
+                    }
+                });
+                win.UpdateLyricsDisplay();
+                Assert(win.LyricsLinesHost.Children.Count == 2 && win.LyricsStatusText.Text == "Synced",
+                    "Scrollable lyrics drawer must render all synced lines");
+
+                win.LyricsAnimStyleBtn.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                Assert(testSettings.Current.LyricsAnimationStyle == "KaraokeGlow" &&
+                       win.LyricsAnimStyleText.Text.Contains("Glow"),
+                    $"Cycling lyrics animation must switch to KaraokeGlow, got '{testSettings.Current.LyricsAnimationStyle}'");
+
+                lyricsSvc.SetTrackForTest(new TrackLyrics
+                {
+                    Title = "Plain Song",
+                    Artist = "Test Artist",
+                    PlainLyrics = "First plain line\nSecond plain line",
+                    IsPlainLyricsOnly = true
+                });
+                win.UpdateLyricsDisplay();
+                Assert(win.LyricsLinesHost.Children.Count == 2 && win.LyricsStatusText.Text == "Plain Lyrics",
+                    "Plain lyrics fallback must render all plain lines");
+            }
+            finally
+            {
+                win.Close();
+            }
+        }
+        finally
+        {
+            try { if (File.Exists(tempSettingsPath)) File.Delete(tempSettingsPath); } catch { }
+            try { if (File.Exists(tempHistoryPath)) File.Delete(tempHistoryPath); } catch { }
+        }
+    }
+
     private static void TestTaskServiceAndCalendar()
     {
         // 1. TaskService CRUD and Atomic Persistence

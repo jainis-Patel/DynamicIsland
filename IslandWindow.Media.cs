@@ -322,7 +322,15 @@ public partial class IslandWindow
 
     private void Pill_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (_machine.State == IslandState.Expanded || e.ChangedButton != MouseButton.Middle)
+        if (_machine.State == IslandState.Expanded)
+        {
+            if (e.ChangedButton == MouseButton.XButton1 && TryNavigateBack())
+            {
+                e.Handled = true;
+            }
+            return;
+        }
+        if (e.ChangedButton != MouseButton.Middle)
             return;
 
         TriggerLiquidImpulse(110, -40, 14);

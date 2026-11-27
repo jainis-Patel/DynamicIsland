@@ -73,46 +73,46 @@ public partial class IslandWindow
     // -------------------------------------------------------------------------
     //  Shelf View Forwarders (ShelfContainer)
     // -------------------------------------------------------------------------
-    internal Button ClearShelfButton => ShelfContainer.ClearShelfButton;
-    internal System.Windows.Controls.Button CopyAllShelfButton => ShelfContainer.CopyAllShelfButton;
-    internal System.Windows.Controls.Border DragAllShelfBtn => ShelfContainer.DragAllShelfBtn;
-    internal System.Windows.Controls.Border ShelfCountBadge => ShelfContainer.ShelfCountBadge;
-    internal TextBlock ShelfCountText => ShelfContainer.ShelfCountText;
-    internal FrameworkElement ShelfEmptyPlaceholder => ShelfContainer.ShelfEmptyPlaceholder;
-    internal ItemsControl ShelfItemsControl => ShelfContainer.ShelfItemsControl;
-    internal System.Windows.Controls.Button ShelfScrollLeftBtn => ShelfContainer.ShelfScrollLeftBtn;
-    internal System.Windows.Controls.Button ShelfScrollRightBtn => ShelfContainer.ShelfScrollRightBtn;
-    internal System.Windows.Controls.ScrollViewer ShelfScrollViewer => ShelfContainer.ShelfScrollViewer;
-    internal Button ZipShelfButton => ShelfContainer.ZipShelfButton;
-    internal Button WindowsShareButton => ShelfContainer.WindowsShareButton;
-    internal Button PhoneShareButton => ShelfContainer.PhoneShareButton;
-    internal Button ShelfActionsButton => ShelfContainer.ShelfActionsButton;
-    internal Button SummonBasketButton => ShelfContainer.SummonBasketButton;
-    internal FrameworkElement? ShelfItemActionsGroup => ShelfContainer.ShelfItemActionsGroup;
+    internal Button ClearShelfButton => EnsureShelfContainer().ClearShelfButton;
+    internal System.Windows.Controls.Button CopyAllShelfButton => EnsureShelfContainer().CopyAllShelfButton;
+    internal System.Windows.Controls.Border DragAllShelfBtn => EnsureShelfContainer().DragAllShelfBtn;
+    internal System.Windows.Controls.Border ShelfCountBadge => EnsureShelfContainer().ShelfCountBadge;
+    internal TextBlock ShelfCountText => EnsureShelfContainer().ShelfCountText;
+    internal FrameworkElement ShelfEmptyPlaceholder => EnsureShelfContainer().ShelfEmptyPlaceholder;
+    internal ItemsControl ShelfItemsControl => EnsureShelfContainer().ShelfItemsControl;
+    internal System.Windows.Controls.Button ShelfScrollLeftBtn => EnsureShelfContainer().ShelfScrollLeftBtn;
+    internal System.Windows.Controls.Button ShelfScrollRightBtn => EnsureShelfContainer().ShelfScrollRightBtn;
+    internal System.Windows.Controls.ScrollViewer ShelfScrollViewer => EnsureShelfContainer().ShelfScrollViewer;
+    internal Button ZipShelfButton => EnsureShelfContainer().ZipShelfButton;
+    internal Button WindowsShareButton => EnsureShelfContainer().WindowsShareButton;
+    internal Button PhoneShareButton => EnsureShelfContainer().PhoneShareButton;
+    internal Button ShelfActionsButton => EnsureShelfContainer().ShelfActionsButton;
+    internal Button SummonBasketButton => EnsureShelfContainer().SummonBasketButton;
+    internal FrameworkElement? ShelfItemActionsGroup => EnsureShelfContainer().ShelfItemActionsGroup;
 
     // -------------------------------------------------------------------------
     //  Clipboard View Forwarders (ClipboardContainer)
     // -------------------------------------------------------------------------
-    internal Button ClearClipboardButton => ClipboardContainer.ClearClipboardButton;
-    internal Button CaptureRegionButton => ClipboardContainer.CaptureRegionButton;
-    internal Button ClipboardQuickPickerButton => ClipboardContainer.ClipboardQuickPickerButton;
-    internal TextBlock ClipboardQueueBtnText => ClipboardContainer.ClipboardQueueBtnText;
-    internal System.Windows.Controls.Button ClearClipboardSearchBtn => ClipboardContainer.ClearClipboardSearchBtn;
-    internal TextBlock ClipboardCountText => ClipboardContainer.ClipboardCountText;
-    internal FrameworkElement ClipboardEmptyPlaceholder => ClipboardContainer.ClipboardEmptyPlaceholder;
-    internal ItemsControl ClipboardItemsControl => ClipboardContainer.ClipboardItemsControl;
-    internal System.Windows.Controls.Button ClipboardScrollLeftBtn => ClipboardContainer.ClipboardScrollLeftBtn;
-    internal System.Windows.Controls.Button ClipboardScrollRightBtn => ClipboardContainer.ClipboardScrollRightBtn;
-    internal System.Windows.Controls.ScrollViewer ClipboardScrollViewer => ClipboardContainer.ClipboardScrollViewer;
-    internal System.Windows.Controls.TextBox ClipboardSearchBox => ClipboardContainer.ClipboardSearchBox;
-    internal System.Windows.Controls.Button ClipFilterAllBtn => ClipboardContainer.ClipFilterAllBtn;
-    internal System.Windows.Controls.Button ClipFilterCodeBtn => ClipboardContainer.ClipFilterCodeBtn;
-    internal System.Windows.Controls.Button ClipFilterColorsBtn => ClipboardContainer.ClipFilterColorsBtn;
-    internal System.Windows.Controls.Button ClipFilterImagesBtn => ClipboardContainer.ClipFilterImagesBtn;
-    internal System.Windows.Controls.Button ClipFilterLinksBtn => ClipboardContainer.ClipFilterLinksBtn;
-    internal System.Windows.Controls.Button ClipFilterPinnedBtn => ClipboardContainer.ClipFilterPinnedBtn;
-    internal Button EyedropperButton => ClipboardContainer.EyedropperButton;
-    internal Button OcrClipboardButton => ClipboardContainer.OcrClipboardButton;
+    internal Button ClearClipboardButton => EnsureClipboardContainer().ClearClipboardButton;
+    internal Button CaptureRegionButton => EnsureClipboardContainer().CaptureRegionButton;
+    internal Button ClipboardQuickPickerButton => EnsureClipboardContainer().ClipboardQuickPickerButton;
+    internal TextBlock ClipboardQueueBtnText => EnsureClipboardContainer().ClipboardQueueBtnText;
+    internal System.Windows.Controls.Button ClearClipboardSearchBtn => EnsureClipboardContainer().ClearClipboardSearchBtn;
+    internal TextBlock ClipboardCountText => EnsureClipboardContainer().ClipboardCountText;
+    internal FrameworkElement ClipboardEmptyPlaceholder => EnsureClipboardContainer().ClipboardEmptyPlaceholder;
+    internal ItemsControl ClipboardItemsControl => EnsureClipboardContainer().ClipboardItemsControl;
+    internal System.Windows.Controls.Button ClipboardScrollLeftBtn => EnsureClipboardContainer().ClipboardScrollLeftBtn;
+    internal System.Windows.Controls.Button ClipboardScrollRightBtn => EnsureClipboardContainer().ClipboardScrollRightBtn;
+    internal System.Windows.Controls.ScrollViewer ClipboardScrollViewer => EnsureClipboardContainer().ClipboardScrollViewer;
+    internal System.Windows.Controls.TextBox ClipboardSearchBox => EnsureClipboardContainer().ClipboardSearchBox;
+    internal System.Windows.Controls.Button ClipFilterAllBtn => EnsureClipboardContainer().ClipFilterAllBtn;
+    internal System.Windows.Controls.Button ClipFilterCodeBtn => EnsureClipboardContainer().ClipFilterCodeBtn;
+    internal System.Windows.Controls.Button ClipFilterColorsBtn => EnsureClipboardContainer().ClipFilterColorsBtn;
+    internal System.Windows.Controls.Button ClipFilterImagesBtn => EnsureClipboardContainer().ClipFilterImagesBtn;
+    internal System.Windows.Controls.Button ClipFilterLinksBtn => EnsureClipboardContainer().ClipFilterLinksBtn;
+    internal System.Windows.Controls.Button ClipFilterPinnedBtn => EnsureClipboardContainer().ClipFilterPinnedBtn;
+    internal Button EyedropperButton => EnsureClipboardContainer().EyedropperButton;
+    internal Button OcrClipboardButton => EnsureClipboardContainer().OcrClipboardButton;
 
     // -------------------------------------------------------------------------
     //  Calc View Forwarders (CalcContainer)
@@ -133,7 +133,7 @@ public partial class IslandWindow
     // -------------------------------------------------------------------------
     //  Settings View Forwarders (Minimal cross-partial accessor)
     // -------------------------------------------------------------------------
-    internal DynamicIsland.Core.VirtualPetControl SettingsHeroPet => SettingsContainer.PetPanel.SettingsHeroPet;
+    internal DynamicIsland.Core.VirtualPetControl? SettingsHeroPet => _settingsContainer?.PetPanel.SettingsHeroPet;
 
     // -------------------------------------------------------------------------
     //  Audio View Forwarders (AudioContainer)
@@ -270,30 +270,30 @@ public partial class IslandWindow
     // -------------------------------------------------------------------------
     //  Notifications View Forwarders (NotificationsContainer)
     // -------------------------------------------------------------------------
-    internal Button ClearNotificationsButton => NotificationsContainer.ClearNotificationsButton;
-    internal System.Windows.Controls.Border NotificationsCountBadge => NotificationsContainer.NotificationsCountBadge;
-    internal TextBlock NotificationsCountText => NotificationsContainer.NotificationsCountText;
-    internal Button NotificationsDndButton => NotificationsContainer.NotificationsDndButton;
-    internal TextBlock NotificationsDndGlyph => NotificationsContainer.NotificationsDndGlyph;
-    internal TextBlock NotificationsDndText => NotificationsContainer.NotificationsDndText;
-    internal DockPanel NotificationsFilterBar => NotificationsContainer.NotificationsFilterBar;
-    internal Button NotifFilterAllBtn => NotificationsContainer.NotifFilterAllBtn;
-    internal Button NotifFilterMessagesBtn => NotificationsContainer.NotifFilterMessagesBtn;
-    internal TextBox NotificationsSearchBox => NotificationsContainer.NotificationsSearchBox;
-    internal Button ClearNotificationsSearchBtn => NotificationsContainer.ClearNotificationsSearchBtn;
-    internal StackPanel NotificationsEmptyPlaceholder => NotificationsContainer.NotificationsEmptyPlaceholder;
-    internal TextBlock NotificationsEmptyGlyph => NotificationsContainer.NotificationsEmptyGlyph;
-    internal TextBlock NotificationsEmptyTitle => NotificationsContainer.NotificationsEmptyTitle;
-    internal TextBlock NotificationsEmptySubtitle => NotificationsContainer.NotificationsEmptySubtitle;
-    internal Button NotificationsEmptyActionBtn => NotificationsContainer.NotificationsEmptyActionBtn;
-    internal TextBlock NotificationsEmptyActionText => NotificationsContainer.NotificationsEmptyActionText;
-    internal ItemsControl NotificationsItemsControl => NotificationsContainer.NotificationsItemsControl;
-    internal System.Windows.Controls.ScrollViewer NotificationsScrollViewer => NotificationsContainer.NotificationsScrollViewer;
-    internal Button UnmuteAllAppsButton => NotificationsContainer.UnmuteAllAppsButton;
-    internal TextBlock UnmuteAllAppsText => NotificationsContainer.UnmuteAllAppsText;
-    internal Button ToggleGroupingButton => NotificationsContainer.ToggleGroupingButton;
-    internal TextBlock ToggleGroupingGlyph => NotificationsContainer.ToggleGroupingGlyph;
-    internal TextBlock ToggleGroupingText => NotificationsContainer.ToggleGroupingText;
+    internal Button ClearNotificationsButton => EnsureNotificationsContainer().ClearNotificationsButton;
+    internal System.Windows.Controls.Border NotificationsCountBadge => EnsureNotificationsContainer().NotificationsCountBadge;
+    internal TextBlock NotificationsCountText => EnsureNotificationsContainer().NotificationsCountText;
+    internal Button NotificationsDndButton => EnsureNotificationsContainer().NotificationsDndButton;
+    internal TextBlock NotificationsDndGlyph => EnsureNotificationsContainer().NotificationsDndGlyph;
+    internal TextBlock NotificationsDndText => EnsureNotificationsContainer().NotificationsDndText;
+    internal DockPanel NotificationsFilterBar => EnsureNotificationsContainer().NotificationsFilterBar;
+    internal Button NotifFilterAllBtn => EnsureNotificationsContainer().NotifFilterAllBtn;
+    internal Button NotifFilterMessagesBtn => EnsureNotificationsContainer().NotifFilterMessagesBtn;
+    internal TextBox NotificationsSearchBox => EnsureNotificationsContainer().NotificationsSearchBox;
+    internal Button ClearNotificationsSearchBtn => EnsureNotificationsContainer().ClearNotificationsSearchBtn;
+    internal StackPanel NotificationsEmptyPlaceholder => EnsureNotificationsContainer().NotificationsEmptyPlaceholder;
+    internal TextBlock NotificationsEmptyGlyph => EnsureNotificationsContainer().NotificationsEmptyGlyph;
+    internal TextBlock NotificationsEmptyTitle => EnsureNotificationsContainer().NotificationsEmptyTitle;
+    internal TextBlock NotificationsEmptySubtitle => EnsureNotificationsContainer().NotificationsEmptySubtitle;
+    internal Button NotificationsEmptyActionBtn => EnsureNotificationsContainer().NotificationsEmptyActionBtn;
+    internal TextBlock NotificationsEmptyActionText => EnsureNotificationsContainer().NotificationsEmptyActionText;
+    internal ItemsControl NotificationsItemsControl => EnsureNotificationsContainer().NotificationsItemsControl;
+    internal System.Windows.Controls.ScrollViewer NotificationsScrollViewer => EnsureNotificationsContainer().NotificationsScrollViewer;
+    internal Button UnmuteAllAppsButton => EnsureNotificationsContainer().UnmuteAllAppsButton;
+    internal TextBlock UnmuteAllAppsText => EnsureNotificationsContainer().UnmuteAllAppsText;
+    internal Button ToggleGroupingButton => EnsureNotificationsContainer().ToggleGroupingButton;
+    internal TextBlock ToggleGroupingGlyph => EnsureNotificationsContainer().ToggleGroupingGlyph;
+    internal TextBlock ToggleGroupingText => EnsureNotificationsContainer().ToggleGroupingText;
 
     // -------------------------------------------------------------------------
     //  SystemHud View Forwarders (SystemHudContainer)

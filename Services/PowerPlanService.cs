@@ -69,7 +69,7 @@ internal sealed class PowerPlanService : IDisposable
     public event Action<int, string>? DisconnectedTriggered;
     public event Action<int>? LowBatteryTriggered;
 
-    public PowerPlanService(Dispatcher ui, SettingsService? settings = null)
+    public PowerPlanService(Dispatcher ui, SettingsService? settings = null, bool deferInitialRefresh = false)
     {
         _ui = ui;
         _settings = settings;
@@ -87,7 +87,10 @@ internal sealed class PowerPlanService : IDisposable
         }
         catch { }
 
-        Refresh();
+        if (!deferInitialRefresh)
+        {
+            Refresh();
+        }
         _initialized = true;
     }
 

@@ -28,100 +28,115 @@ public partial class IslandWindow
         try
         {
             var cur = _settingsService.Current;
-            var appPanel = SettingsContainer.AppearancePanel;
-            var dispPanel = SettingsContainer.DisplayPowerPanel;
-
-            if (dispPanel.NotchOffsetSlider != null) dispPanel.NotchOffsetSlider.Value = cur.NotchYOffset;
-            if (dispPanel.NotchOffsetText != null) dispPanel.NotchOffsetText.Text = $"{cur.NotchYOffset} px";
-
-            double liquidPct = Math.Round(cur.LiquidIntensity * 100);
-            if (appPanel.LiquidIntensitySlider != null) appPanel.LiquidIntensitySlider.Value = liquidPct;
-            if (appPanel.LiquidIntensityText != null) appPanel.LiquidIntensityText.Text = $"{liquidPct}%";
-
-            double speedPct = Math.Round(cur.AnimationSpeed * 100);
-            if (appPanel.AnimationSpeedSlider != null) appPanel.AnimationSpeedSlider.Value = speedPct;
-            if (appPanel.AnimationSpeedText != null) appPanel.AnimationSpeedText.Text = $"{speedPct}%";
-
-            double scalePct = Math.Round(cur.IslandScale * 100);
-            if (appPanel.IslandScaleSlider != null) appPanel.IslandScaleSlider.Value = scalePct;
-            if (appPanel.IslandScaleText != null) appPanel.IslandScaleText.Text = $"{scalePct}%";
             if (RootScaleTransform != null)
             {
                 RootScaleTransform.ScaleX = cur.IslandScale;
                 RootScaleTransform.ScaleY = cur.IslandScale;
             }
-
-            double opacityPct = Math.Round(cur.BackdropOpacity * 100);
-            if (appPanel.BackdropOpacitySlider != null) appPanel.BackdropOpacitySlider.Value = opacityPct;
-            if (appPanel.BackdropOpacityText != null) appPanel.BackdropOpacityText.Text = $"{opacityPct}%";
             if (PillBackground != null) PillBackground.Opacity = Math.Clamp(cur.BackdropOpacity, 0.65, 1.0);
-
-            double blurPct = Math.Round(cur.GlassBlurIntensity * 100);
-            if (appPanel.GlassBlurSlider != null) appPanel.GlassBlurSlider.Value = blurPct;
-            if (appPanel.GlassBlurText != null) appPanel.GlassBlurText.Text = $"{blurPct}%";
             DynamicIsland.Core.LiquidGlassTheme.GlobalBlurScale = (float)cur.GlassBlurIntensity;
-
-            double refPct = Math.Round(cur.GlassRefractionIntensity * 100);
-            if (appPanel.GlassRefractionSlider != null) appPanel.GlassRefractionSlider.Value = refPct;
-            if (appPanel.GlassRefractionText != null) appPanel.GlassRefractionText.Text = $"{refPct}%";
             DynamicIsland.Core.LiquidGlassTheme.GlobalThicknessScale = (float)cur.GlassRefractionIntensity;
-
-            UpdateGlassOpticsAvailabilityUI();
 
             ThemeManager.SetThemeMode(SettingsService.NormalizeThemeMode(cur.ThemeMode));
             ThemeManager.SetThemeStyle(SettingsService.NormalizeThemeStyle(cur.ThemeStyle));
             ApplyTheme(cur.ThemeName);
-            UpdateDockButtonsUI();
-            UpdateExpandTriggerUI();
-            UpdateFastSwipeGuardUI();
-            UpdateGhostModifierUI();
-            UpdateQuickTuckUI();
-            UpdateAutoHideModeUI();
-        UpdateContextProfilesUI();
-            UpdateHaloUI();
-            UpdateDndUI();
-            UpdateBannerModeUI();
-            UpdateMotionModeUI();
-            UpdateStartupUI();
-            UpdateVolumeOsdUI();
             UpdateHotkeysUI();
             UpdateDockVisibilityUI();
-            UpdateMonitorUI();
-            UpdateNotchBezelUI();
-            UpdateFollowMonitorUI();
-            UpdateClockStyleUI();
-            UpdateLyricsSettingsUI();
-            UpdateNetSpeedIdleUI();
-            UpdateCapsuleElementsUI();
-            UpdateVisualizerStyleUI();
-            UpdateAlbumArtStyleUI();
-            UpdatePetSettingsUI();
-            UpdateDisplayAndBatterySettingsUI();
-            UpdateNotifSettingsUI();
-            UpdateSystemSettingsUI();
-            UpdateSettingsHeaderRamBadge();
-            SwitchSettingsTab(_currentSettingsTab, false);
             ApplyClockStyle(cur.ClockStyle);
             ApplyVisualizerStyle(cur.VisualizerStyle);
             ApplyAlbumArtStyle(cur.AlbumArtStyle);
             ApplyIslandTheme(cur.IslandTheme);
-            UpdateThemeModeUI();
-            UpdateThemeStyleUI();
-            UpdateIslandThemeUI();
-            UpdateIslandNatureSettingsUI();
             ApplyThemeStyleVisuals();
             ApplyEdgeBorder(cur.ShowEdgeBorder);
-            UpdateEdgeBorderUI();
-            UpdateSecondaryDropletUI();
             SyncSpringMotionPreferences();
             UpdateSpectrumActivity();
-            UpdateSettingsVersionAndStatusUI();
             PositionWindow();
+
+            if (_settingsContainer != null)
+            {
+                SyncSettingsContainerUI();
+            }
         }
         finally
         {
             _isApplyingSettings = false;
         }
+    }
+
+    internal void SyncSettingsContainerUI()
+    {
+        if (_settingsContainer == null) return;
+        var cur = _settingsService.Current;
+        var appPanel = _settingsContainer.AppearancePanel;
+        var dispPanel = _settingsContainer.DisplayPowerPanel;
+
+        if (dispPanel.NotchOffsetSlider != null) dispPanel.NotchOffsetSlider.Value = cur.NotchYOffset;
+        if (dispPanel.NotchOffsetText != null) dispPanel.NotchOffsetText.Text = $"{cur.NotchYOffset} px";
+
+        double liquidPct = Math.Round(cur.LiquidIntensity * 100);
+        if (appPanel.LiquidIntensitySlider != null) appPanel.LiquidIntensitySlider.Value = liquidPct;
+        if (appPanel.LiquidIntensityText != null) appPanel.LiquidIntensityText.Text = $"{liquidPct}%";
+
+        double speedPct = Math.Round(cur.AnimationSpeed * 100);
+        if (appPanel.AnimationSpeedSlider != null) appPanel.AnimationSpeedSlider.Value = speedPct;
+        if (appPanel.AnimationSpeedText != null) appPanel.AnimationSpeedText.Text = $"{speedPct}%";
+
+        double scalePct = Math.Round(cur.IslandScale * 100);
+        if (appPanel.IslandScaleSlider != null) appPanel.IslandScaleSlider.Value = scalePct;
+        if (appPanel.IslandScaleText != null) appPanel.IslandScaleText.Text = $"{scalePct}%";
+
+        double opacityPct = Math.Round(cur.BackdropOpacity * 100);
+        if (appPanel.BackdropOpacitySlider != null) appPanel.BackdropOpacitySlider.Value = opacityPct;
+        if (appPanel.BackdropOpacityText != null) appPanel.BackdropOpacityText.Text = $"{opacityPct}%";
+
+        double blurPct = Math.Round(cur.GlassBlurIntensity * 100);
+        if (appPanel.GlassBlurSlider != null) appPanel.GlassBlurSlider.Value = blurPct;
+        if (appPanel.GlassBlurText != null) appPanel.GlassBlurText.Text = $"{blurPct}%";
+
+        double refPct = Math.Round(cur.GlassRefractionIntensity * 100);
+        if (appPanel.GlassRefractionSlider != null) appPanel.GlassRefractionSlider.Value = refPct;
+        if (appPanel.GlassRefractionText != null) appPanel.GlassRefractionText.Text = $"{refPct}%";
+
+        UpdateGlassOpticsAvailabilityUI();
+        UpdateAccentSwatchUI(cur.ThemeName);
+        UpdateDockButtonsUI();
+        UpdateExpandTriggerUI();
+        UpdateFastSwipeGuardUI();
+        UpdateGhostModifierUI();
+        UpdateQuickTuckUI();
+        UpdateAutoHideModeUI();
+        UpdateContextProfilesUI();
+        UpdateHaloUI();
+        UpdateDndUI();
+        UpdateBannerModeUI();
+        UpdateMotionModeUI();
+        UpdateStartupUI();
+        UpdateVolumeOsdUI();
+        UpdateHotkeysUI();
+        UpdateDockVisibilityUI();
+        UpdateMonitorUI();
+        UpdateNotchBezelUI();
+        UpdateFollowMonitorUI();
+        UpdateClockStyleUI();
+        UpdateLyricsSettingsUI();
+        UpdateNetSpeedIdleUI();
+        UpdateCapsuleElementsUI();
+        UpdateVisualizerStyleUI();
+        UpdateAlbumArtStyleUI();
+        UpdatePetSettingsUI();
+        UpdateDisplayAndBatterySettingsUI();
+        UpdateNotifSettingsUI();
+        UpdateSystemSettingsUI();
+        UpdateSettingsHeaderRamBadge();
+        UpdateThemeModeUI();
+        UpdateThemeStyleUI();
+        UpdateIslandThemeUI();
+        UpdateIslandNatureSettingsUI();
+        UpdateEdgeBorderUI();
+        UpdateSecondaryDropletUI();
+        UpdateSettingsVersionAndStatusUI();
+        UpdateDropletsUI();
+        SwitchSettingsTab(_currentSettingsTab, false);
     }
 
     private void OnSettingsPropertyChanged(string? propertyName)

@@ -58,6 +58,9 @@ public sealed class ActivityIpcRequest
 
     [JsonPropertyName("timeoutSec")]
     public int? TimeoutSec { get; set; }
+
+    [JsonPropertyName("logLine")]
+    public string? LogLine { get; set; }
 }
 
 public sealed class ActivityIpcResponse
@@ -519,7 +522,28 @@ internal sealed class LiveActivityIpcService : IDisposable
                 };
 
                 _hub.Publish(item);
+                if (!string.IsNullOrWhiteSpace(req.LogLine))
+                {
+                    _hub.AppendLog(item.Id, req.LogLine);
+                }
                 return new ActivityIpcResponse { Ok = true, Message = $"Published activity '{item.Id}'." };
+            }
+
+            case "log":
+            {
+                if (string.IsNullOrWhiteSpace(req.Id))
+                {
+                    return new ActivityIpcResponse { Ok = false, Error = "Missing required 'id'." };
+                }
+                string? line = req.LogLine ?? req.Chunk;
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    return new ActivityIpcResponse { Ok = false, Error = "Missing 'logLine' or 'chunk'." };
+                }
+                bool appended = _hub.AppendLog(req.Id.Trim(), line);
+                return appended
+                    ? new ActivityIpcResponse { Ok = true, Message = $"Appended log to '{req.Id.Trim()}'." }
+                    : new ActivityIpcResponse { Ok = false, Error = $"Activity '{req.Id.Trim()}' not found." };
             }
 
             case "update":

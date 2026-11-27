@@ -107,6 +107,7 @@ internal static partial class SelfTestRunner
         Run("Phase5SharingAndPhoneBridge: Windows Share Sheet interop, Phone Bridge LAN Quickshare & PWA", TestPhase5SharingAndPhoneBridge);
         Run("QrCodeGenerator: ISO/IEC 18004 2D matrix encoding, Reed-Solomon ECC, mask optimization & BitmapSource generation", TestQrCodeGenerator);
         Run("DetachedPlayer & MediaSongList: Tracklist cleaning, session models & active players", TestMediaSongListAndDetachedPlayer);
+        Run("MiniPlayerUpgrades: Showcase mode, GPU EQ, persistent artwork history, plain/animated lyrics & fullscreen suppression", TestMiniPlayerUpgrades);
         Run("TaskService & CalendarService: Real checklists, custom events, dot markers & metadata parsing", TestTaskServiceAndCalendar);
         Run("LauncherView: Smooth scrolling, search filtering & friendly tooltip descriptions", TestLauncherScrollingAndSearch);
         Run("NavigationAndFocusability: Expanded views focusability, input traps & key roundtrips", TestNavigationAndFocusability);
@@ -150,7 +151,19 @@ internal static partial class SelfTestRunner
         Run("IpcHookGenerator: Valid JSON/PS1 hook synthesis & pipe target verification", TestIpcHookGenerator);
         Run("AccessibilityAndHighContrast: High-contrast fallback & AutomationProperties coverage", TestAccessibilityAndHighContrast);
         Run("SettingsExport: Secret stripping & preset round-trip", TestSettingsExportSanitization);
+        Run("IslandShapeTable: Idle complications, notch override, prompt sizing & hover tension", TestIslandShapeTableInvariants);
+        Run("ChoreographerConsolidation: Multi-service registration, BatterySaver throttling & unregister", TestChoreographerFullConsolidation);
+        Run("DiagnosticsBundle: Bounded log ring & secret-stripped JSON export", TestDiagnosticsBundleSanitization);
+        Run("CommandPaletteV2: Prefix providers (clip:/audio:/win:/set:) & secret exclusion", TestCommandPaletteV2Prefixes);
+        Run("LanShareTrustedSession: HMAC-SHA256 pairing token issue, validate, tamper & revoke", TestLanShareTrustedSessionToken);
+        Run("LocalizationAndCustomProfiles: Language pack override & custom profile round-trip", TestLocalizationPackAndCustomProfiles);
         Run("FirstTimeSetup: Initial settings synthesis for OLED, Liquid Glass & Living Nature presets", TestFirstTimeSetupSynthesis);
+        Run("DesktopWidgetPersistence: Work-area clamping, state round-trip & fullscreen suppression", TestDesktopWidgetPersistenceAndClamping);
+        Run("ViewNavigationBackStack: Bounded push, duplicate skip, LIFO pop & clear", TestViewNavigationBackStack);
+        Run("SingleFlightGate: Concurrent rejection, fault observation & busy reset", TestSingleFlightGateConcurrency);
+        Run("PomodoroFocusAndImageActions: Deep Focus auto-link, minutes tracking & EXIF-strip/resize", TestPomodoroFocusLinkAndImageActions);
+        Run("LiveActivityInspector: Log ring cap, Publish preservation & ActivityInspector routing", TestLiveActivityLogRingAndInspectorRouting);
+        Run("PortableMode: AppPaths --portable / marker redirection vs LocalAppData", TestPortableModePathResolution);
 
         string summary = skipped > 0
             ? $"\nSelf-Test Summary: {passed} passed, {failed} failed, {skipped} skipped (filter: '{filter}')."

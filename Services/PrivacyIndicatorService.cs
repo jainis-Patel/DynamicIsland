@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Windows.Threading;
+using DynamicIsland.Core;
 using Microsoft.Win32;
 using NAudio.CoreAudioApi;
 using static DynamicIsland.Interop.NativeMethods;
@@ -52,6 +53,9 @@ internal sealed class PrivacyIndicatorService : IDisposable
         }
     }
 
+    public const string ChoreId = "privacy_fallback_poll";
+    private Choreographer? _choreographer;
+
     public bool IsCameraActive { get; private set; }
     public bool IsMicrophoneActive { get; private set; }
     public bool IsMicrophoneMuted { get; private set; }
@@ -91,11 +95,14 @@ internal sealed class PrivacyIndicatorService : IDisposable
         "chrome", "msedge", "firefox", "brave", "opera", "vivaldi", "arc"
     };
 
-    public PrivacyIndicatorService(Dispatcher ui, MMDeviceEnumerator enumerator)
+    public PrivacyIndicatorService(Dispatcher ui, MMDeviceEnumerator enumerator, bool deferDeviceInit = false)
     {
         _ui = ui;
         _enumerator = enumerator;
-        InitCaptureDevice();
+        if (!deferDeviceInit)
+        {
+            InitCaptureDevice();
+        }
 
         _fallbackTimer = new DispatcherTimer(DispatcherPriority.Background, _ui)
         {
@@ -149,15 +156,37 @@ internal sealed class PrivacyIndicatorService : IDisposable
         });
     }
 
+    public void AttachChoreographer(Choreographer choreographer)
+    {
+        if (_disposed || choreographer == null) return;
+        _choreographer = choreographer;
+        _fallbackTimer.Stop();
+        if (!_isSuspended && (!_watchersAttached || IsCameraActive || IsMicrophoneActive))
+        {
+            _choreographer.Register(ChoreId, TriggerPoll, 4, PowerSensitivity.Relaxed);
+        }
+    }
+
     public void Start()
     {
+        if (_captureDevice == null)
+        {
+            InitCaptureDevice();
+        }
         bool camAttached = TryAttachRegistryWatcher("webcam");
         bool micAttached = TryAttachRegistryWatcher("microphone");
         _watchersAttached = camAttached && micAttached;
         if (!_watchersAttached && !_isSuspended)
         {
-            _fallbackTimer.Interval = TimeSpan.FromSeconds(10);
-            _fallbackTimer.Start();
+            if (_choreographer != null)
+            {
+                _choreographer.Register(ChoreId, TriggerPoll, 10, PowerSensitivity.Relaxed);
+            }
+            else
+            {
+                _fallbackTimer.Interval = TimeSpan.FromSeconds(10);
+                _fallbackTimer.Start();
+            }
         }
         TriggerPoll();
     }
@@ -165,6 +194,7 @@ internal sealed class PrivacyIndicatorService : IDisposable
     public void Stop()
     {
         _fallbackTimer.Stop();
+        _choreographer?.Unregister(ChoreId);
         DisposeWatchers();
     }
 
@@ -175,12 +205,16 @@ internal sealed class PrivacyIndicatorService : IDisposable
         if (suspended)
         {
             _fallbackTimer.Stop();
+            _choreographer?.Unregister(ChoreId);
         }
         else
         {
             if (!_watchersAttached || IsCameraActive || IsMicrophoneActive)
             {
-                _fallbackTimer.Start();
+                if (_choreographer != null)
+                    _choreographer.Register(ChoreId, TriggerPoll, 4, PowerSensitivity.Relaxed);
+                else
+                    _fallbackTimer.Start();
             }
             TriggerPoll();
         }

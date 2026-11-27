@@ -29,7 +29,8 @@ public enum ExpandedView
     QuickReply,
     WidgetsGallery,
     Pet,
-    Mirror
+    Mirror,
+    ActivityInspector
 }
 
 public static class ExpandedViewExtensions
@@ -59,6 +60,7 @@ public static class ExpandedViewExtensions
         ExpandedView.WidgetsGallery => "widgetsgallery",
         ExpandedView.Pet => "pet",
         ExpandedView.Mirror => "mirror",
+        ExpandedView.ActivityInspector => "activityinspector",
         _ => "media"
     };
 
@@ -175,6 +177,12 @@ public static class ExpandedViewExtensions
             case "camera":
             case "webcam":
                 view = ExpandedView.Mirror;
+                return true;
+            case "activityinspector":
+            case "inspector":
+            case "liveactivity":
+            case "liveactivities":
+                view = ExpandedView.ActivityInspector;
                 return true;
             default:
                 view = ExpandedView.Media;

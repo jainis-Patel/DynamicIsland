@@ -41,6 +41,12 @@ public partial class SystemUpdatesSettingsPanel : UserControl
     private void LottieAnimToggleBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.LottieAnimToggleBtn_Click(sender, e);
 
+    private void ExportDiagnosticsBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.ExportDiagnosticsWithToast();
+
+    private void ReplayOnboardingBtn_Click(object sender, RoutedEventArgs e) =>
+        Island?.ReplayOnboardingWithToast();
+
     private void ExportSettingsBtn_Click(object sender, RoutedEventArgs e) =>
         Island?.ExportSettingsBtn_Click(sender, e);
 

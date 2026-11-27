@@ -52,8 +52,15 @@ public static class Program
                 swTotal.Stop();
                 Core.IslandMemoryManager.ExecuteConservativeTrim();
                 var p = System.Diagnostics.Process.GetCurrentProcess();
+                long managedMb = GC.GetTotalMemory(false) / 1024 / 1024;
                 Console.WriteLine($"[Startup] AppInit={swInit.ElapsedMilliseconds}ms, WindowCtor={swWindow.ElapsedMilliseconds}ms, LoadedTotal={swTotal.ElapsedMilliseconds}ms");
-                Console.WriteLine($"[Startup Memory] WorkingSet={p.WorkingSet64 / 1024 / 1024} MB, PrivateBytes={p.PrivateMemorySize64 / 1024 / 1024} MB, TotalManaged={GC.GetTotalMemory(false) / 1024 / 1024} MB");
+                Console.WriteLine($"[Startup Memory] WorkingSet={p.WorkingSet64 / 1024 / 1024} MB, PrivateBytes={p.PrivateMemorySize64 / 1024 / 1024} MB, TotalManaged={managedMb} MB");
+                if (args.Any(a => string.Equals(a, "--assert-startup-budget", StringComparison.OrdinalIgnoreCase)) &&
+                    (managedMb > 48 || swWindow.ElapsedMilliseconds > 2500))
+                {
+                    Console.Error.WriteLine($"[BUDGET FAIL] WindowCtor={swWindow.ElapsedMilliseconds}ms (limit 2500ms), TotalManaged={managedMb} MB (limit 48 MB)");
+                    Environment.Exit(1);
+                }
                 Environment.Exit(0);
             };
             app.Run(win);

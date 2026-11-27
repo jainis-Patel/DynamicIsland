@@ -21,11 +21,6 @@ public partial class IslandWindow
 
     private void OnPowerStatusChanged(PowerStatusInfo status)
     {
-        if (BatteryBadgeText == null) return;
-
-        BatteryBadgeText.Text = status.HasBattery ? $"{status.BatteryPercent}%" : "AC";
-        BatteryButtonGlyph.Text = status.BatteryGlyph;
-
         var dpHealthText = SettingsContainer?.DisplayPowerPanel?.BatteryHealthSummaryText;
         if (dpHealthText != null)
         {

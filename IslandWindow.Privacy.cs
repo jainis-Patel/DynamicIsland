@@ -92,10 +92,6 @@ public partial class IslandWindow
     private void UpdateMicMuteUI()
     {
         bool muted = _privacyService.IsMicrophoneMuted;
-        MicMuteGlyph.Text = muted ? "\uE74F" : "\uE720";
-        MicMuteButton.Background = muted ? ThemeBrushes.MicMutedBg : ThemeBrushes.ButtonSubtleBg;
-        MicMuteGlyph.Foreground = muted ? ThemeBrushes.Red : ThemeBrushes.PrimaryText;
-        MicMuteButton.ToolTip = muted ? "Unmute Microphone" : "Mute Microphone";
 
         if (ExpandedCallMicBadge != null && ExpandedCallMicText != null)
         {
@@ -128,7 +124,7 @@ public partial class IslandWindow
             CompactMicToggleBtn.ToolTip = muted ? "Microphone Muted \u00B7 Click to unmute (Ctrl+Alt+K)" : "Microphone Active \u00B7 Click to mute (Ctrl+Alt+K)";
         }
 
-        if (HardwareMicGlyph != null && HardwareMicText != null)
+        if (_audioContainer != null && HardwareMicGlyph != null && HardwareMicText != null)
         {
             HardwareMicGlyph.Text = muted ? "\uE74F" : "\uE720";
             HardwareMicGlyph.Foreground = muted ? ThemeBrushes.Red : ThemeBrushes.Green;

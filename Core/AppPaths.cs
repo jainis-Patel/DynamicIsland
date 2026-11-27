@@ -11,8 +11,10 @@ namespace DynamicIsland.Core;
 internal static class AppPaths
 {
     private static readonly ConcurrentDictionary<string, string> CachedDataPaths = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Lazy<(string Directory, bool IsPortable)> ResolvedRoot = new(ResolveInitialDataDirectory);
 
-    public static string DataDirectory { get; } = ResolveDataDirectory();
+    public static string DataDirectory => ResolvedRoot.Value.Directory;
+    public static bool IsPortableMode => ResolvedRoot.Value.IsPortable;
 
     public static string SettingsFile => GetDataFilePath("settings.json");
     public static string ShelfFile => GetDataFilePath("shelf.json");
@@ -63,11 +65,37 @@ internal static class AppPaths
         });
     }
 
-    private static string ResolveDataDirectory()
+    private static (string Directory, bool IsPortable) ResolveInitialDataDirectory()
     {
+        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        bool hasPortableFlag = Environment.GetCommandLineArgs()
+                                   .Any(a => string.Equals(a, "--portable", StringComparison.OrdinalIgnoreCase)) ||
+                               File.Exists(Path.Combine(baseDir, "portable.marker"));
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return ResolveDataDirectoryCore(baseDir, localAppData, hasPortableFlag);
+    }
+
+    internal static (string Directory, bool IsPortable) ResolveDataDirectoryCore(string baseDir, string localAppData, bool hasPortableFlag)
+    {
+        if (hasPortableFlag)
+        {
+            try
+            {
+                string portableDir = Path.Combine(baseDir, "data");
+                Directory.CreateDirectory(portableDir);
+                string probe = Path.Combine(portableDir, $".write_probe_{Guid.NewGuid():N}");
+                File.WriteAllText(probe, "");
+                File.Delete(probe);
+                return (portableDir, true);
+            }
+            catch
+            {
+                // Fall through if base directory is read-only
+            }
+        }
+
         try
         {
-            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             if (!string.IsNullOrWhiteSpace(localAppData))
             {
                 string dir = Path.Combine(localAppData, "DynamicIsland");
@@ -77,7 +105,7 @@ internal static class AppPaths
                 string probe = Path.Combine(dir, $".write_probe_{Guid.NewGuid():N}");
                 File.WriteAllText(probe, "");
                 File.Delete(probe);
-                return dir;
+                return (dir, false);
             }
         }
         catch
@@ -85,6 +113,6 @@ internal static class AppPaths
             // Fall back to application base directory (portable / sandboxed mode)
         }
 
-        return AppDomain.CurrentDomain.BaseDirectory;
+        return (baseDir, hasPortableFlag);
     }
 }

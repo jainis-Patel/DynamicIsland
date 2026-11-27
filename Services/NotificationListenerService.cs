@@ -187,6 +187,7 @@ public sealed class NotificationAppGroup : System.ComponentModel.INotifyProperty
 /// </remarks>
 internal sealed partial class NotificationListenerService : IDisposable
 {
+    public const string ChoreId = "notifications_poll";
     public const int MaxHistoryCount = 25;
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(750);
 
@@ -197,6 +198,7 @@ internal sealed partial class NotificationListenerService : IDisposable
     private readonly List<NotificationHistoryItem> _history = new();
     private UserNotificationListener? _listener;
     private DispatcherTimer? _pollTimer;
+    private Choreographer? _choreographer;
     private bool _eventSubscribed;
     private bool _polling;
     private bool _suspended;
@@ -289,10 +291,13 @@ internal sealed partial class NotificationListenerService : IDisposable
             }
 
             _pollTimer = new DispatcherTimer(DispatcherPriority.Background, _ui) { Interval = PollInterval };
-            _pollTimer.Tick += async (_, _) => await PollAsync();
+            _pollTimer.Tick += (_, _) => PollAsync().FireAndForget("Notifications.Poll");
             if (!_suspended && !_disposed)
             {
-                _pollTimer.Start();
+                if (_choreographer != null)
+                    _choreographer.Register(ChoreId, () => PollAsync().FireAndForget("Notifications.Chore"), (int)Math.Max(1, PollInterval.TotalSeconds), PowerSensitivity.Relaxed);
+                else
+                    _pollTimer.Start();
             }
             App.Log($"[NotificationListener] Listening ({_seenIds.Count} existing notifications ignored).");
         }
@@ -730,10 +735,22 @@ internal sealed partial class NotificationListenerService : IDisposable
 
     public static bool IsMessagingApp(string? appName) => IsMessagingApp(appName, null);
 
+    public void AttachChoreographer(Choreographer choreographer)
+    {
+        if (_disposed || choreographer == null) return;
+        _choreographer = choreographer;
+        _pollTimer?.Stop();
+        if (!_suspended && _listener != null)
+        {
+            _choreographer.Register(ChoreId, () => PollAsync().FireAndForget("Notifications.Chore"), (int)Math.Max(1, PollInterval.TotalSeconds), PowerSensitivity.Relaxed);
+        }
+    }
+
     public void Dispose()
     {
         _disposed = true;
         _pollTimer?.Stop();
+        _choreographer?.Unregister(ChoreId);
         if (_listener != null && _eventSubscribed)
         {
             try { _listener.NotificationChanged -= OnNotificationChanged; } catch { }

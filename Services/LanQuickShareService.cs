@@ -89,7 +89,62 @@ internal sealed partial class LanQuickShareService : IDisposable
     private LanShareSessionInfo? _currentSession;
     private byte[]? _passwordSalt;
     private byte[]? _passwordDigest;
+    private byte[] _trustedTokenKey = RandomNumberGenerator.GetBytes(32);
     private bool _disposed;
+
+    public string IssueTrustedDeviceToken(TimeSpan ttl)
+    {
+        long exp = DateTimeOffset.UtcNow.Add(ttl).ToUnixTimeSeconds();
+        byte[] keySnapshot;
+        lock (_lock)
+        {
+            keySnapshot = _trustedTokenKey;
+        }
+        string expStr = exp.ToString(CultureInfo.InvariantCulture);
+        byte[] sig = HMACSHA256.HashData(keySnapshot, Encoding.UTF8.GetBytes(expStr));
+        return $"{expStr}.{Convert.ToHexString(sig).ToLowerInvariant()}";
+    }
+
+    public bool ValidateTrustedDeviceToken(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return false;
+        int dot = token.IndexOf('.');
+        if (dot <= 0 || dot >= token.Length - 1) return false;
+
+        if (!long.TryParse(token[..dot], NumberStyles.None, CultureInfo.InvariantCulture, out long exp))
+            return false;
+
+        if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() > exp)
+            return false;
+
+        byte[] keySnapshot;
+        lock (_lock)
+        {
+            keySnapshot = _trustedTokenKey;
+        }
+
+        try
+        {
+            byte[] providedSig = Convert.FromHexString(token[(dot + 1)..]);
+            byte[] expectedSig = HMACSHA256.HashData(keySnapshot, Encoding.UTF8.GetBytes(token[..dot]));
+            return providedSig.Length == expectedSig.Length &&
+                   CryptographicOperations.FixedTimeEquals(providedSig, expectedSig);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public void RevokeTrustedDevices()
+    {
+        lock (_lock)
+        {
+            _trustedTokenKey = RandomNumberGenerator.GetBytes(32);
+        }
+        _authorizedClients.Clear();
+        NotifyConnectedClientsChanged();
+    }
 
     public event Action<LanShareSessionInfo?>? SessionChanged;
     public event Action<string>? FileReceivedFromPhone;

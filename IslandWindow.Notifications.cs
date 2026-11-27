@@ -27,31 +27,18 @@ public partial class IslandWindow
 
     internal void OnNotificationHistoryChanged()
     {
-        if (NotificationsBadgeText == null) return;
         var items = _notificationListener.History;
-        NotificationsBadgeText.Text = items.Count > 99 ? "99+" : items.Count.ToString();
-        NotificationsBadgeText.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (NotificationsBadgeText != null)
+        {
+            NotificationsBadgeText.Text = items.Count > 99 ? "99+" : items.Count.ToString();
+            NotificationsBadgeText.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
         if (NotificationsBadgeHost != null)
         {
             NotificationsBadgeHost.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
-        NotificationsCountText.Text = $"{items.Count} new";
-        if (NotificationsCountBadge != null)
-        {
-            NotificationsCountBadge.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        }
-        if (NotificationsFilterBar != null)
-        {
-            NotificationsFilterBar.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        UpdateNotificationsDndUI();
-        UpdateMutedAppsBadgeUI();
-        UpdateGroupingButtonUI();
-        UpdateNotificationFilterButtonsUI();
 
         var filtered = NotificationListenerService.FilterNotifications(items, _notificationFilter, _notificationSearchQuery);
-        ClearNotificationsButton.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         SyncObservableCollection(_notificationHistoryItems, items);
 
         List<NotificationAppGroup> groups;
@@ -71,6 +58,25 @@ public partial class IslandWindow
             groups = filtered.Select(NotificationAppGroup.FromSingle).ToList();
         }
         SyncObservableCollection(_notificationAppGroups, groups);
+
+        if (_notificationsContainer == null) return;
+
+        NotificationsCountText.Text = $"{items.Count} new";
+        if (NotificationsCountBadge != null)
+        {
+            NotificationsCountBadge.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        if (NotificationsFilterBar != null)
+        {
+            NotificationsFilterBar.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        UpdateNotificationsDndUI();
+        UpdateMutedAppsBadgeUI();
+        UpdateGroupingButtonUI();
+        UpdateNotificationFilterButtonsUI();
+
+        ClearNotificationsButton.Visibility = items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         UpdateNotificationsEmptyStateUI(items.Count, filtered.Count);
 
         // Dynamically adjust expanded height if currently viewing Notifications

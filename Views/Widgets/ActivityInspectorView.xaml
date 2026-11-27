@@ -1,0 +1,77 @@
+<UserControl x:Class="DynamicIsland.Views.Widgets.ActivityInspectorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             UseLayoutRounding="True" SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Ideal">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource Glyph}" Text="&#xE9D9;" FontSize="12" Foreground="{DynamicResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                <TextBlock Text="Live Activities" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                <Border x:Name="CountBadge" Background="{DynamicResource ChipBgBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="CountBadgeText" Text="0" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryBrush}" />
+                </Border>
+            </StackPanel>
+            <Button x:Name="ClearAllBtn" DockPanel.Dock="Right" Click="ClearAllBtn_Click" Style="{StaticResource IslandButton}" Height="22" Padding="8,0" Margin="0">
+                <TextBlock Text="Dismiss All" FontSize="9" FontWeight="Medium" Foreground="{DynamicResource SecondaryBrush}" />
+            </Button>
+        </DockPanel>
+
+        <!-- Empty State -->
+        <StackPanel x:Name="EmptyPlaceholder" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+            <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E7;" FontSize="22" Foreground="{DynamicResource SecondaryBrush}" Opacity="0.45" HorizontalAlignment="Center" Margin="0,0,0,6" />
+            <TextBlock Text="No active live activities" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" HorizontalAlignment="Center" />
+            <TextBlock Text="Background pipelines, agent hooks, and paste queues appear here" FontSize="9" Foreground="{DynamicResource SecondaryBrush}" HorizontalAlignment="Center" Margin="0,2,0,0" />
+        </StackPanel>
+
+        <!-- Activity Cards List -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="ActivitiesItemsControl">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{DynamicResource CardSurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,0,0,6">
+                            <StackPanel>
+                                <DockPanel LastChildFill="False">
+                                    <Border Width="24" Height="24" CornerRadius="12" Background="#20FFFFFF" Margin="0,0,8,0" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" FontSize="11" Foreground="{Binding AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center" MaxWidth="290">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
+                                            <Border Background="{DynamicResource ChipBgBrush}" CornerRadius="5" Padding="5,0" Margin="6,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Source}" FontSize="8" Foreground="{DynamicResource SecondaryBrush}" />
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Subtitle}" FontSize="9.5" Foreground="{DynamicResource SecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding ProgressText}" Visibility="{Binding ProgressVisibility}" FontSize="9.5" FontWeight="SemiBold" Foreground="{Binding AccentBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <Button Tag="{Binding Id}" Click="DismissActivityBtn_Click" Style="{StaticResource IslandButton}" Width="22" Height="22" Padding="0" Margin="0" ToolTip="Dismiss activity">
+                                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" />
+                                        </Button>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <!-- Progress Bar -->
+                                <ProgressBar Value="{Binding ProgressPercent, Mode=OneWay}" Maximum="100" Height="3" Margin="0,6,0,0"
+                                             Visibility="{Binding ProgressVisibility}"
+                                             Foreground="{Binding AccentBrush}" Background="#20FFFFFF" BorderThickness="0" />
+
+                                <!-- Streaming Log Tail -->
+                                <Border Visibility="{Binding LogsVisibility}" Background="#14000000" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="6" Padding="6,4" Margin="0,6,0,0">
+                                    <TextBlock Text="{Binding JoinedLogs}" FontFamily="Consolas, Cascadia Mono" FontSize="8.5" Foreground="{DynamicResource SecondaryBrush}" TextWrapping="Wrap" MaxHeight="68" />
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

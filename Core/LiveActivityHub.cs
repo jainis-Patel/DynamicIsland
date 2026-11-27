@@ -19,7 +19,8 @@ public sealed record LiveActivityItem(
     string? TargetViewKey = null,
     IReadOnlyList<LiveActivityAction>? Actions = null,
     string? Diff = null,
-    DateTimeOffset? ExpiresAt = null)
+    DateTimeOffset? ExpiresAt = null,
+    IReadOnlyList<string>? LogLines = null)
 {
     public string Category { get => Source; init => Source = value; }
     public string? TargetView { get => TargetViewKey; init => TargetViewKey = value; }
@@ -28,6 +29,8 @@ public sealed record LiveActivityItem(
     public double ClampedProgress => Progress.HasValue ? Math.Clamp(Progress.Value, 0.0, 1.0) : 0.0;
     public string ProgressPercentText => Progress.HasValue ? $"{(int)Math.Round(ClampedProgress * 100)}%" : "";
     public bool IsInteractivePrompt => Actions != null && Actions.Count > 0;
+    public bool HasLogs => LogLines is { Count: > 0 };
+    public string JoinedLogs => LogLines is { Count: > 0 } ? string.Join("\n", LogLines) : "";
 }
 
 /// <summary>
@@ -140,6 +143,31 @@ public sealed class LiveActivityHub
         return true;
     }
 
+    public bool AppendLog(string id, string? logLine, int maxLines = 20)
+    {
+        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(logLine)) return false;
+        string cleanLine = logLine.Trim();
+        lock (_lock)
+        {
+            int idx = _activities.FindIndex(a => string.Equals(a.Id, id.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (idx < 0) return false;
+            var cur = _activities[idx];
+            var lines = cur.LogLines != null ? new List<string>(cur.LogLines) : new List<string>();
+            lines.Add(cleanLine);
+            if (lines.Count > maxLines)
+            {
+                lines.RemoveRange(0, lines.Count - maxLines);
+            }
+            _activities[idx] = cur with
+            {
+                LogLines = lines,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+        }
+        Changed?.Invoke();
+        return true;
+    }
+
     public void Publish(LiveActivityItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
@@ -149,7 +177,10 @@ public sealed class LiveActivityHub
             int existingIdx = _activities.FindIndex(a => string.Equals(a.Id, item.Id, StringComparison.OrdinalIgnoreCase));
             if (existingIdx >= 0)
             {
-                _activities[existingIdx] = item;
+                var existing = _activities[existingIdx];
+                _activities[existingIdx] = item.LogLines == null && existing.LogLines != null
+                    ? item with { LogLines = existing.LogLines }
+                    : item;
             }
             else
             {

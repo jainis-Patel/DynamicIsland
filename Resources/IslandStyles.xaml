@@ -175,9 +175,25 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
+    <Style x:Key="IslandFocusVisual">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="1.5"
+                            CornerRadius="8"
+                            Margin="-2"
+                            SnapsToDevicePixels="True"
+                            IsHitTestVisible="False" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Pill button: subtle hover veil + fluid spring press scale. Never steals focus. -->
     <Style x:Key="IslandButton" TargetType="Button">
         <Setter Property="Focusable" Value="False" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Height" Value="26" />
         <Setter Property="Padding" Value="9,0" />
@@ -354,6 +370,7 @@
 
     <!-- Compact Floating Dock Icon Pill -->
     <Style x:Key="DockIconButton" TargetType="Button" BasedOn="{StaticResource DockToolButton}">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
         <Setter Property="Width" Value="32" />
         <Setter Property="Height" Value="32" />
         <Setter Property="Padding" Value="0" />
@@ -362,6 +379,7 @@
 
     <!-- Utility Icon Button in Floating Dock (Pin, Settings, Collapse) -->
     <Style x:Key="FloatingDockUtilityButton" TargetType="Button" BasedOn="{StaticResource DockToolButton}">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource IslandFocusVisual}" />
         <Setter Property="Width" Value="28" />
         <Setter Property="Height" Value="28" />
         <Setter Property="Padding" Value="0" />

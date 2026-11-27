@@ -20,11 +20,27 @@ public partial class IslandWindow
     // =================================================================
 
     internal void ExpandNow() => _machine.ExpandNow();
-    internal void CollapseNow() => _machine.CollapseNow();
+    internal void CollapseNow()
+    {
+        _viewBackStack.Clear();
+        _machine.CollapseNow();
+    }
 
+    private readonly ViewNavigationStack _viewBackStack = new();
     private DateTime _lastViewSwitchTime = DateTime.MinValue;
 
-    internal void SwitchExpandedView(ExpandedView view, bool animateTransition = true)
+    internal bool TryNavigateBack()
+    {
+        if (_machine.State != IslandState.Expanded) return false;
+        if (_viewBackStack.TryPop(out var previous))
+        {
+            SwitchExpandedView(previous, animateTransition: true, recordHistory: false);
+            return true;
+        }
+        return false;
+    }
+
+    internal void SwitchExpandedView(ExpandedView view, bool animateTransition = true, bool recordHistory = true)
     {
         if (_machine.State != IslandState.Expanded)
         {
@@ -42,6 +58,10 @@ public partial class IslandWindow
             {
                 return;
             }
+        }
+        if (recordHistory && previousView != view && _machine.State == IslandState.Expanded)
+        {
+            _viewBackStack.Push(previousView);
         }
         _lastViewSwitchTime = DateTime.UtcNow;
 
@@ -837,16 +857,32 @@ public partial class IslandWindow
                 return;
             }
 
+            if (TryNavigateBack())
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (_currentExpandedView != ExpandedView.Media)
             {
-                SwitchExpandedView(ExpandedView.Media);
+                SwitchExpandedView(ExpandedView.Media, animateTransition: true, recordHistory: false);
             }
             else
             {
+                _viewBackStack.Clear();
                 _machine.CollapseNow();
                 UpdatePinExpandedUI();
             }
 
+            e.Handled = true;
+            return;
+        }
+
+        if (_machine.State == IslandState.Expanded &&
+            (Keyboard.Modifiers & ModifierKeys.Alt) != 0 &&
+            e.SystemKey == Key.Left &&
+            TryNavigateBack())
+        {
             e.Handled = true;
             return;
         }

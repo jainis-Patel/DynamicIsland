@@ -15,11 +15,13 @@ internal sealed class MeetingModeService : IDisposable
     public const string MeetingJoinActivityId = "meeting_join";
     public const string MeetingActiveActivityId = "meeting_active";
 
+    public const string ChoreId = "meeting_countdown";
     private readonly Dispatcher _ui;
     private readonly CalendarService _calendar;
     private readonly PrivacyIndicatorService _privacy;
     private readonly LiveActivityHub _hub;
     private readonly DispatcherTimer _countdownTimer;
+    private Choreographer? _choreographer;
     private bool _disposed;
 
     public MeetingModeService(
@@ -38,6 +40,14 @@ internal sealed class MeetingModeService : IDisposable
             Interval = TimeSpan.FromSeconds(15)
         };
         _countdownTimer.Tick += (_, _) => CheckUpcomingMeeting();
+    }
+
+    public void AttachChoreographer(Choreographer choreographer)
+    {
+        if (_disposed || choreographer == null) return;
+        _choreographer = choreographer;
+        _countdownTimer.Stop();
+        CheckUpcomingMeeting();
     }
 
     public void Start()
@@ -91,10 +101,14 @@ internal sealed class MeetingModeService : IDisposable
             // Manage countdown timer: active only when within 15 minutes of meeting
             if (mins <= 15 && mins >= -15)
             {
-                if (!_countdownTimer.IsEnabled) _countdownTimer.Start();
+                if (_choreographer != null)
+                    _choreographer.Register(ChoreId, CheckUpcomingMeeting, 15, PowerSensitivity.Relaxed);
+                else if (!_countdownTimer.IsEnabled)
+                    _countdownTimer.Start();
             }
             else
             {
+                _choreographer?.Unregister(ChoreId);
                 if (_countdownTimer.IsEnabled) _countdownTimer.Stop();
             }
 
@@ -106,6 +120,7 @@ internal sealed class MeetingModeService : IDisposable
         }
         else
         {
+            _choreographer?.Unregister(ChoreId);
             if (_countdownTimer.IsEnabled) _countdownTimer.Stop();
         }
 
@@ -181,6 +196,7 @@ internal sealed class MeetingModeService : IDisposable
         if (_disposed) return;
         _disposed = true;
         _countdownTimer.Stop();
+        _choreographer?.Unregister(ChoreId);
         _calendar.Updated -= OnCalendarUpdated;
         _privacy.StateChanged -= OnPrivacyStateChanged;
         _hub.Complete(MeetingJoinActivityId);

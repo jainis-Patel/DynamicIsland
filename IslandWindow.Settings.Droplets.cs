@@ -132,24 +132,24 @@ public partial class IslandWindow
         }
 
         ApplyPin("shelf", ShelfButton, dp?.DockPinShelfBtn, dp?.DockPinShelfText);
-        ApplyPin("clipboard", ClipboardButton, dp?.DockPinClipBtn, dp?.DockPinClipText);
-        ApplyPin("calc", CalcButton, dp?.DockPinCalcBtn, dp?.DockPinCalcText);
-        ApplyPin("notes", NotesButton, dp?.DockPinNotesBtn, dp?.DockPinNotesText);
-        ApplyPin("converter", ConverterButton, dp?.DockPinConverterBtn, dp?.DockPinConverterText);
+        ApplyPin("clipboard", null, dp?.DockPinClipBtn, dp?.DockPinClipText);
+        ApplyPin("calc", null, dp?.DockPinCalcBtn, dp?.DockPinCalcText);
+        ApplyPin("notes", null, dp?.DockPinNotesBtn, dp?.DockPinNotesText);
+        ApplyPin("converter", null, dp?.DockPinConverterBtn, dp?.DockPinConverterText);
         ApplyPin("widgets", WidgetsGalleryButton, dp?.DockPinWidgetsBtn, dp?.DockPinWidgetsText);
         ApplyPin("launcher", LauncherButton, dp?.DockPinLauncherBtn, dp?.DockPinLauncherText);
-        ApplyPin("termi", TermiButton, dp?.DockPinTermiBtn, dp?.DockPinTermiText);
-        ApplyPin("phonebridge", PhoneBridgeButton, dp?.DockPinPhoneBridgeBtn, dp?.DockPinPhoneBridgeText);
-        ApplyPin("mechsounds", MechSoundsButton, dp?.DockPinMechSoundsBtn, dp?.DockPinMechSoundsText);
-        ApplyPin("capturestudio", CaptureStudioButton, dp?.DockPinCaptureStudioBtn, dp?.DockPinCaptureStudioText);
+        ApplyPin("termi", null, dp?.DockPinTermiBtn, dp?.DockPinTermiText);
+        ApplyPin("phonebridge", null, dp?.DockPinPhoneBridgeBtn, dp?.DockPinPhoneBridgeText);
+        ApplyPin("mechsounds", null, dp?.DockPinMechSoundsBtn, dp?.DockPinMechSoundsText);
+        ApplyPin("capturestudio", null, dp?.DockPinCaptureStudioBtn, dp?.DockPinCaptureStudioText);
         ApplyPin("audio", AudioButton, dp?.DockPinAudioBtn, dp?.DockPinAudioText);
-        ApplyPin("battery", BatteryButton, dp?.DockPinBatteryBtn, dp?.DockPinBatteryText);
-        ApplyPin("systemhud", SystemHudButton, dp?.DockPinHudBtn, dp?.DockPinHudText);
-        ApplyPin("voicememo", RecordButton, dp?.DockPinMemoBtn, dp?.DockPinMemoText);
-        ApplyPin("peripherals", PeripheralsButton, dp?.DockPinDevicesBtn, dp?.DockPinDevicesText);
-        ApplyPin("network", NetworkButton, dp?.DockPinWifiBtn, dp?.DockPinWifiText);
+        ApplyPin("battery", null, dp?.DockPinBatteryBtn, dp?.DockPinBatteryText);
+        ApplyPin("systemhud", null, dp?.DockPinHudBtn, dp?.DockPinHudText);
+        ApplyPin("voicememo", null, dp?.DockPinMemoBtn, dp?.DockPinMemoText);
+        ApplyPin("peripherals", null, dp?.DockPinDevicesBtn, dp?.DockPinDevicesText);
+        ApplyPin("network", null, dp?.DockPinWifiBtn, dp?.DockPinWifiText);
         ApplyPin("notifications", NotificationsButton, dp?.DockPinNotifBtn, dp?.DockPinNotifText);
-        ApplyPin("micmute", MicMuteButton, dp?.DockPinMicBtn, dp?.DockPinMicText);
+        ApplyPin("micmute", null, dp?.DockPinMicBtn, dp?.DockPinMicText);
 
         if (dp?.DockHeaderSummaryText != null)
         {

@@ -175,7 +175,14 @@ public partial class LauncherView : UserControl
             var apps = Island?.QuickLauncherServiceInstance?.Items;
             var clips = Island?.ClipboardService?.Items;
             var profiles = Island?.ContextProfiles?.GetAllProfiles();
-            _paletteResults = CommandPaletteEngine.Query(_searchQuery, apps, clips, profiles).ToList();
+            var audioEndpoints = Island?.AudioEndpointServiceInstance?.Endpoints;
+            IReadOnlyList<OpenWindowEntry>? openWindows = null;
+            if (_searchQuery.StartsWith("win:", StringComparison.OrdinalIgnoreCase) || _searchQuery.Length >= 2)
+            {
+                IntPtr selfHwnd = Island != null ? new System.Windows.Interop.WindowInteropHelper(Island).Handle : IntPtr.Zero;
+                openWindows = WindowSwitcherHelper.EnumerateVisibleWindows(selfHwnd);
+            }
+            _paletteResults = CommandPaletteEngine.Query(_searchQuery, apps, clips, profiles, 12, audioEndpoints, openWindows).ToList();
             _selectedPaletteIndex = 0;
 
             LauncherItemsControl.Visibility = Visibility.Collapsed;
@@ -229,6 +236,8 @@ public partial class LauncherView : UserControl
                     CommandResultKind.Setting => "SETTING",
                     CommandResultKind.App => "APP",
                     CommandResultKind.Clipboard => "CLIP",
+                    CommandResultKind.AudioEndpoint => "AUDIO",
+                    CommandResultKind.Window => "WINDOW",
                     _ => "CMD"
                 },
                 RowBackground = selected ? TabActiveBg : AppDefaultBg,
@@ -341,6 +350,24 @@ public partial class LauncherView : UserControl
                 break;
             case "export_hooks":
                 Island.ExportAiAgentHooksWithToast();
+                break;
+            case "export_diagnostics":
+                Island.ExportDiagnosticsWithToast();
+                break;
+            case "replay_onboarding":
+                Island.ReplayOnboardingWithToast();
+                break;
+            case "switch_audio":
+                if (!string.IsNullOrEmpty(item.Payload))
+                {
+                    Island.AudioEndpointServiceInstance?.SetDefaultEndpoint(item.Payload);
+                }
+                break;
+            case "focus_window":
+                if (long.TryParse(item.Payload, out long rawHwnd))
+                {
+                    WindowSwitcherHelper.FocusWindow(new IntPtr(rawHwnd));
+                }
                 break;
         }
     }

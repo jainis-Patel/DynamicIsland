@@ -144,7 +144,16 @@ public partial class IslandWindow
                         _settingsService.Update(s => s.ThemeStyle = style, nameof(AppSettings.ThemeStyle))),
                     GetIslandTheme = () => _settingsService.Current.IslandTheme,
                     SetIslandTheme = theme => Dispatcher.InvokeAsync(() =>
-                        _settingsService.Update(s => s.IslandTheme = theme, nameof(AppSettings.IslandTheme)))
+                        _settingsService.Update(s => s.IslandTheme = theme, nameof(AppSettings.IslandTheme))),
+                    OnCommandPalette = () => Dispatcher.InvokeAsync(() =>
+                    {
+                        SwitchExpandedView(ExpandedView.Launcher);
+                        LauncherContainer?.FocusSearch();
+                    }),
+                    OnExportDiagnostics = () => Dispatcher.InvokeAsync(ExportDiagnosticsWithToast),
+                    GetProfiles = () => _contextProfileService.GetAllProfiles(),
+                    GetActiveProfileId = () => _settingsService.Current.ActiveProfileId ?? "default",
+                    OnSelectProfile = id => Dispatcher.InvokeAsync(() => _contextProfileService.ApplyProfile(id))
                 });
 
             await _mediaService.InitializeAsync();

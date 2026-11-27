@@ -48,12 +48,6 @@ public partial class IslandWindow
             if (ClockCpuText != null) ClockCpuText.Text = cpuStr;
             if (ClockRamText != null) ClockRamText.Text = ramStr;
 
-            if (SystemHudBadgeText != null)
-            {
-                SystemHudBadgeText.Text = $"{snap.CpuPercent}%";
-                SystemHudBadgeText.Foreground = snap.CpuPercent >= 80 ? ThemeBrushes.Amber : ThemeBrushes.PrimaryText;
-            }
-
             // 2. High-Load Alert State (rendered in detached SecondaryDroplet instead of main bar)
             var alert = ActivityResolver.ResolveHighLoadAlert(snap.IsHighCpu, snap.CpuPercent, snap.IsHighRam, snap.RamPercent);
             bool alertStateChanged = alert.IsActive != _isHighLoadAlertActive;

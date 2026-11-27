@@ -95,6 +95,9 @@ internal sealed partial class LanQuickShareService
                     : !string.IsNullOrWhiteSpace(cookies.GetValueOrDefault("di_auth"))
                         ? cookies["di_auth"]
                         : queryParams.GetValueOrDefault("a", "");
+                string trustToken = headers.TryGetValue("X-DI-Session", out var headerTrust) && !string.IsNullOrWhiteSpace(headerTrust)
+                    ? headerTrust.Trim()
+                    : cookies.GetValueOrDefault("di_trust", "");
                 string userAgent = headers.GetValueOrDefault("User-Agent", "");
 
                 if (path is "/" or "/index.html")
@@ -114,7 +117,8 @@ internal sealed partial class LanQuickShareService
                             return;
                         }
 
-                        bool alreadyUnlocked = !string.IsNullOrWhiteSpace(authToken) && _authorizedClients.ContainsKey(authToken);
+                        bool alreadyUnlocked = (!string.IsNullOrWhiteSpace(authToken) && _authorizedClients.ContainsKey(authToken))
+                                               || ValidateTrustedDeviceToken(trustToken);
                         string safeToken = ConstantTimeTokenEquals(pairingToken, sessionSnapshot.Token) ? sessionSnapshot.Token : "";
                         string pwaHtml = GetEmbeddedPwaHtml(safeToken, requirePassword: !alreadyUnlocked, pcName: Environment.MachineName, passwordProtected: true);
                         await WriteResponseAsync(stream, 200, "OK", "text/html; charset=utf-8", pwaHtml, headerCts.Token);
@@ -264,6 +268,7 @@ internal sealed partial class LanQuickShareService
                         deviceLabel,
                         passwordProtected = true
                     });
+                    string trustedToken = IssueTrustedDeviceToken(TimeSpan.FromHours(24));
                     await WriteResponseAsync(
                         stream,
                         200,
@@ -271,7 +276,7 @@ internal sealed partial class LanQuickShareService
                         "application/json; charset=utf-8",
                         successJson,
                         headerCts.Token,
-                        $"Set-Cookie: di_auth={newAuthToken}; Path=/; HttpOnly; SameSite=Strict\r\n");
+                        $"Set-Cookie: di_auth={newAuthToken}; Path=/; HttpOnly; SameSite=Strict\r\nSet-Cookie: di_trust={trustedToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400\r\n");
                     return;
                 }
 

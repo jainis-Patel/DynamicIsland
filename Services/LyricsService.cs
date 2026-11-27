@@ -26,6 +26,8 @@ public sealed class TrackLyrics
     public string? PlainLyrics { get; init; }
     public IReadOnlyList<LrcLine> SyncedLines { get; init; } = Array.Empty<LrcLine>();
     public bool HasSyncedLyrics => SyncedLines.Count > 0;
+    public bool IsPlainLyricsOnly { get; init; }
+    public bool HasAnyLyrics => HasSyncedLyrics || !string.IsNullOrWhiteSpace(PlainLyrics);
 }
 
 /// <summary>
@@ -104,7 +106,9 @@ internal sealed class LyricsService : IDisposable
         string Title,
         string Artist,
         bool IsInstrumental,
-        List<CachedLineDto> Lines);
+        List<CachedLineDto> Lines,
+        bool IsPlainLyricsOnly = false,
+        string? PlainLyrics = null);
 
     private sealed record CachedLineDto(long Ticks, string Text);
 
@@ -282,6 +286,12 @@ internal sealed class LyricsService : IDisposable
     }
 
     public void Reset() => Clear();
+
+    internal void SetTrackForTest(TrackLyrics? track)
+    {
+        IsLoading = false;
+        SetCurrentTrack(track);
+    }
 
     public void Clear()
     {
@@ -540,6 +550,7 @@ internal sealed class LyricsService : IDisposable
         string? plain = el.TryGetProperty("plainLyrics", out var pl) && pl.ValueKind == JsonValueKind.String ? pl.GetString() : null;
 
         var parsedLines = ParseLrc(synced);
+        bool usedPlainSynthesis = false;
         if (parsedLines.Count == 0 && !string.IsNullOrWhiteSpace(plain))
         {
             TimeSpan effectiveDur = duration > TimeSpan.FromSeconds(15) ? duration : TimeSpan.FromMinutes(3.2);
@@ -548,6 +559,7 @@ internal sealed class LyricsService : IDisposable
                 effectiveDur = TimeSpan.FromSeconds(dSec);
             }
             parsedLines = SynthesizeLinesFromPlain(plain, effectiveDur);
+            usedPlainSynthesis = true;
         }
 
         return new TrackLyrics
@@ -556,7 +568,8 @@ internal sealed class LyricsService : IDisposable
             Artist = artist,
             IsInstrumental = instrumental,
             PlainLyrics = plain,
-            SyncedLines = parsedLines
+            SyncedLines = parsedLines,
+            IsPlainLyricsOnly = usedPlainSynthesis
         };
     }
 
@@ -596,6 +609,8 @@ internal sealed class LyricsService : IDisposable
                     Title = entry.Title,
                     Artist = entry.Artist,
                     IsInstrumental = entry.IsInstrumental,
+                    PlainLyrics = entry.PlainLyrics,
+                    IsPlainLyricsOnly = entry.IsPlainLyricsOnly,
                     SyncedLines = entry.Lines.Select(l => new LrcLine(TimeSpan.FromTicks(l.Ticks), l.Text)).ToList()
                 };
             }
@@ -613,7 +628,9 @@ internal sealed class LyricsService : IDisposable
                 kv.Value.Title,
                 kv.Value.Artist,
                 kv.Value.IsInstrumental,
-                kv.Value.SyncedLines.Select(l => new CachedLineDto(l.Timestamp.Ticks, l.Text)).ToList()))
+                kv.Value.SyncedLines.Select(l => new CachedLineDto(l.Timestamp.Ticks, l.Text)).ToList(),
+                kv.Value.IsPlainLyricsOnly,
+                kv.Value.PlainLyrics))
             .ToList();
     }
 
